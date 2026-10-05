@@ -25,7 +25,7 @@ async function launch() {
     timeout: 30000,
   });
   const page = await application.firstWindow();
-  await page.getByRole('heading', { name: 'Welcome to your Dock.' }).waitFor();
+  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
   return page;
 }
 async function waitPins(page, pins) {
@@ -64,7 +64,7 @@ async function waitPins(page, pins) {
     await page
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
       .press('Control+Alt+p');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: '重複' }).waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
@@ -75,7 +75,7 @@ async function waitPins(page, pins) {
     await page
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
       .press('Control+Alt+r');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByRole('status').filter({ hasText: '設定を保存' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
     await page.getByRole('button', { name: 'ホーム', exact: true }).first().click();
@@ -87,15 +87,18 @@ async function waitPins(page, pins) {
     await page.keyboard.press('Control+Alt+r');
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     // Assign and execute a real .NET command through the same shortcut settings.
-    await page.getByRole('button', { name: 'Appletを管理', exact: true }).click();
-    await page.getByRole('button', { name: '.NET Connection Demo C# / .NET 10' }).click();
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await page
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /.NET Connection Demo/ })
+      .click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.keyboard.press('Control+,');
     await page
       .getByLabel('.NET拡張の状態を更新のショートカット 1', { exact: true })
       .press('Control+Alt+d');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     const before = (await page.evaluate(() => window.dock.snapshot())).extensions
       .find((e) => e.id === 'appdock.dotnet-demo')
       .panel.facts.find((f) => f.label === 'Refresh').value;
@@ -119,7 +122,7 @@ async function waitPins(page, pins) {
     await page.getByLabel('ユーザー名').fill('ユキちゃん');
     await page.getByLabel('アバター画像を選択').setInputFiles(path.join(root, 'assets/icon.png'));
     await page.getByAltText('プロフィール画像').waitFor();
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.locator('.avatar img').waitFor();
     await page.waitForFunction(() => {
       const img = document.querySelector('.avatar img');
@@ -131,7 +134,7 @@ async function waitPins(page, pins) {
     );
     const firstHash = hash();
     await page.getByLabel('アバター画像を選択').setInputFiles(path.join(profile, 'pins.png'));
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByText('すべて保存されています', { exact: true }).waitFor();
     assert.notEqual(hash(), firstHash);
     const finalHash = hash();

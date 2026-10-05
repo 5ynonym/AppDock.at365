@@ -13,16 +13,19 @@ fs.mkdirSync(profile, { recursive: true });
   });
   try {
     const page = await application.firstWindow();
-    await page.getByRole('heading', { name: 'Welcome to your Dock.' }).waitFor();
-    await page.getByRole('button', { name: 'Appletを管理', exact: true }).click();
-    await page.getByRole('button', { name: '.NET Connection Demo C# / .NET 10' }).click();
+    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await page
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /.NET Connection Demo/ })
+      .click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.getByRole('button', { name: '状態を更新', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'dotnet.png') });
     await page.getByRole('button', { name: '設定', exact: true }).first().click();
     await page.getByLabel('テーマ', { exact: true }).selectOption('light');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
@@ -31,22 +34,25 @@ fs.mkdirSync(profile, { recursive: true });
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     const json = page.getByRole('textbox', { name: '設定JSON' });
     await json.fill('{broken json');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: 'JSONの形式' }).waitFor();
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
       'light',
     );
-    await page.getByRole('button', { name: '再読み込み', exact: true }).click();
+    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'settings-json.png') });
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('switch', { name: '閉じるとトレイに常駐' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'settings-general.png') });
-    await page.getByRole('button', { name: 'Applet設定', exact: true }).click();
+    await page
+      .locator('.settings-applet-list')
+      .getByRole('button', { name: '.NET Connection Demo', exact: true })
+      .click();
     await page.getByLabel('更新間隔（秒）').fill('10');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
         'appdock.dotnet-demo'

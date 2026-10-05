@@ -15,6 +15,7 @@
     "dist": "pnpm run build:dotnet && pnpm run build && electron-builder --win portable --x64",
     "smoke": "node scripts/smoke.cjs",
     "test:ui": "node scripts/ui-test.cjs",
+    "test:navigation": "node scripts/navigation-ui-test.cjs",
     "test:preferences": "node scripts/preferences-ui-test.cjs",
     "test:hotkeys": "node scripts/hotkeys-ui-test.cjs",
     "test:window-state": "node scripts/window-state-ui-test.cjs",
