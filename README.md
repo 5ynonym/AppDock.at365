@@ -119,6 +119,8 @@ GmailChecker、WallpaperSlideshow、Watchの時計以外の機能は移行して
 
 ## 配置
 
+`deploy.bat` はPowerShell 7（`pwsh.exe`）を使用します。
+
 `deploy.bat "配置先の既存フォルダ"` でEXEのみコピーします。引数省略時は `deploy.local.txt` の先頭行を使います。`deploy.local.txt.example` を参考にしてください。設定や追加拡張はコピーしません。配置先で実行中の場合は先に終了してください。既存EXEを置換する操作なので、配置はユーザーが必要な時に実行してください。
 
 ## 公式仕様
