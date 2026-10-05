@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><ProjectReference Include="../AppDock.SDK/AppDock.SDK.csproj" /></ItemGroup>
+</Project>

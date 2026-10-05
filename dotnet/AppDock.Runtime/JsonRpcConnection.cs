@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace AppDock.ExtensionHost;
+namespace AppDock.Runtime;
 
 internal sealed class JsonRpcConnection(TextReader input, TextWriter output) : IAsyncDisposable
 {

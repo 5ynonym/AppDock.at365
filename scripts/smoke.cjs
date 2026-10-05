@@ -5,9 +5,21 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, 'artifacts', `smoke-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const portable = !!process.argv[2];
+const clockApplet = process.argv[3] ? path.resolve(process.argv[3]) : null;
+if (clockApplet) {
+  const folder = path.join(profile, 'extensions', 'Applet.Watch.at365');
+  fs.mkdirSync(folder, { recursive: true });
+  for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
+    fs.copyFileSync(path.join(clockApplet, name), path.join(folder, name));
+  const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
+  const value = createDefaultSettings();
+  value.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
+  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(value));
+}
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executable);
 const args = portable ? ['--smoke-test'] : [root, '--smoke-test', `--smoke-dir=${profile}`];
+if (clockApplet) args.push('--smoke-clock');
 const child = spawn(executable, args, {
   cwd: root,
   windowsHide: true,

@@ -25,6 +25,8 @@ public interface ISettingsService
 {
     T Get<T>(string key, T fallback);
     Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default);
+    IDisposable OnChanged(Func<CancellationToken, Task> handler);
+    Task SetOptionsAsync(string key, IReadOnlyList<SettingOption> options, CancellationToken cancellationToken = default);
 }
 public interface INotificationService { Task ShowAsync(string title, string body, CancellationToken cancellationToken = default); }
 public interface IUiService { Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default); }
@@ -53,3 +55,4 @@ public interface ISchedulerService
 public sealed record Panel(string Title, string? Description = null, IReadOnlyList<PanelFact>? Facts = null, IReadOnlyList<PanelAction>? Actions = null);
 public sealed record PanelFact(string Label, string Value);
 public sealed record PanelAction(string Title, string Command);
+public sealed record SettingOption(string Label, string Value);

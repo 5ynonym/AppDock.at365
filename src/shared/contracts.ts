@@ -32,10 +32,18 @@ export interface TrayItem {
 export interface SettingDefinition {
   key: string;
   title: string;
-  type: 'boolean' | 'number' | 'string';
+  type: 'boolean' | 'number' | 'string' | 'select';
+  description?: string;
   default?: unknown;
   minimum?: number;
   maximum?: number;
+  step?: number;
+  options?: SettingOption[];
+  dynamic?: boolean;
+}
+export interface SettingOption {
+  label: string;
+  value: string;
 }
 export interface Panel {
   title: string;
@@ -49,7 +57,7 @@ export interface ExtensionManifest {
   name: string;
   version: string;
   description?: string;
-  runtime: 'node' | 'dotnet';
+  runtime: 'node' | 'dotnet' | 'native';
   entry: string;
   type?: string;
   capabilities?: string[];
@@ -63,6 +71,7 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   commands: Command[];
   tray: TrayItem[];
   panel: Panel | null;
+  settingOptions: Record<string, SettingOption[]>;
 }
 export interface LogEntry {
   time: string;

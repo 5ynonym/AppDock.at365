@@ -9,6 +9,7 @@ import type {
 } from '../shared/contracts';
 import './style.css';
 import { parseSettings } from '../shared/settings-schema';
+import { validateAppletSettings } from '../shared/setting-definitions';
 import {
   hostCommands,
   rankCommands,
@@ -156,7 +157,7 @@ function Brand({ small = false }: { small?: boolean }) {
 }
 const labels: Record<Page, string> = {
   home: 'ホーム',
-  extensions: '拡張機能',
+  extensions: 'Applet',
   settings: '設定',
   logs: 'ログ',
 };
@@ -289,7 +290,7 @@ function App() {
     ]
       .filter((id) => !commandIds.has(id))
       .map((id) => ({
-        ...(knownCommands.current.get(id) ?? { id, title: id, extension: '拡張コマンド' }),
+        ...(knownCommands.current.get(id) ?? { id, title: id, extension: 'Appletコマンド' }),
         available: false,
       })),
   ];
@@ -419,7 +420,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-section">YOUR EXTENSIONS</div>
+        <div className="sidebar-section">YOUR APPLETS</div>
         <div className="sidebar-extensions">
           {snapshot?.extensions.map((e) => (
             <button
@@ -476,7 +477,7 @@ function App() {
                   </div>
                   <button className="secondary" onClick={() => setPage('extensions')}>
                     <Icon name="extensions" size={16} />
-                    拡張機能を管理
+                    Appletを管理
                   </button>
                 </div>
                 <div className="hero">
@@ -491,7 +492,7 @@ function App() {
                       できることを増やそう。
                     </h2>
                     <p>
-                      拡張をつないで、あなたのDockを育てていく。
+                      Appletをつないで、あなたのDockを育てていく。
                       <br />
                       設定もコマンドも、この場所から。
                     </p>
@@ -526,7 +527,7 @@ function App() {
                       <Icon name="play" />
                     </span>
                     <div>
-                      <span>実行中の拡張</span>
+                      <span>実行中のApplet</span>
                       <strong>
                         {active}
                         <small> / {snapshot.extensions.length}</small>
@@ -559,7 +560,7 @@ function App() {
                 </div>
                 <div className="section-heading">
                   <h3>
-                    Your extensions<span>{snapshot.extensions.length}</span>
+                    Your Applets<span>{snapshot.extensions.length}</span>
                   </h3>
                   <button className="text-button" onClick={() => setPage('extensions')}>
                     すべて見る
@@ -608,7 +609,7 @@ function App() {
             {page === 'extensions' && (
               <>
                 <PageHeading
-                  title="拡張機能"
+                  title="Applet"
                   subtitle="必要な道具をつないで、Dockをあなたらしく。"
                   action={
                     <button
@@ -616,7 +617,7 @@ function App() {
                       onClick={() => void action(() => window.dock.openPath('extensions'))}
                     >
                       <Icon name="folder" size={16} />
-                      拡張フォルダを開く
+                      Appletフォルダを開く
                     </button>
                   }
                 />
@@ -652,7 +653,7 @@ function App() {
                 <div className="migration-note">
                   <span>これから載せる道具</span>
                   <p>
-                    GmailChecker・Watch・WallpaperSlideshowの移行先として使えるホストです。現在は接続を確認するサンプル拡張を搭載しています。
+                    Watchの時計はApplet.Watch.at365として利用できます。GmailChecker・WallpaperSlideshowや、Watchのほかの機能も、個別のAppletとして追加していけます。
                   </p>
                 </div>
               </>
@@ -675,7 +676,7 @@ function App() {
       <footer className="statusbar">
         <span>
           <i />
-          {active} extensions running
+          {active} Applets running
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
@@ -811,7 +812,7 @@ function ExtensionDetail({
   if (!e)
     return (
       <section className="detail empty">
-        拡張フォルダにextension.jsonを配置してAppDockを起動し直してください。
+        Appletフォルダにextension.jsonを配置してAppDockを起動し直してください。
       </section>
     );
   return (
@@ -841,7 +842,7 @@ function ExtensionDetail({
           className="text-button"
           disabled={busy || !e.enabled}
           onClick={() =>
-            void run(() => window.dock.restartExtension(e.id), '拡張を再起動しました。')
+            void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
           }
         >
           <Icon name="refresh" size={14} />
@@ -851,7 +852,7 @@ function ExtensionDetail({
       {e.error && <div className="error-text">{e.error}</div>}
       {e.panel ? (
         <div className="extension-panel">
-          <div className="eyebrow">EXTENSION VIEW</div>
+          <div className="eyebrow">APPLET VIEW</div>
           <h3>{e.panel.title}</h3>
           <p>{e.panel.description}</p>
           <dl>
@@ -880,8 +881,8 @@ function ExtensionDetail({
       ) : (
         <div className="inactive-panel">
           <Icon name="extensions" size={28} />
-          <h3>この拡張をDockにつなぐ</h3>
-          <p>有効にすると、拡張の画面とコマンドを使えます。</p>
+          <h3>このAppletをDockにつなぐ</h3>
+          <p>有効にすると、Appletの画面とコマンドを使えます。</p>
         </div>
       )}
       <div className="detail-meta">
@@ -954,6 +955,7 @@ function SettingsPage({
     let value: Settings;
     try {
       value = parseSettings(mode === 'json' ? JSON.parse(text) : draft);
+      validateAppletSettings(value, extensions);
       setParseError('');
     } catch (e) {
       setParseError(
@@ -1063,7 +1065,7 @@ function SettingsPage({
               [
                 ['appearance', '表示', 'sun'],
                 ['general', '一般', 'settings'],
-                ['extensions', '拡張設定', 'extensions'],
+                ['extensions', 'Applet設定', 'extensions'],
                 ['shortcuts', 'ショートカット', 'command'],
                 ['profile', 'プロフィール', 'home'],
               ] as const
@@ -1132,9 +1134,9 @@ function SettingsPage({
                     [
                       'closeToTray',
                       '閉じるとトレイに常駐',
-                      'ウィンドウを閉じた後も拡張を動かします。',
+                      'ウィンドウを閉じた後もAppletを動かします。',
                     ],
-                    ['notifications', 'デスクトップ通知', '拡張からの通知を表示します。'],
+                    ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
                     [
                       'startMinimized',
                       'トレイから起動',
@@ -1172,15 +1174,36 @@ function SettingsPage({
                           },
                         });
                       return (
-                        <SettingRow key={s.key} title={s.title} description={s.key}>
+                        <SettingRow key={s.key} title={s.title} description={s.description ?? ''}>
                           {s.type === 'boolean' ? (
                             <Toggle checked={Boolean(value)} label={s.title} onChange={set} />
+                          ) : s.type === 'select' ? (
+                            <select
+                              aria-label={s.title}
+                              value={String(value ?? '')}
+                              onChange={(ev) => set(ev.target.value)}
+                            >
+                              {!(e.settingOptions[s.key] ?? s.options ?? []).some(
+                                (o) => o.value === value,
+                              ) &&
+                                value !== undefined && (
+                                  <option value={String(value)}>
+                                    保存された選択（現在利用できません）: {String(value)}
+                                  </option>
+                                )}
+                              {(e.settingOptions[s.key] ?? s.options ?? []).map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
                           ) : (
                             <input
                               aria-label={s.title}
                               type={s.type === 'number' ? 'number' : 'text'}
                               min={s.minimum}
                               max={s.maximum}
+                              step={s.step ?? 'any'}
                               value={String(value ?? '')}
                               onChange={(ev) =>
                                 set(s.type === 'number' ? Number(ev.target.value) : ev.target.value)
@@ -1233,7 +1256,7 @@ function LogsPage({ snapshot, run }: { snapshot: HostSnapshot; run: Run }) {
     <>
       <PageHeading
         title="ログ"
-        subtitle="ホストと拡張の動作を、ここから確認。"
+        subtitle="ホストとAppletの動作を、ここから確認。"
         action={
           <button
             className="secondary"

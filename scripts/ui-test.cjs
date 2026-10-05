@@ -14,7 +14,7 @@ fs.mkdirSync(profile, { recursive: true });
   try {
     const page = await application.firstWindow();
     await page.getByRole('heading', { name: 'Welcome to your Dock.' }).waitFor();
-    await page.getByRole('button', { name: '拡張機能を管理', exact: true }).click();
+    await page.getByRole('button', { name: 'Appletを管理', exact: true }).click();
     await page.getByRole('button', { name: '.NET Connection Demo C# / .NET 10' }).click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
@@ -44,7 +44,7 @@ fs.mkdirSync(profile, { recursive: true });
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('switch', { name: '閉じるとトレイに常駐' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'settings-general.png') });
-    await page.getByRole('button', { name: '拡張設定', exact: true }).click();
+    await page.getByRole('button', { name: 'Applet設定', exact: true }).click();
     await page.getByLabel('更新間隔（秒）').fill('10');
     await page.getByRole('button', { name: '保存', exact: true }).click();
     assert.equal(
@@ -72,9 +72,9 @@ fs.mkdirSync(profile, { recursive: true });
     await page.getByText(/設定ファイルを読み込めません。最後の有効/).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), '{broken');
     fs.writeFileSync(settingsFile, JSON.stringify(config, null, 2));
-    await page.getByRole('button', { name: '拡張機能', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Applet', exact: true }).first().click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
-    await page.getByRole('heading', { name: 'この拡張をDockにつなぐ' }).waitFor();
+    await page.getByRole('heading', { name: 'このAppletをDockにつなぐ' }).waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).extensions.find(
         (e) => e.id === 'appdock.dotnet-demo',

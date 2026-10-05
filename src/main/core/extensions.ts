@@ -4,12 +4,14 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
+import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
   Command,
   TrayItem,
   Panel,
+  SettingOption,
 } from '../../shared/contracts';
 function contained(root: string, entry: string) {
   const resolved = fs.realpathSync(path.resolve(root, entry));
@@ -28,7 +30,7 @@ function readManifest(folder: string): LoadedManifest {
     !m.name ||
     m.name.length > 100 ||
     typeof m.version !== 'string' ||
-    !['node', 'dotnet'].includes(m.runtime) ||
+    !['node', 'dotnet', 'native'].includes(m.runtime) ||
     typeof m.entry !== 'string'
   )
     throw new Error('拡張マニフェストの形式が正しくありません。');
@@ -39,19 +41,12 @@ function readManifest(folder: string): LoadedManifest {
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))
   )
     throw new Error('capabilities の形式が正しくありません。');
-  if (
-    m.settings !== undefined &&
-    (!Array.isArray(m.settings) ||
-      m.settings.some(
-        (s: any) =>
-          !isObject(s) ||
-          typeof s.key !== 'string' ||
-          !/^[a-zA-Z0-9._-]+$/.test(s.key) ||
-          !['boolean', 'number', 'string'].includes(s.type),
-      ))
-  )
-    throw new Error('settings の形式が正しくありません。');
-  return { ...m, folder, entryPath: contained(folder, m.entry) } as LoadedManifest;
+  return {
+    ...m,
+    settings: parseSettingDefinitions(m.settings),
+    folder,
+    entryPath: contained(folder, m.entry),
+  } as LoadedManifest;
 }
 type LoadedManifest = ExtensionManifest & { folder: string; entryPath: string };
 export interface ExtensionInstance {
@@ -60,6 +55,7 @@ export interface ExtensionInstance {
   commands: Command[];
   tray: TrayItem[];
   panel: Panel | null;
+  settingOptions: Record<string, SettingOption[]>;
   error: string | null;
   child?: ChildProcessWithoutNullStreams | null;
   peer?: JsonLinePeer | null;
@@ -128,6 +124,7 @@ class ExtensionManager extends EventEmitter {
             commands: [],
             tray: [],
             panel: null,
+            settingOptions: {},
             error: null,
           });
         } catch (e: any) {
@@ -146,6 +143,7 @@ class ExtensionManager extends EventEmitter {
       commands: e.commands,
       tray: e.tray,
       panel: e.panel,
+      settingOptions: e.settingOptions,
     }));
   }
   reconcile() {
@@ -188,7 +186,13 @@ class ExtensionManager extends EventEmitter {
           env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
           stdio: ['pipe', 'pipe', 'pipe'],
         });
-      else {
+      else if (m.runtime === 'native') {
+        child = spawn(m.entryPath, [], {
+          cwd: m.folder,
+          windowsHide: true,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } else {
         const exe = path.join(this.dotnetHost, 'AppDock.ExtensionHost.exe');
         if (!fs.existsSync(exe))
           throw new Error('.NETホストがありません。pnpm run build:dotnet を実行してください。');

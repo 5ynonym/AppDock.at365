@@ -1,6 +1,6 @@
 # AppDock.at365
 
-自作の常駐ツールを拡張として集める、Windows x64向けのElectronホストです。ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.jsの拡張をそれぞれ別プロセスで実行します。
+自作の常駐ツールを**Applet**として集める、Windows x64向けのElectronホストです。ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.js、ネイティブ表示を持つ専用EXEのAppletをそれぞれ別プロセスで実行します。設定JSONやAPIの `extensions` は互換性のため名前を維持しています。
 
 ## 起動
 
@@ -8,15 +8,15 @@
 
 初回起動でEXEの隣に `settings.json` が作成されます。「設定」からフォームとJSONの両方で編集できます。ウィンドウの×は既定でトレイへ格納します。完全終了はトレイメニューの「終了」です。この動作は設定で変更できます。
 
-- **ホーム**: 拡張の状態とコマンド数。
-- **拡張機能**: 有効・無効、再起動、拡張が提供する画面と操作。
-- **設定**: メイン画面内のカテゴリ式編集画面。テーマ（Dark / Light / System）、常駐動作、通知、拡張の設定、ショートカット、プロフィール。
+- **ホーム**: Appletの状態とコマンド数。
+- **Applet**: 有効・無効、再起動、Appletが提供する画面と操作。
+- **設定**: メイン画面内のカテゴリ式編集画面。テーマ（Dark / Light / System）、常駐動作、通知、Applet設定、ショートカット、プロフィール。選択式設定と、動的なモニター一覧にも対応。
 - **ログ**: 直近500件、検索、レベルでの絞り込み。ファイルログは1MBで1世代ローテーション。
 - **コマンドパレット**: 既定は `Ctrl+P` / `Ctrl+Shift+P`。`Ctrl+,` で設定を開きます。☆でピン留め、↑／↓でピンの順番を変更できます。ピンと順番は操作時に保存します。
 
-最初はTypeScript製のWelcome拡張だけが有効です。.NET Connection Demoを有効にすると、C# DLLからの画面表示、定期実行、コマンド、通知、トレイ登録を確認できます。
+最初はTypeScript製のWelcome Appletだけが有効です。.NET Connection Demoを有効にすると、C# DLLからの画面表示、定期実行、コマンド、通知、トレイ登録を確認できます。
 
-「設定 → ショートカット」で、ホストと拡張が登録したコマンドにキーを割り当てられます。欄を選んでキーを押し、「保存」で確定します。Ctrl / Altとの組み合わせ、F1〜F24に対応し、1つのコマンドに5個まで登録できます。Backspace / Deleteまたは×で解除します。同じキーの重複割り当ては保存時に拒否します。ショートカットはAppDockの画面を操作している間に有効です。無効になった拡張のキー設定とピンの順番も保持します。
+「設定 → ショートカット」で、ホストとAppletが登録したコマンドにキーを割り当てられます。欄を選んでキーを押し、「保存」で確定します。Ctrl / Altとの組み合わせ、F1〜F24に対応し、1つのコマンドに5個まで登録できます。Backspace / Deleteまたは×で解除します。同じキーの重複割り当ては保存時に拒否します。ショートカットはAppDockの画面を操作している間に有効です。無効になったAppletのキー設定とピンの順番も保持します。
 
 「設定 → プロフィール」でユーザー名とアバターを変更できます。左下のアバターからも開けます。PNG / JPEG（5MB以下）を選択して「保存」すると、設定ファイルの隣に `avatar.png` を保存します。長辺256px以内のPNGに変換し、次の画像を保存すると同じファイルを上書きします。元画像や過去の画像は残しません。「画像を削除」を保存するとファイルも削除します。
 
@@ -70,7 +70,8 @@ src/main/                  Electron本体・IPC・拡張管理・Node拡張ラ�
 src/renderer/              React UI
 src/shared/                UI/ホスト間の型と設定検証
 dotnet/AppDock.SDK/        .NET拡張向けインターフェース
-dotnet/AppDock.ExtensionHost/  DLLを読み込むプロセス・JSON-RPC・SDK実装
+dotnet/AppDock.Runtime/     .NET共通のJSON-RPC・SDK実装・セッション
+dotnet/AppDock.ExtensionHost/  DLLを読み込むプロセス
 dotnet/AppDock.Extensions.Demo/  C#拡張サンプル
 extensions/welcome/        TypeScript拡張サンプル
 extensions/dotnet-demo/    C#サンプルのmanifestと発行DLL
@@ -80,15 +81,19 @@ scripts/                   ビルドと実機UI/portable検証
 
 テストは専用の一時フォルダ／`artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
 
-## 拡張を書く
+## Appletを書く
 
-[拡張APIとプロトコル](docs/extensions.md) を参照してください。外部拡張はEXEの隣の `extensions\<拡張フォルダ>\extension.json` と実装ファイルで構成します。追加・削除後はホストを起動し直してください。新規拡張は既定で無効です。同梱拡張と同じIDは同梱側を優先し、重複をログに記録します。
+[Applet実装ガイド](docs/applet-development.md)に実行方式の選択、最小C#実装、設定・コマンド・終了処理、時計で得た注意点と検証手順をまとめています。[AppDock実装ガイド](docs/host-development.md)は、必要なAPI・設定・React UIをホストへ足す際の変更先と注意点です。個々のAPIと通信は[Applet API](docs/extensions.md)を参照してください。
+
+外部AppletはEXEの隣の `extensions\<Appletフォルダ>\extension.json` と実装ファイルで構成します。追加・削除後はホストを起動し直してください。新規Appletは既定で無効です。同梱Appletと同じIDは同梱側を優先し、重複をログに記録します。
 
 ローカルの信頼できる拡張を対象にしています。拡張はユーザー権限で動く.NET/Nodeコードです。別プロセス化は障害の分離であり、OSの権限制限ではありません。manifestのcapabilitiesはHost APIの使用宣言・検査であり、拡張の直接のファイル操作やネットワーク通信を制限する仕組みではありません。React画面はNodeを公開せず、画面に渡せる拡張UIはテキスト・状態・コマンドに限定しています。
 
 ## 既存3アプリの移行
 
-現在は**ホストと接続サンプルまで**です。GmailChecker、Watch、WallpaperSlideshow本体の移行は行っていません。既存アプリのソースや設定も変更していません。
+**Watchの時計をApplet.Watch.at365として実装しました。** 隣の `../Applet.Watch.at365` で作成し、その `publish/Applet.Watch.at365` をEXEの隣の `extensions` に置くと使えます。「Applet」で有効にし、「設定 → Applet設定」で表示・モニター・位置・余白・文字サイズ・不透明度などを設定します。表示／非表示コマンドにも対応します。
+
+GmailChecker、WallpaperSlideshow、Watchの時計以外の機能は移行していません。既存アプリのソースや設定も変更していません。
 
 [移行メモ](docs/migration.md) に現行コードを確認した分割案をまとめました。既存EXEを単に起動する方式ではなく、CoreロジックをSDK対応DLLに移し、設定・通知・トレイ等をホストに集約する方針です。Watchのオーバーレイと壁紙のWorkerWのようなWindows固有の表示は、ネイティブ表示処理を残す必要があります。
 
