@@ -33,7 +33,7 @@ export interface TrayItem {
 export interface SettingDefinition {
   key: string;
   title: string;
-  type: 'boolean' | 'number' | 'string' | 'select';
+  type: 'boolean' | 'number' | 'string' | 'select' | 'shortcut-list';
   description?: string;
   default?: unknown;
   minimum?: number;

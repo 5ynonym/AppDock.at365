@@ -1,5 +1,15 @@
 # Applet API v1
 
+## v0.4.0: 動的コマンドとキー送信の一覧設定
+
+`dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大100件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
+
+.NETの`CommandRegistration`はID・タイトル・実行ハンドラーの3項目です。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。
+
+設定定義の `type: "shortcut-list"` は `{ id, title, keys }` の配列を扱い、追加・削除UIを提供します。IDは小文字英数字とハイフン（先頭英数字、40文字以内）、名前は100文字以内、最大32件。既定値は `[]` です。キーは `Ctrl+Shift+T` や `Win+E` などの1組の組み合わせで、フォーム保存／Host API保存時に検証します。設定型はキーを送信せず、実行はApplet側の責任です。
+
+実装例: [WindowsTools](../../Applet.WindowsTools.at365/README.md)。この型と動的APIを使用するAppletにはv0.4.0以降が必要です。既存API v1のAppletは引き続き使用できます。
+
 画面上では拡張機能をAppletと呼びます。`extension.json`、`extensions`、`IAppDockExtension` などの既存API名は互換性を維持します。
 
 新規実装の手順は[Applet実装ガイド](applet-development.md)、API・設定・UI等をホストへ足す手順は[AppDock実装ガイド](host-development.md)を参照してください。

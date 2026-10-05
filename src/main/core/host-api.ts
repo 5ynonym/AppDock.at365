@@ -6,11 +6,13 @@ import type { SettingsStore } from './settings';
 import { atomicWrite, isObject } from './settings';
 import type { Panel } from '../../shared/contracts';
 import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
+import { parseExtensionCommands } from '../../shared/extension-commands';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
   log: (level: string, source: string, message: string) => void,
   changed: () => void,
+  commandsChanged: () => void = changed,
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -32,6 +34,14 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.commands.replace': {
+        requireCapability('dynamic-commands');
+        const commands = parseExtensionCommands(id, p.commands);
+        e.commands = commands;
+        e.tray = e.tray.filter((item) => commands.some((command) => command.id === item.command));
+        commandsChanged();
+        return null;
+      }
       case 'host.log':
         log(
           ['info', 'warn', 'error'].includes(p.level) ? p.level : 'info',
