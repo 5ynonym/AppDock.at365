@@ -22,6 +22,8 @@ import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
+import { hostCommands, shortcutFromEvent } from '../shared/commands';
+import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import type { HostSnapshot, Settings } from '../shared/contracts';
 
 protocol.registerSchemesAsPrivileged([
@@ -51,6 +53,8 @@ let tray: Tray | null = null;
 let settings: SettingsStore;
 let manager: ExtensionManager;
 let log: HostLog;
+let hotKeys: GlobalHotKeyManager | undefined;
+let shortcutRecording = false;
 let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
@@ -101,6 +105,7 @@ function trayMenu() {
 }
 function snapshot(): HostSnapshot {
   return {
+    globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
     extensions: manager.snapshot(),
     logs: log.entries,
@@ -117,6 +122,17 @@ function applySettings() {
   nativeTheme.themeSource = settings.value.host.theme;
   changed();
 }
+function syncHotKeys(retry = false) {
+  if (quitting || !hotKeys) return Promise.resolve();
+  const available = [
+    ...hostCommands.map((command) => command.id),
+    ...manager
+      .snapshot()
+      .filter((extension) => extension.enabled && extension.state === 'running')
+      .flatMap((extension) => extension.commands.map((command) => command.id)),
+  ];
+  return hotKeys.sync(settings.value, available, shortcutRecording, retry);
+}
 function registerIpc() {
   const handle = (channel: string, callback: (...args: any[]) => unknown) =>
     ipcMain.handle(channel, (event, ...args) => {
@@ -130,6 +146,12 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
+  handle('dock:setShortcutRecording', async (recording: boolean) => {
+    if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
+    shortcutRecording = recording && !!window?.isFocused();
+    await syncHotKeys();
+  });
   handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) => {
     const next = parseSettings(value);
     validateAppletSettings(next, manager.snapshot());
@@ -207,12 +229,37 @@ async function initialize() {
     api: createHostApi(settings, dataDirectory, log.write, changed),
     log: log.write,
   });
+  const hotKeyHost = app.isPackaged
+    ? path.join(process.resourcesPath, 'dotnet-host', 'AppDock.ExtensionHost.exe')
+    : path.join(app.getAppPath(), 'artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
+  hotKeys = new GlobalHotKeyManager(
+    new WindowsHotKeyBackend(
+      hotKeyHost,
+      (shortcut) => {
+        void hotKeys?.pressed(shortcut);
+      },
+      (error) => hotKeys?.failed(error),
+    ),
+    async (id) => {
+      if (shortcutRecording || quitting) return;
+      if (hostCommands.some((command) => command.id === id)) {
+        showWindow();
+        window?.webContents.send('dock:hostCommand', id);
+      } else {
+        await manager.execute(id);
+      }
+    },
+    changed,
+    (message) => log.write('error', 'hotkeys', message),
+  );
   manager.on('changed', () => {
     trayMenu();
+    void syncHotKeys();
     changed();
   });
   settings.on('changed', () => {
     applySettings();
+    void syncHotKeys(true);
     void manager.reconcile();
   });
   settings.watch((e) =>
@@ -278,6 +325,27 @@ async function initialize() {
   window.webContents.on('render-process-gone', (_, details) =>
     log.write('error', 'renderer', details.reason),
   );
+  const resumeHotKeys = () => {
+    shortcutRecording = false;
+    void syncHotKeys();
+  };
+  window.on('blur', resumeHotKeys);
+  window.webContents.on('render-process-gone', resumeHotKeys);
+  window.webContents.on('did-start-loading', resumeHotKeys);
+  window.webContents.on('before-input-event', (event, input) => {
+    if (shortcutRecording) return;
+    const shortcut = shortcutFromEvent({
+      key: input.key,
+      code: input.code,
+      ctrlKey: input.control,
+      altKey: input.alt,
+      shiftKey: input.shift,
+      metaKey: input.meta,
+      isComposing: input.isComposing,
+    });
+    if (hotKeys?.statuses.some((status) => status.registered && status.shortcut === shortcut))
+      event.preventDefault();
+  });
   registerIpc();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
   tray = new Tray(icon.resize({ width: 20, height: 20 }));
@@ -288,6 +356,7 @@ async function initialize() {
   await window.loadURL('appdock://host/index.html');
   manager.discover();
   await manager.reconcile();
+  await syncHotKeys();
   log.write('info', 'host', 'AppDockを起動しました。');
   if (smoke) await runSmoke();
   else if (!settings.value.host.startMinimized) showWindow();
@@ -407,7 +476,10 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (shutdownStarted) return;
   shutdownStarted = true;
-  void manager.shutdown().finally(() => {
+  void (async () => {
+    await hotKeys?.close();
+    await manager.shutdown();
+  })().finally(() => {
     settings.close();
     tray?.destroy();
     shutdownFinished = true;

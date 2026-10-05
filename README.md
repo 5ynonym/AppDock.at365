@@ -16,7 +16,9 @@
 
 最初はTypeScript製のWelcome Appletだけが有効です。.NET Connection Demoを有効にすると、C# DLLからの画面表示、定期実行、コマンド、通知、トレイ登録を確認できます。
 
-「設定 → ショートカット」で、ホストとAppletが登録したコマンドにキーを割り当てられます。欄を選んでキーを押し、「保存」で確定します。Ctrl / Altとの組み合わせ、F1〜F24に対応し、1つのコマンドに5個まで登録できます。Backspace / Deleteまたは×で解除します。同じキーの重複割り当ては保存時に拒否します。ショートカットはAppDockの画面を操作している間に有効です。無効になったAppletのキー設定とピンの順番も保持します。
+「設定 → ショートカット」で、ホストとAppletが登録したコマンドにキーを割り当てられます。欄を選んでキーを押し、「保存」で確定します。Ctrl / Alt / Shiftとの組み合わせと、Pause・F1〜F24・文字キーなどの単独キーに対応し、1つのコマンドに5個まで登録できます。×で解除、Escapeで入力終了、Tabで次の欄へ移動します。同じキーの重複割り当ては保存時に拒否します。通常はAppDock操作中に有効で、修飾なしのキーはテキスト入力中に実行しません。
+
+コマンドの「グローバル」を有効にして保存すると、ほかのアプリを操作中やトレイ格納中にも使えます。`at365.watch.toggle` の既定キーは **Pause**、既定でグローバルです。Appletが実行中のときだけWindowsに登録し、停止・キー変更・解除・AppDock終了時に登録を解放します。キー入力欄を選択中は一時解除します。ほかのアプリとの競合などで登録できないキーは、設定画面とログに理由を表示します。元のWatchがPauseを登録している場合は、元Watchを終了するか割り当てを変えてください。既存の明示的なキー設定・解除状態は保持し、未設定のコマンドに既定値を補います。
 
 「設定 → プロフィール」でユーザー名とアバターを変更できます。左下のアバターからも開けます。PNG / JPEG（5MB以下）を選択して「保存」すると、設定ファイルの隣に `avatar.png` を保存します。長辺256px以内のPNGに変換し、次の画像を保存すると同じファイルを上書きします。元画像や過去の画像は残しません。「画像を削除」を保存するとファイルも削除します。
 
@@ -41,25 +43,39 @@ electron-builderの**portable**形式です。配布するアプリ本体はEXE�
 
 JSONはUTF-8の標準JSONです。コメントを含むJSONCには対応していません。保存は一時ファイルから置換します。手動編集は起動中にも反映されます。壊れたJSONは上書きせず、起動中は最後の有効な設定を維持してログに記録します。起動時に壊れていた場合は、場所とエラーを表示して終了します。編集中に他の場所で設定が変更された場合は、古い内容による上書きを拒否します。
 
-0.1.0の設定ファイルもそのまま読み込めます。新しい項目は既定値で補われ、次の保存で書き込まれます。`shortcuts` はコマンドIDとキー文字列の配列、`pinnedCommands` は表示順のコマンドID配列、`profile` は `name` と `avatar`（`"avatar.png"` または `null`）です。[設定例](settings.example.json) を参照してください。
+0.1.0の設定ファイルもそのまま読み込めます。新しい項目は既定値で補われ、次の保存で書き込まれます。`shortcuts` はコマンドIDとキー文字列の配列、`globalShortcutCommands` はグローバルに登録するコマンドID配列（`[]` で全解除）、`pinnedCommands` は表示順のコマンドID配列、`profile` は `name` と `avatar`（`"avatar.png"` または `null`）です。[設定例](settings.example.json) を参照してください。
 
 ## 開発
 
-Windows、Node.js 24以降、pnpm 11、.NET 10 SDKが必要です。依存バージョンは `pnpm-lock.yaml` で固定しています。
+Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
+
+初回は次の手順で準備します。公式Node.js ZIPのSHA256を照合し、npmでpnpmをプロジェクト内にインストールします。
 
 ```powershell
-pnpm install --frozen-lockfile
-pnpm run build:dotnet
-pnpm start
-
-pnpm run typecheck
-pnpm test
-node scripts/ui-test.cjs
-pnpm run test:preferences
-pnpm run smoke
-pnpm run dist
-node scripts/smoke.cjs publish/AppDock.at365.exe
+.\setup-tools.bat
+.\dev.bat install --frozen-lockfile
+.\publish.bat
 ```
+
+次回からの発行は `.\publish.bat` です。`dev.bat` はローカルのNode.jsとpnpmを、そのコマンドの実行中だけPATHへ追加します。開発コマンドもこの入口から実行できます。
+
+```powershell
+.\dev.bat run build:dotnet
+.\dev.bat start
+
+.\dev.bat run typecheck
+.\dev.bat test
+.\dev.bat run test:ui
+.\dev.bat run test:preferences
+.\dev.bat run test:hotkeys
+.\dev.bat run smoke
+.\dev.bat run dist
+.\dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe
+```
+
+Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号を変更してから `.\setup-tools.bat` を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは `.tools/node/<version>` と `.tools/pnpm/<version>` に残すので、設定を戻してsetupを実行すると切り戻せます。winget等の更新対象にはなりません。更新後は `.\dev.bat run typecheck`、`.\dev.bat test`、`.\publish.bat` で確認してください。
+
+`.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
 `pnpm run dist` は.NETホストのself-contained発行、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`AppDock.at365.slnx` はSDK・.NETホスト・C#サンプル用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 

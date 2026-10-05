@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  retryGlobalHotKeys: () => ipcRenderer.invoke('dock:retryGlobalHotKeys'),
+  setShortcutRecording: (recording) => ipcRenderer.invoke('dock:setShortcutRecording', recording),
+  onHostCommand: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, id: string) => callback(id);
+    ipcRenderer.on('dock:hostCommand', handler);
+    return () => ipcRenderer.removeListener('dock:hostCommand', handler);
+  },
   snapshot: () => ipcRenderer.invoke('dock:snapshot'),
   saveSettings: (value, revision, avatar) =>
     ipcRenderer.invoke('dock:saveSettings', value, revision, avatar),

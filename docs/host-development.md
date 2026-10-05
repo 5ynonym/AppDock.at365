@@ -1,6 +1,6 @@
 # AppletのためにAppDockへ機能を追加する
 
-AppDock v0.3.0の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
+AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
 
 ## まず変更範囲を決める
 
@@ -65,6 +65,10 @@ AppDock v0.3.0の実装を基準に、どの層へ変更を入れるかと検証
 この変更で時計固有のウィンドウ、DeviceName、DPI、位置計算をAppDock mainへ持ち込んでいません。動的な選択肢の意味や代替先はAppletが決めます。別の画面付きAppletもnative接続と共通の設定フォームを利用できます。
 
 ## 検証と成果物を更新する
+
+Node.jsとpnpmのグローバルインストールは不要です。プロジェクトの `setup-tools.bat` で `.tools` に準備し、下記のpnpmコマンドは `dev.bat` 経由で実行できます。直接のNodeコマンドは `dev.bat exec node ...` を使います。バージョンは `toolchain.json` で指定します。
+
+グローバルホットキーは `src/main/core/global-hotkeys.ts` が設定とAppletの稼働状態に追従し、同梱.NETホストの `--hotkeys` モードがWindowsのRegisterHotKey / WM_HOTKEYを扱います。PauseはElectronのaccelerator対象外のため、Windows登録に統一しています。キー記録中は一時解除し、設定画面に登録結果・競合理由・再試行ボタンを表示します。`pnpm run test:hotkeys` で専用profileの時計Appletを使い、Windows入力、競合、再割り当て、停止と終了時の解除を確認します。先に元WatchなどのPause登録を解除してください。
 
 変更に合う検証だけを選び、通ったものと未検証事項を記録します。
 

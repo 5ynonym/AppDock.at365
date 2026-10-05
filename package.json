@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "A personal Electron dock for Node.js and .NET extensions",
   "author": "at365",
@@ -16,6 +16,7 @@
     "smoke": "node scripts/smoke.cjs",
     "test:ui": "node scripts/ui-test.cjs",
     "test:preferences": "node scripts/preferences-ui-test.cjs",
+    "test:hotkeys": "node scripts/hotkeys-ui-test.cjs",
     "format": "prettier --write src extensions scripts tests"
   },
   "devDependencies": {

@@ -6,6 +6,7 @@ import type {
   ExtensionSnapshot,
   Settings,
   SettingsSnapshot,
+  GlobalHotKeyStatus,
 } from '../shared/contracts';
 import './style.css';
 import { parseSettings } from '../shared/settings-schema';
@@ -15,6 +16,8 @@ import {
   rankCommands,
   movePinnedCommand,
   shortcutFromEvent,
+  defaultShortcuts,
+  defaultGlobalShortcutCommands,
   type UiCommand,
 } from '../shared/commands';
 import { ShortcutsEditor } from './ShortcutsEditor';
@@ -223,6 +226,11 @@ function App() {
     return window.dock.onChanged(() => void load());
   }, []);
   useEffect(() => {
+    return window.dock.onHostCommand((id) => {
+      void execute(id);
+    });
+  }, []);
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
         e.defaultPrevented ||
@@ -232,6 +240,17 @@ function App() {
       )
         return;
       const shortcut = shortcutFromEvent(e);
+      if (
+        snapshot?.globalHotKeys.some((status) => status.registered && status.shortcut === shortcut)
+      )
+        return;
+      if (
+        !e.ctrlKey &&
+        !e.altKey &&
+        e.target instanceof Element &&
+        e.target.closest('input, textarea, select, [contenteditable="true"]')
+      )
+        return;
       const commandId =
         shortcut &&
         Object.entries(snapshot?.settings.value.shortcuts ?? {}).find(([, values]) =>
@@ -667,6 +686,7 @@ function App() {
                 commands={shortcutCommands}
                 avatarUrl={snapshot.avatarUrl}
                 profileRequest={profileRequest}
+                globalHotKeys={snapshot.globalHotKeys}
               />
             </div>
             {page === 'logs' && <LogsPage snapshot={snapshot} run={action} />}
@@ -906,6 +926,7 @@ function SettingsPage({
   commands,
   avatarUrl,
   profileRequest,
+  globalHotKeys,
 }: {
   snapshot: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
@@ -914,6 +935,7 @@ function SettingsPage({
   commands: UiCommand[];
   avatarUrl: string | null;
   profileRequest: number;
+  globalHotKeys: GlobalHotKeyStatus[];
 }) {
   const [draft, setDraft] = useState<Settings>(snapshot.value);
   const [text, setText] = useState(JSON.stringify(snapshot.value, null, 2));
@@ -1086,6 +1108,20 @@ function SettingsPage({
                 commands={commands}
                 bindings={draft.shortcuts}
                 onChange={(shortcuts) => edit({ ...draft, shortcuts })}
+                globalCommands={draft.globalShortcutCommands}
+                onGlobalChange={(globalShortcutCommands) =>
+                  edit({ ...draft, globalShortcutCommands })
+                }
+                statuses={globalHotKeys}
+                onRestore={(id) =>
+                  edit({
+                    ...draft,
+                    shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
+                    globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
+                      ? [...new Set([...draft.globalShortcutCommands, id])]
+                      : draft.globalShortcutCommands.filter((command) => command !== id),
+                  })
+                }
               />
             )}
             {category === 'profile' && (

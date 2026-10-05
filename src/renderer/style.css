@@ -1559,6 +1559,15 @@ main {
   overflow-wrap: anywhere;
   margin-top: 5px;
 }
+.shortcut-global {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.shortcut-global input {
+  accent-color: var(--accent);
+}
 .shortcut-bindings {
   display: flex;
   flex-direction: column;

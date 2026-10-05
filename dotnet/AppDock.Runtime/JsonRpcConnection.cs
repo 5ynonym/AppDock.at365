@@ -13,6 +13,8 @@ internal sealed class JsonRpcConnection(TextReader input, TextWriter output) : I
     private long handlerSequence;
     private readonly CancellationTokenSource lifetime = new();
     public CancellationToken Lifetime => lifetime.Token;
+    internal Task NotifyAsync(string method, object parameters) =>
+        SendAsync(new { jsonrpc = "2.0", method, @params = parameters }, lifetime.Token);
 
     public async Task<JsonElement> RequestAsync(string method, object? parameters, CancellationToken token)
     {

@@ -1,5 +1,10 @@
 import type { Settings } from './contracts';
-import { defaultShortcuts, parseShortcuts, validCommandId } from './commands';
+import {
+  defaultShortcuts,
+  defaultGlobalShortcutCommands,
+  parseShortcuts,
+  validCommandId,
+} from './commands';
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
@@ -10,6 +15,7 @@ export const createDefaultSettings = (): Settings => ({
     'appdock.dotnet-demo': { enabled: false, settings: { intervalSeconds: 30 } },
   },
   shortcuts: structuredClone(defaultShortcuts),
+  globalShortcutCommands: [...defaultGlobalShortcutCommands],
   pinnedCommands: [],
   profile: { name: 'ユキ', avatar: null },
 });
@@ -39,6 +45,17 @@ export function parseSettings(value: unknown): Settings {
       throw new Error(`拡張設定 ${id} の形式が正しくありません。`);
   }
   const shortcuts = parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
+  const globalShortcutCommands =
+    value.globalShortcutCommands === undefined
+      ? [...defaultGlobalShortcutCommands]
+      : value.globalShortcutCommands;
+  if (
+    !Array.isArray(globalShortcutCommands) ||
+    globalShortcutCommands.length > 500 ||
+    globalShortcutCommands.some((id) => !validCommandId(id)) ||
+    new Set(globalShortcutCommands).size !== globalShortcutCommands.length
+  )
+    throw new Error('globalShortcutCommands は重複のないコマンドIDの配列です。');
   const pinnedCommands = value.pinnedCommands === undefined ? [] : value.pinnedCommands;
   if (
     !Array.isArray(pinnedCommands) ||
@@ -59,6 +76,7 @@ export function parseSettings(value: unknown): Settings {
   const next = {
     ...value,
     shortcuts,
+    globalShortcutCommands,
     pinnedCommands,
     profile: { ...profile, name: profile.name.trim() },
   };

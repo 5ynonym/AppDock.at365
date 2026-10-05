@@ -9,6 +9,11 @@ Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = new UTF8Encoding(false);
 var wireOutput = Console.Out;
 Console.SetOut(Console.Error); // Extension Console.WriteLine cannot corrupt the protocol.
+if (args is ["--hotkeys"])
+{
+    await WindowsHotKeySession.RunAsync(Console.In, wireOutput);
+    return 0;
+}
 if (args.Length != 2) { Console.Error.WriteLine("Usage: AppDock.ExtensionHost <assembly.dll> <type>"); return 2; }
 try
 {
