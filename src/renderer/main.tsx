@@ -23,6 +23,7 @@ import {
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { ProfileEditor } from './ProfileEditor';
 import { AppletSettings } from './AppletSettings';
+import { useAppletSidebar } from './useAppletSidebar';
 declare global {
   interface Window {
     dock: DockApi;
@@ -206,6 +207,7 @@ function Toggle({
   );
 }
 function App() {
+  const appletSidebar = useAppletSidebar();
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
   const [page, setPage] = useState<Page>('home');
   const [selected, setSelected] = useState('');
@@ -368,7 +370,10 @@ function App() {
     snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   return (
-    <div className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}>
+    <div
+      className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}
+      style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
+    >
       <header className="titlebar">
         <div className="title-brand">
           <Brand small />
@@ -472,8 +477,7 @@ function App() {
                   aria-current={selectedApplet?.id === e.id ? 'true' : undefined}
                   className={selectedApplet?.id === e.id ? 'selected' : ''}
                 >
-                  <i className={`extension-dot ${e.state}`} />
-                  <span>{e.name}</span>
+                  <span title={e.name}>{e.name}</span>
                   <small>{states[e.state]}</small>
                 </button>
               ))}
@@ -482,6 +486,7 @@ function App() {
                 (e.name + ' ' + e.id).toLowerCase().includes(appletFilter.toLowerCase()),
               ) && <p className="empty">該当するAppletはありません。</p>}
           </div>
+          <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
       )}
       <main>

@@ -1,0 +1,126 @@
+const { _electron: electron } = require('playwright');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const root = path.resolve(__dirname, '..');
+const profile = path.join(root, 'artifacts', `applet-sidebar-${Date.now()}`);
+const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+settings.host.notifications = false;
+settings.globalShortcutCommands = [];
+for (const [index, name] of [
+  'Applet.Watch',
+  'Applet.WindowsMover',
+  'Applet.WindowsTools',
+].entries()) {
+  const folder = path.join(profile, 'extensions', `test.sidebar-${index}`);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(
+    path.join(folder, 'extension.json'),
+    JSON.stringify({
+      apiVersion: 1,
+      id: `test.sidebar-${index}`,
+      name,
+      version: '1.0.0',
+      runtime: 'node',
+      entry: 'index.js',
+      capabilities: [],
+    }),
+  );
+  fs.writeFileSync(path.join(folder, 'index.js'), 'exports.activate = async () => {};');
+}
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+const env = { ...process.env };
+delete env.ELECTRON_RUN_AS_NODE;
+async function launch() {
+  const app = await electron.launch({
+    executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+    args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
+    env,
+  });
+  const page = await app.firstWindow();
+  page.setDefaultTimeout(12000);
+  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Applet', exact: true }).click();
+  await page.locator('.sidebar-extensions button').first().waitFor();
+  return { app, page };
+}
+(async () => {
+  let { app, page } = await launch();
+  const width = () => page.locator('.sidebar').evaluate((el) => el.getBoundingClientRect().width);
+  try {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    assert.equal(await width(), 280);
+    assert.equal(await page.locator('.sidebar-extensions i').count(), 0);
+    const starts = await page.locator('.sidebar-extensions button > span').evaluateAll((items) =>
+      items.map((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return { x: range.getBoundingClientRect().x, align: getComputedStyle(el).textAlign };
+      }),
+    );
+    assert.equal(starts.length, 3);
+    assert(starts.every((item) => item.x === starts[0].x && item.align === 'left'));
+    const separator = page.getByRole('separator', { name: 'Applet一覧の幅を変更' });
+    const bounds = await separator.boundingBox();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width / 2 + 60, bounds.y + 60, { steps: 8 });
+    await page.mouse.up();
+    assert.equal(await width(), 340);
+    await separator.focus();
+    await separator.press('ArrowRight');
+    assert.equal(await width(), 350);
+    await separator.press('Home');
+    assert.equal(await width(), 220);
+    await separator.press('End');
+    const viewport = await page.evaluate(() => innerWidth);
+    assert(Math.abs((await width()) - Math.min(480, viewport * 0.4)) < 1);
+    await separator.press('Home');
+    for (let i = 0; i < 13; i++) await separator.press('ArrowRight');
+    assert.equal(await width(), 350);
+    for (const size of [
+      { width: 1280, height: 840 },
+      { width: 900, height: 620 },
+    ]) {
+      await page.setViewportSize(size);
+      assert.equal(await width(), 350);
+      assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+      await page.screenshot({ path: path.join(profile, `sidebar-${size.width}.png`) });
+    }
+    await page.setViewportSize({ width: 700, height: 620 });
+    assert.equal(await separator.isVisible(), false);
+    assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+    await page.setViewportSize({ width: 1280, height: 840 });
+    assert.equal(await width(), 350);
+    assert.deepEqual(errors, []);
+    await app.close();
+    ({ app, page } = await launch());
+    assert.equal(await width(), 350, 'width survives an Electron restart');
+    await page.evaluate(() => localStorage.setItem('appdock.applet-sidebar-width', 'broken'));
+    await page.reload();
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    assert.equal(await width(), 280, 'invalid saved width falls back to default');
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          profile,
+          checks: [
+            'left alignment / no dots',
+            'drag / keyboard / bounds',
+            '900px / 1280px / narrow layout',
+            'restart persistence / invalid storage',
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await app.close();
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

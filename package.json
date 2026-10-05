@@ -20,6 +20,7 @@
     "test:preferences": "pnpm run build:test-extensions && node scripts/preferences-ui-test.cjs",
     "test:hotkeys": "pnpm run build:test-extensions && node scripts/hotkeys-ui-test.cjs",
     "test:window-state": "node scripts/window-state-ui-test.cjs",
+    "test:applet-sidebar": "node scripts/applet-sidebar-ui-test.cjs",
     "format": "prettier --write --ignore-path .gitignore src scripts tests"
   },
   "devDependencies": {
