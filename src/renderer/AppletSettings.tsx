@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../shared/contracts';
+import { ShortcutListSetting } from './ShortcutListSetting';
 
 /** The host draft stays above this component, so filtering never discards edits. */
 export function AppletSettings({
@@ -54,7 +55,9 @@ export function AppletSettings({
               <strong>{item.title}</strong>
               <p id={descriptionId}>{item.description}</p>
             </div>
-            {item.type === 'boolean' ? (
+            {item.type === 'shortcut-list' ? (
+              <ShortcutListSetting title={item.title} value={value} onChange={set} />
+            ) : item.type === 'boolean' ? (
               <button
                 className="toggle"
                 role="switch"

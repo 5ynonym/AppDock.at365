@@ -8,7 +8,8 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
     IUiService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
+    private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
+    private readonly SemaphoreSlim commandUpdates = new(1, 1);
     private readonly List<object> tray = [];
     private readonly List<ScheduledTask> schedules = [];
     private readonly SemaphoreSlim commandLock = new(1, 1);
@@ -33,6 +34,27 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
         if (!commands.TryAdd(commandId, (title, handler))) throw new ArgumentException("Duplicate command ID.");
     }
     public void Add(string title, string command) => tray.Add(new { title, command });
+    public async Task ReplaceAsync(IReadOnlyList<CommandRegistration> registrations, CancellationToken cancellationToken = default)
+    {
+        if (registrations.Count > 100) throw new ArgumentException("At most 100 commands are allowed.");
+        var next = new ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)>();
+        foreach (var command in registrations)
+        {
+            if (!command.Id.StartsWith(id + ".", StringComparison.Ordinal) || command.Id.Length > 200
+                || string.IsNullOrWhiteSpace(command.Title) || command.Title.Length > 200 || command.Handler is null
+                || !next.TryAdd(command.Id, (command.Title, command.Handler)))
+                throw new ArgumentException("Invalid or duplicate command registration.");
+        }
+        await commandUpdates.WaitAsync(cancellationToken);
+        var previous = commands;
+        try
+        {
+            commands = next;
+            await CallAsync("host.commands.replace", new { commands = next.Select(c => new { id = c.Key, title = c.Value.Title }).ToArray() }, cancellationToken);
+        }
+        catch { commands = previous; throw; }
+        finally { commandUpdates.Release(); }
+    }
     public async Task ChangeSettingsAsync(JsonElement value)
     {
         await commandLock.WaitAsync(lifetime);
@@ -92,9 +114,13 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private async Task CallAsync(string method, object value, CancellationToken token) => _ = await connection.RequestAsync(method, value, token);
     public async Task ExecuteAsync(string commandId)
     {
-        if (!commands.TryGetValue(commandId, out var command)) throw new ArgumentException("Unknown command.");
         await commandLock.WaitAsync(lifetime);
-        try { await command.Handler(lifetime); } finally { commandLock.Release(); }
+        try
+        {
+            if (!commands.TryGetValue(commandId, out var command)) throw new ArgumentException("Unknown command.");
+            await command.Handler(lifetime);
+        }
+        finally { commandLock.Release(); }
     }
     public IDisposable Every(TimeSpan interval, Func<CancellationToken, Task> callback)
     {
