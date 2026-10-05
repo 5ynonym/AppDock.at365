@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
+import { parseExtensionCommands } from '../../shared/extension-commands';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -242,7 +243,7 @@ class ExtensionManager extends EventEmitter {
         )
       )
         throw new Error('コマンド登録の形式が正しくありません。');
-      e.commands = result.commands;
+      e.commands = parseExtensionCommands(m.id, result.commands);
       e.tray = Array.isArray(result.tray)
         ? result.tray.filter(
             (t: any) =>

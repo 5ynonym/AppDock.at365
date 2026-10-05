@@ -235,7 +235,7 @@ async function initialize() {
     dotnetHost: app.isPackaged
       ? path.join(process.resourcesPath, 'dotnet-host')
       : path.join(app.getAppPath(), 'artifacts', 'dotnet-host'),
-    api: createHostApi(settings, dataDirectory, log.write, changed),
+    api: createHostApi(settings, dataDirectory, log.write, changed, () => manager.emit('changed')),
     log: log.write,
   });
   const hotKeyHost = app.isPackaged
