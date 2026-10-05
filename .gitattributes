@@ -1,0 +1,4 @@
+* text=auto
+*.bat text eol=crlf
+*.cjs text eol=lf
+*.cs text eol=lf

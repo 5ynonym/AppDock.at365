@@ -1,0 +1,406 @@
+import {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  ipcMain,
+  dialog,
+  nativeTheme,
+  session,
+  shell,
+  protocol,
+  net,
+} from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { SettingsStore } from './core/settings';
+import { ExtensionManager } from './core/extensions';
+import { HostLog } from './core/log';
+import { createHostApi } from './core/host-api';
+import { saveUserSettings } from './core/profile';
+import type { HostSnapshot, Settings } from '../shared/contracts';
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'appdock', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
+const smoke = process.argv.includes('--smoke-test');
+const smokeDirectory = process.argv
+  .find((a) => a.startsWith('--smoke-dir='))
+  ?.slice('--smoke-dir='.length);
+const testDirectory = process.argv
+  .find((a) => a.startsWith('--test-profile='))
+  ?.slice('--test-profile='.length);
+const baseDirectory = testDirectory
+  ? path.resolve(testDirectory)
+  : smoke && smokeDirectory
+    ? path.resolve(smokeDirectory)
+    : app.isPackaged
+      ? process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe'))
+      : app.getAppPath();
+const dataDirectory = path.join(baseDirectory, '.appdock');
+fs.mkdirSync(dataDirectory, { recursive: true });
+app.setPath('userData', path.join(dataDirectory, 'chromium'));
+app.setAppUserModelId('at365.appdock');
+const locked = app.requestSingleInstanceLock({ baseDirectory });
+let window: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let settings: SettingsStore;
+let manager: ExtensionManager;
+let log: HostLog;
+let quitting = false;
+let shutdownFinished = false;
+let shutdownStarted = false;
+let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+const changed = () => {
+  if (notifyTimer) return;
+  notifyTimer = setTimeout(() => {
+    notifyTimer = undefined;
+    if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
+  }, 60);
+};
+function showWindow() {
+  if (window) {
+    window.show();
+    window.focus();
+  }
+}
+function trayMenu() {
+  if (!tray || !manager) return;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'AppDockを開く', click: showWindow },
+      { type: 'separator' },
+      ...manager
+        .snapshot()
+        .filter((e) => e.state === 'running' && e.tray.length)
+        .map((e) => ({
+          label: e.name,
+          submenu: e.tray.map((item) => ({
+            label: item.title,
+            click: () => {
+              void manager
+                .execute(item.command)
+                .catch((err) => log.write('error', e.id, err.message));
+            },
+          })),
+        })),
+      { type: 'separator' },
+      {
+        label: '終了',
+        click: () => {
+          quitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+}
+function snapshot(): HostSnapshot {
+  return {
+    settings: settings.snapshot(),
+    extensions: manager.snapshot(),
+    logs: log.entries,
+    version: app.getVersion(),
+    dataDirectory,
+    dark: nativeTheme.shouldUseDarkColors,
+    avatarUrl:
+      settings.value.profile.avatar && fs.existsSync(path.join(baseDirectory, 'avatar.png'))
+        ? `appdock://host/avatar.png?v=${fs.statSync(path.join(baseDirectory, 'avatar.png')).mtimeMs}`
+        : null,
+  };
+}
+function applySettings() {
+  nativeTheme.themeSource = settings.value.host.theme;
+  changed();
+}
+function registerIpc() {
+  const handle = (channel: string, callback: (...args: any[]) => unknown) =>
+    ipcMain.handle(channel, (event, ...args) => {
+      if (
+        !window ||
+        event.sender !== window.webContents ||
+        event.senderFrame !== window.webContents.mainFrame ||
+        event.senderFrame?.url !== 'appdock://host/index.html'
+      )
+        throw new Error('許可されていない画面からの要求です。');
+      return callback(...args);
+    });
+  handle('dock:snapshot', snapshot);
+  handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) =>
+    saveUserSettings(settings, baseDirectory, value, revision, avatar),
+  );
+  handle('dock:setPinnedCommands', (ids: string[]) =>
+    settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
+  );
+  handle('dock:toggleExtension', async (id: string, enabled: boolean) => {
+    if (!manager.items.has(id) || typeof enabled !== 'boolean')
+      throw new Error('拡張が見つかりません。');
+    settings.updateExtension(id, { enabled });
+    await manager.reconcile();
+  });
+  handle('dock:restartExtension', (id: string) => manager.restart(id));
+  handle('dock:executeCommand', (id: string) => manager.execute(id));
+  handle('dock:openPath', async (kind: string) => {
+    const target = (
+      {
+        settings: settings.file,
+        extensions: path.join(baseDirectory, 'extensions'),
+        logs: log.directory,
+      } as Record<string, string>
+    )[kind];
+    if (!target) throw new Error('保存先が見つかりません。');
+    const error = await shell.openPath(target);
+    if (error) throw new Error(error);
+  });
+  handle('dock:windowAction', (action: string) => {
+    switch (action) {
+      case 'minimize':
+        window?.minimize();
+        break;
+      case 'maximize':
+        window?.isMaximized() ? window.unmaximize() : window?.maximize();
+        break;
+      case 'close':
+        window?.close();
+        break;
+      case 'quit':
+        quitting = true;
+        app.quit();
+        break;
+      default:
+        throw new Error('未対応のウィンドウ操作です。');
+    }
+  });
+}
+async function initialize() {
+  settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
+  try {
+    settings.load();
+  } catch (e) {
+    dialog.showErrorBox(
+      'AppDock — 設定を読み込めません',
+      `${e instanceof Error ? e.message : e}\n\n${settings.file}\n元のファイルは保持しています。JSONを修正して起動し直してください。`,
+    );
+    app.quit();
+    return;
+  }
+  log = new HostLog(path.join(dataDirectory, 'logs'), changed);
+  const builtins = app.isPackaged
+    ? path.join(process.resourcesPath, 'extensions')
+    : path.join(app.getAppPath(), 'extensions');
+  const external = path.join(baseDirectory, 'extensions');
+  fs.mkdirSync(external, { recursive: true });
+  manager = new ExtensionManager({
+    roots: builtins === external ? [builtins] : [builtins, external],
+    settings,
+    nodeExecutable: process.execPath,
+    nodeWorker: path.join(__dirname, 'node-worker.js'),
+    dotnetHost: app.isPackaged
+      ? path.join(process.resourcesPath, 'dotnet-host')
+      : path.join(app.getAppPath(), 'artifacts', 'dotnet-host'),
+    api: createHostApi(settings, dataDirectory, log.write, changed),
+    log: log.write,
+  });
+  manager.on('changed', () => {
+    trayMenu();
+    changed();
+  });
+  settings.on('changed', () => {
+    applySettings();
+    void manager.reconcile();
+  });
+  settings.watch((e) =>
+    log.write(
+      'error',
+      'settings',
+      `設定ファイルを読み込めません。最後の有効な設定を継続します。${e.message}`,
+    ),
+  );
+  applySettings();
+  nativeTheme.on('updated', changed);
+  const renderer = path.resolve(__dirname, '../../renderer');
+  protocol.handle('appdock', (request) => {
+    const url = new URL(request.url);
+    if (url.host === 'host' && url.pathname === '/avatar.png') {
+      const file = path.join(baseDirectory, 'avatar.png');
+      if (!settings.value.profile.avatar || !fs.existsSync(file))
+        return new Response('Not found', { status: 404 });
+      return net.fetch(pathToFileURL(file).href);
+    }
+    const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+    const file = path.resolve(renderer, relative || 'index.html');
+    if (
+      url.host !== 'host' ||
+      path.relative(renderer, file).startsWith('..') ||
+      !fs.existsSync(file)
+    )
+      return new Response('Not found', { status: 404 });
+    return net.fetch(pathToFileURL(file).href);
+  });
+  session.defaultSession.setPermissionRequestHandler((_, __, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  Menu.setApplicationMenu(null);
+  window = new BrowserWindow({
+    width: 1280,
+    height: 840,
+    minWidth: 900,
+    minHeight: 620,
+    title: 'AppDock.at365',
+    backgroundColor: '#101116',
+    show: false,
+    frame: false,
+    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webviewTag: false,
+    },
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event) => event.preventDefault());
+  window.on('close', (event) => {
+    if (!quitting && settings.value.host.closeToTray && tray) {
+      event.preventDefault();
+      window?.hide();
+    } else {
+      quitting = true;
+      app.quit();
+    }
+  });
+  window.webContents.on('render-process-gone', (_, details) =>
+    log.write('error', 'renderer', details.reason),
+  );
+  registerIpc();
+  const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
+  tray = new Tray(icon.resize({ width: 20, height: 20 }));
+  tray.setToolTip('AppDock.at365');
+  tray.on('double-click', showWindow);
+  tray.on('click', showWindow);
+  trayMenu();
+  await window.loadURL('appdock://host/index.html');
+  manager.discover();
+  await manager.reconcile();
+  log.write('info', 'host', 'AppDockを起動しました。');
+  if (smoke) await runSmoke();
+  else if (!settings.value.host.startMinimized) showWindow();
+}
+async function runSmoke() {
+  try {
+    const title = await window!.webContents.executeJavaScript('document.title');
+    if (title !== 'AppDock.at365') throw new Error('Renderer did not load');
+    const running = manager.snapshot().find((e) => e.id === 'appdock.welcome');
+    if (running?.state !== 'running')
+      throw new Error(running?.error || 'Node extension did not activate');
+    await manager.execute('appdock.welcome.refresh');
+    settings.updateExtension('appdock.dotnet-demo', { enabled: true });
+    await manager.reconcile();
+    const dotnet = manager.snapshot().find((e) => e.id === 'appdock.dotnet-demo');
+    if (dotnet?.state !== 'running')
+      throw new Error(dotnet?.error || '.NET extension did not activate');
+    await manager.execute('appdock.dotnet-demo.refresh');
+    await manager.execute('appdock.welcome.verify-storage');
+    await manager.execute('appdock.dotnet-demo.verify-storage');
+    await new Promise((r) => setTimeout(r, 400));
+    const avatarBytes = nativeImage
+      .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
+      .resize({ width: 64, height: 64 })
+      .toPNG();
+    const result = await window!.webContents.executeJavaScript(`(async () => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings({...s.settings.value, host: {...s.settings.value.host, theme: 'light'}}, s.settings.revision);
+      const avatar = new Uint8Array(${JSON.stringify([...avatarBytes])});
+      const current = await window.dock.snapshot();
+      await window.dock.saveSettings({...current.settings.value, profile: {name: 'Portable test', avatar: 'avatar.png'}}, current.settings.revision, avatar);
+      await window.dock.setPinnedCommands(['appdock.welcome.refresh', 'appdock.dotnet-demo.refresh']);
+      const saved = await window.dock.snapshot();
+      const image = new Image();
+      const avatarLoaded = await new Promise(resolve => {
+        image.onload = () => resolve(image.naturalWidth > 0);
+        image.onerror = () => resolve(false);
+        image.src = saved.avatarUrl;
+      });
+      return {bridge: !!window.dock, nodeExposed: typeof window.require !== 'undefined', rows: document.querySelectorAll('button').length,
+        profile: saved.settings.value.profile, pins: saved.settings.value.pinnedCommands,
+        paletteKeys: saved.settings.value.shortcuts['appdock.commands.search'], avatarLoaded};
+    })()`);
+    if (result.nodeExposed || !result.bridge || result.rows < 5)
+      throw new Error('Preload / React check failed');
+    if (
+      !result.avatarLoaded ||
+      result.profile.avatar !== 'avatar.png' ||
+      result.paletteKeys[0] !== 'Ctrl+P' ||
+      result.pins.length !== 2
+    )
+      throw new Error('Portable preferences / avatar check failed');
+    await new Promise((r) => setTimeout(r, 250));
+    fs.mkdirSync(path.join(baseDirectory, 'screenshots'), { recursive: true });
+    fs.writeFileSync(
+      path.join(baseDirectory, 'screenshots', 'light.png'),
+      (await window!.webContents.capturePage()).toPNG(),
+    );
+    settings.save(
+      { ...settings.value, host: { ...settings.value.host, theme: 'dark' } },
+      settings.revision,
+    );
+    await new Promise((r) => setTimeout(r, 250));
+    fs.writeFileSync(
+      path.join(baseDirectory, 'screenshots', 'dark.png'),
+      (await window!.webContents.capturePage()).toPNG(),
+    );
+    fs.writeFileSync(
+      path.join(baseDirectory, 'smoke-result.json'),
+      JSON.stringify(
+        {
+          ok: true,
+          result,
+          extensions: manager
+            .snapshot()
+            .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
+          settingsPath: settings.file,
+          avatarPath: path.join(baseDirectory, 'avatar.png'),
+        },
+        null,
+        2,
+      ),
+    );
+  } catch (e) {
+    fs.writeFileSync(
+      path.join(baseDirectory, 'smoke-result.json'),
+      JSON.stringify({ ok: false, error: e instanceof Error ? e.stack : String(e) }),
+    );
+    process.exitCode = 1;
+  }
+  quitting = true;
+  app.quit();
+}
+app.on('second-instance', () => showWindow());
+app.on('before-quit', (event) => {
+  quitting = true;
+  if (shutdownFinished || !manager) return;
+  event.preventDefault();
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  void manager.shutdown().finally(() => {
+    settings.close();
+    tray?.destroy();
+    shutdownFinished = true;
+    app.quit();
+  });
+});
+app.on('window-all-closed', () => {
+  if (!tray || quitting) app.quit();
+});
+if (!locked) app.quit();
+else
+  void app
+    .whenReady()
+    .then(initialize)
+    .catch((e) => {
+      dialog.showErrorBox('AppDock', String(e));
+      quitting = true;
+      app.quit();
+    });

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>AppDock.ExtensionHost</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../AppDock.SDK/AppDock.SDK.csproj" /></ItemGroup>
+</Project>

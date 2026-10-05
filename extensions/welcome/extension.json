@@ -1,0 +1,7 @@
+{
+  "apiVersion": 1, "id": "appdock.welcome", "name": "Welcome to your Dock",
+  "version": "0.1.0", "runtime": "node", "entry": "index.js",
+  "description": "ホストAPIの動作を確認できる、TypeScript製の小さな拡張です。",
+  "capabilities": ["ui", "notifications", "settings", "storage", "secrets"],
+  "settings": [{ "key": "greeting", "title": "ウェルカムメッセージ", "type": "string", "default": "自分の道具を、ひとつの場所に。" }]
+}

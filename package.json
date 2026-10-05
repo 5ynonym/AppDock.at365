@@ -1,0 +1,78 @@
+{
+  "name": "appdock-at365",
+  "version": "0.2.0",
+  "private": true,
+  "description": "A personal Electron dock for Node.js and .NET extensions",
+  "author": "at365",
+  "license": "UNLICENSED",
+  "main": "out/main/main/index.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.extensions.json && node scripts/build-node-extensions.cjs && vite build",
+    "start": "pnpm run build && electron .",
+    "test": "pnpm run build && node --test tests/*.test.cjs",
+    "build:dotnet": "node scripts/build-dotnet.cjs",
+    "dist": "pnpm run build:dotnet && pnpm run build && electron-builder --win portable --x64",
+    "smoke": "node scripts/smoke.cjs",
+    "test:ui": "node scripts/ui-test.cjs",
+    "test:preferences": "node scripts/preferences-ui-test.cjs",
+    "format": "prettier --write src extensions scripts tests"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "playwright": "^1.63.0",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  },
+  "build": {
+    "appId": "at365.appdock",
+    "productName": "AppDock.at365",
+    "executableName": "AppDock.at365",
+    "directories": {
+      "output": "publish",
+      "buildResources": "assets"
+    },
+    "files": [
+      "out/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "artifacts/dotnet-host",
+        "to": "dotnet-host"
+      },
+      {
+        "from": "extensions",
+        "to": "extensions",
+        "filter": [
+          "**/*",
+          "!**/bin/**/*",
+          "!**/obj/**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/icon.ico",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "AppDock.at365.exe",
+      "requestExecutionLevel": "user",
+      "unpackDirName": false
+    }
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

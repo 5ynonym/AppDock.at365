@@ -1,0 +1,15 @@
+node_modules/
+publish/
+artifacts/
+out/
+.appdock/
+settings.json
+settings.json.*
+avatar.png
+avatar.png.*.tmp
+**/bin/
+**/obj/
+extensions/dotnet-demo/*.dll
+extensions/dotnet-demo/*.pdb
+extensions/welcome/index.js
+deploy.local.txt

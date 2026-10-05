@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="dotnet/AppDock.SDK/AppDock.SDK.csproj" />
+  <Project Path="dotnet/AppDock.ExtensionHost/AppDock.ExtensionHost.csproj" />
+  <Project Path="dotnet/AppDock.Extensions.Demo/AppDock.Extensions.Demo.csproj" />
+</Solution>

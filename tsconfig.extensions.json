@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.main.json",
+  "compilerOptions": { "rootDir": ".", "outDir": "artifacts/node-extensions", "declaration": true },
+  "include": [
+    "extensions/welcome/index.ts",
+    "src/main/node-worker.ts",
+    "src/main/core/rpc.ts",
+    "src/shared/contracts.ts"
+  ]
+}

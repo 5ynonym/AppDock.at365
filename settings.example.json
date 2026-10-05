@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "host": {
+    "theme": "dark",
+    "closeToTray": true,
+    "notifications": true,
+    "startMinimized": false
+  },
+  "shortcuts": {
+    "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
+    "appdock.settings.open": ["Ctrl+,"]
+  },
+  "pinnedCommands": [],
+  "profile": { "name": "ユキ", "avatar": null },
+  "extensions": {
+    "appdock.welcome": { "enabled": true, "settings": {} },
+    "appdock.dotnet-demo": { "enabled": false, "settings": { "intervalSeconds": 30 } }
+  }
+}
