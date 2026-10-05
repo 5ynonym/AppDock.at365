@@ -1,4 +1,8 @@
-# Extension API v1
+# Applet API v1
+
+画面上では拡張機能をAppletと呼びます。`extension.json`、`extensions`、`IAppDockExtension` などの既存API名は互換性を維持します。
+
+新規実装の手順は[Applet実装ガイド](applet-development.md)、API・設定・UI等をホストへ足す手順は[AppDock実装ガイド](host-development.md)を参照してください。
 
 ## マニフェスト
 
@@ -20,7 +24,17 @@
 
 `entry` はマニフェストがあるフォルダ内のファイルです。相対パスを指定し、必要な依存DLLも同じフォルダに置きます。`runtime: "node"` の場合はコンパイル済みCommonJSの `.js` を指定し、`type` は不要です。拡張IDとコマンドIDは安定した名前にしてください。コマンドIDは必ず `<extension-id>.` から始めます。
 
-フォームの設定定義は `boolean` / `number` / `string` に対応します。数値は `minimum` / `maximum` を定義できます。拡張は設定値を読み取る際にも妥当性を確認してください。
+フォームの設定定義は `boolean` / `number` / `string` / `select` に対応します。`description` は項目の説明、数値の `minimum` / `maximum` / `step` は範囲と刻み幅です。型・範囲・静的な選択肢はUIとHost APIの保存時に検証します。手動JSON編集もあるため、Appletは設定値を読む際にも妥当性を確認してください。
+
+`select` には `options: [{"label":"上端","value":"top"}]` を宣言します。`dynamic: true` の項目は、.NETの `Settings.SetOptionsAsync` / Nodeの `settings.setOptions` で選択肢を更新できます。未接続モニターなどの保存された選択は保持し、現在利用できない選択として表示します。動的な値の代替動作はApplet側で実装してください。
+
+設定変更の通知は `.NET: Settings.OnChanged(async token => ...)` / `Node: settings.onChanged(async () => ...)` で購読します。購読解除のIDisposable／関数を返します。.NETでは同じAppletのコマンドと設定変更処理を直列化します。
+
+## ネイティブ表示を持つApplet
+
+WPF等で独自ウィンドウを表示するAppletは `runtime: "native"`、`entry: "Applet.Watch.at365.exe"` を指定します。AppDockが専用EXEを起動し、DLL拡張と同じ標準入力／出力のJSON-RPCで接続します。`type` は不要です。EXEは実行環境と依存関係を自身で持つ必要があります。
+
+`.NET` 用の共通接続処理は `dotnet/AppDock.Runtime` の `AppletSession.RunAsync(IAppDockExtension, TextReader, TextWriter)` にあります。WPFではSTAのDispatcherを維持し、接続処理をバックグラウンドで動かします。`../Applet.Watch.at365` が実装例です。ホスト終了／無効化時はdeactivateの後にプロセスを停止し、通信断時もセッションを終了します。コマンド、設定、パネル、capabilitiesの検査は既存のAppletと共通です。
 
 登録したコマンドは、ホストの「設定 → ショートカット」に自動的に表示され、ユーザーがキーを割り当てられます。コマンドパレットからピン留めと並べ替えもできます。設定はコマンドIDで保存するため、更新時にもIDを維持してください。拡張を無効にしてもキー設定とピンは保持され、有効にして再登録されると利用できます。
 
@@ -56,7 +70,7 @@ public sealed class Extension : IAppDockExtension
 
 1拡張ごとにホストランナーを1プロセス起動します。各DLLは独立したAssemblyLoadContextで読み込み、AppDock.SDKの型はランナーと共有します。コマンド処理は同一拡張内で直列化します。定期処理は前回の完了まで次回を重ねません。定期処理とコマンドの同時実行が問題になるロジックでは、拡張側にも排他を置いてください。定期処理はSDKから停止されますが、拡張が独自に作成したリソースはDeactivateAsyncで解放してください。CancellationTokenを処理へ渡してください。
 
-任意のWPF/WinFormsアプリEXEを読み込むものではありません。.NETホストはMicrosoft.NETCore.Appを同梱しており、WindowsDesktopランタイムは同梱していません。WPF/WinFormsの画面やSTAメッセージループを必要とする部分は、将来のネイティブ表示用ヘルパー等として設計する必要があります。P/InvokeのようなWindows API処理をCore拡張に置くことは可能です。
+DLL用の.NETホストはMicrosoft.NETCore.Appを同梱し、WindowsDesktopランタイムは同梱していません。WPF/WinFormsの画面やSTAメッセージループが必要なAppletは、上記の `runtime: native` と自身のWindowsDesktopランタイムを持つEXEで実装します。任意の既存EXEを置くだけで接続されるものではなく、SDKの接続とライフサイクルへの対応が必要です。P/InvokeのようなWindows API処理をDLL Appletに置くことも可能です。
 
 ## TypeScript / Node.js
 
@@ -91,10 +105,10 @@ Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト�
 | Storage | 拡張ID・キー別のJSON永続データ（1件1MBまで） | `storage` |
 | Secrets | 拡張ID・キー別の暗号化文字列 | `secrets` |
 
-設定変更はキャッシュへ通知します。設定に依存するタイマー間隔等は、都度読み取りまたは拡張再起動で反映してください。UIへHTML/JavaScriptは渡せません。Reactがテキストとして描画します。API v1は1拡張1パネルです。
+設定変更はキャッシュへ通知します。設定に依存する表示やタイマー間隔等は、OnChangedの購読または都度読み取りで反映してください。UIへHTML/JavaScriptは渡せません。Reactがテキストとして描画します。API v1は1拡張1パネルです。
 
 ## 通信
 
 UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上限1MB、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
 
-拡張→ホストは `host.settings.get/set` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
+拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。

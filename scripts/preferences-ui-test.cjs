@@ -87,7 +87,7 @@ async function waitPins(page, pins) {
     await page.keyboard.press('Control+Alt+r');
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     // Assign and execute a real .NET command through the same shortcut settings.
-    await page.getByRole('button', { name: '拡張機能を管理', exact: true }).click();
+    await page.getByRole('button', { name: 'Appletを管理', exact: true }).click();
     await page.getByRole('button', { name: '.NET Connection Demo C# / .NET 10' }).click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();

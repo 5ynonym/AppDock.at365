@@ -754,7 +754,8 @@ main {
   color: var(--accent);
   background: var(--accent-soft);
 }
-.extension-icon.dotnet {
+.extension-icon.dotnet,
+.extension-icon.native {
   color: var(--purple);
   background: #69549525;
 }

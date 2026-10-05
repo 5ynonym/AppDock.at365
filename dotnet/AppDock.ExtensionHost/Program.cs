@@ -3,7 +3,7 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json;
 using AppDock.SDK;
-using AppDock.ExtensionHost;
+using AppDock.Runtime;
 
 Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = new UTF8Encoding(false);
@@ -16,35 +16,7 @@ try
     var loader = new ExtensionLoadContext(assemblyPath);
     var type = loader.LoadFromAssemblyPath(assemblyPath).GetType(args[1], throwOnError: true)!;
     var extension = Activator.CreateInstance(type) as IAppDockExtension ?? throw new InvalidOperationException("Type must implement IAppDockExtension.");
-    await using var connection = new JsonRpcConnection(Console.In, wireOutput);
-    using var active = CancellationTokenSource.CreateLinkedTokenSource(connection.Lifetime);
-    ExtensionContext? context = null;
-    var deactivated = false;
-    await connection.ReadAsync(async (method, parameters) =>
-    {
-        switch (method)
-        {
-            case "activate":
-                if (context is not null) throw new InvalidOperationException("Already activated.");
-                context = new ExtensionContext(parameters.GetProperty("id").GetString()!, parameters.GetProperty("settings"), connection, active.Token);
-                await extension.ActivateAsync(context, active.Token);
-                return context.Contributions;
-            case "settings.changed":
-                context?.ChangeSettings(parameters); return null;
-            case "command.execute":
-                if (context is null) throw new InvalidOperationException("Not activated.");
-                await context.ExecuteAsync(parameters.GetProperty("id").GetString()!); return null;
-            case "deactivate":
-                await active.CancelAsync();
-                if (context is not null) await context.DisposeAsync();
-                await extension.DeactivateAsync(CancellationToken.None); deactivated = true;
-                return null;
-            default: throw new InvalidOperationException($"Unknown method: {method}");
-        }
-    });
-    await active.CancelAsync();
-    if (context is not null) await context.DisposeAsync();
-    if (!deactivated) await extension.DeactivateAsync(CancellationToken.None);
+    await AppletSession.RunAsync(extension, Console.In, wireOutput);
     return 0;
 }
 catch (Exception e) { Console.Error.WriteLine(e); return 1; }

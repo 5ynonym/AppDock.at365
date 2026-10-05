@@ -17,13 +17,15 @@
 
 ## Watch.at365
 
-現在はWPFにWinFormsトレイとWindowsフックを組み合わせています。CommonのApplicationSettingsをホスト設定へ移し、入力・ホットキー・時計の各機能を分割してから移行します。
+元のWatchはWPFにWinFormsトレイとWindowsフックを組み合わせています。時計機能は **Applet.Watch.at365** として `../Applet.Watch.at365` に実装済みです。時計専用WPFプロセスを `runtime: native` で起動し、表示状態・モニター・位置などをAppDockの設定へ集約しました。元Watchのソースや設定は変更していません。
+
+マウスジェスチャー、ホットキー、AutoLockなどは別Appletへ分離する方針です。時計Applet内にそれらの拡張ポイントは設けません。
 
 - フック／ホットキーはWindows固有処理として拡張側に残す。
 - NotifyIcon、ON/OFF設定、ログはホストへ。
-- 時計オーバーレイとクリップボード履歴ウィンドウは、メイン画面とは別の表示が必要。
+- 時計オーバーレイは今回のnative Appletで実装済み。クリップボード履歴にも専用の表示が必要。
 - クリップボードのSTA・メッセージループ、カーソルを動かさない表示、500msの静穏待機、起動中だけ保持する履歴を維持。
-- API v1の.NETランナーはWindowsDesktopを同梱していないため、WPF/WinForms依存をそのまま読み込む前提ではない。ネイティブ表示用ヘルパーか、別ElectronウィンドウとWindows API橋渡しを設計する。
+- DLL用の.NETランナーはWindowsDesktopを同梱していない。WPF/WinFormsを使うAppletは、時計と同様にWindowsDesktopを含む専用EXEと `runtime: native` を利用できる。
 - 既存Watchとの同時有効化でフック・ホットキーが競合しないよう、移行時の切り替えを用意。
 
 ## WallpaperSlideshow.at365
@@ -37,4 +39,4 @@ ImageCatalog・ImageLoader等の画像選定／処理をCoreへ。ApplicationCon
 
 ## 進め方
 
-GmailからHost APIの不足を実利用で埋め、その後Watch／Wallpaperのネイティブ表示を設計する順序が扱いやすいです。既存アプリの独立起動を残し、共有CoreとUI境界だけを分けることも可能です。ホストのSDK v1はDLL接続・状態パネル・コマンドの土台であり、既存UIやすべての機能を自動的に変換するものではありません。
+時計Appletを最初の実装として、ホスト設定・コマンド・nativeプロセスの接続を確認済みです。次のAppletは、その機能に必要なHost APIを追加しながら個別に移行します。既存アプリの独立起動を残し、共有CoreとUI境界だけを分けることも可能です。SDK v1はDLL／native接続・状態パネル・コマンドの土台であり、既存UIやすべての機能を自動的に変換するものではありません。

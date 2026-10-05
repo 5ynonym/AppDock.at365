@@ -1,5 +1,5 @@
 import { JsonLinePeer } from './core/rpc';
-import type { Command, TrayItem, Panel } from '../shared/contracts';
+import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
 type Handler = () => unknown | Promise<unknown>;
 export interface NodeExtensionContext {
   commands: { register(id: string, title: string, handler: Handler): void };
@@ -7,6 +7,8 @@ export interface NodeExtensionContext {
   settings: {
     get<T>(key: string, fallback: T): T;
     set(key: string, value: unknown): Promise<unknown>;
+    onChanged(handler: Handler): () => void;
+    setOptions(key: string, options: SettingOption[]): Promise<unknown>;
   };
   notifications: { show(title: string, body: string): Promise<unknown> };
   ui: { showPanel(panel: Panel): Promise<unknown> };
@@ -32,6 +34,7 @@ const tray: TrayItem[] = [];
 const disposables: (() => void)[] = [];
 let configuration: Record<string, unknown> = {};
 let extension: NodeExtension;
+const settingsHandlers = new Set<Handler>();
 const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) => {
   switch (method) {
     case 'activate': {
@@ -47,7 +50,19 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         tray: { add: (title, command) => tray.push({ title, command }) },
         settings: {
           get: (key, fallback) => (configuration[key] ?? fallback) as typeof fallback,
-          set: (key, value) => peer.request('host.settings.set', { key, value }),
+          set: async (key, value) => {
+            await peer.request('host.settings.set', { key, value });
+            configuration = { ...configuration, [key]: value };
+          },
+          onChanged: (handler) => {
+            settingsHandlers.add(handler);
+            const dispose = () => {
+              settingsHandlers.delete(handler);
+            };
+            disposables.push(dispose);
+            return dispose;
+          },
+          setOptions: (key, options) => peer.request('host.settings.options', { key, options }),
         },
         ui: { showPanel: (panel) => peer.request('host.ui.panel', panel) },
         notifications: {
@@ -97,9 +112,12 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       if (!cmd) throw new Error('Unknown command');
       return await cmd.handler();
     }
-    case 'settings.changed':
+    case 'settings.changed': {
+      const changed = JSON.stringify(configuration) !== JSON.stringify(p);
       configuration = p;
+      if (changed) for (const handler of settingsHandlers) await handler();
       return null;
+    }
     case 'deactivate':
       disposables.forEach((d) => d());
       await extension?.deactivate?.();

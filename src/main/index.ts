@@ -20,6 +20,8 @@ import { ExtensionManager } from './core/extensions';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
+import { validateAppletSettings } from '../shared/setting-definitions';
+import { parseSettings } from '../shared/settings-schema';
 import type { HostSnapshot, Settings } from '../shared/contracts';
 
 protocol.registerSchemesAsPrivileged([
@@ -128,9 +130,11 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
-  handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) =>
-    saveUserSettings(settings, baseDirectory, value, revision, avatar),
-  );
+  handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) => {
+    const next = parseSettings(value);
+    validateAppletSettings(next, manager.snapshot());
+    return saveUserSettings(settings, baseDirectory, next, revision, avatar);
+  });
   handle('dock:setPinnedCommands', (ids: string[]) =>
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
@@ -304,6 +308,24 @@ async function runSmoke() {
     await manager.execute('appdock.dotnet-demo.refresh');
     await manager.execute('appdock.welcome.verify-storage');
     await manager.execute('appdock.dotnet-demo.verify-storage');
+    let nativeClock:
+      { state: string; commands: number; trayItems: number; visibleSaved: boolean } | undefined;
+    if (process.argv.includes('--smoke-clock')) {
+      const clock = manager.snapshot().find((e) => e.id === 'at365.watch');
+      if (clock?.state !== 'running' || clock.commands.length !== 3 || clock.tray.length)
+        throw new Error(clock?.error || 'Native clock did not activate');
+      await manager.execute('at365.watch.show');
+      await manager.execute('at365.watch.hide');
+      await manager.reconcile();
+      if (settings.value.extensions['at365.watch']?.settings.visible !== false)
+        throw new Error('Native clock visibility was not persisted');
+      nativeClock = {
+        state: clock.state,
+        commands: clock.commands.length,
+        trayItems: clock.tray.length,
+        visibleSaved: true,
+      };
+    }
     await new Promise((r) => setTimeout(r, 400));
     const avatarBytes = nativeImage
       .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
@@ -362,6 +384,7 @@ async function runSmoke() {
             .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
           settingsPath: settings.file,
           avatarPath: path.join(baseDirectory, 'avatar.png'),
+          nativeClock,
         },
         null,
         2,

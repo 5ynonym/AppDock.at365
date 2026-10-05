@@ -5,6 +5,7 @@ import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
 import { atomicWrite, isObject } from './settings';
 import type { Panel } from '../../shared/contracts';
+import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -43,8 +44,22 @@ export function createHostApi(
       case 'host.settings.set': {
         requireCapability('settings');
         const k = key();
+        const definition = e.manifest.settings?.find((s) => s.key === k);
+        if (definition) validateSettingValue(definition, p.value);
         const current = settings.value.extensions[id]?.settings ?? {};
         settings.updateExtension(id, { settings: { ...current, [k]: p.value } });
+        return null;
+      }
+      case 'host.settings.options': {
+        requireCapability('settings');
+        const k = key();
+        if (!e.manifest.settings?.some((s) => s.key === k && s.type === 'select' && s.dynamic))
+          throw new Error('動的な選択肢を宣言した設定項目が必要です。');
+        const options = parseSettingOptions(p.options);
+        if (JSON.stringify(e.settingOptions[k]) !== JSON.stringify(options)) {
+          e.settingOptions[k] = options;
+          changed();
+        }
         return null;
       }
       case 'host.notifications.show':
