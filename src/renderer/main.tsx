@@ -22,12 +22,14 @@ import {
 } from '../shared/commands';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { ProfileEditor } from './ProfileEditor';
+import { AppletSettings } from './AppletSettings';
 declare global {
   interface Window {
     dock: DockApi;
   }
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs';
+type SettingsTarget = { appletId: string; tab: 'settings' | 'shortcuts'; request: number };
 type IconName =
   | 'home'
   | 'extensions'
@@ -213,6 +215,28 @@ function App() {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [profileRequest, setProfileRequest] = useState(0);
+  const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
+  const [appletFilter, setAppletFilter] = useState('');
+  const [logSource, setLogSource] = useState('');
+  const [paletteIndex, setPaletteIndex] = useState(0);
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!palette) return;
+    returnFocus.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    paletteRef.current?.querySelector('input')?.focus();
+    return () => {
+      if (returnFocus.current?.isConnected) returnFocus.current.focus();
+    };
+  }, [palette]);
+  useEffect(() => {
+    setPaletteIndex(0);
+  }, [query, palette]);
+  const openAppletSettings = (appletId: string, tab: SettingsTarget['tab'] = 'settings') => {
+    setSettingsTarget((previous) => ({ appletId, tab, request: (previous?.request ?? 0) + 1 }));
+    setPage('settings');
+  };
   const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
     try {
@@ -292,9 +316,9 @@ function App() {
     setPage('extensions');
   };
   const commands: UiCommand[] = [
-    ...hostCommands,
+    ...hostCommands.map((command) => ({ ...command, extensionId: null })),
     ...(snapshot?.extensions.flatMap((e) =>
-      e.commands.map((c) => ({ ...c, extension: e.name, available: true })),
+      e.commands.map((c) => ({ ...c, extension: e.name, extensionId: e.id, available: true })),
     ) ?? []),
   ];
   for (const command of commands) knownCommands.current.set(command.id, command);
@@ -309,15 +333,20 @@ function App() {
     ]
       .filter((id) => !commandIds.has(id))
       .map((id) => ({
-        ...(knownCommands.current.get(id) ?? { id, title: id, extension: 'Appletコマンド' }),
+        ...(knownCommands.current.get(id) ?? { id, title: id, extension: '未確認のコマンド' }),
         available: false,
       })),
   ];
   const pins = snapshot?.settings.value.pinnedCommands ?? [];
   const filteredCommands = rankCommands(
-    commands.filter((c) => (c.title + ' ' + c.id).toLowerCase().includes(query.toLowerCase())),
+    commands.filter((c) =>
+      (c.title + ' ' + c.extension + ' ' + c.id).toLowerCase().includes(query.toLowerCase()),
+    ),
     pins,
   );
+  useEffect(() => {
+    setPaletteIndex((index) => Math.min(index, Math.max(0, filteredCommands.length - 1)));
+  }, [filteredCommands.length]);
   const visiblePins = filteredCommands.filter((c) => pins.includes(c.id)).map((c) => c.id);
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
@@ -335,9 +364,11 @@ function App() {
     await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
   }
   const updatePins = (ids: string[]) => void action(() => window.dock.setPinnedCommands(ids));
+  const selectedApplet =
+    snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   return (
-    <div className="shell">
+    <div className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}>
       <header className="titlebar">
         <div className="title-brand">
           <Brand small />
@@ -345,7 +376,15 @@ function App() {
             AppDock<span className="muted">.at365</span>
           </span>
         </div>
-        <span className="titlebar-center">Personal workspace</span>
+        <button
+          className="titlebar-search"
+          onClick={() => {
+            setPalette(true);
+            setQuery('');
+          }}
+        >
+          <Icon name="search" size={15} /> コマンドを検索 {paletteKey && <kbd>{paletteKey}</kbd>}
+        </button>
         <div className="window-controls">
           {(['minimize', 'maximize', 'close'] as const).map((a, i) => (
             <button
@@ -366,10 +405,12 @@ function App() {
             key={p}
             title={labels[p]}
             aria-label={labels[p]}
+            aria-current={page === p ? 'page' : undefined}
             className={page === p ? 'active' : ''}
             onClick={() => setPage(p)}
           >
             <Icon name={p} size={21} />
+            <span className="rail-label">{labels[p]}</span>
           </button>
         ))}
         <div className="rail-spacer" />
@@ -410,68 +451,40 @@ function App() {
           )}
         </button>
       </aside>
-      <aside className="sidebar">
-        <div className="workspace-label">
-          WORKSPACE
-          <span className="tiny-dot" />
-        </div>
-        <div className="workspace-name">
-          My Dock <span>01</span>
-        </div>
-        <button
-          className="search-button"
-          onClick={() => {
-            setPalette(true);
-            setQuery('');
-          }}
-        >
-          <Icon name="search" size={15} />
-          コマンドを検索{paletteKey && <kbd>{paletteKey}</kbd>}
-        </button>
-        <nav>
-          {(['home', 'extensions', 'settings', 'logs'] as Page[]).map((p) => (
-            <button key={p} className={page === p ? 'selected' : ''} onClick={() => setPage(p)}>
-              <Icon name={p} />
-              {labels[p]}
-              {p === 'extensions' && (
-                <span className="count">{snapshot?.extensions.length ?? 0}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-section">YOUR APPLETS</div>
-        <div className="sidebar-extensions">
-          {snapshot?.extensions.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => goExtension(e.id)}
-              className={page === 'extensions' && selected === e.id ? 'selected' : ''}
-            >
-              <i className={`extension-dot ${e.state}`} />
-              <span>{e.name}</span>
-              <small>{e.runtime === 'node' ? 'TS' : 'C#'}</small>
-            </button>
-          ))}
-        </div>
-        <div className="sidebar-footer">
-          <div className="connection">
-            <i />
-            {active > 0 ? 'Dock is connected' : 'Dock is ready'}
+      {page === 'extensions' && (
+        <aside className="sidebar" aria-label="Applet一覧">
+          <h2>Applet</h2>
+          <input
+            aria-label="Appletを検索"
+            placeholder="Appletを検索…"
+            value={appletFilter}
+            onChange={(event) => setAppletFilter(event.target.value)}
+          />
+          <div className="sidebar-extensions">
+            {snapshot?.extensions
+              .filter((e) =>
+                (e.name + ' ' + e.id).toLowerCase().includes(appletFilter.toLowerCase()),
+              )
+              .map((e) => (
+                <button
+                  key={e.id}
+                  onClick={() => goExtension(e.id)}
+                  aria-current={selectedApplet?.id === e.id ? 'true' : undefined}
+                  className={selectedApplet?.id === e.id ? 'selected' : ''}
+                >
+                  <i className={`extension-dot ${e.state}`} />
+                  <span>{e.name}</span>
+                  <small>{states[e.state]}</small>
+                </button>
+              ))}
+            {snapshot &&
+              !snapshot.extensions.some((e) =>
+                (e.name + ' ' + e.id).toLowerCase().includes(appletFilter.toLowerCase()),
+              ) && <p className="empty">該当するAppletはありません。</p>}
           </div>
-          <span>小さな道具の、帰る場所。</span>
-          <strong className="profile-name">{snapshot?.settings.value.profile.name}</strong>
-        </div>
-      </aside>
+        </aside>
+      )}
       <main>
-        <div className="breadcrumb">
-          My Dock
-          <Icon name="chevron" size={12} />
-          <strong>{labels[page]}</strong>
-          <span className="local-label">
-            <i />
-            LOCAL WORKSPACE
-          </span>
-        </div>
         {error && (
           <div className="error-banner" role="alert">
             {error}
@@ -486,60 +499,7 @@ function App() {
           <div className="page-content">
             {page === 'home' && (
               <>
-                <div className="page-heading">
-                  <div>
-                    <div className="eyebrow">MAKE ROOM FOR YOUR TOOLS</div>
-                    <h1>
-                      Welcome to your Dock<span className="accent">.</span>
-                    </h1>
-                    <p>いつもの道具を、ひとつのワークスペースに。</p>
-                  </div>
-                  <button className="secondary" onClick={() => setPage('extensions')}>
-                    <Icon name="extensions" size={16} />
-                    Appletを管理
-                  </button>
-                </div>
-                <div className="hero">
-                  <div className="hero-copy">
-                    <span className="hero-label">
-                      <i />
-                      YOUR PERSONAL APP HOST
-                    </span>
-                    <h2>
-                      ひとつの場所から、
-                      <br />
-                      できることを増やそう。
-                    </h2>
-                    <p>
-                      Appletをつないで、あなたのDockを育てていく。
-                      <br />
-                      設定もコマンドも、この場所から。
-                    </p>
-                    <button className="primary" onClick={() => setPage('extensions')}>
-                      Dockを見てみる
-                      <Icon name="arrow" size={17} />
-                    </button>
-                  </div>
-                  <div className="dock-art" aria-hidden="true">
-                    <div className="orbit orbit-1" />
-                    <div className="orbit orbit-2" />
-                    <div className="dock-core">
-                      <Brand />
-                    </div>
-                    <div className="art-tile mail">
-                      <Icon name="mail" size={25} />
-                    </div>
-                    <div className="art-tile clock">
-                      <Icon name="clock" size={25} />
-                    </div>
-                    <div className="art-tile image">
-                      <Icon name="image" size={25} />
-                    </div>
-                    <span className="star s1" />
-                    <span className="star s2" />
-                    <span className="star s3" />
-                  </div>
-                </div>
+                <PageHeading title="ホーム" subtitle="Appletの状態と、よく使う操作。" />
                 <div className="stats">
                   <div>
                     <span className="stat-icon green">
@@ -552,7 +512,6 @@ function App() {
                         <small> / {snapshot.extensions.length}</small>
                       </strong>
                     </div>
-                    <span className="stat-note">Ready to work</span>
                   </div>
                   <div>
                     <span className="stat-icon blue">
@@ -568,18 +527,50 @@ function App() {
                   </div>
                   <div>
                     <span className="stat-icon purple">
-                      <Icon name="settings" />
+                      <Icon name="logs" />
                     </span>
                     <div>
-                      <span>設定ファイル</span>
-                      <strong className="stat-text">settings.json</strong>
+                      <span>エラーのApplet</span>
+                      <strong>
+                        {snapshot.extensions.filter((e) => e.state === 'error').length}
+                      </strong>
                     </div>
-                    <span className="stat-note">EXEと同じ場所</span>
+                    <button
+                      aria-label="ログを開く"
+                      onClick={() => {
+                        setLogSource('');
+                        setPage('logs');
+                      }}
+                    >
+                      <Icon name="arrow" />
+                    </button>
                   </div>
                 </div>
+                <section className="home-pins" aria-label="よく使うコマンド">
+                  <h2>よく使うコマンド</h2>
+                  <div className="actions">
+                    {rankCommands(
+                      commands.filter((c) => pins.includes(c.id)),
+                      pins,
+                    ).map((c) => (
+                      <button
+                        key={c.id}
+                        className="secondary"
+                        disabled={busy}
+                        onClick={() => void execute(c.id)}
+                      >
+                        {c.title}
+                        <small>{c.extension}</small>
+                      </button>
+                    ))}
+                  </div>
+                  {!commands.some((c) => pins.includes(c.id)) && (
+                    <p>コマンド検索の☆から、よく使う操作をピン留めできます。</p>
+                  )}
+                </section>
                 <div className="section-heading">
                   <h3>
-                    Your Applets<span>{snapshot.extensions.length}</span>
+                    Applet<span>{snapshot.extensions.length}</span>
                   </h3>
                   <button className="text-button" onClick={() => setPage('extensions')}>
                     すべて見る
@@ -607,22 +598,6 @@ function App() {
                     </button>
                   ))}
                 </div>
-                <div className="next-strip">
-                  <span className="next-label">NEXT ON YOUR DOCK</span>
-                  <div>
-                    <Icon name="mail" size={15} />
-                    GmailChecker
-                  </div>
-                  <div>
-                    <Icon name="clock" size={15} />
-                    Watch
-                  </div>
-                  <div>
-                    <Icon name="image" size={15} />
-                    WallpaperSlideshow
-                  </div>
-                  <span className="muted">これから、ひとつずつ。</span>
-                </div>
               </>
             )}
             {page === 'extensions' && (
@@ -641,39 +616,16 @@ function App() {
                   }
                 />
                 <div className="extensions-layout">
-                  <div className="extension-list">
-                    {snapshot.extensions.map((e) => (
-                      <button
-                        className={selected === e.id ? 'selected' : ''}
-                        key={e.id}
-                        onClick={() => setSelected(e.id)}
-                      >
-                        <span className={`extension-icon ${e.runtime}`}>
-                          <Icon name="extensions" size={20} />
-                        </span>
-                        <div>
-                          <strong>{e.name}</strong>
-                          <span>
-                            {e.runtime === 'node' ? 'TypeScript / Node.js' : 'C# / .NET 10'}
-                          </span>
-                        </div>
-                        <i className={`extension-dot ${e.state}`} />
-                      </button>
-                    ))}
-                  </div>
                   <ExtensionDetail
-                    extension={
-                      snapshot.extensions.find((e) => e.id === selected) ?? snapshot.extensions[0]
-                    }
+                    extension={selectedApplet}
+                    onSettings={openAppletSettings}
+                    onLogs={(id) => {
+                      setLogSource(id);
+                      setPage('logs');
+                    }}
                     busy={busy}
                     run={action}
                   />
-                </div>
-                <div className="migration-note">
-                  <span>これから載せる道具</span>
-                  <p>
-                    Watchの時計はApplet.Watch.at365として利用できます。GmailChecker・WallpaperSlideshowや、Watchのほかの機能も、個別のAppletとして追加していけます。
-                  </p>
                 </div>
               </>
             )}
@@ -686,17 +638,26 @@ function App() {
                 commands={shortcutCommands}
                 avatarUrl={snapshot.avatarUrl}
                 profileRequest={profileRequest}
+                target={settingsTarget}
+                onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
               />
             </div>
-            {page === 'logs' && <LogsPage snapshot={snapshot} run={action} />}
+            {page === 'logs' && (
+              <LogsPage
+                snapshot={snapshot}
+                run={action}
+                source={logSource}
+                onSource={setLogSource}
+              />
+            )}
           </div>
         )}
       </main>
       <footer className="statusbar">
         <span>
           <i />
-          {active} Applets running
+          実行中 {active} Applet
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
@@ -716,6 +677,30 @@ function App() {
         <div className="modal-backdrop" onClick={() => setPalette(false)}>
           <div
             className="command-palette"
+            ref={paletteRef}
+            aria-modal="true"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                setPalette(false);
+              }
+              if (event.key === 'Tab') {
+                const nodes = Array.from(
+                  paletteRef.current?.querySelectorAll<HTMLElement>(
+                    'input, button:not(:disabled)',
+                  ) ?? [],
+                );
+                const first = nodes[0],
+                  last = nodes[nodes.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first?.focus();
+                }
+              }
+            }}
             role="dialog"
             aria-label="コマンドパレット"
             onClick={(e) => e.stopPropagation()}
@@ -723,7 +708,35 @@ function App() {
             <div className="palette-input">
               <Icon name="search" />
               <input
-                autoFocus
+                aria-label="コマンドを検索"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="palette-results"
+                aria-activedescendant={
+                  filteredCommands[paletteIndex] ? `palette-option-${paletteIndex}` : undefined
+                }
+                onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) return;
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const next = filteredCommands.length
+                      ? (paletteIndex +
+                          (event.key === 'ArrowDown' ? 1 : -1) +
+                          filteredCommands.length) %
+                        filteredCommands.length
+                      : 0;
+                    setPaletteIndex(next);
+                    document
+                      .getElementById(`palette-option-${next}`)
+                      ?.scrollIntoView({ block: 'nearest' });
+                  }
+                  if (event.key === 'Enter' && !busy && filteredCommands[paletteIndex]) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void execute(filteredCommands[paletteIndex].id);
+                  }
+                }}
                 placeholder="コマンドを入力…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -731,68 +744,79 @@ function App() {
               <kbd>Esc</kbd>
             </div>
             <div className="palette-label">COMMANDS</div>
-            {filteredCommands.map((c) => {
-              const pinned = pins.includes(c.id);
-              const index = visiblePins.indexOf(c.id);
-              return (
-                <div
-                  className={`palette-command ${pinned ? 'pinned' : ''}`}
-                  key={c.id}
-                  data-command-id={c.id}
-                >
-                  <button
-                    className="palette-execute"
-                    disabled={busy}
-                    onClick={() => void execute(c.id)}
+            <div id="palette-results" role="listbox" aria-label="コマンド検索結果">
+              {filteredCommands.map((c, commandIndex) => {
+                const pinned = pins.includes(c.id);
+                const index = visiblePins.indexOf(c.id);
+                return (
+                  <div
+                    className={`palette-command ${pinned ? 'pinned' : ''} ${commandIndex === paletteIndex ? 'highlighted' : ''}`}
+                    id={`palette-option-${commandIndex}`}
+                    role="option"
+                    aria-selected={commandIndex === paletteIndex}
+                    key={c.id}
+                    data-command-id={c.id}
                   >
-                    <Icon name="play" size={16} />
-                    <div>
-                      {c.title}
-                      <small>
-                        {c.extension}
-                        {pinned && <span className="pin-badge">PINNED</span>}
-                      </small>
-                    </div>
-                    {snapshot?.settings.value.shortcuts[c.id]?.[0] && (
-                      <kbd>{snapshot.settings.value.shortcuts[c.id][0]}</kbd>
-                    )}
-                  </button>
-                  <div className="palette-pin-controls">
-                    {pinned && (
-                      <>
-                        <button
-                          aria-label={`${c.title}を上に移動`}
-                          disabled={busy || index <= 0}
-                          onClick={() => updatePins(movePinnedCommand(pins, c.id, -1, visiblePins))}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          aria-label={`${c.title}を下に移動`}
-                          disabled={busy || index === visiblePins.length - 1}
-                          onClick={() => updatePins(movePinnedCommand(pins, c.id, 1, visiblePins))}
-                        >
-                          ↓
-                        </button>
-                      </>
-                    )}
                     <button
-                      className="pin-toggle"
-                      aria-label={`${c.title}を${pinned ? 'ピン留め解除' : 'ピン留め'}`}
-                      aria-pressed={pinned}
+                      className="palette-execute"
                       disabled={busy}
-                      onClick={() =>
-                        updatePins(pinned ? pins.filter((id) => id !== c.id) : [...pins, c.id])
-                      }
+                      onClick={() => void execute(c.id)}
                     >
-                      {pinned ? '★' : '☆'}
+                      <Icon name="play" size={16} />
+                      <div>
+                        {c.title}
+                        <small>
+                          {c.extension}
+                          {pinned && <span className="pin-badge">PINNED</span>}
+                        </small>
+                      </div>
+                      {snapshot?.settings.value.shortcuts[c.id]?.[0] && (
+                        <kbd>{snapshot.settings.value.shortcuts[c.id][0]}</kbd>
+                      )}
                     </button>
+                    <div className="palette-pin-controls">
+                      {pinned && (
+                        <>
+                          <button
+                            aria-label={`${c.title}を上に移動`}
+                            disabled={busy || index <= 0}
+                            onClick={() =>
+                              updatePins(movePinnedCommand(pins, c.id, -1, visiblePins))
+                            }
+                          >
+                            ↑
+                          </button>
+                          <button
+                            aria-label={`${c.title}を下に移動`}
+                            disabled={busy || index === visiblePins.length - 1}
+                            onClick={() =>
+                              updatePins(movePinnedCommand(pins, c.id, 1, visiblePins))
+                            }
+                          >
+                            ↓
+                          </button>
+                        </>
+                      )}
+                      <button
+                        className="pin-toggle"
+                        aria-label={`${c.title}を${pinned ? 'ピン留め解除' : 'ピン留め'}`}
+                        aria-pressed={pinned}
+                        disabled={busy}
+                        onClick={() =>
+                          updatePins(pinned ? pins.filter((id) => id !== c.id) : [...pins, c.id])
+                        }
+                      >
+                        {pinned ? '★' : '☆'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
             {filteredCommands.length === 0 && <p>該当するコマンドはありません。</p>}
-            <div className="palette-footer">★でピン留め。↑↓でピンの順番を変更できます。</div>
+            <div className="palette-footer">
+              ↑↓キーで選択・Enterで実行・Escで閉じる。☆でピン留め、行の矢印ボタンで並べ替え。
+            </div>
           </div>
         </div>
       )}
@@ -811,7 +835,6 @@ function PageHeading({
   return (
     <div className="page-heading compact">
       <div>
-        <div className="eyebrow">YOUR WORKSPACE</div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
       </div>
@@ -824,8 +847,12 @@ function ExtensionDetail({
   extension: e,
   busy,
   run,
+  onSettings,
+  onLogs,
 }: {
   extension?: ExtensionSnapshot;
+  onSettings(id: string, tab?: SettingsTarget['tab']): void;
+  onLogs(id: string): void;
   busy: boolean;
   run: Run;
 }) {
@@ -856,6 +883,19 @@ function ExtensionDetail({
         />
       </div>
       <p className="detail-description">{e.description}</p>
+      <div className="actions detail-actions">
+        <button className="secondary" onClick={() => onSettings(e.id)}>
+          <Icon name="settings" />
+          設定を開く
+        </button>
+        <button className="secondary" onClick={() => onSettings(e.id, 'shortcuts')}>
+          <Icon name="command" />
+          ショートカットを設定
+        </button>
+        <button className="text-button" onClick={() => onLogs(e.id)}>
+          ログを見る
+        </button>
+      </div>
       <div className="detail-state">
         <StateBadge extension={e} />
         <button
@@ -872,7 +912,6 @@ function ExtensionDetail({
       {e.error && <div className="error-text">{e.error}</div>}
       {e.panel ? (
         <div className="extension-panel">
-          <div className="eyebrow">APPLET VIEW</div>
           <h3>{e.panel.title}</h3>
           <p>{e.panel.description}</p>
           <dl>
@@ -901,11 +940,32 @@ function ExtensionDetail({
       ) : (
         <div className="inactive-panel">
           <Icon name="extensions" size={28} />
-          <h3>このAppletをDockにつなぐ</h3>
-          <p>有効にすると、Appletの画面とコマンドを使えます。</p>
+          <h3>
+            {!e.enabled
+              ? 'このAppletをDockにつなぐ'
+              : e.state === 'starting'
+                ? 'Appletを起動しています'
+                : e.state === 'stopping'
+                  ? 'Appletを停止しています'
+                  : e.state === 'error'
+                    ? 'Appletでエラーが発生しました'
+                    : e.state === 'running'
+                      ? '専用の操作画面はありません'
+                      : 'Appletは停止しています'}
+          </h3>
+          <p>
+            {!e.enabled
+              ? '有効にすると、Appletの画面とコマンドを使えます。'
+              : e.state === 'error'
+                ? 'ログを確認して、必要に応じて再起動してください。'
+                : e.state === 'running'
+                  ? '設定やコマンド検索から操作できます。'
+                  : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
+          </p>
         </div>
       )}
-      <div className="detail-meta">
+      <details className="detail-meta">
+        <summary>技術情報</summary>
         <div>
           <span>Extension ID</span>
           <code>{e.id}</code>
@@ -914,7 +974,7 @@ function ExtensionDetail({
           <span>Host API</span>
           <p>{e.capabilities?.join(' · ') || 'なし'}</p>
         </div>
-      </div>
+      </details>
     </section>
   );
 }
@@ -927,6 +987,8 @@ function SettingsPage({
   avatarUrl,
   profileRequest,
   globalHotKeys,
+  target,
+  onApplet,
 }: {
   snapshot: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
@@ -935,6 +997,8 @@ function SettingsPage({
   commands: UiCommand[];
   avatarUrl: string | null;
   profileRequest: number;
+  target?: SettingsTarget;
+  onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
 }) {
   const [draft, setDraft] = useState<Settings>(snapshot.value);
@@ -944,13 +1008,67 @@ function SettingsPage({
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [parseError, setParseError] = useState('');
   const [category, setCategory] = useState<
-    'appearance' | 'general' | 'extensions' | 'shortcuts' | 'profile'
+    'appearance' | 'general' | 'extensions' | 'shortcuts' | 'host-shortcuts' | 'profile'
   >('appearance');
+  const [appletId, setAppletId] = useState('');
+  const [appletTab, setAppletTab] = useState<SettingsTarget['tab']>('settings');
+  const [appletSearch, setAppletSearch] = useState('');
+  const selectedApplet = extensions.find((e) => e.id === appletId) ?? extensions[0];
+  const switchToForm = () => {
+    if (mode === 'json') {
+      try {
+        setDraft(parseSettings(JSON.parse(text)));
+        setParseError('');
+      } catch (error) {
+        setParseError('JSONの内容を修正してからフォームを開いてください。' + String(error));
+        return false;
+      }
+    }
+    setMode('form');
+    return true;
+  };
+  useEffect(() => {
+    if (!target) return;
+    setCategory('extensions');
+    setAppletId(target.appletId);
+    setAppletTab(target.tab);
+    setAppletSearch('');
+    switchToForm();
+  }, [target]);
+  const changed = (part: unknown, original: unknown) =>
+    JSON.stringify(part) !== JSON.stringify(original);
+  const shortcutChanged = (owner: string | null) =>
+    commands
+      .filter((command) => command.extensionId === owner)
+      .some(
+        (command) =>
+          changed(draft.shortcuts[command.id], snapshot.value.shortcuts[command.id]) ||
+          draft.globalShortcutCommands.includes(command.id) !==
+            snapshot.value.globalShortcutCommands.includes(command.id),
+      );
+  const appletChanged = (id: string) =>
+    changed(draft.extensions[id], snapshot.value.extensions[id]) || shortcutChanged(id);
+  const categoryChanged = (id: string) =>
+    id === 'appearance'
+      ? draft.host.theme !== snapshot.value.host.theme
+      : id === 'general'
+        ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
+        : id === 'profile'
+          ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+          : id === 'host-shortcuts'
+            ? shortcutChanged(null)
+            : id === 'shortcuts'
+              ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands)
+              : extensions.some((e) => appletChanged(e.id));
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
   const [avatarLoading, setAvatarLoading] = useState(false);
   useEffect(() => {
-    if (profileRequest) setCategory('profile');
+    if (profileRequest) {
+      setCategory('profile');
+      switchToForm();
+    }
   }, [profileRequest]);
   useEffect(() => {
     if (!dirty) {
@@ -1043,7 +1161,7 @@ function SettingsPage({
           {dirty ? '未保存の変更があります' : 'すべて保存されています'}
         </span>
         <button className="text-button" disabled={!dirty || busy || avatarLoading} onClick={reset}>
-          再読み込み
+          変更を破棄して再読み込み
         </button>
         <button
           className="primary"
@@ -1051,7 +1169,7 @@ function SettingsPage({
           onClick={() => void save()}
         >
           <Icon name="check" size={16} />
-          保存
+          変更をすべて保存
         </button>
       </div>
       {parseError && (
@@ -1087,25 +1205,105 @@ function SettingsPage({
               [
                 ['appearance', '表示', 'sun'],
                 ['general', '一般', 'settings'],
-                ['extensions', 'Applet設定', 'extensions'],
+                ['host-shortcuts', 'AppDockのキー', 'command'],
                 ['shortcuts', 'ショートカット', 'command'],
                 ['profile', 'プロフィール', 'home'],
               ] as const
             ).map(([id, label, icon]) => (
               <button
+                aria-current={category === id ? 'true' : undefined}
                 className={category === id ? 'selected' : ''}
                 key={id}
                 onClick={() => setCategory(id)}
               >
                 <Icon name={icon} size={16} />
                 {label}
+                {categoryChanged(id) && (
+                  <span className="unsaved-mark" aria-label="未保存">
+                    ●
+                  </span>
+                )}
               </button>
             ))}
+            <div className="settings-applet-list">
+              <h3>Applet別の設定</h3>
+              <input
+                aria-label="設定するAppletを検索"
+                placeholder="Appletを検索…"
+                value={appletSearch}
+                onChange={(event) => setAppletSearch(event.target.value)}
+              />
+              {extensions
+                .filter((e) =>
+                  (e.name + ' ' + e.id).toLowerCase().includes(appletSearch.toLowerCase()),
+                )
+                .map((e) => (
+                  <button
+                    key={e.id}
+                    className={
+                      category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
+                    }
+                    aria-current={
+                      category === 'extensions' && selectedApplet?.id === e.id ? 'true' : undefined
+                    }
+                    onClick={() => {
+                      setCategory('extensions');
+                      setAppletId(e.id);
+                    }}
+                  >
+                    {e.name}
+                    {appletChanged(e.id) && (
+                      <span className="unsaved-mark" aria-label="未保存">
+                        ●
+                      </span>
+                    )}
+                  </button>
+                ))}
+              {!extensions.some((e) =>
+                (e.name + ' ' + e.id).toLowerCase().includes(appletSearch.toLowerCase()),
+              ) && <p>該当するAppletはありません。</p>}
+            </div>
           </div>
           <div className="settings-form">
-            {category === 'shortcuts' && (
+            {category === 'extensions' && selectedApplet && (
+              <>
+                <div className="applet-settings-heading">
+                  <h3>{selectedApplet.name}</h3>
+                  <button className="text-button" onClick={() => onApplet(selectedApplet.id)}>
+                    Appletに戻る
+                  </button>
+                </div>
+                <div className="tabs" aria-label="Applet設定の表示">
+                  <button
+                    aria-pressed={appletTab === 'settings'}
+                    className={appletTab === 'settings' ? 'selected' : ''}
+                    onClick={() => setAppletTab('settings')}
+                  >
+                    設定項目
+                  </button>
+                  <button
+                    aria-pressed={appletTab === 'shortcuts'}
+                    className={appletTab === 'shortcuts' ? 'selected' : ''}
+                    onClick={() => setAppletTab('shortcuts')}
+                  >
+                    ショートカットキー
+                  </button>
+                </div>
+              </>
+            )}
+            {(category === 'shortcuts' ||
+              category === 'host-shortcuts' ||
+              (category === 'extensions' && appletTab === 'shortcuts' && selectedApplet)) && (
               <ShortcutsEditor
+                key={category === 'extensions' ? selectedApplet?.id : category}
                 commands={commands}
+                owner={
+                  category === 'extensions'
+                    ? selectedApplet?.id
+                    : category === 'host-shortcuts'
+                      ? null
+                      : undefined
+                }
                 bindings={draft.shortcuts}
                 onChange={(shortcuts) => edit({ ...draft, shortcuts })}
                 globalCommands={draft.globalShortcutCommands}
@@ -1190,67 +1388,17 @@ function SettingsPage({
                 ))}
               </>
             )}
-            {category === 'extensions' &&
-              extensions
-                .filter((e) => e.settings?.length)
-                .map((e) => (
-                  <React.Fragment key={e.id}>
-                    <h3>{e.name}</h3>
-                    {e.settings?.map((s) => {
-                      const value = draft.extensions[e.id]?.settings[s.key] ?? s.default;
-                      const set = (v: unknown) =>
-                        edit({
-                          ...draft,
-                          extensions: {
-                            ...draft.extensions,
-                            [e.id]: {
-                              ...(draft.extensions[e.id] || { enabled: false, settings: {} }),
-                              settings: { ...draft.extensions[e.id]?.settings, [s.key]: v },
-                            },
-                          },
-                        });
-                      return (
-                        <SettingRow key={s.key} title={s.title} description={s.description ?? ''}>
-                          {s.type === 'boolean' ? (
-                            <Toggle checked={Boolean(value)} label={s.title} onChange={set} />
-                          ) : s.type === 'select' ? (
-                            <select
-                              aria-label={s.title}
-                              value={String(value ?? '')}
-                              onChange={(ev) => set(ev.target.value)}
-                            >
-                              {!(e.settingOptions[s.key] ?? s.options ?? []).some(
-                                (o) => o.value === value,
-                              ) &&
-                                value !== undefined && (
-                                  <option value={String(value)}>
-                                    保存された選択（現在利用できません）: {String(value)}
-                                  </option>
-                                )}
-                              {(e.settingOptions[s.key] ?? s.options ?? []).map((o) => (
-                                <option key={o.value} value={o.value}>
-                                  {o.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              aria-label={s.title}
-                              type={s.type === 'number' ? 'number' : 'text'}
-                              min={s.minimum}
-                              max={s.maximum}
-                              step={s.step ?? 'any'}
-                              value={String(value ?? '')}
-                              onChange={(ev) =>
-                                set(s.type === 'number' ? Number(ev.target.value) : ev.target.value)
-                              }
-                            />
-                          )}
-                        </SettingRow>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
+            {category === 'extensions' && appletTab === 'settings' && selectedApplet && (
+              <AppletSettings
+                key={selectedApplet.id}
+                applet={selectedApplet}
+                draft={draft}
+                onChange={edit}
+              />
+            )}
+            {category === 'extensions' && !selectedApplet && (
+              <p className="empty">Appletはまだありません。</p>
+            )}
           </div>
         </div>
       )}
@@ -1280,11 +1428,22 @@ function SettingRow({
     </div>
   );
 }
-function LogsPage({ snapshot, run }: { snapshot: HostSnapshot; run: Run }) {
+function LogsPage({
+  snapshot,
+  run,
+  source,
+  onSource,
+}: {
+  snapshot: HostSnapshot;
+  run: Run;
+  source: string;
+  onSource(value: string): void;
+}) {
   const [filter, setFilter] = useState('');
   const [level, setLevel] = useState('all');
   const logs = snapshot.logs.filter(
     (l) =>
+      (!source || l.source === source) &&
       (level === 'all' || level === l.level) &&
       `${l.source} ${l.message}`.toLowerCase().includes(filter.toLowerCase()),
   );
@@ -1311,13 +1470,31 @@ function LogsPage({ snapshot, run }: { snapshot: HostSnapshot; run: Run }) {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        <select
+          aria-label="ログのApplet"
+          value={source}
+          onChange={(event) => onSource(event.target.value)}
+        >
+          <option value="">すべてのログ</option>
+          {[
+            ...new Set([
+              ...snapshot.extensions.map((e) => e.id),
+              ...snapshot.logs.map((entry) => entry.source),
+              ...(source ? [source] : []),
+            ]),
+          ].map((id) => (
+            <option key={id} value={id}>
+              {snapshot.extensions.find((e) => e.id === id)?.name ?? id}
+            </option>
+          ))}
+        </select>
         <select aria-label="ログレベル" value={level} onChange={(e) => setLevel(e.target.value)}>
-          <option value="all">All levels</option>
+          <option value="all">すべてのレベル</option>
           <option value="info">Info</option>
           <option value="warn">Warning</option>
           <option value="error">Error</option>
         </select>
-        <span>{logs.length} entries</span>
+        <span>{logs.length} 件</span>
       </div>
       <div className="log-table">
         <div className="log-head">

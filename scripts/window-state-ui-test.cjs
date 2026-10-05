@@ -16,7 +16,7 @@ async function launch() {
     timeout: 30000,
   });
   const page = await application.firstWindow();
-  await page.getByRole('heading', { name: 'Welcome to your Dock.' }).waitFor();
+  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
 }
 async function waitFor(check) {
   for (let i = 0; i < 100; i++) {

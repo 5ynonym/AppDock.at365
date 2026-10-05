@@ -1731,3 +1731,333 @@ main {
   font-weight: 500;
   margin-bottom: 15px;
 }
+
+/* One global navigation rail, with a contextual selector only where needed. */
+.shell {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+.shell.with-sidebar {
+  grid-template-columns: 76px 230px minmax(0, 1fr);
+}
+.activity-rail {
+  padding-inline: 6px;
+}
+.activity-rail > button:not(.avatar) {
+  width: 62px;
+  min-height: 52px;
+  height: auto;
+  flex-direction: column;
+  gap: 5px;
+}
+.rail-label {
+  font-size: 11px;
+}
+.titlebar-search {
+  -webkit-app-region: no-drag;
+  margin-left: auto;
+  margin-right: 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.window-controls {
+  margin-left: 0;
+}
+.sidebar {
+  gap: 16px;
+}
+.sidebar h2 {
+  font-size: 16px;
+}
+.sidebar > input,
+.settings-applet-list input {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+.sidebar-extensions button {
+  padding: 12px 8px;
+  flex-wrap: wrap;
+}
+.sidebar-extensions button > span {
+  flex: 1;
+  font-size: 12px;
+}
+.sidebar-extensions small {
+  font-size: 11px;
+}
+.page-content {
+  padding: 26px 30px;
+}
+.page-heading {
+  margin-bottom: 22px;
+}
+.page-heading h1 {
+  font-size: 25px;
+}
+.page-heading p,
+.detail-description,
+.extension-panel > p,
+.inactive-panel p,
+.settings-help {
+  font-size: 13px;
+}
+.extensions-layout {
+  display: block;
+}
+.detail-actions {
+  margin-top: 20px;
+}
+.detail-meta {
+  font-size: 12px;
+}
+summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.detail-meta > div {
+  margin-top: 12px;
+}
+.home-pins {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.home-pins h2 {
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+.home-pins p,
+.home-pins small {
+  font-size: 12px;
+}
+.home-pins small {
+  color: var(--muted);
+}
+.settings-toolbar {
+  position: sticky;
+  top: -1px;
+  z-index: 3;
+  background: var(--bg);
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+.settings-toolbar > span {
+  font-size: 12px;
+}
+.settings-layout {
+  grid-template-columns: 210px minmax(0, 1fr);
+  align-items: start;
+}
+.settings-categories {
+  position: sticky;
+  top: 85px;
+  max-height: calc(100vh - 185px);
+  overflow: auto;
+  padding: 4px;
+}
+.settings-categories button {
+  font-size: 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  padding: 9px 10px;
+}
+.settings-applet-list {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 15px;
+}
+.settings-applet-list h3 {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.settings-applet-list button {
+  width: 100%;
+  margin-top: 4px;
+}
+.settings-applet-list p {
+  padding: 10px;
+  font-size: 12px;
+}
+.unsaved-mark {
+  margin-left: auto;
+  font-size: 9px;
+  color: #bd873a;
+}
+.applet-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.applet-settings-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+}
+.settings-form {
+  min-width: 0;
+}
+.setting-row {
+  gap: 16px;
+}
+.setting-row strong,
+.shortcut-description strong {
+  font-size: 14px;
+}
+.setting-row p,
+.shortcut-description span,
+.shortcut-binding input,
+.setting-row input {
+  font-size: 12px;
+}
+.setting-row select {
+  max-width: 55%;
+  min-width: 0;
+}
+.shortcut-row {
+  flex-wrap: wrap;
+}
+.shortcut-group {
+  flex-basis: 100%;
+  margin: 0 0 5px;
+  padding: 8px 0;
+  color: var(--accent);
+  font-size: 15px;
+}
+.shortcut-description details {
+  margin: 8px 0;
+  font-size: 11px;
+}
+.shortcut-conflict {
+  color: #c35d6c;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.shortcut-row-actions button {
+  font-size: 11px;
+}
+.palette-command.highlighted {
+  box-shadow: inset 3px 0 var(--accent);
+  background: var(--raised);
+}
+.palette-footer {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.log-toolbar {
+  flex-wrap: wrap;
+}
+.log-toolbar input {
+  min-width: 150px;
+}
+.log-toolbar select {
+  max-width: 100%;
+}
+.log-row,
+.log-row p,
+.log-row > div > span {
+  font-size: 12px;
+}
+.log-head,
+.log-level,
+.state,
+.statusbar,
+.statusbar > button {
+  font-size: 11px;
+}
+.extension-card p,
+.card-bottom {
+  font-size: 12px;
+}
+.text-button,
+.tabs button {
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .shell.with-sidebar {
+    grid-template-columns: 76px 185px minmax(0, 1fr);
+  }
+  .page-content {
+    padding: 22px 20px;
+  }
+  .settings-layout {
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .settings-categories {
+    max-height: calc(100vh - 290px);
+  }
+  .settings-layout .settings-form {
+    padding: 20px 18px;
+  }
+  .settings-toolbar {
+    gap: 10px;
+  }
+  .settings-toolbar > span {
+    margin-left: 0;
+  }
+  .setting-row {
+    flex-wrap: wrap;
+  }
+  .settings-layout .setting-row input {
+    width: 100%;
+    max-width: none;
+  }
+  .setting-row select {
+    width: 100%;
+    max-width: none;
+  }
+}
+@media (max-width: 760px) {
+  .shell.with-sidebar {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+  .shell {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+  .shell.with-sidebar .sidebar {
+    grid-column: 2;
+    grid-row: 2;
+    max-height: 150px;
+    border-bottom: 1px solid var(--border);
+    padding: 10px;
+  }
+  .shell.with-sidebar main {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 150px;
+  }
+  .sidebar h2 {
+    display: none;
+  }
+  .sidebar-extensions {
+    margin-top: 6px;
+  }
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-categories {
+    position: static;
+    max-height: 200px;
+  }
+  .titlebar-search {
+    margin-right: 8px;
+  }
+  .titlebar-search kbd {
+    display: none;
+  }
+  .stats {
+    grid-template-columns: 1fr;
+  }
+  .extension-grid {
+    grid-template-columns: 1fr;
+  }
+  .activity-rail > button:not(.avatar) {
+    width: 54px;
+  }
+}

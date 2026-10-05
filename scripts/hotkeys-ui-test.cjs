@@ -109,13 +109,13 @@ async function until(check, message) {
       async () => (await input.inputValue()) === 'F24',
       'Recorder did not capture single F24.',
     );
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(() => registered('F24'), 'F24 remapping did not register.');
     assert.equal((await contender.sync(['Pause']))[0].registered, true);
     checks.push('recording suspends Pause; single F24 remapping releases Pause');
 
     await row.getByRole('button', { name: '既定に戻す', exact: true }).click();
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
         (await snapshot()).globalHotKeys.some(
@@ -136,12 +136,12 @@ async function until(check, message) {
     checks.push('focused AppDock executes global key once');
 
     await row.getByRole('checkbox').uncheck();
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(async () => !(await registered('Pause')), 'Global opt-out did not release Pause.');
     assert.equal((await contender.sync(['Pause']))[0].registered, true);
     await contender.sync([]);
     await row.getByRole('button', { name: '既定に戻す', exact: true }).click();
-    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(() => registered('Pause'), 'Default restore did not restore global Pause.');
     await page.screenshot({ path: path.join(profile, 'registered.png') });
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', false));
