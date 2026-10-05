@@ -5,6 +5,9 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, 'artifacts', `ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
+const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+require('../tests/fixtures/install.cjs')(profile, settings);
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 (async () => {
   const application = await electron.launch({
     executablePath: require('electron'),

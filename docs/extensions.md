@@ -84,7 +84,7 @@ DLL用の.NETホストはMicrosoft.NETCore.Appを同梱し、WindowsDesktopラ�
 
 ## TypeScript / Node.js
 
-`extensions/welcome/index.ts` が完全な例です。型は `src/main/node-worker.ts` の `NodeExtensionContext` / `NodeExtension` を `import type` で参照できます。コンパイル済みCommonJSコードを配置してください。`pnpm run build` は同梱サンプルを自動コンパイルします。
+検証用の [Node拡張](../tests/fixtures/extensions/welcome/index.ts) が完全な例です。型は `src/main/node-worker.ts` の `NodeExtensionContext` / `NodeExtension` を `import type` で参照できます。コンパイル済みCommonJSコードを配置してください。検証用拡張は `pnpm run build:test-extensions` でコンパイルし、通常のビルド・発行には含めません。
 
 ```typescript
 import type { NodeExtensionContext } from '../../src/main/node-worker';

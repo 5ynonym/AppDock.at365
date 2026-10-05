@@ -1,4 +1,4 @@
-import type { NodeExtensionContext } from '../../src/main/node-worker';
+import type { NodeExtensionContext } from '../../../../src/main/node-worker';
 export async function activate(context: NodeExtensionContext) {
   const refresh = async () =>
     context.ui.showPanel({

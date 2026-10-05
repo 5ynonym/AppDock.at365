@@ -13,9 +13,6 @@
   },
   "globalShortcutCommands": ["at365.watch.toggle"],
   "pinnedCommands": [],
-  "profile": { "name": "ユキ", "avatar": null },
-  "extensions": {
-    "appdock.welcome": { "enabled": true, "settings": {} },
-    "appdock.dotnet-demo": { "enabled": false, "settings": { "intervalSeconds": 30 } }
-  }
+  "profile": { "name": "User", "avatar": null },
+  "extensions": {}
 }

@@ -8,9 +8,9 @@ Appletは1つの道具として有効化・停止・再起動できる単位で�
 
 | runtime | 選ぶ場面 | 実装と参照例 |
 | --- | --- | --- |
-| `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#サンプル](../dotnet/AppDock.Extensions.Demo/DemoExtension.cs) |
+| `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#検証用拡張](../tests/fixtures/dotnet/AppDock.Extensions.Demo/DemoExtension.cs) |
 | `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要 | 自身のランタイムを持つEXE。[時計Applet](../../Applet.Watch.at365/README.md) |
-| `node` | TypeScriptで実装する処理。Electron同梱Nodeを利用 | コンパイル済みCommonJS。[Welcomeサンプル](../extensions/welcome/index.ts) |
+| `node` | TypeScriptで実装する処理。Electron同梱Nodeを利用 | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts) |
 
 独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。アカウント一覧等の専用画面が必要になった場合は、ホスト側の型とUIを追加します。
 
@@ -138,7 +138,7 @@ AppDockはdeactivateを最大2秒待ってからプロセスを停止します�
 
 ## 6. ビルド・配置・検証する
 
-ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で無効です。同梱Appletと同じIDは同梱側が優先されるので、別IDを使います。
+ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で無効です。他のAppletと重複しないIDを使います。
 
 時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)と[ローカル配置スクリプト](../../Applet.Watch.at365/scripts/install-local.ps1)は、EXEとmanifestだけをコピーし、AppDockの設定を変更しない例です。EXEを置換する前にその配置先のAppDockを終了してください。既存Watch等の実行中出力やソースには上書きしません。
 
