@@ -11,11 +11,13 @@ import {
   shell,
   protocol,
   net,
+  screen,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
+import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
@@ -51,6 +53,8 @@ let tray: Tray | null = null;
 let settings: SettingsStore;
 let manager: ExtensionManager;
 let log: HostLog;
+let windowState: WindowStateStore | undefined;
+let restoreMaximized = false;
 let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
@@ -64,6 +68,11 @@ const changed = () => {
 };
 function showWindow() {
   if (window) {
+    if (restoreMaximized) {
+      restoreMaximized = false;
+      window.maximize();
+    }
+    if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
   }
@@ -246,11 +255,22 @@ async function initialize() {
   session.defaultSession.setPermissionRequestHandler((_, __, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   Menu.setApplicationMenu(null);
+  windowState = new WindowStateStore(path.join(dataDirectory, 'window-state.json'), (error) =>
+    log.write('error', 'window', `ウィンドウ状態の読み込み・保存に失敗しました: ${String(error)}`),
+  );
+  const primary = screen.getPrimaryDisplay();
+  const displays = [
+    primary,
+    ...screen.getAllDisplays().filter((display) => display.id !== primary.id),
+  ];
+  const savedWindow = windowState.load(displays.map((display) => display.workArea));
+  restoreMaximized = savedWindow?.maximized ?? false;
   window = new BrowserWindow({
     width: 1280,
     height: 840,
-    minWidth: 900,
-    minHeight: 620,
+    ...savedWindow?.bounds,
+    minWidth: Math.min(windowMinimum.width, savedWindow?.bounds.width ?? windowMinimum.width),
+    minHeight: Math.min(windowMinimum.height, savedWindow?.bounds.height ?? windowMinimum.height),
     title: 'AppDock.at365',
     backgroundColor: '#101116',
     show: false,
@@ -264,6 +284,7 @@ async function initialize() {
       webviewTag: false,
     },
   });
+  windowState.track(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.on('close', (event) => {
@@ -286,6 +307,8 @@ async function initialize() {
   tray.on('click', showWindow);
   trayMenu();
   await window.loadURL('appdock://host/index.html');
+  // Reapply after native initialization, which can adjust frameless bounds for DPI.
+  if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   manager.discover();
   await manager.reconcile();
   log.write('info', 'host', 'AppDockを起動しました。');
@@ -403,6 +426,7 @@ async function runSmoke() {
 app.on('second-instance', () => showWindow());
 app.on('before-quit', (event) => {
   quitting = true;
+  windowState?.flush();
   if (shutdownFinished || !manager) return;
   event.preventDefault();
   if (shutdownStarted) return;
