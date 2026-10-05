@@ -123,40 +123,47 @@ export function ShortcutsEditor({
               )}
             <div className="shortcut-description">
               <strong>{command.title}</strong>
-              <span>
-                {command.extension}
-                {!command.available && ' · 現在利用できません'}
-              </span>
-              <details>
-                <summary>コマンドID</summary>
-                <code>{command.id}</code>
-              </details>
-              <label className="shortcut-global">
-                <input
-                  type="checkbox"
-                  checked={globalCommands.includes(command.id)}
-                  onChange={(event) => setGlobal(command.id, event.target.checked)}
-                />
-                グローバル
-              </label>
-              <span>
-                他のアプリの操作中も有効
-                {globalCommands.includes(command.id) ? '：オン' : '：オフ（AppDock内のみ）'}
-              </span>
+              <div className="shortcut-meta">
+                <span title={command.extension}>{command.extension}</span>
+                <code title={`コマンドID: ${command.id}`}>{command.id}</code>
+              </div>
+              <div className="shortcut-status-line">
+                <label className="shortcut-global">
+                  <input
+                    type="checkbox"
+                    checked={globalCommands.includes(command.id)}
+                    onChange={(event) => setGlobal(command.id, event.target.checked)}
+                  />
+                  グローバル
+                </label>
+                <span className="shortcut-scope">
+                  {globalCommands.includes(command.id) ? '他のアプリでも有効' : 'AppDock内のみ'}
+                </span>
+                {!command.available && (
+                  <span className="shortcut-availability">現在利用できません</span>
+                )}
+                {globalCommands.includes(command.id) && !command.available && (
+                  <span>Applet起動時に登録します</span>
+                )}
+                {statuses
+                  .filter((status) => status.commandId === command.id && !status.error)
+                  .map((status) => (
+                    <span key={status.shortcut} title="保存済みの登録状態">
+                      {status.shortcut}: {status.registered ? '登録済み' : '未登録'}
+                    </span>
+                  ))}
+              </div>
               {conflicts(command.id).map((message) => (
                 <p className="shortcut-conflict" role="alert" key={message}>
                   {message}
                 </p>
               ))}
-              {globalCommands.includes(command.id) && !command.available && (
-                <span>Applet起動時に登録します</span>
-              )}
               {statuses
-                .filter((status) => status.commandId === command.id)
+                .filter((status) => status.commandId === command.id && status.error)
                 .map((status) => (
-                  <span key={status.shortcut} role={status.error ? 'alert' : undefined}>
-                    {status.shortcut}: {status.error ?? (status.registered ? '登録済み' : '未登録')}
-                  </span>
+                  <p className="shortcut-conflict" key={status.shortcut} role="alert">
+                    {status.shortcut}: {status.error}
+                  </p>
                 ))}
             </div>
             <div className="shortcut-bindings">

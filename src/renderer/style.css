@@ -1534,11 +1534,11 @@ main {
   gap: 16px;
   justify-content: space-between;
   border-top: 1px solid var(--border);
-  padding: 20px 0;
+  padding: 12px 0;
 }
 .shortcut-description {
   min-width: 0;
-  padding-top: 8px;
+  padding-top: 0;
   flex: 1;
 }
 .shortcut-description strong {
@@ -1547,23 +1547,52 @@ main {
   font-weight: 500;
 }
 .shortcut-description span {
-  display: block;
   font-size: 10px;
   color: var(--muted);
-  margin-top: 6px;
 }
 .shortcut-description code {
-  display: block;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--faint);
+}
+.shortcut-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.shortcut-meta > span {
+  max-width: 45%;
+  flex-shrink: 0;
+}
+.shortcut-meta > code {
+  flex: 1;
+  min-width: 0;
+}
+.shortcut-meta > span,
+.shortcut-meta > code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shortcut-status-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 4px;
+  margin-top: 7px;
+  line-height: 1.5;
+}
+.shortcut-status-line > span {
   overflow-wrap: anywhere;
-  margin-top: 5px;
 }
 .shortcut-global {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  flex-shrink: 0;
 }
 .shortcut-global input {
   accent-color: var(--accent);
@@ -1686,7 +1715,7 @@ main {
     gap: 10px;
   }
   .shortcut-description code {
-    font-size: 8px;
+    font-size: 10px;
   }
   .profile-actions {
     justify-content: flex-start;
@@ -1924,14 +1953,10 @@ summary {
 }
 .shortcut-group {
   flex-basis: 100%;
-  margin: 0 0 5px;
-  padding: 8px 0;
+  margin: 0;
+  padding: 4px 0;
   color: var(--accent);
   font-size: 15px;
-}
-.shortcut-description details {
-  margin: 8px 0;
-  font-size: 11px;
 }
 .shortcut-conflict {
   color: #c35d6c;
