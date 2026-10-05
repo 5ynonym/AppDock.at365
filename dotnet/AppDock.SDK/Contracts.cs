@@ -19,7 +19,12 @@ public interface IExtensionContext
     ISecretService Secrets { get; }
     ISchedulerService Scheduler { get; }
 }
-public interface ICommandService { void Register(string id, string title, Func<CancellationToken, Task> handler); }
+public interface ICommandService
+{
+    void Register(string id, string title, Func<CancellationToken, Task> handler);
+    Task ReplaceAsync(IReadOnlyList<CommandRegistration> commands, CancellationToken cancellationToken = default);
+}
+public sealed record CommandRegistration(string Id, string Title, Func<CancellationToken, Task> Handler);
 public interface ITrayService { void Add(string title, string command); }
 public interface ISettingsService
 {

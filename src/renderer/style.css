@@ -2086,3 +2086,9 @@ summary {
     width: 54px;
   }
 }
+/* Editable SendKey command definitions supplied by an applet. */
+.send-key-list { min-width: 0; width: 100%; display: grid; gap: 10px; }
+.send-key-entry { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.setting-row:has(.send-key-list) { flex-direction: column; align-items: stretch; }
+.setting-row .send-key-entry input { min-width: 0; width: 100%; max-width: none; }
+.send-key-list p { margin: 0; }
