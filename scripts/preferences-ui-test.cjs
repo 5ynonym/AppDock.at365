@@ -12,6 +12,7 @@ delete legacy.shortcuts;
 delete legacy.profile;
 delete legacy.pinnedCommands;
 legacy.host.notifications = false;
+require('../tests/fixtures/install.cjs')(profile, legacy);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
 const hash = () =>
   createHash('sha256')

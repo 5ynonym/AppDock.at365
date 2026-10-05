@@ -11,9 +11,10 @@ test('real Node and .NET extensions: activation, commands, crash isolation, rest
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-lifecycle-'));
   const settings = new SettingsStore(path.join(dir, 'settings.json'));
   settings.load();
+  settings.updateExtension('appdock.welcome', { enabled: true });
   settings.updateExtension('appdock.dotnet-demo', { enabled: true });
   const manager = new ExtensionManager({
-    roots: [path.join(root, 'extensions')],
+    roots: [path.join(root, 'artifacts/test-extensions')],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),

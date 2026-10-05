@@ -222,13 +222,10 @@ async function initialize() {
     return;
   }
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
-  const builtins = app.isPackaged
-    ? path.join(process.resourcesPath, 'extensions')
-    : path.join(app.getAppPath(), 'extensions');
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
-    roots: builtins === external ? [builtins] : [builtins, external],
+    roots: [external],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(__dirname, 'node-worker.js'),
@@ -312,6 +309,9 @@ async function initialize() {
   ];
   const savedWindow = windowState.load(displays.map((display) => display.workArea));
   restoreMaximized = savedWindow?.maximized ?? false;
+  const windowIcon = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(app.getAppPath(), 'assets', 'icon.ico');
   window = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -322,7 +322,7 @@ async function initialize() {
     backgroundColor: '#101116',
     show: false,
     frame: false,
-    icon: path.join(app.getAppPath(), 'assets', 'icon.png'),
+    icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -331,6 +331,18 @@ async function initialize() {
       webviewTag: false,
     },
   });
+  if (process.platform === 'win32') {
+    // Windows Shell needs a real file path, outside app.asar, for the taskbar icon.
+    const executable = process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe');
+    window.setAppDetails({
+      appId: 'at365.appdock',
+      // A portable app extracts resources temporarily; pinned icons must use its stable EXE.
+      appIconPath: process.env.PORTABLE_EXECUTABLE_FILE || windowIcon,
+      appIconIndex: 0,
+      relaunchCommand: app.isPackaged ? `"${executable}"` : `"${executable}" "${app.getAppPath()}"`,
+      relaunchDisplayName: 'AppDock.at365',
+    });
+  }
   windowState.track(window);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
@@ -388,18 +400,9 @@ async function runSmoke() {
   try {
     const title = await window!.webContents.executeJavaScript('document.title');
     if (title !== 'AppDock.at365') throw new Error('Renderer did not load');
-    const running = manager.snapshot().find((e) => e.id === 'appdock.welcome');
-    if (running?.state !== 'running')
-      throw new Error(running?.error || 'Node extension did not activate');
-    await manager.execute('appdock.welcome.refresh');
-    settings.updateExtension('appdock.dotnet-demo', { enabled: true });
-    await manager.reconcile();
-    const dotnet = manager.snapshot().find((e) => e.id === 'appdock.dotnet-demo');
-    if (dotnet?.state !== 'running')
-      throw new Error(dotnet?.error || '.NET extension did not activate');
-    await manager.execute('appdock.dotnet-demo.refresh');
-    await manager.execute('appdock.welcome.verify-storage');
-    await manager.execute('appdock.dotnet-demo.verify-storage');
+    const expectedApplets = process.argv.includes('--smoke-clock') ? ['at365.watch'] : [];
+    if (manager.snapshot().some((e) => !expectedApplets.includes(e.id)))
+      throw new Error('Unexpected applet in a clean smoke profile');
     let nativeClock:
       { state: string; commands: number; trayItems: number; visibleSaved: boolean } | undefined;
     if (process.argv.includes('--smoke-clock')) {
@@ -429,7 +432,7 @@ async function runSmoke() {
       const avatar = new Uint8Array(${JSON.stringify([...avatarBytes])});
       const current = await window.dock.snapshot();
       await window.dock.saveSettings({...current.settings.value, profile: {name: 'Portable test', avatar: 'avatar.png'}}, current.settings.revision, avatar);
-      await window.dock.setPinnedCommands(['appdock.welcome.refresh', 'appdock.dotnet-demo.refresh']);
+      await window.dock.setPinnedCommands(['appdock.commands.search', 'appdock.settings.open']);
       const saved = await window.dock.snapshot();
       const image = new Image();
       const avatarLoaded = await new Promise(resolve => {

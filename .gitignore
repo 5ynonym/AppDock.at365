@@ -10,7 +10,7 @@ avatar.png
 avatar.png.*.tmp
 **/bin/
 **/obj/
-extensions/dotnet-demo/*.dll
-extensions/dotnet-demo/*.pdb
-extensions/welcome/index.js
 deploy.local.txt
+tests/fixtures/extensions/dotnet-demo/*.dll
+tests/fixtures/extensions/dotnet-demo/*.pdb
+tests/fixtures/extensions/welcome/index.js

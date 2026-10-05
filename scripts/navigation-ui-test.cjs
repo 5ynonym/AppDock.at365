@@ -9,6 +9,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.shortcuts['missing.command'] = ['Ctrl+Alt+9'];
 settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
+require('../tests/fixtures/install.cjs')(profile, settings);
 for (let i = 0; i < 24; i++) {
   const id = `test.applet-${i}`;
   const folder = path.join(profile, 'extensions', id);

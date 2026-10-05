@@ -10,10 +10,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
 export const createDefaultSettings = (): Settings => ({
   schemaVersion: 1,
   host: { theme: 'dark', closeToTray: true, notifications: true, startMinimized: false },
-  extensions: {
-    'appdock.welcome': { enabled: true, settings: {} },
-    'appdock.dotnet-demo': { enabled: false, settings: { intervalSeconds: 30 } },
-  },
+  extensions: {},
   shortcuts: structuredClone(defaultShortcuts),
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
   pinnedCommands: [],

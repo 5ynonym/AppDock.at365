@@ -20,7 +20,7 @@
 
 設定の「変更をすべて保存」は、表示中のAppletだけでなく、すべてのカテゴリの未保存変更をまとめて保存します。変更したカテゴリ・Applet名には印が付き、ページやAppletを切り替えても編集内容を保持します。保存バーはスクロール中も表示します。「変更を破棄して再読み込み」は全カテゴリの下書きを破棄します。JSONの構文や内容に誤りがある場合、Appletからの直接移動でもJSONを保持し、修正後にフォームへ切り替えられます。
 
-最初はTypeScript製のWelcome Appletだけが有効です。.NET Connection Demoを有効にすると、C# DLLからの画面表示、定期実行、コマンド、通知、トレイ登録を確認できます。
+Appletは同梱していません。初回起動時のApplet一覧は空で、必要なAppletをEXEの隣の `extensions` に追加して使用します。
 
 「設定 → ショートカット」で、ホストとAppletが登録したコマンドにキーを割り当てられます。欄を選んでキーを押し、「保存」で確定します。Ctrl / Alt / Shiftとの組み合わせと、Pause・F1〜F24・文字キーなどの単独キーに対応し、1つのコマンドに5個まで登録できます。×で解除、Escapeで入力終了、Tabで次の欄へ移動します。同じキーの重複割り当ては保存時に拒否します。通常はAppDock操作中に有効で、修飾なしのキーはテキスト入力中に実行しません。
 
@@ -88,7 +88,7 @@ Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号�
 
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
-`pnpm run dist` は.NETホストのself-contained発行、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`AppDock.at365.slnx` はSDK・.NETホスト・C#サンプル用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+`pnpm run dist` は.NETホストのself-contained発行、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
 ソースの主な配置:
 
@@ -99,20 +99,18 @@ src/shared/                UI/ホスト間の型と設定検証
 dotnet/AppDock.SDK/        .NET拡張向けインターフェース
 dotnet/AppDock.Runtime/     .NET共通のJSON-RPC・SDK実装・セッション
 dotnet/AppDock.ExtensionHost/  DLLを読み込むプロセス
-dotnet/AppDock.Extensions.Demo/  C#拡張サンプル
-extensions/welcome/        TypeScript拡張サンプル
-extensions/dotnet-demo/    C#サンプルのmanifestと発行DLL
+tests/fixtures/            Node・C#拡張の検証用データ（同梱対象外）
 tests/                     設定・通信・実プロセスの回帰テスト
 scripts/                   ビルドと実機UI/portable検証
 ```
 
-テストは専用の一時フォルダ／`artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
+テストは専用の一時フォルダ／`artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Node・C#の検証用拡張は `build:test-extensions` で `artifacts/test-extensions` に生成し、UIテストの専用プロファイルにだけ配置します。通常のビルド・発行・起動では読み込みません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
 
 ## Appletを書く
 
 [Applet実装ガイド](docs/applet-development.md)に実行方式の選択、最小C#実装、設定・コマンド・終了処理、時計で得た注意点と検証手順をまとめています。[AppDock実装ガイド](docs/host-development.md)は、必要なAPI・設定・React UIをホストへ足す際の変更先と注意点です。個々のAPIと通信は[Applet API](docs/extensions.md)を参照してください。
 
-外部AppletはEXEの隣の `extensions\<Appletフォルダ>\extension.json` と実装ファイルで構成します。追加・削除後はホストを起動し直してください。新規Appletは既定で無効です。同梱Appletと同じIDは同梱側を優先し、重複をログに記録します。
+外部AppletはEXEの隣の `extensions\<Appletフォルダ>\extension.json` と実装ファイルで構成します。追加・削除後はホストを起動し直してください。新規Appletは既定で無効です。IDが重複した場合は先に見つかったAppletを優先し、重複をログに記録します。
 
 ローカルの信頼できる拡張を対象にしています。拡張はユーザー権限で動く.NET/Nodeコードです。別プロセス化は障害の分離であり、OSの権限制限ではありません。manifestのcapabilitiesはHost APIの使用宣言・検査であり、拡張の直接のファイル操作やネットワーク通信を制限する仕組みではありません。React画面はNodeを公開せず、画面に渡せる拡張UIはテキスト・状態・コマンドに限定しています。
 

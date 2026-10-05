@@ -8,18 +8,19 @@
   "main": "out/main/main/index.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
-    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.extensions.json && node scripts/build-node-extensions.cjs && vite build",
+    "build": "tsc -p tsconfig.main.json && vite build",
     "start": "pnpm run build && electron .",
-    "test": "pnpm run build && node --test tests/*.test.cjs",
+    "test": "pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
+    "build:test-extensions": "node scripts/build-test-extensions.cjs",
     "build:dotnet": "node scripts/build-dotnet.cjs",
     "dist": "pnpm run build:dotnet && pnpm run build && electron-builder --win portable --x64",
     "smoke": "node scripts/smoke.cjs",
-    "test:ui": "node scripts/ui-test.cjs",
-    "test:navigation": "node scripts/navigation-ui-test.cjs",
-    "test:preferences": "node scripts/preferences-ui-test.cjs",
-    "test:hotkeys": "node scripts/hotkeys-ui-test.cjs",
+    "test:ui": "pnpm run build:test-extensions && node scripts/ui-test.cjs",
+    "test:navigation": "pnpm run build:test-extensions && node scripts/navigation-ui-test.cjs",
+    "test:preferences": "pnpm run build:test-extensions && node scripts/preferences-ui-test.cjs",
+    "test:hotkeys": "pnpm run build:test-extensions && node scripts/hotkeys-ui-test.cjs",
     "test:window-state": "node scripts/window-state-ui-test.cjs",
-    "format": "prettier --write src extensions scripts tests"
+    "format": "prettier --write --ignore-path .gitignore src scripts tests"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
@@ -52,13 +53,8 @@
         "to": "dotnet-host"
       },
       {
-        "from": "extensions",
-        "to": "extensions",
-        "filter": [
-          "**/*",
-          "!**/bin/**/*",
-          "!**/obj/**/*"
-        ]
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {

@@ -15,6 +15,7 @@ for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: true } };
 settings.host.notifications = false;
+require('../tests/fixtures/install.cjs')(profile, settings);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const { WindowsHotKeyBackend } = require('../out/main/main/core/global-hotkeys.js');
 const checks = [];
