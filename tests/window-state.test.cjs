@@ -1,0 +1,141 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
+const {
+  WindowStateStore,
+  parseWindowState,
+  fitWindowState,
+  restoreWindowBounds,
+} = require('../out/main/main/core/window-state.js');
+const area = { x: 0, y: 0, width: 1920, height: 1040 };
+const state = { bounds: { x: 100, y: 120, width: 1100, height: 700 }, maximized: false };
+function fixture(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-window-'));
+  const errors = [];
+  const file = path.join(dir, 'window-state.json');
+  const store = new WindowStateStore(file, (error) => errors.push(error));
+  t.after(() => {
+    store.flush();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  const window = Object.assign(new EventEmitter(), {
+    visible: true,
+    minimized: false,
+    maximized: false,
+    bounds: { ...state.bounds },
+    isDestroyed: () => false,
+    isVisible() {
+      return this.visible;
+    },
+    isMinimized() {
+      return this.minimized;
+    },
+    isFullScreen: () => false,
+    isMaximized() {
+      return this.maximized;
+    },
+    getNormalBounds() {
+      return { ...this.bounds };
+    },
+  });
+  return { store, file, errors, window };
+}
+test('normal bounds survive restart, maximize, minimize and tray close', (t) => {
+  const { store, file, window, errors } = fixture(t);
+  assert.equal(store.load([area]), undefined);
+  store.track(window);
+  window.emit('move');
+  window.maximized = true;
+  window.emit('maximize');
+  window.minimized = true;
+  window.maximized = false;
+  window.bounds = { x: -32000, y: -32000, width: 160, height: 28 };
+  window.emit('resize');
+  window.emit('close');
+  window.visible = false;
+  window.emit('move');
+  store.flush();
+  const restored = new WindowStateStore(file, assert.fail).load([area]);
+  assert.deepEqual(restored, { ...state, maximized: true });
+  assert.deepEqual(errors, []);
+});
+test('unmaximize and resize replace previous maximized state', (t) => {
+  const { store, window, file } = fixture(t);
+  store.track(window);
+  window.maximized = true;
+  window.emit('maximize');
+  window.maximized = false;
+  window.bounds.width = 1200;
+  window.emit('unmaximize');
+  window.emit('close');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)), { bounds: window.bounds, maximized: false });
+});
+test('hidden startup preserves saved maximum state', (t) => {
+  const { store, window, file } = fixture(t);
+  fs.writeFileSync(file, JSON.stringify({ ...state, maximized: true }));
+  store.load([area]);
+  window.visible = false;
+  store.track(window);
+  window.emit('resize');
+  window.emit('close');
+  assert.equal(JSON.parse(fs.readFileSync(file)).maximized, true);
+});
+test('negative monitor coordinates survive; disconnected monitor and smaller work area are clamped', () => {
+  const left = { x: -1920, y: 0, width: 1920, height: 1040 };
+  const onLeft = { bounds: { ...state.bounds, x: -1800 }, maximized: true };
+  assert.deepEqual(fitWindowState(onLeft, [area, left]), onLeft);
+  assert.equal(fitWindowState(onLeft, [area]).bounds.x, 0);
+  const small = { x: 40, y: 30, width: 800, height: 580 };
+  assert.deepEqual(fitWindowState(state, [small]).bounds, small);
+});
+test('invalid geometry and broken JSON fall back without preventing startup', (t) => {
+  for (const value of [
+    null,
+    {},
+    { ...state, maximized: 'yes' },
+    { ...state, bounds: { ...state.bounds, width: -1 } },
+    { ...state, bounds: { ...state.bounds, x: Infinity } },
+  ]) {
+    assert.throws(() => parseWindowState(value));
+  }
+  const { store, file, errors } = fixture(t);
+  fs.writeFileSync(file, '{broken');
+  assert.equal(store.load([area]), undefined);
+  assert.equal(errors.length, 1);
+  assert.equal(fs.readFileSync(file, 'utf8'), '{broken');
+});
+test('write failures are reported without throwing from a window event', (t) => {
+  const { store, file, window, errors } = fixture(t);
+  fs.mkdirSync(file);
+  store.track(window);
+  assert.doesNotThrow(() => window.emit('close'));
+  assert.equal(errors.length, 1);
+});
+
+test('fractional DPI rounding does not grow bounds on each restart', () => {
+  let actual;
+  const window = {
+    setBounds(bounds) {
+      actual = { ...bounds, width: bounds.width + 1 };
+    },
+    getNormalBounds() {
+      return actual;
+    },
+  };
+  restoreWindowBounds(window, state.bounds);
+  assert.deepEqual(actual, state.bounds);
+  restoreWindowBounds(window, actual);
+  assert.deepEqual(actual, state.bounds);
+});
+
+test('first show records bounds even if immediately minimized', (t) => {
+  const { store, file, window } = fixture(t);
+  store.track(window);
+  window.emit('show');
+  window.minimized = true;
+  window.emit('close');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)), state);
+});

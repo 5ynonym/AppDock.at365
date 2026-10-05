@@ -8,6 +8,8 @@
 
 初回起動でEXEの隣に `settings.json` が作成されます。「設定」からフォームとJSONの両方で編集できます。ウィンドウの×は既定でトレイへ格納します。完全終了はトレイメニューの「終了」です。この動作は設定で変更できます。
 
+メインウィンドウの位置・サイズ・最大化状態は自動保存し、次回起動時に復元します。最小化中は通常表示の位置・サイズを保持し、「起動時に最小化」の設定も優先します。モニターの取り外しや解像度変更で画面外になる場合は、現在の画面内へ補正します。
+
 - **ホーム**: Appletの状態とコマンド数。
 - **Applet**: 有効・無効、再起動、Appletが提供する画面と操作。
 - **設定**: メイン画面内のカテゴリ式編集画面。テーマ（Dark / Light / System）、常駐動作、通知、Applet設定、ショートカット、プロフィール。選択式設定と、動的なモニター一覧にも対応。
@@ -31,6 +33,7 @@ electron-builderの**portable**形式です。配布するアプリ本体はEXE�
 ├─ avatar.png             アバターを設定した場合のみ。常に最新の1枚
 ├─ extensions/            追加拡張（初回起動で空フォルダを作成）
 └─ .appdock/
+   ├─ window-state.json   メインウィンドウの位置・サイズ・最大化状態
    ├─ chromium/           Chromiumのユーザーデータ
    ├─ logs/               ホスト・拡張ログ
    ├─ storage/            拡張固有の永続データ
@@ -56,6 +59,7 @@ pnpm run typecheck
 pnpm test
 node scripts/ui-test.cjs
 pnpm run test:preferences
+pnpm run test:window-state
 pnpm run smoke
 pnpm run dist
 node scripts/smoke.cjs publish/AppDock.at365.exe
