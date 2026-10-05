@@ -10,7 +10,9 @@ export interface UiCommand extends Command {
 export const defaultShortcuts: Record<string, string[]> = {
   'appdock.commands.search': ['Ctrl+P', 'Ctrl+Shift+P'],
   'appdock.settings.open': ['Ctrl+,'],
+  'at365.watch.toggle': ['Pause'],
 };
+export const defaultGlobalShortcutCommands = ['at365.watch.toggle'];
 export function validCommandId(id: unknown): id is string {
   return (
     typeof id === 'string' &&
@@ -40,6 +42,7 @@ const specialKeys: Record<string, string> = {
   left: 'Left',
   right: 'Right',
   plus: 'Plus',
+  pause: 'Pause',
 };
 export function normalizeShortcut(value: unknown): string {
   if (typeof value !== 'string' || value.length > 80)
@@ -61,8 +64,6 @@ export function normalizeShortcut(value: unknown): string {
   else if (specialKeys[rawKey.toLowerCase()]) key = specialKeys[rawKey.toLowerCase()];
   else if (/^[,./\\;\[\]'=-]$/.test(rawKey)) key = rawKey;
   else throw new Error(`ショートカット ${value} のキーを確認してください。`);
-  if (!modifiers.has('Ctrl') && !modifiers.has('Alt') && !/^F\d+$/.test(key))
-    throw new Error('文字キーにはCtrlまたはAltを組み合わせてください。');
   return [...['Ctrl', 'Alt', 'Shift'].filter((m) => modifiers.has(m)), key].join('+');
 }
 export interface KeyStroke {

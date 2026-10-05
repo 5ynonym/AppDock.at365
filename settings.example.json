@@ -8,8 +8,10 @@
   },
   "shortcuts": {
     "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
-    "appdock.settings.open": ["Ctrl+,"]
+    "appdock.settings.open": ["Ctrl+,"],
+    "at365.watch.toggle": ["Pause"]
   },
+  "globalShortcutCommands": ["at365.watch.toggle"],
   "pinnedCommands": [],
   "profile": { "name": "ユキ", "avatar": null },
   "extensions": {

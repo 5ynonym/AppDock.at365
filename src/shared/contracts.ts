@@ -13,6 +13,7 @@ export interface Settings {
   host: HostSettings;
   extensions: Record<string, ExtensionSettings>;
   shortcuts: Record<string, string[]>;
+  globalShortcutCommands: string[];
   pinnedCommands: string[];
   profile: { name: string; avatar: 'avatar.png' | null };
 }
@@ -80,6 +81,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  globalHotKeys: GlobalHotKeyStatus[];
   settings: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
   logs: LogEntry[];
@@ -88,7 +90,16 @@ export interface HostSnapshot {
   dark: boolean;
   avatarUrl: string | null;
 }
+export interface GlobalHotKeyStatus {
+  commandId: string;
+  shortcut: string;
+  registered: boolean;
+  error?: string;
+}
 export interface DockApi {
+  retryGlobalHotKeys(): Promise<void>;
+  setShortcutRecording(recording: boolean): Promise<void>;
+  onHostCommand(callback: (id: string) => void): () => void;
   snapshot(): Promise<HostSnapshot>;
   saveSettings(
     value: Settings,

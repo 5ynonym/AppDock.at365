@@ -25,7 +25,9 @@ test('shortcut normalization, duplicate detection, disabling and persisted unkno
   assert.equal(normalizeShortcut(' shift + control + p '), 'Ctrl+Shift+P');
   assert.equal(normalizeShortcut('ctrl+,'), 'Ctrl+,');
   assert.equal(normalizeShortcut('F12'), 'F12');
-  assert.throws(() => normalizeShortcut('P'), /Ctrl/);
+  assert.equal(normalizeShortcut('P'), 'P');
+  assert.equal(normalizeShortcut(' pause '), 'Pause');
+  assert.equal(normalizeShortcut('shift+Pause'), 'Shift+Pause');
   assert.throws(() => normalizeShortcut('Ctrl+Ctrl+P'), /修飾/);
   const settings = createDefaultSettings();
   settings.shortcuts['test.extension.run'] = ['Ctrl+Alt+R'];

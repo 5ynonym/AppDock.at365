@@ -1,5 +1,51 @@
 # 検証記録
 
+## プロジェクト内のNode.js／pnpm（2026-10-06 JST）
+
+Node.js 24.21.0とpnpm 11.25.0をAppDockの `.tools` 内に準備。Node.js ZIPは公式SHA256と一致しました。mise設定は作成せず、ツールのバージョンは `toolchain.json` で指定します。旧バージョンを残し、両ツールの動作確認後に利用バージョンを切り替える方式です。
+
+Codexが追加するPATHを外し、Windowsの通常PATHだけを渡した子プロセスで次を確認しました。永続PATHとグローバルNode.js／pnpmは変更していません。
+
+- `setup-tools.bat` の初回準備と再実行: 成功。
+- `dev.bat exec node --version` / `dev.bat --version`: 24.21.0 / 11.25.0。
+- `dev.bat install --frozen-lockfile` / `dev.bat run typecheck`: 成功。
+- `dev.bat test`: 23件成功。
+- `publish.bat`: .NET発行、Reactビルド、portable EXE作成に成功。
+- `dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe ../Applet.Watch.at365/publish/Applet.Watch.at365`: Node/.NET/native時計、設定保存・画像表示・終了まで成功。記録は `artifacts/smoke-1791215308632/smoke-result.json`。
+- BAT 4ファイル（生成された `.tools/environment.bat` を含む）: CP932往復とCRLFを確認。差分空白検証も成功。
+
+今回の成果物: `publish/AppDock.at365.exe`、125,270,147 bytes、Version 0.3.1。
+SHA256: `0E121B1B714EA02D7BECB3A4F16272F7C1C959EFB634773492951E5317DF225D`。
+別バージョンへの実際の更新・切り戻しは未実施です。pnpmの依存パッケージストアは通常のユーザーキャッシュを使います。
+
+## v0.3.1 グローバルホットキー（2026-10-06 JST）
+
+Windows x64、テスト専用profileで確認。元Watchはユーザーが終了し、実利用のAppDock設定は変更していません。
+
+| 検証 | 結果 |
+| --- | --- |
+| TypeScript型チェック・React production build | 成功 |
+| .NET ExtensionHost / Runtime発行 | 成功、警告0・エラー0 |
+| 自動回帰テスト | 23件成功 |
+| 既存のショートカット・ピン・プロフィールUIテスト | 成功 |
+| `at365.watch.toggle` の既定グローバルPause登録 | 成功 |
+| トレイ格納相当の非表示状態でWindowsのPause入力による時計の表示／非表示 | 双方向で成功 |
+| AppDock前面でのグローバルキー | 1回だけ実行されることを確認 |
+| キー入力欄の一時解除・単独F24への変更・Pauseの解放 | 成功 |
+| 別ホストによるPause競合・設定画面への理由表示・再試行 | 成功 |
+| グローバルOFF・既定に戻す・Applet停止／再有効化・AppDock終了時の登録解除 | 成功。別ホストがPauseを取得できることでも確認 |
+| 背面からのTypeScriptコマンド実行・ホストコマンドで画面とパレットを開く | 成功 |
+| 完成版 `publish/win-unpacked/AppDock.at365.exe` のホットキーUIテスト | 上記9項目成功 |
+| portable EXEを別フォルダーにコピーして起動・Node/.NET/native時計・設定と画像保存 | 成功 |
+| 両プロジェクトの差分空白検証 | 成功 |
+
+成果物: `publish/AppDock.at365.exe`、125,270,146 bytes、Version 0.3.1。
+SHA256: `38E7159990FC549F222CF6B82540A0666CADF30845502C8329C99FAA58F0879B`。
+
+記録: `artifacts/hotkeys-1791212601125/result.json`（完成版の9項目）、`artifacts/preferences-1791212138244/`（既存UI）、`artifacts/smoke-1791212633700/smoke-result.json`（portable）。Pause等の入力はWindowsのSendInputで送信しました。手で押す実キーボード、別の配列・リモートデスクトップ、長期常駐は未検証です。Sandbox内のNuGet／Electron起動テストはアクセス制限で失敗したため、通常実行環境で成功を確認しています。
+
+## v0.3.0 の検証記録
+
 2026-10-05 JST、Windows x64の通常実行環境でv0.3.0を確認。実利用の設定と画像は変更せず、テスト専用のフォルダーを使用。
 
 | 検証 | 結果 |
