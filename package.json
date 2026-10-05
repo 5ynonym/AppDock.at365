@@ -17,6 +17,7 @@
     "test:ui": "node scripts/ui-test.cjs",
     "test:preferences": "node scripts/preferences-ui-test.cjs",
     "test:hotkeys": "node scripts/hotkeys-ui-test.cjs",
+    "test:window-state": "node scripts/window-state-ui-test.cjs",
     "format": "prettier --write src extensions scripts tests"
   },
   "devDependencies": {
