@@ -850,14 +850,14 @@ function PageHeading({
   action,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   action?: React.ReactNode;
 }) {
   return (
     <div className="page-heading compact">
       <div>
         <h1>{title}</h1>
-        <p>{subtitle}</p>
+        {subtitle && <p>{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -1205,7 +1205,6 @@ function SettingsPage({
     <>
       <PageHeading
         title="設定"
-        subtitle="使い心地を整える。変更は保存すると反映されます。"
         action={
           <button
             className="secondary"
@@ -1558,10 +1557,6 @@ function SettingsPage({
             </div>
           </div>
         )}
-        <div className="settings-path">
-          <Icon name="folder" size={16} />
-          <code>{snapshot.path}</code>
-        </div>
       </div>
     </>
   );

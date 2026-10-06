@@ -1132,17 +1132,6 @@ main {
 .setting-row div {
   min-width: 0;
 }
-.settings-path {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--faint);
-  margin-top: 19px;
-}
-.settings-path code {
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
 .json-editor {
   border: 1px solid var(--border);
   border-radius: 9px;
