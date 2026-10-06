@@ -15,7 +15,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   };
   const result = parseSettings(original);
   assert.deepEqual(result.extensions, original.extensions);
-  assert.deepEqual(result.host, original.host);
+  assert.deepEqual(result.host, { ...original.host, trayClickCommand: 'appdock.open' });
   assert.equal(result.shortcuts['appdock.commands.search'][0], 'Ctrl+P');
   assert.deepEqual(result.pinnedCommands, []);
   assert.equal(result.profile.avatar, null);

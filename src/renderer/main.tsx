@@ -334,6 +334,8 @@ function App() {
       ...new Set([
         ...knownCommands.current.keys(),
         ...Object.keys(snapshot?.settings.value.shortcuts ?? {}),
+        ...(snapshot?.settings.value.trayCommands ?? []),
+        ...(snapshot ? [snapshot.settings.value.host.trayClickCommand] : []),
       ]),
     ]
       .filter((id) => !commandIds.has(id))
@@ -1117,7 +1119,9 @@ function SettingsPage({
         (command) =>
           changed(draft.shortcuts[command.id], snapshot.value.shortcuts[command.id]) ||
           draft.globalShortcutCommands.includes(command.id) !==
-            snapshot.value.globalShortcutCommands.includes(command.id),
+            snapshot.value.globalShortcutCommands.includes(command.id) ||
+          draft.trayCommands.includes(command.id) !==
+            snapshot.value.trayCommands.includes(command.id),
       );
   const appletChanged = (id: string) =>
     changed(draft.extensions[id], snapshot.value.extensions[id]) || shortcutChanged(id);
@@ -1132,7 +1136,8 @@ function SettingsPage({
             ? shortcutChanged(null)
             : id === 'shortcuts'
               ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
-                changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands)
+                changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
+                changed(draft.trayCommands, snapshot.value.trayCommands)
               : extensions.some((e) => appletChanged(e.id));
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
@@ -1384,6 +1389,8 @@ function SettingsPage({
                   edit({ ...draft, globalShortcutCommands })
                 }
                 statuses={globalHotKeys}
+                trayCommands={draft.trayCommands}
+                onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
                 onRestore={(id) =>
                   edit({
                     ...draft,
@@ -1391,6 +1398,7 @@ function SettingsPage({
                     globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
                       ? [...new Set([...draft.globalShortcutCommands, id])]
                       : draft.globalShortcutCommands.filter((command) => command !== id),
+                    trayCommands: draft.trayCommands.filter((command) => command !== id),
                   })
                 }
               />
@@ -1436,6 +1444,37 @@ function SettingsPage({
             {category === 'general' && (
               <>
                 <h3>一般</h3>
+                <SettingRow
+                  title="トレイクリックのコマンド"
+                  description="トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。"
+                >
+                  <select
+                    aria-label="トレイクリックのコマンド"
+                    value={draft.host.trayClickCommand}
+                    onChange={(event) =>
+                      edit({
+                        ...draft,
+                        host: { ...draft.host, trayClickCommand: event.target.value },
+                      })
+                    }
+                  >
+                    {commands
+                      .filter(
+                        (command) => !command.hidden || command.id === draft.host.trayClickCommand,
+                      )
+                      .map((command) => (
+                        <option key={command.id} value={command.id}>
+                          {command.extension} / {command.title}
+                          {command.available ? '' : '（現在利用できません）'}
+                        </option>
+                      ))}
+                    {!commands.some((command) => command.id === draft.host.trayClickCommand) && (
+                      <option value={draft.host.trayClickCommand}>
+                        {draft.host.trayClickCommand}（現在利用できません）
+                      </option>
+                    )}
+                  </select>
+                </SettingRow>
                 {(
                   [
                     [

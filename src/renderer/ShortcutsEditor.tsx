@@ -7,6 +7,8 @@ export function ShortcutsEditor({
   onChange,
   globalCommands,
   onGlobalChange,
+  trayCommands,
+  onTrayChange,
   statuses,
   onRestore,
   owner,
@@ -16,6 +18,8 @@ export function ShortcutsEditor({
   onChange(value: Record<string, string[]>): void;
   globalCommands: string[];
   onGlobalChange(value: string[]): void;
+  trayCommands: string[];
+  onTrayChange(value: string[]): void;
   statuses: GlobalHotKeyStatus[];
   onRestore(id: string): void;
   owner?: string | null;
@@ -36,7 +40,7 @@ export function ShortcutsEditor({
   const visible = commands
     .filter(
       (command) =>
-        (!command.hidden || !!bindings[command.id]?.length) &&
+        (!command.hidden || !!bindings[command.id]?.length || trayCommands.includes(command.id)) &&
         (owner === undefined || command.extensionId === owner) &&
         `${command.title} ${command.extension} ${command.id} ${(bindings[command.id] ?? []).join(' ')}`
           .toLowerCase()
@@ -86,6 +90,8 @@ export function ShortcutsEditor({
         欄を選び、割り当てたいキーを押してください。Pauseや文字キー単独にも対応します。
         「グローバル」を有効にすると、ほかのアプリを操作中やトレイ格納中にも使えます。
         ×で解除、Escapeで入力を終了します。変更は保存で反映します。
+        「トレイに表示」を有効にすると、トレイの右クリックメニューにも追加します。
+        「設定…」と「終了」は常に表示されます。
       </p>
       {recordError && <p role="alert">{recordError}</p>}
       <input
@@ -140,6 +146,21 @@ export function ShortcutsEditor({
                 <span className="shortcut-scope">
                   {globalCommands.includes(command.id) ? '他のアプリでも有効' : 'AppDock内のみ'}
                 </span>
+                <label className="shortcut-global">
+                  <input
+                    type="checkbox"
+                    aria-label={`${command.title}をトレイに表示`}
+                    checked={trayCommands.includes(command.id)}
+                    onChange={(event) =>
+                      onTrayChange(
+                        event.target.checked
+                          ? [...new Set([...trayCommands, command.id])]
+                          : trayCommands.filter((id) => id !== command.id),
+                      )
+                    }
+                  />
+                  トレイに表示
+                </label>
                 {!command.available && (
                   <span className="shortcut-availability">現在利用できません</span>
                 )}

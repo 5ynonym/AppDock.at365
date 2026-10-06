@@ -161,3 +161,7 @@ UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--t
 履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
 
 契約と範囲は[拡張API](extensions.md#v060-宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshow](../../Applet.WallpaperSlideshow.at365/README.md)を参照してください。必要ホストをv0.6.0へ上げ、SDK・Runtimeを含めて再publishします。
+
+## v0.7.0のトレイ表示
+
+登録・宣言した一般コマンドは、ユーザーがホスト設定の「トレイに表示」を有効にするとトレイメニューへ追加されます。既定はOFFです。Applet側の`context.Tray.Add` / `context.tray.add`はメニューラベルの提案で、表示を強制しません。これらを呼ばないAppletでも登録コマンドを選択できます。クリック時のコマンドもホスト設定から選べるため、Appletごとに独自トレイを追加する必要はありません。安定したコマンドIDを維持し、実行中の動的置換には従来の`ReplaceAsync`を使います。

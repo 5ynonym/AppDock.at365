@@ -108,3 +108,11 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 履歴専用操作は一般コマンドとは独立した`panel.action`です。現在のパネル（actions / tabs / images）にあるIDだけ許可します。ローカル画像は`panel-images.ts`で実パスの包含を確認し、CSPを緩めず`appdock://host/panel-images`で配信します。ホスト管理外のファイルや外部画像URLは受け付けません。
 
 [panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDK既存コンストラクターは維持し、新機能のminimumHostVersionは0.6.0です。
+
+## v0.7.0のトレイコマンド
+
+表示可否はホスト設定`trayCommands`（既定`[]`）、クリック先は`host.trayClickCommand`（既定`appdock.open`）で管理します。`tray-commands.ts`はコマンドカタログとユーザーの選択からメニューを構成し、従来の`Tray.Add`はラベルの提案としてのみ参照します。設定保存・外部編集・Appletのコマンド置換・状態変更で再構成します。保存された未取得のIDは保持し、利用不可の宣言は無効表示、`activateOnExecute`は共通の実行経路を利用します。
+
+トレイ、IPC、グローバルキーはmainの`executeCommand`でホスト/Appletを振り分けます。`appdock.open`はウィンドウ表示、検索・設定はrenderer通知。トレイは`click`だけを処理し、`double-click`に追加の実行を登録しません。クリック先の失敗はログとウィンドウ表示で復旧し、固定の「設定…」「終了」で管理画面への入口を確保します。
+
+未インストールの旧サンプル設定はdiscover後に整理して既存の原子的な保存を使います。インストール済みfixtureとほかの未知コマンドは保持します。[回帰テスト](../tests/tray-commands.test.cjs)、[実トレイUIテスト](../scripts/tray-commands-ui-test.cjs)、完成EXEのsmokeで検証します。Applet API v1とSDKは変更しません。

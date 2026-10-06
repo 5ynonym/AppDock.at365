@@ -98,6 +98,8 @@ export async function activate(context: NodeExtensionContext) {
 export async function deactivate() { /* 独自のリソースを解放 */ }
 ```
 
+v0.7.0以降、`tray.add` / `Tray.Add`はメニューの表示名を提案します。トレイへの追加はホスト設定のコマンドごとの「トレイに表示」で選択し、既定はOFFです。提案のない登録コマンドも選択できます。クリック時に実行するコマンドは`host.trayClickCommand`で選び、既定は`appdock.open`です。
+
 Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト本体のNode空間にはロードしません。stdoutはプロトコル専用です。通常のconsole.logはstderrへ転送します。
 
 ## SDKで使えるサービス

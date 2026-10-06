@@ -4,7 +4,8 @@
     "theme": "dark",
     "closeToTray": true,
     "notifications": true,
-    "startMinimized": false
+    "startMinimized": false,
+    "trayClickCommand": "appdock.open"
   },
   "shortcuts": {
     "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
@@ -12,6 +13,7 @@
     "at365.watch.toggle": ["Pause"]
   },
   "globalShortcutCommands": ["at365.watch.toggle"],
+  "trayCommands": [],
   "pinnedCommands": [],
   "profile": { "name": "User", "avatar": null },
   "extensions": {}

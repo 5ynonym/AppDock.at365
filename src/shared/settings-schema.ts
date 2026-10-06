@@ -9,10 +9,17 @@ const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
   schemaVersion: 1,
-  host: { theme: 'dark', closeToTray: true, notifications: true, startMinimized: false },
+  host: {
+    theme: 'dark',
+    closeToTray: true,
+    notifications: true,
+    startMinimized: false,
+    trayClickCommand: 'appdock.open',
+  },
   extensions: {},
   shortcuts: structuredClone(defaultShortcuts),
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
+  trayCommands: [],
   pinnedCommands: [],
   profile: { name: 'ユキ', avatar: null },
 });
@@ -31,6 +38,18 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   for (const key of ['closeToTray', 'notifications', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
+  const trayClickCommand =
+    value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
+  if (!validCommandId(trayClickCommand))
+    throw new Error('host.trayClickCommand はコマンドIDです。');
+  const trayCommands = value.trayCommands === undefined ? [] : value.trayCommands;
+  if (
+    !Array.isArray(trayCommands) ||
+    trayCommands.length > 500 ||
+    trayCommands.some((id) => !validCommandId(id)) ||
+    new Set(trayCommands).size !== trayCommands.length
+  )
+    throw new Error('trayCommands は重複のないコマンドIDの配列です。');
   for (const [id, item] of Object.entries(value.extensions)) {
     if (
       !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(id) ||
@@ -79,6 +98,8 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
   const next = {
     ...value,
+    host: { ...value.host, trayClickCommand },
+    trayCommands,
     shortcuts,
     globalShortcutCommands,
     pinnedCommands,
