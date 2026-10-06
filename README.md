@@ -4,7 +4,9 @@
 
 ## 起動
 
-`publish\AppDock.at365.exe` を、書き込み可能な好きなフォルダに置いて起動してください。インストール不要です。Electronと.NET 10の実行環境を内部に同梱しているので、利用するPCにNode.jsや.NETを別途入れる必要はありません。
+`publish\AppDock.at365.exe` を、書き込み可能な好きなフォルダに置いて起動してください。AppDock自体のインストールは不要です。Electronは内部に同梱していますが、.NETランタイムは同梱せず、利用するPCにインストール済みの **.NET 10 Runtime（Windows x64）** を使用します。Node.jsの別途インストールは不要です。
+
+.NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。.NETホストはDLL Appletとグローバルショートカットの両方で使用します。native Appletのランタイム要件は、そのAppletの配布方法に従います。
 
 初回起動でEXEの隣に `settings.json` が作成されます。「設定」からフォームとJSONの両方で編集できます。ウィンドウの×は既定でトレイへ格納します。完全終了はトレイメニューの「終了」です。この動作は設定で変更できます。
 
@@ -32,7 +34,7 @@ Appletは同梱していません。初回起動時のApplet一覧は空で、�
 
 ## 「EXEひとつ」の意味
 
-electron-builderの**portable**形式です。配布するアプリ本体はEXEひとつですが、起動時にElectronや同梱.NETランタイムをWindowsの一時フォルダへ展開します。展開せず直接実行する.NETの単一ファイルと同一の方式ではありません。設定は一時フォルダに保存せず、`PORTABLE_EXECUTABLE_DIR` を使って元のEXEの隣に保存します。
+electron-builderの**portable**形式です。配布するアプリ本体はEXEひとつですが、起動時にElectronと.NETホストのアプリファイルをWindowsの一時フォルダへ展開します。.NETランタイムはPCの環境から読み込みます。展開せず直接実行する.NETの単一ファイルと同一の方式ではありません。設定は一時フォルダに保存せず、`PORTABLE_EXECUTABLE_DIR` を使って元のEXEの隣に保存します。
 
 ```text
 任意の配置先/
@@ -90,7 +92,7 @@ Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号�
 
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
-`pnpm run dist` は.NETホストのself-contained発行、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
 ソースの主な配置:
 
