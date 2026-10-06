@@ -2165,3 +2165,94 @@ summary {
   object-fit: contain;
   margin-bottom: 8px;
 }
+.image-preview-button {
+  border: none;
+  padding: 0;
+  background: transparent;
+  width: 100%;
+  cursor: zoom-in;
+}
+.panel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.panel-tabs button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.image-preview-dialog {
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.image-preview-dialog::backdrop {
+  background: #0009;
+}
+.image-preview-dialog img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.object-list-setting {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.setting-row:has(.object-list-setting) {
+  flex-direction: column;
+  align-items: stretch;
+}
+.object-list-item {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.object-list-item legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+.object-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.object-field > p {
+  grid-column: 1/-1;
+}
+.settings-layout .object-field input,
+.object-field select {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+.source-folders {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.source-folder {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.source-folder input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .object-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

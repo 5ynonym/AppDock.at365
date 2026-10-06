@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  chooseDirectory: () => ipcRenderer.invoke('dock:chooseDirectory'),
   checkUpdates: (id) => ipcRenderer.invoke('dock:checkUpdates', id),
   openReleases: (id) => ipcRenderer.invoke('dock:openReleases', id),
   startExtensionNow: (id) => ipcRenderer.invoke('dock:startExtensionNow', id),
@@ -18,6 +19,7 @@ const api: DockApi = {
   toggleExtension: (id, enabled) => ipcRenderer.invoke('dock:toggleExtension', id, enabled),
   restartExtension: (id) => ipcRenderer.invoke('dock:restartExtension', id),
   executeCommand: (id) => ipcRenderer.invoke('dock:executeCommand', id),
+  executePanelAction: (id, actionId) => ipcRenderer.invoke('dock:executePanelAction', id, actionId),
   openPath: (kind) => ipcRenderer.invoke('dock:openPath', kind),
   windowAction: (action) => ipcRenderer.invoke('dock:windowAction', action),
   onChanged: (callback) => {

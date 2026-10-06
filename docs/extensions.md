@@ -135,3 +135,14 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 パネルの`images`は4件まで。各項目は`title`、任意の`description`、`image`（JPEG/PNG/WebPのbase64 data URL、200000文字以内）、名前空間内の`actions`（4件まで）。ホストは外部URL・SVG・HTMLを受け付けない。.NETの既存`Panel`コンストラクターは維持し、任意の`Images`プロパティと`PanelImage`を追加。Nodeの`ui.showPanel`でも同じJSON型を使用できる。
 
 これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
+## v0.6.0: 宣言コマンド・構造化一覧・パネル操作
+
+新しい機能を使うAppletは`minimumHostVersion: "0.6.0"`を指定してください。
+
+manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロード前からパレット・ショートカットに表示するコマンドを宣言します。実行中はruntimeの登録内容を優先し、snapshotの`available`で使用可否を知らせます。`activateOnExecute: true`の明示実行は無効化・開始待ち状態から有効化して即時起動します。最低ホストバージョンはこの経路でも検証します。起動時に同じIDをruntimeへ登録してください。`aliases`は同じ名前空間の旧ID（8件まで）を受け付け、未割り当ての別名はコマンド候補に重複表示しません。既存の割り当ては保持します。
+
+`type: object-list`の設定は`fields`と`itemTitle`を持つ64件までのオブジェクト配列です。フォームで追加・並べ替え・削除します。旧JSON文字列も読み取れます。フィールドはboolean / number / string / select / string-listで、一覧の入れ子は不可。`string-list`はフィールド内だけで使用し、64件までの文字列を追加・削除します。`format: directory`でフォルダー選択、`aliases: ["Folder"]`で旧単一文字列を統合します。`select`の`numericOptions: true`は旧数値enumをoptionsの順序で読み取ります。正規化時も未知のフィールドを保持します。
+
+`Panel.Images`は1000件まで、`Tabs`は100件までに拡張しました。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
+
+`local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。従来のbase64 `Image`は200000文字上限のまま使用可能です。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。

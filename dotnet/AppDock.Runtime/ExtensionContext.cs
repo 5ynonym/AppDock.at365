@@ -95,6 +95,8 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     }
     public Task ShowAsync(string title, string body, CancellationToken cancellationToken = default) => CallAsync("host.notifications.show", new { title, body }, cancellationToken);
     public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);
+    public async Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default) =>
+        (await connection.RequestAsync("host.ui.imageDirectory", new { }, cancellationToken)).GetString()!;
     public Task OpenAsync(string url, CancellationToken cancellationToken = default) => CallAsync("host.browser.open", new { url }, cancellationToken);
     public Task InfoAsync(string message, CancellationToken cancellationToken = default) => CallAsync("host.log", new { level = "info", message }, cancellationToken);
     public Task ErrorAsync(string message, CancellationToken cancellationToken = default) => CallAsync("host.log", new { level = "error", message }, cancellationToken);

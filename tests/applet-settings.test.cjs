@@ -7,6 +7,75 @@ const {
   validateAppletSettings,
 } = require('../out/main/shared/setting-definitions.js');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
+const { normalizeObject, readObjectList } = require('../out/main/shared/object-list.js');
+
+test('monitor forms accept legacy JSON and preserve folders, enum values, padding and unknown data', () => {
+  const [definition] = parseSettingDefinitions([
+    {
+      key: 'monitors',
+      title: 'Monitors',
+      type: 'object-list',
+      default: [],
+      fields: [
+        { key: 'Folders', title: 'Folders', type: 'string-list', aliases: ['Folder'], default: [] },
+        {
+          key: 'Mode',
+          title: 'Mode',
+          type: 'select',
+          numericOptions: true,
+          default: 'Fit',
+          options: [
+            { label: 'Fill', value: 'Fill' },
+            { label: 'Fit', value: 'Fit' },
+            { label: 'Tile', value: 'Tile' },
+          ],
+        },
+        {
+          key: 'PaddingBottom',
+          title: 'Bottom',
+          type: 'number',
+          default: 0,
+          minimum: 0,
+          maximum: 65535,
+        },
+      ],
+    },
+  ]);
+  const legacy = JSON.stringify([
+    { Folder: 'C:/images', Mode: 2, PaddingBottom: 40, extra: 'keep' },
+  ]);
+  validateSettingValue(definition, legacy);
+  const canonical = readObjectList(legacy).map((item) => normalizeObject(item, definition.fields));
+  assert.deepEqual(canonical, [
+    { Folders: ['C:/images'], Mode: 'Tile', PaddingBottom: 40, extra: 'keep' },
+  ]);
+  validateSettingValue(definition, canonical);
+  assert.deepEqual(
+    normalizeObject({ Folder: 'a', Folders: ['b', 'a'] }, definition.fields).Folders,
+    ['b', 'a'],
+  );
+  for (const invalid of [
+    '{',
+    [null],
+    [{ Folders: null }],
+    [{ Folders: [null] }],
+    [{ Folders: [''] }],
+    [{ Mode: 99 }],
+    [{ PaddingBottom: -1 }],
+  ])
+    assert.throws(() => validateSettingValue(definition, invalid));
+  assert.throws(
+    () => parseSettingDefinitions([{ ...definition, fields: [{ ...definition, key: 'nested' }] }]),
+    /一覧/,
+  );
+  assert.throws(
+    () =>
+      parseSettingDefinitions([
+        { ...definition, fields: [{ key: '__proto__', title: 'Bad', type: 'string' }] },
+      ]),
+    /定義/,
+  );
+});
 test('Applet selections validate definitions, unique options, defaults and ranges', () => {
   const [position] = parseSettingDefinitions([
     {

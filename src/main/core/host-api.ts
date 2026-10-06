@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { imageDirectory, registerLocalImages } from './panel-images';
 import { Notification, safeStorage, shell } from 'electron';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
@@ -18,6 +19,18 @@ export function createHostApi(
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
     const p = params;
     const id = e.manifest.id;
+    const validAction = (action: unknown) =>
+      isObject(action) &&
+      typeof action.title === 'string' &&
+      action.title.length <= 200 &&
+      (action.selected == null || typeof action.selected === 'boolean') &&
+      ((typeof action.command === 'string' &&
+        action.command.startsWith(id + '.') &&
+        !action.actionId) ||
+        (typeof action.actionId === 'string' &&
+          action.actionId.startsWith(id + '.') &&
+          action.actionId.length <= 200 &&
+          !action.command));
     if (['stopped', 'stopping', 'error'].includes(e.state))
       throw new Error('拡張は停止しています。');
     const requireCapability = (cap: string) => {
@@ -87,17 +100,26 @@ export function createHostApi(
         await shell.openExternal(url.href);
         return null;
       }
+      case 'host.ui.imageDirectory':
+        requireCapability('local-images');
+        return imageDirectory(dataRoot, id);
       case 'host.ui.panel': {
         requireCapability('ui');
         if (
           p.images != null &&
           (!Array.isArray(p.images) ||
-            p.images.length > 4 ||
+            p.images.length > 1000 ||
             p.images.some(
               (item: unknown) =>
                 !isObject(item) ||
                 typeof item.title !== 'string' ||
-                item.title.length > 200 ||
+                item.title.length > 1200 ||
+                (item.imageFile != null &&
+                  (typeof item.imageFile !== 'string' ||
+                    !path.isAbsolute(item.imageFile) ||
+                    !e.manifest.capabilities?.includes('local-images'))) ||
+                (item.tooltip != null &&
+                  (typeof item.tooltip !== 'string' || item.tooltip.length > 32767)) ||
                 (item.description != null &&
                   (typeof item.description !== 'string' || item.description.length > 1000)) ||
                 (item.image != null &&
@@ -109,19 +131,16 @@ export function createHostApi(
                 (item.actions != null &&
                   (!Array.isArray(item.actions) ||
                     item.actions.length > 4 ||
-                    item.actions.some(
-                      (a: unknown) =>
-                        !isObject(a) ||
-                        typeof a.title !== 'string' ||
-                        a.title.length > 200 ||
-                        typeof a.command !== 'string' ||
-                        !a.command.startsWith(id + '.'),
-                    ))),
+                    item.actions.some((a: unknown) => !validAction(a)))),
             ))
         )
-          throw new Error('パネルの画像は4件以内のサムネイルを指定してください。');
+          throw new Error('パネルの画像は1000件以内のサムネイルを指定してください。');
         if (
           typeof p.title !== 'string' ||
+          (p.tabs != null &&
+            (!Array.isArray(p.tabs) ||
+              p.tabs.length > 100 ||
+              p.tabs.some((a: unknown) => !validAction(a)))) ||
           p.title.length > 200 ||
           (p.description !== undefined && typeof p.description !== 'string') ||
           (p.facts !== undefined &&
@@ -133,17 +152,11 @@ export function createHostApi(
               ))) ||
           (p.actions !== undefined &&
             (!Array.isArray(p.actions) ||
-              p.actions.length > 30 ||
-              p.actions.some(
-                (a: unknown) =>
-                  !isObject(a) ||
-                  typeof a.title !== 'string' ||
-                  typeof a.command !== 'string' ||
-                  !a.command.startsWith(id + '.'),
-              )))
+              p.actions.length > 100 ||
+              p.actions.some((a: unknown) => !validAction(a))))
         )
           throw new Error('パネルの形式が正しくありません。');
-        e.panel = structuredClone(p) as unknown as Panel;
+        e.panel = registerLocalImages(structuredClone(p) as unknown as Panel, dataRoot, id);
         changed();
         return null;
       }

@@ -1,4 +1,5 @@
 import type { ExtensionManifest, Settings, SettingDefinition, SettingOption } from './contracts';
+import { readObjectList, objectFieldValue } from './object-list';
 const object = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 export function parseSettingOptions(value: unknown): SettingOption[] {
@@ -34,6 +35,33 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
   )
     fail();
   if (definition.type === 'string' && (typeof value !== 'string' || value.length > 10000)) fail();
+  if (
+    definition.type === 'string-list' &&
+    (!Array.isArray(value) ||
+      value.length > 64 ||
+      value.some((item) => typeof item !== 'string' || !item.trim() || item.length > 32767))
+  )
+    fail();
+  if (definition.type === 'object-list') {
+    let items: Record<string, unknown>[];
+    try {
+      items = readObjectList(value);
+    } catch {
+      fail();
+      return;
+    }
+    for (const item of items)
+      for (const field of definition.fields ?? []) {
+        let fieldValue: unknown;
+        try {
+          fieldValue = objectFieldValue(item, field);
+        } catch {
+          fail();
+          return;
+        }
+        if (fieldValue !== undefined) validateSettingValue(field, fieldValue);
+      }
+  }
   if (definition.type === 'json') {
     if (typeof value !== 'string' || value.length > 10000) {
       fail();
@@ -78,7 +106,10 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
   )
     fail();
 }
-export function parseSettingDefinitions(value: unknown): SettingDefinition[] | undefined {
+export function parseSettingDefinitions(
+  value: unknown,
+  depth = 0,
+): SettingDefinition[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 128)
     throw new Error('settings の形式が正しくありません。');
@@ -93,12 +124,40 @@ export function parseSettingDefinitions(value: unknown): SettingDefinition[] | u
       typeof s.title !== 'string' ||
       !s.title ||
       s.title.length > 160 ||
-      !['boolean', 'number', 'string', 'json', 'select', 'shortcut-list'].includes(s.type) ||
+      ![
+        'boolean',
+        'number',
+        'string',
+        'json',
+        'select',
+        'shortcut-list',
+        'string-list',
+        'object-list',
+      ].includes(s.type) ||
       (s.description !== undefined &&
         (typeof s.description !== 'string' || s.description.length > 500))
     )
       throw new Error('settings の項目定義を確認してください。');
     keys.add(s.key);
+    if (
+      (s.type === 'object-list' && (depth > 0 || !Array.isArray(s.fields) || !s.fields.length)) ||
+      (depth === 0 && s.type === 'string-list') ||
+      (depth > 0 && ['object-list', 'shortcut-list', 'json'].includes(s.type)) ||
+      (s.itemTitle !== undefined &&
+        (typeof s.itemTitle !== 'string' || s.itemTitle.length > 100)) ||
+      (s.format !== undefined && s.format !== 'directory') ||
+      (s.numericOptions !== undefined && typeof s.numericOptions !== 'boolean') ||
+      (s.aliases !== undefined &&
+        (!Array.isArray(s.aliases) ||
+          s.aliases.length > 8 ||
+          s.aliases.some(
+            (alias: unknown) =>
+              typeof alias !== 'string' ||
+              !/^[A-Za-z0-9._-]{1,100}$/.test(alias) ||
+              ['__proto__', 'prototype', 'constructor'].includes(alias),
+          )))
+    )
+      throw new Error('一覧設定の項目定義を確認してください。');
     for (const key of ['minimum', 'maximum', 'step'])
       if (s[key] !== undefined && (typeof s[key] !== 'number' || !Number.isFinite(s[key])))
         throw new Error(`${s.title} の範囲が正しくありません。`);
@@ -111,6 +170,7 @@ export function parseSettingDefinitions(value: unknown): SettingDefinition[] | u
     const definition = {
       ...s,
       ...(s.type === 'select' ? { options: parseSettingOptions(s.options) } : {}),
+      ...(s.type === 'object-list' ? { fields: parseSettingDefinitions(s.fields, depth + 1) } : {}),
     } as SettingDefinition;
     if (definition.default !== undefined) validateSettingValue(definition, definition.default);
     return definition;
