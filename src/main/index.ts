@@ -19,6 +19,7 @@ import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
+import { checkUpdate, releasesUrl } from './core/updates';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
@@ -143,6 +144,13 @@ function syncHotKeys(retry = false) {
   return hotKeys.sync(settings.value, available, shortcutRecording, retry);
 }
 function registerIpc() {
+  const updateTarget = (id?: string) => {
+    if (id === undefined) return { version: app.getVersion(), repository: '5ynonym/AppDock.at365' };
+    if (typeof id !== 'string' || !manager.items.has(id))
+      throw new Error('Appletが見つかりません。');
+    const manifest = manager.items.get(id)!.manifest;
+    return { version: manifest.version, repository: manifest.updateRepository };
+  };
   const handle = (channel: string, callback: (...args: any[]) => unknown) =>
     ipcMain.handle(channel, (event, ...args) => {
       if (
@@ -155,6 +163,20 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:checkUpdates', (id?: string) => {
+    const target = updateTarget(id);
+    return checkUpdate(target.version, target.repository, net.fetch);
+  });
+  handle('dock:openReleases', (id?: string) => {
+    const target = updateTarget(id);
+    if (!target.repository) throw new Error('更新確認先が設定されていません。');
+    return shell.openExternal(releasesUrl(target.repository));
+  });
+  handle('dock:startExtensionNow', (id: string) => {
+    if (manager.items.get(id)?.state !== 'waiting')
+      throw new Error('開始待ちのAppletが見つかりません。');
+    return manager.restart(id, true);
+  });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:setShortcutRecording', async (recording: boolean) => {
     if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
@@ -225,6 +247,7 @@ async function initialize() {
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
+    hostVersion: app.getVersion(),
     roots: [external],
     settings,
     nodeExecutable: process.execPath,

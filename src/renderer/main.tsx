@@ -23,6 +23,7 @@ import {
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { ProfileEditor } from './ProfileEditor';
 import { AppletSettings } from './AppletSettings';
+import { VersionCheck } from './VersionCheck';
 import { useAppletSidebar } from './useAppletSidebar';
 declare global {
   interface Window {
@@ -168,6 +169,7 @@ const labels: Record<Page, string> = {
   logs: 'ログ',
 };
 const states = {
+  waiting: '開始待ち',
   running: '実行中',
   stopped: '停止中',
   starting: '起動中',
@@ -666,6 +668,7 @@ function App() {
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
+          <VersionCheck />
         </span>
         <button onClick={() => setPalette(true)}>
           <Icon name="command" size={12} />
@@ -888,6 +891,10 @@ function ExtensionDetail({
         />
       </div>
       <p className="detail-description">{e.description}</p>
+      {e.minimumHostVersion && (
+        <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
+      )}
+      <VersionCheck key={e.id} id={e.id} />
       <div className="actions detail-actions">
         <button className="secondary" onClick={() => onSettings(e.id)}>
           <Icon name="settings" />
@@ -915,10 +922,45 @@ function ExtensionDetail({
         </button>
       </div>
       {e.error && <div className="error-text">{e.error}</div>}
+      {e.state === 'waiting' && (
+        <div className="extension-panel">
+          <p>
+            {e.name} は {new Date(e.scheduledStartAt!).toLocaleTimeString()} に開始します。
+          </p>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
+          >
+            今すぐ開始
+          </button>
+        </div>
+      )}
       {e.panel ? (
         <div className="extension-panel">
           <h3>{e.panel.title}</h3>
           <p>{e.panel.description}</p>
+          {!!e.panel.images?.length && (
+            <div className="panel-images">
+              {e.panel.images.map((item, i) => (
+                <article key={i}>
+                  {item.image && <img src={item.image} alt={item.title} />}
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                  {item.actions?.map((action) => (
+                    <button
+                      className="secondary"
+                      key={action.command}
+                      disabled={busy || !e.commands.some((c) => c.id === action.command)}
+                      onClick={() => void run(() => window.dock.executeCommand(action.command))}
+                    >
+                      {action.title}
+                    </button>
+                  ))}
+                </article>
+              ))}
+            </div>
+          )}
           <dl>
             {e.panel.facts?.map((f, i) => (
               <div key={i}>
@@ -948,15 +990,17 @@ function ExtensionDetail({
           <h3>
             {!e.enabled
               ? 'このAppletをDockにつなぐ'
-              : e.state === 'starting'
-                ? 'Appletを起動しています'
-                : e.state === 'stopping'
-                  ? 'Appletを停止しています'
-                  : e.state === 'error'
-                    ? 'Appletでエラーが発生しました'
-                    : e.state === 'running'
-                      ? '専用の操作画面はありません'
-                      : 'Appletは停止しています'}
+              : e.state === 'waiting'
+                ? 'Appletの開始を待っています'
+                : e.state === 'starting'
+                  ? 'Appletを起動しています'
+                  : e.state === 'stopping'
+                    ? 'Appletを停止しています'
+                    : e.state === 'error'
+                      ? 'Appletでエラーが発生しました'
+                      : e.state === 'running'
+                        ? '専用の操作画面はありません'
+                        : 'Appletは停止しています'}
           </h3>
           <p>
             {!e.enabled

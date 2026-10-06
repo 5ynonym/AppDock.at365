@@ -34,13 +34,38 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
   )
     fail();
   if (definition.type === 'string' && (typeof value !== 'string' || value.length > 10000)) fail();
+  if (definition.type === 'json') {
+    if (typeof value !== 'string' || value.length > 10000) {
+      fail();
+      return;
+    }
+    try {
+      JSON.parse(value);
+    } catch {
+      fail();
+    }
+  }
   if (definition.type === 'shortcut-list') {
-    if (!Array.isArray(value) || value.length > 32) { fail(); return; }
+    if (!Array.isArray(value) || value.length > 32) {
+      fail();
+      return;
+    }
     const ids = new Set<string>();
     for (const entry of value) {
-      if (!object(entry) || typeof entry.id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(entry.id)
-        || ids.has(entry.id) || typeof entry.title !== 'string' || !entry.title.trim() || entry.title.length > 100
-        || typeof entry.keys !== 'string' || !validSendKeys(entry.keys)) { fail(); return; }
+      if (
+        !object(entry) ||
+        typeof entry.id !== 'string' ||
+        !/^[a-z0-9][a-z0-9-]{0,39}$/.test(entry.id) ||
+        ids.has(entry.id) ||
+        typeof entry.title !== 'string' ||
+        !entry.title.trim() ||
+        entry.title.length > 100 ||
+        typeof entry.keys !== 'string' ||
+        !validSendKeys(entry.keys)
+      ) {
+        fail();
+        return;
+      }
       ids.add(entry.id);
     }
   }
@@ -68,7 +93,7 @@ export function parseSettingDefinitions(value: unknown): SettingDefinition[] | u
       typeof s.title !== 'string' ||
       !s.title ||
       s.title.length > 160 ||
-      !['boolean', 'number', 'string', 'select', 'shortcut-list'].includes(s.type) ||
+      !['boolean', 'number', 'string', 'json', 'select', 'shortcut-list'].includes(s.type) ||
       (s.description !== undefined &&
         (typeof s.description !== 'string' || s.description.length > 500))
     )
@@ -95,10 +120,17 @@ export function parseSettingDefinitions(value: unknown): SettingDefinition[] | u
 export function validSendKeys(value: string): boolean {
   const parts = value.split('+').map((part) => part.trim().toUpperCase());
   const key = parts.pop() ?? '';
-  const modifiers = parts.map((part) => ({ CONTROL: 'CTRL', WINDOWS: 'WIN', META: 'WIN' }[part] ?? part));
-  return value.length <= 100 && modifiers.every((part) => ['CTRL', 'ALT', 'SHIFT', 'WIN'].includes(part))
-    && new Set(modifiers).size === modifiers.length
-    && /^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|ENTER|TAB|ESC|ESCAPE|SPACE|BACKSPACE|DELETE|INSERT|HOME|END|PAGEUP|PAGEDOWN|LEFT|RIGHT|UP|DOWN)$/.test(key);
+  const modifiers = parts.map(
+    (part) => ({ CONTROL: 'CTRL', WINDOWS: 'WIN', META: 'WIN' })[part] ?? part,
+  );
+  return (
+    value.length <= 100 &&
+    modifiers.every((part) => ['CTRL', 'ALT', 'SHIFT', 'WIN'].includes(part)) &&
+    new Set(modifiers).size === modifiers.length &&
+    /^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|ENTER|TAB|ESC|ESCAPE|SPACE|BACKSPACE|DELETE|INSERT|HOME|END|PAGEUP|PAGEDOWN|LEFT|RIGHT|UP|DOWN)$/.test(
+      key,
+    )
+  );
 }
 export function validateAppletSettings(value: Settings, applets: ExtensionManifest[]) {
   for (const applet of applets)

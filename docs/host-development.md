@@ -24,7 +24,7 @@ AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証
 3. **保存と表示更新をつなぐ。** 設定はSettingsStore経由で更新し、全JSONの独自書き込みを避けます。状態をメモリへ追加した場合はsnapshotへ含め、`changed()`またはmanagerのchangedイベントでrendererへ通知します。既存の変更通知はまとめて送られます。React側では更新が届くまで待つ必要があります。
 4. **SDKへ公開する。** .NETは[Contracts.cs](../dotnet/AppDock.SDK/Contracts.cs)のインターフェースと型、[ExtensionContext](../dotnet/AppDock.Runtime/ExtensionContext.cs)の実装を対応させます。Nodeは[NodeExtensionContext](../src/main/node-worker.ts)とactivate時に渡すcontextの実装を対応させます。片方だけ対応する場合はAPI仕様に明記し、未対応なのに型だけ存在する状態を避けます。
 5. **購読やリソースの寿命を定める。** 解除用IDisposable／関数を返し、deactivateと通信断で解除します。.NETのコマンド／設定変更を直列化する `commandLock`を保持したまま、同じロックを再取得する処理を呼ばないようにします。ホストへ要求するだけなら別方向のRPCで返答を処理できますが、逆方向の処理完了を相互に待つ循環を作らないでください。
-6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletのREADMEには必要なAppDockバージョンを記載します。現行manifestに最小ホストバージョンやAPIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
+6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletのREADMEには必要なAppDockバージョンを記載します。v0.5.0ではmanifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。旧ホストにはこの検証がないため、新機能を使うAppletの配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
 
 新APIがAppletプロセスからだけ使われる場合、preload/renderer IPCへの追加は不要です。Applet通信とReact用IPCは別の境界です。
 

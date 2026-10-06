@@ -20,6 +20,37 @@ export function AppletSettings({
   );
   return (
     <div className="applet-settings">
+      <div className="setting-row">
+        <div>
+          <strong>開始までの秒数</strong>
+          <p>
+            有効化・再起動からAppletを起動するまで待ちます。0で即時開始。実行中の変更は次の起動から適用します。
+          </p>
+        </div>
+        <input
+          aria-label="開始までの秒数"
+          type="number"
+          min={0}
+          max={86400}
+          step={1}
+          value={
+            draft.extensions[applet.id]?.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0
+          }
+          onChange={(event) =>
+            onChange({
+              ...draft,
+              extensions: {
+                ...draft.extensions,
+                [applet.id]: {
+                  ...(draft.extensions[applet.id] ?? { enabled: false, settings: {} }),
+                  startupDelaySeconds:
+                    event.target.value === '' ? Number.NaN : Number(event.target.value),
+                },
+              },
+            })
+          }
+        />
+      </div>
       <input
         className="shortcut-filter"
         aria-label="Appletの設定項目を検索"
@@ -55,7 +86,15 @@ export function AppletSettings({
               <strong>{item.title}</strong>
               <p id={descriptionId}>{item.description}</p>
             </div>
-            {item.type === 'shortcut-list' ? (
+            {item.type === 'json' ? (
+              <textarea
+                aria-label={item.title}
+                aria-describedby={descriptionId}
+                rows={12}
+                value={String(value ?? '')}
+                onChange={(event) => set(event.target.value)}
+              />
+            ) : item.type === 'shortcut-list' ? (
               <ShortcutListSetting title={item.title} value={value} onChange={set} />
             ) : item.type === 'boolean' ? (
               <button

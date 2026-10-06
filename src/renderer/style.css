@@ -2106,8 +2106,62 @@ summary {
   }
 }
 /* Editable SendKey command definitions supplied by an applet. */
-.send-key-list { min-width: 0; width: 100%; display: grid; gap: 10px; }
-.send-key-entry { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.setting-row:has(.send-key-list) { flex-direction: column; align-items: stretch; }
-.setting-row .send-key-entry input { min-width: 0; width: 100%; max-width: none; }
-.send-key-list p { margin: 0; }
+.send-key-list {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+.send-key-entry {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.setting-row:has(.send-key-list) {
+  flex-direction: column;
+  align-items: stretch;
+}
+.setting-row .send-key-entry input {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+.send-key-list p {
+  margin: 0;
+}
+/* Common Applet startup settings and structured JSON editors. */
+.setting-row textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font-family: monospace;
+  resize: vertical;
+}
+.setting-row:has(textarea) {
+  flex-direction: column;
+  align-items: stretch;
+}
+.version-check {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.panel-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.panel-images article {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel-images img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  margin-bottom: 8px;
+}

@@ -40,6 +40,13 @@ export function parseSettings(value: unknown): Settings {
       !object(item.settings)
     )
       throw new Error(`拡張設定 ${id} の形式が正しくありません。`);
+    if (
+      item.startupDelaySeconds !== undefined &&
+      (!Number.isInteger(item.startupDelaySeconds) ||
+        Number(item.startupDelaySeconds) < 0 ||
+        Number(item.startupDelaySeconds) > 86400)
+    )
+      throw new Error(`拡張設定 ${id} の開始までの秒数は0～86400の整数です。`);
   }
   const shortcuts = parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
   const globalShortcutCommands =

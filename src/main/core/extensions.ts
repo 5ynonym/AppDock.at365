@@ -6,6 +6,7 @@ import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseExtensionCommands } from '../../shared/extension-commands';
+import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -37,6 +38,16 @@ function readManifest(folder: string): LoadedManifest {
     throw new Error('拡張マニフェストの形式が正しくありません。');
   if (m.runtime === 'dotnet' && (typeof m.type !== 'string' || !m.type))
     throw new Error('.NET拡張のtypeが必要です。');
+  if (m.minimumHostVersion !== undefined) parseVersion(m.minimumHostVersion);
+  if (m.updateRepository !== undefined && !validRepository(m.updateRepository))
+    throw new Error('updateRepository はGitHubの owner/repo を指定してください。');
+  if (
+    m.startupDelaySeconds !== undefined &&
+    (!Number.isInteger(m.startupDelaySeconds) ||
+      m.startupDelaySeconds < 0 ||
+      m.startupDelaySeconds > 86400)
+  )
+    throw new Error('startupDelaySeconds は0～86400の整数です。');
   if (
     m.capabilities !== undefined &&
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))
@@ -58,10 +69,14 @@ export interface ExtensionInstance {
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
+  scheduledStartAt?: number;
+  scheduledDelay?: number;
+  startTimer?: ReturnType<typeof setTimeout>;
   child?: ChildProcessWithoutNullStreams | null;
   peer?: JsonLinePeer | null;
 }
 interface ManagerOptions {
+  hostVersion?: string;
   roots: string[];
   settings: SettingsStore;
   nodeExecutable: string;
@@ -81,6 +96,7 @@ class ExtensionManager extends EventEmitter {
   items: Map<string, ExtensionInstance>;
   queue: Promise<void>;
   shuttingDown: boolean;
+  hostVersion: string;
   constructor({
     roots,
     settings,
@@ -89,6 +105,7 @@ class ExtensionManager extends EventEmitter {
     dotnetHost,
     api,
     log,
+    hostVersion = '0.0.0',
   }: ManagerOptions) {
     super();
     this.roots = roots;
@@ -101,6 +118,7 @@ class ExtensionManager extends EventEmitter {
     this.items = new Map();
     this.queue = Promise.resolve();
     this.shuttingDown = false;
+    this.hostVersion = hostVersion;
   }
   discover() {
     for (const root of this.roots) {
@@ -139,6 +157,7 @@ class ExtensionManager extends EventEmitter {
     return [...this.items.values()].map((e) => ({
       ...e.manifest,
       state: e.state,
+      scheduledStartAt: e.scheduledStartAt,
       error: e.error,
       enabled: this.settings.value.extensions[e.manifest.id]?.enabled ?? false,
       commands: e.commands,
@@ -154,8 +173,11 @@ class ExtensionManager extends EventEmitter {
         if (this.shuttingDown) return;
         for (const e of this.items.values()) {
           const enabled = this.settings.value.extensions[e.manifest.id]?.enabled ?? false;
-          if (enabled && e.state === 'stopped') await this.start(e);
-          if (!enabled && ['running', 'error', 'starting'].includes(e.state)) await this.stop(e);
+          if (enabled && e.state === 'stopped') await this.schedule(e);
+          if (enabled && e.state === 'waiting' && e.scheduledDelay !== this.delay(e))
+            await this.schedule(e);
+          if (!enabled && ['running', 'error', 'starting', 'waiting'].includes(e.state))
+            await this.stop(e);
           if (enabled && e.state === 'running') {
             try {
               await e.peer!.request(
@@ -171,12 +193,68 @@ class ExtensionManager extends EventEmitter {
       });
     return this.queue;
   }
+  delay(e: ExtensionInstance) {
+    return (
+      this.settings.value.extensions[e.manifest.id]?.startupDelaySeconds ??
+      e.manifest.startupDelaySeconds ??
+      0
+    );
+  }
+  cancelStart(e: ExtensionInstance) {
+    clearTimeout(e.startTimer);
+    e.startTimer = undefined;
+    e.scheduledStartAt = undefined;
+    e.scheduledDelay = undefined;
+  }
+  checkCompatibility(e: ExtensionInstance) {
+    const minimum = e.manifest.minimumHostVersion;
+    if (minimum && compareVersions(this.hostVersion, minimum) < 0)
+      throw new Error(`AppDock v${minimum}以降が必要です（現在 v${this.hostVersion}）。`);
+  }
+  async schedule(e: ExtensionInstance) {
+    this.cancelStart(e);
+    try {
+      this.checkCompatibility(e);
+    } catch (err) {
+      this.crashed(e, err instanceof Error ? err.message : String(err));
+      return;
+    }
+    const delay = this.delay(e);
+    if (!delay) {
+      await this.start(e);
+      return;
+    }
+    e.state = 'waiting';
+    e.error = null;
+    e.scheduledDelay = delay;
+    const due = (e.scheduledStartAt = Date.now() + delay * 1000);
+    e.startTimer = setTimeout(() => {
+      this.queue = this.queue
+        .catch((err) => this.log('error', 'host', err.message))
+        .then(async () => {
+          if (this.shuttingDown || e.state !== 'waiting' || e.scheduledStartAt !== due) return;
+          if (!this.settings.value.extensions[e.manifest.id]?.enabled) {
+            await this.stop(e);
+            return;
+          }
+          if (e.scheduledDelay !== this.delay(e)) {
+            await this.schedule(e);
+            return;
+          }
+          this.cancelStart(e);
+          await this.start(e);
+        });
+    }, delay * 1000);
+    this.log('info', e.manifest.id, `${delay}秒後に ${e.manifest.name} を起動します。`);
+    this.emit('changed');
+  }
   async start(e: ExtensionInstance) {
     e.state = 'starting';
     e.error = null;
     this.emit('changed');
     try {
       const m = e.manifest;
+      this.checkCompatibility(e);
       // Revalidate paths on each activation, including after an external extension update.
       m.entryPath = contained(m.folder, m.entry);
       let child: ChildProcessWithoutNullStreams;
@@ -271,6 +349,7 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async stop(e: ExtensionInstance) {
+    this.cancelStart(e);
     e.state = 'stopping';
     this.emit('changed');
     const child = e.child;
@@ -303,14 +382,17 @@ class ExtensionManager extends EventEmitter {
     if (!e.peer || e.peer.closed) throw new Error('拡張との接続が終了しました。');
     return e.peer.request('command.execute', { id });
   }
-  restart(id: string) {
+  restart(id: string, immediate = false) {
     this.queue = this.queue
       .catch(() => {})
       .then(async () => {
         const e = this.items.get(id);
         if (!e) throw new Error('拡張が見つかりません。');
         await this.stop(e);
-        if (this.settings.value.extensions[id]?.enabled) await this.start(e);
+        if (this.settings.value.extensions[id]?.enabled && !this.shuttingDown) {
+          if (immediate) await this.start(e);
+          else await this.schedule(e);
+        }
       });
     return this.queue;
   }

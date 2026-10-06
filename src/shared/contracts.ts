@@ -6,6 +6,7 @@ export interface HostSettings {
 }
 export interface ExtensionSettings {
   enabled: boolean;
+  startupDelaySeconds?: number;
   settings: Record<string, unknown>;
 }
 export interface Settings {
@@ -33,7 +34,7 @@ export interface TrayItem {
 export interface SettingDefinition {
   key: string;
   title: string;
-  type: 'boolean' | 'number' | 'string' | 'select' | 'shortcut-list';
+  type: 'boolean' | 'number' | 'string' | 'json' | 'select' | 'shortcut-list';
   description?: string;
   default?: unknown;
   minimum?: number;
@@ -51,12 +52,21 @@ export interface Panel {
   description?: string;
   facts?: { label: string; value: string }[];
   actions?: { title: string; command: string }[];
+  images?: {
+    title: string;
+    description?: string;
+    image?: string;
+    actions?: { title: string; command: string }[];
+  }[];
 }
 export interface ExtensionManifest {
   apiVersion: 1;
   id: string;
   name: string;
   version: string;
+  minimumHostVersion?: string;
+  updateRepository?: string;
+  startupDelaySeconds?: number;
   description?: string;
   runtime: 'node' | 'dotnet' | 'native';
   entry: string;
@@ -66,7 +76,8 @@ export interface ExtensionManifest {
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
   folder: string;
-  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
+  state: 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'error';
+  scheduledStartAt?: number;
   error: string | null;
   enabled: boolean;
   commands: Command[];
@@ -97,6 +108,9 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  checkUpdates(id?: string): Promise<UpdateResult>;
+  openReleases(id?: string): Promise<void>;
+  startExtensionNow(id: string): Promise<void>;
   retryGlobalHotKeys(): Promise<void>;
   setShortcutRecording(recording: boolean): Promise<void>;
   onHostCommand(callback: (id: string) => void): () => void;
@@ -113,4 +127,10 @@ export interface DockApi {
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   onChanged(callback: () => void): () => void;
+}
+export interface UpdateResult {
+  status: 'current' | 'available' | 'unpublished' | 'unsupported';
+  currentVersion: string;
+  latestVersion?: string;
+  checkedAt: string;
 }
