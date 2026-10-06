@@ -94,23 +94,39 @@ export function ShortcutsEditor({
         「設定…」と「終了」は常に表示されます。
       </p>
       {recordError && <p role="alert">{recordError}</p>}
-      <input
-        className="shortcut-filter"
-        aria-label="ショートカットのコマンドを検索"
-        placeholder="コマンドを検索…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-      />
-      <select
-        aria-label="ショートカットの絞り込み"
-        value={statusFilter}
-        onChange={(event) => setStatusFilter(event.target.value)}
-      >
-        <option value="all">すべて</option>
-        <option value="assigned">割り当て済み</option>
-        <option value="unassigned">未設定</option>
-        <option value="conflict">競合・登録エラーあり</option>
-      </select>
+      <div className="shortcut-filters">
+        <input
+          className="shortcut-filter"
+          aria-label="ショートカットのコマンドを検索"
+          placeholder="コマンドを検索…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <div
+          className="tabs shortcut-status-filter"
+          role="group"
+          aria-label="ショートカットの絞り込み"
+        >
+          {(
+            [
+              ['all', 'すべて'],
+              ['assigned', '割り当て済み'],
+              ['unassigned', '未設定'],
+              ['conflict', '競合・エラー'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              aria-pressed={statusFilter === value}
+              className={statusFilter === value ? 'selected' : ''}
+              title={value === 'conflict' ? '競合・登録エラーあり' : undefined}
+              onClick={() => setStatusFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       {!visible.length && (
         <p className="empty">
           該当するコマンドはありません。停止中のAppletでまだ取得していないコマンドは、起動後に表示されます。

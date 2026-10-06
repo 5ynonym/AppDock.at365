@@ -98,10 +98,87 @@ async function launch() {
     assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
     await page.setViewportSize({ width: 1280, height: 840 });
     assert.equal(await width(), 350);
+    const appletStyle = await page.locator('.sidebar-extensions button.selected').evaluate((el) => {
+      const style = getComputedStyle(el);
+      const side = getComputedStyle(el.closest('.sidebar'));
+      return [
+        style.padding,
+        style.fontSize,
+        style.borderRadius,
+        style.backgroundColor,
+        style.color,
+        side.padding,
+        side.backgroundColor,
+        side.borderRight,
+      ];
+    });
+    await page.getByRole('button', { name: '設定', exact: true }).click();
+    assert.equal(await width(), 350, 'settings uses the Applet width');
+    const settingsStyle = await page
+      .locator('.settings-categories button.selected')
+      .evaluate((el) => {
+        const style = getComputedStyle(el);
+        const side = getComputedStyle(el.closest('.sidebar'));
+        return [
+          style.padding,
+          style.fontSize,
+          style.borderRadius,
+          style.backgroundColor,
+          style.color,
+          side.padding,
+          side.backgroundColor,
+          side.borderRight,
+        ];
+      });
+    assert.deepEqual(settingsStyle, appletStyle, 'both selectors share their appearance');
+    const settingsSeparator = page.getByRole('separator', { name: '設定一覧の幅を変更' });
+    const settingsBounds = await settingsSeparator.boundingBox();
+    await page.mouse.move(settingsBounds.x + settingsBounds.width / 2, settingsBounds.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(settingsBounds.x + settingsBounds.width / 2 - 40, settingsBounds.y + 60, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    assert.equal(await width(), 310, 'settings can resize the shared sidebar');
+    await settingsSeparator.focus();
+    await settingsSeparator.press('ArrowRight');
+    assert.equal(await width(), 320);
+    await page.getByRole('button', { name: '一般', exact: true }).click();
+    await page.getByRole('switch', { name: 'デスクトップ通知', exact: true }).click();
+    assert.equal(await page.getByText('未保存の変更があります', { exact: true }).count(), 1);
+    assert.equal(await page.locator('.settings-categories .unsaved-mark').count(), 1);
+    for (const size of [
+      { width: 1280, height: 840 },
+      { width: 900, height: 620 },
+      { width: 700, height: 620 },
+    ]) {
+      await page.setViewportSize(size);
+      assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+      assert.equal(await settingsSeparator.isVisible(), size.width > 760);
+      await page.screenshot({ path: path.join(profile, `settings-sidebar-${size.width}.png`) });
+    }
+    await page.setViewportSize({ width: 1280, height: 840 });
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    assert.equal(await width(), 320, 'settings resize is reflected in Applet');
+    assert.equal(await page.locator('.page-heading p').count(), 0);
+    await page.getByRole('button', { name: '設定', exact: true }).click();
+    assert.equal(
+      await page
+        .getByRole('switch', { name: 'デスクトップ通知', exact: true })
+        .getAttribute('aria-checked'),
+      'true',
+      'unsaved draft survives page switches',
+    );
+    await page.getByRole('button', { name: 'ログ', exact: true }).click();
+    assert.equal(await page.locator('.page-heading p').count(), 0);
+    await page.getByRole('button', { name: 'ホーム', exact: true }).click();
+    assert.equal(await page.locator('.page-heading p').count(), 0);
     assert.deepEqual(errors, []);
     await app.close();
     ({ app, page } = await launch());
-    assert.equal(await width(), 350, 'width survives an Electron restart');
+    assert.equal(await width(), 320, 'shared width survives an Electron restart');
+    await page.getByRole('button', { name: '設定', exact: true }).click();
+    assert.equal(await width(), 320, 'settings restores the shared width after restart');
     await page.evaluate(() => localStorage.setItem('appdock.applet-sidebar-width', 'broken'));
     await page.reload();
     await page.getByRole('button', { name: 'Applet', exact: true }).click();
@@ -116,6 +193,8 @@ async function launch() {
             'drag / keyboard / bounds',
             '900px / 1280px / narrow layout',
             'restart persistence / invalid storage',
+            'settings appearance / shared drag and keyboard width / draft preservation',
+            'home / Applet / logs subtitles removed',
           ],
         },
         null,

@@ -38,6 +38,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
+Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイルを使います。幅はAppで一度だけ呼ぶ`useAppletSidebar`の状態と既存の`appdock.applet-sidebar-width`で共有し、各画面で独立した幅を持たせません。設定一覧はportalでshellの左パネルへ表示しますが、SettingsPage自体は画面移動時も保持して未保存のdraftを失わないようにします。ショートカットの検索と状態フィルターは`.shortcut-filters`で一行にそろえ、表示領域不足時のみ折り返します。状態フィルターは排他的な4つのボタンで、選択状態を`aria-pressed`へ反映します。`scripts/applet-sidebar-ui-test.cjs`と`scripts/navigation-ui-test.cjs`で共通幅・再起動・編集保持・絞り込みとキーボード操作・両テーマと狭い画面の配置を確認できます。
+
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
 3. [mainのregisterIpc](../src/main/index.ts)の既存handleラッパーで受けます。送信元webContents・mainFrame・`appdock://host/index.html`の確認を維持し、引数も実行時に検証します。

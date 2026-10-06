@@ -1517,6 +1517,27 @@ main {
   margin: 20px 0 12px;
   font-size: 11px;
 }
+.shortcut-filters {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+.shortcut-filters .shortcut-filter {
+  flex: 1 1 120px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.shortcut-status-filter {
+  flex-shrink: 0;
+}
+.shortcut-status-filter button {
+  padding: 7px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
 .shortcut-row {
   display: flex;
   align-items: flex-start;
@@ -1690,10 +1711,6 @@ main {
   color: var(--accent);
 }
 @media (max-width: 1000px) {
-  .settings-layout {
-    grid-template-columns: 130px minmax(0, 1fr);
-    gap: 12px;
-  }
   .settings-layout .settings-form {
     padding: 20px 18px;
   }
@@ -1712,26 +1729,8 @@ main {
 }
 .settings-layout {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 300px;
-}
-.settings-categories {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: stretch;
-}
-.settings-categories button {
-  padding: 12px;
-  justify-content: flex-start;
-  border-radius: 7px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.settings-categories button.selected {
-  color: var(--text);
-  background: var(--raised);
 }
 .settings-layout .settings-form {
   padding: 24px 26px;
@@ -1756,6 +1755,18 @@ main {
 }
 .shell.with-sidebar {
   grid-template-columns: 76px min(var(--applet-sidebar-width, 280px), 40vw) minmax(0, 1fr);
+}
+.settings-sidebar-slot {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  min-width: 0;
+}
+.settings-sidebar-slot > .sidebar {
+  height: 100%;
+}
+.settings-categories > *:not(.sidebar-resizer) {
+  flex-shrink: 0;
 }
 .activity-rail {
   padding-inline: 6px;
@@ -1913,25 +1924,10 @@ summary {
   font-size: 12px;
 }
 .settings-layout {
-  grid-template-columns: 210px minmax(0, 1fr);
   align-items: start;
-}
-.settings-categories {
-  position: sticky;
-  top: 0;
-  max-height: calc(100vh - 185px);
-  overflow: auto;
-  padding: 4px;
-}
-.settings-categories button {
-  font-size: 12px;
-  text-align: left;
-  overflow-wrap: anywhere;
-  padding: 9px 10px;
 }
 .settings-applet-list {
   border-top: 1px solid var(--border);
-  margin-top: 10px;
   padding-top: 15px;
 }
 .settings-applet-list h3 {
@@ -1939,9 +1935,8 @@ summary {
   color: var(--muted);
   margin-bottom: 12px;
 }
-.settings-applet-list button {
-  width: 100%;
-  margin-top: 4px;
+.settings-applet-list .sidebar-extensions {
+  margin-top: 16px;
 }
 .settings-applet-list p {
   padding: 10px;
@@ -1950,6 +1945,9 @@ summary {
 .unsaved-mark {
   margin-left: auto;
   font-size: 9px;
+  color: #bd873a;
+}
+.sidebar-extensions .unsaved-mark {
   color: #bd873a;
 }
 .applet-settings-heading {
@@ -2044,13 +2042,6 @@ summary {
   .page-content {
     padding: 22px 20px;
   }
-  .settings-layout {
-    grid-template-columns: 180px minmax(0, 1fr);
-    gap: 12px;
-  }
-  .settings-categories {
-    max-height: calc(100vh - 290px);
-  }
   .settings-layout .settings-form {
     padding: 20px 18px;
   }
@@ -2102,10 +2093,6 @@ summary {
   }
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .settings-categories {
-    position: static;
-    max-height: 200px;
   }
   .titlebar-search {
     margin-right: 8px;
