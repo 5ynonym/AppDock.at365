@@ -72,6 +72,8 @@ Node.jsとpnpmのグローバルインストールは不要です。プロジェ
 
 変更に合う検証だけを選び、通ったものと未検証事項を記録します。
 
+Windows portable起動用EXEの`FileDescription`は、electron-builderが`package.json`の`description`から生成します。タスクマネージャーの表示名を本体とそろえるため、この値は`productName`と同じ`AppDock.at365`を維持します。発行後はportable起動用EXEと`win-unpacked`内の本体の両方で`FileDescription`を確認してください。起動用EXEは32ビット、本体は64ビットです。
+
 | 変更箇所 | 確認するもの |
 | --- | --- |
 | 型・React・main | `pnpm run typecheck` / `pnpm run build` |
