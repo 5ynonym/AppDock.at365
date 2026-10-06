@@ -288,3 +288,11 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 発行したwin-unpacked版の実トレイUI成功: `artifacts/tray-ui-1791295488202/`。Appletのみ/両方/ビルトインのみ/選択なしの実Menu階層と区切り位置、最上位の開くコールバック、既存Applet実行、表示切り替え、単/ダブルクリック、保存・再起動を確認。物理的なWindows通知領域への入力は送っていない。
 - 更新した単一EXEの隔離smoke成功: `artifacts/smoke-1791295545430/smoke-result.json`。bridge/sandbox、設定・avatar・ピン保存、トレイコマンドと正常終了を確認。
 - 最新成果物: `publish/AppDock.at365.exe`、100,500,097 bytes。SHA256: `E9A5F315042CB71759231D28F3DB597CAED93F5BF234FB6F22F06EF37C8B7C65`。実利用先への配置は行っていない。
+# 2026-10-07 Settings scroll layout
+
+- Keep the settings heading and save toolbar outside the scrolling body. Reserve scrollbar space and reset category/Applet/tab/mode scroll before paint.
+- Renderer TypeScript check and Vite build passed.
+- `scripts/settings-scroll-ui-test.cjs`: isolated Electron profile, 1280/900/760px widths; heading/toolbar bounds remain unchanged during scrolling and general-to-appearance switching, form width stays stable, JSON switching works.
+- Initial sandbox launch was blocked by Electron install-directory ACL restrictions; the UI checks passed outside that sandbox without changing ACLs. Packaged EXE and deployed installation were not updated.
+
+- Deployment completed after user shutdown confirmation: portable smoke passed (artifacts/smoke-1791327621153); deployed EXE SHA-256 matches publish output, settings.json SHA-256 unchanged. Previous EXE retained in artifacts/settings-scroll-deployment-20261007-075937. App was not restarted.
