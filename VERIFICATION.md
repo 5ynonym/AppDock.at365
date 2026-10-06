@@ -302,3 +302,14 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - Removed the settings subtitle and bottom settings-file path; the heading omits its paragraph when no subtitle is supplied.
 - Renderer typecheck/build and existing 1280/900/760px settings-scroll UI checks passed. Screenshot inspected at 900px.
 - Portable smoke passed (artifacts/smoke-1791328207131). Deployed with matching EXE SHA-256 and unchanged settings.json; previous EXE backed up in artifacts/settings-cleanup-deployment-20261007-081014. App was not restarted.
+
+## 2026-10-07: 設定とAppletの一覧を統一・検索フィルターをボタン化
+
+- 設定カテゴリとApplet別設定の一覧をshellの左パネルへ移動。Appletと背景・余白・文字・選択表示を共通化し、既存の保存済み一覧幅を両画面で共有。フォームとJSON編集、未保存印、画面移動時のdraft保持、固定見出し・保存バーは維持。
+- ホーム・Applet・ログのタイトル下の案内文を削除。ショートカットの検索欄と状態フィルターを同じ行へ配置し、「すべて／割り当て済み／未設定／競合・エラー」の排他的な切り替えボタンへ変更。選択状態はaria-pressedで表示し、領域不足時は折り返す。
+- main/renderer TypeScript型検査、Vite build、変更コードのPrettier、git diff --check成功。
+- 既存の一覧幅UI検証を拡張し、両画面のスタイル一致、ドラッグ・キー操作・幅の上限下限、幅の相互反映と再起動後の復元、未保存データ保持、3画面の案内文削除を確認。開発版: `artifacts/applet-sidebar-1791328926715`、発行win-unpacked版: `artifacts/applet-sidebar-1791329187617`。
+- 設定スクロールUI検証成功。1280/900/760pxで見出し・保存バーを固定し、カテゴリ切り替え・JSON表示・フォーム幅を確認。
+- ナビゲーションUI検証成功。検索・全4種類の絞り込み・Spaceでのボタン選択、複数Appletの編集保存、JSON不正時の保持、外部変更との競合保護、24 Applet、ライト/ダーク、1280/900/700pxでの検索とフィルターの同一行配置・同じ高さ・横はみ出しなしを確認。開発版: `artifacts/navigation-1791329154290`、発行版: `artifacts/navigation-1791329206049`。既存検証の古い期待件数を共通開始遅延設定と現行5件のホストコマンドに合わせた。
+- 900pxの設定フォーム・ショートカットと700pxの設定をPNGで確認。初回のsandbox GUI起動はElectronのinstall-directory ACL制限で失敗したため、ACLを変更せず許可された通常実行環境の隔離profileで検証した。
+- プロジェクト内の既存ツールとElectron、既存.NET host成果物で単一EXEを再発行。portable smoke成功: `artifacts/smoke-1791329218130/smoke-result.json`。bridge/sandbox、設定・avatar・ピン保存、トレイ操作、正常終了を確認。実利用先への配置は行っていない。

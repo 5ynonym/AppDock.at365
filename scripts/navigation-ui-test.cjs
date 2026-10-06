@@ -113,7 +113,11 @@ const checks = [];
     await chooseApplet('検証Applet 01');
     await page.getByLabel('検証項目 0', { exact: true }).fill('編集した値');
     await page.getByLabel('Appletの設定項目を検索').fill('検証項目 23');
-    assert.equal(await page.locator('.applet-settings .setting-row').count(), 1);
+    assert.equal(
+      await page.locator('.applet-settings .setting-row').count(),
+      2,
+      'the matched setting and the common startup delay remain visible',
+    );
     await page.getByLabel('検証項目 23', { exact: true }).fill('末尾の値');
     await chooseApplet('検証Applet 02');
     await page.getByLabel('検証項目 0', { exact: true }).fill('別Appletの値');
@@ -165,18 +169,32 @@ const checks = [];
     assert.equal(await page.locator('.shortcut-row').count(), 3);
     await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).press('Control+p');
     await page.getByRole('alert').filter({ hasText: 'AppDock / コマンドを検索' }).waitFor();
-    await page.getByLabel('ショートカットの絞り込み').selectOption('conflict');
+    await page
+      .getByRole('group', { name: 'ショートカットの絞り込み' })
+      .getByRole('button', { name: '競合・エラー', exact: true })
+      .click();
     assert.equal(await page.locator('.shortcut-row').count(), 1);
     await page
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
       .press('Control+Alt+r');
-    await page.getByLabel('ショートカットの絞り込み').selectOption('assigned');
+    await page
+      .getByRole('group', { name: 'ショートカットの絞り込み' })
+      .getByRole('button', { name: '割り当て済み', exact: true })
+      .click();
     assert.equal(await page.locator('.shortcut-row').count(), 1);
+    const statusButtons = page.getByRole('group', { name: 'ショートカットの絞り込み' });
+    const unassigned = statusButtons.getByRole('button', { name: '未設定', exact: true });
+    await unassigned.focus();
+    await unassigned.press('Space');
+    assert.equal(await unassigned.getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('.shortcut-row').count(), 2);
+    await statusButtons.getByRole('button', { name: 'すべて', exact: true }).click();
+    assert.equal(await page.locator('.shortcut-row').count(), 3);
     await save();
     await button('ショートカット').click();
     await page.getByRole('heading', { name: '未確認のコマンド', exact: true }).waitFor();
     await button('AppDockのキー').click();
-    assert.equal(await page.locator('.shortcut-row').count(), 2);
+    assert.equal(await page.locator('.shortcut-row').count(), 5);
     checks.push(
       'owner scope / cross-applet conflicts / status filters / unknown commands / host keys',
     );
@@ -281,7 +299,19 @@ const checks = [];
       }
       await button('ショートカットキー').click();
       await chooseApplet('Welcome to your Dock');
-      await page.screenshot({ path: path.join(profile, `${theme}-900-shortcuts.png`) });
+      for (const width of [1280, 900, 700]) {
+        await page.setViewportSize({ width, height: 620 });
+        const search = await page.getByLabel('ショートカットのコマンドを検索').boundingBox();
+        const statusGroup = page.getByRole('group', { name: 'ショートカットの絞り込み' });
+        const status = await statusGroup.boundingBox();
+        assert.equal(await statusGroup.locator('[aria-pressed="true"]').count(), 1);
+        assert.equal(search.y, status.y, 'search and status filter share one row');
+        assert.equal(search.height, status.height, 'filter controls have equal height');
+        assert(search.x + search.width < status.x, 'filter controls do not overlap');
+        assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+        await page.screenshot({ path: path.join(profile, `${theme}-${width}-shortcuts.png`) });
+      }
+      await page.setViewportSize({ width: 900, height: 620 });
       for (const name of ['ホーム', 'Applet', 'ログ']) {
         await button(name).click();
         await page.locator('main').evaluate((el) => {
@@ -297,6 +327,7 @@ const checks = [];
     }
     checks.push(
       '24 applets / long forms / dark and light / 1280x840 and 900x620 / sticky save / no overflow',
+      'command search and status filter share a row at 1280 / 900 / 700px in both themes',
     );
     assert.deepEqual(errors, []);
     const result = { ok: true, profile, checks };

@@ -1,6 +1,7 @@
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import type {
   DockApi,
   HostSnapshot,
@@ -211,6 +212,7 @@ function Toggle({
 }
 function App() {
   const appletSidebar = useAppletSidebar();
+  const [settingsSidebarHost, setSettingsSidebarHost] = useState<HTMLDivElement | null>(null);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
   const [page, setPage] = useState<Page>('home');
   const [selected, setSelected] = useState('');
@@ -381,7 +383,7 @@ function App() {
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   return (
     <div
-      className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}
+      className={`shell ${page === 'extensions' || page === 'settings' ? 'with-sidebar' : ''}`}
       style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
     >
       <header className="titlebar">
@@ -503,6 +505,11 @@ function App() {
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
       )}
+      <div
+        className="settings-sidebar-slot"
+        ref={setSettingsSidebarHost}
+        hidden={page !== 'settings'}
+      />
       <main className={page === 'settings' ? 'settings-main' : undefined}>
         {error && (
           <div className="error-banner" role="alert">
@@ -518,7 +525,7 @@ function App() {
           <div className="page-content">
             {page === 'home' && (
               <>
-                <PageHeading title="ホーム" subtitle="Appletの状態と、よく使う操作。" />
+                <PageHeading title="ホーム" />
                 <div className="stats">
                   <div>
                     <span className="stat-icon green">
@@ -623,7 +630,6 @@ function App() {
               <>
                 <PageHeading
                   title="Applet"
-                  subtitle="必要な道具をつないで、Dockをあなたらしく。"
                   action={
                     <button
                       className="secondary"
@@ -660,6 +666,9 @@ function App() {
                 target={settingsTarget}
                 onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
+                sidebarHost={settingsSidebarHost}
+                sidebar={appletSidebar}
+                active={page === 'settings'}
               />
             </div>
             {page === 'logs' && (
@@ -844,20 +853,11 @@ function App() {
     </div>
   );
 }
-function PageHeading({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-}) {
+function PageHeading({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="page-heading compact">
       <div>
         <h1>{title}</h1>
-        {subtitle && <p>{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -1071,6 +1071,9 @@ function SettingsPage({
   globalHotKeys,
   target,
   onApplet,
+  sidebarHost,
+  sidebar,
+  active,
 }: {
   snapshot: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
@@ -1082,6 +1085,9 @@ function SettingsPage({
   target?: SettingsTarget;
   onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
+  sidebarHost: HTMLDivElement | null;
+  sidebar: ReturnType<typeof useAppletSidebar>;
+  active: boolean;
 }) {
   const [draft, setDraft] = useState<Settings>(snapshot.value);
   const [text, setText] = useState(JSON.stringify(snapshot.value, null, 2));
@@ -1203,6 +1209,93 @@ function SettingsPage({
   };
   return (
     <>
+      {active &&
+        sidebarHost &&
+        createPortal(
+          <aside className="sidebar settings-categories" aria-label="設定一覧">
+            <h2>設定</h2>
+            <div className="sidebar-extensions">
+              {(
+                [
+                  ['appearance', '表示'],
+                  ['general', '一般'],
+                  ['host-shortcuts', 'AppDockのキー'],
+                  ['shortcuts', 'ショートカット'],
+                  ['profile', 'プロフィール'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  aria-current={category === id ? 'true' : undefined}
+                  className={category === id ? 'selected' : ''}
+                  key={id}
+                  onClick={() => {
+                    if (switchToForm()) setCategory(id);
+                  }}
+                >
+                  <span title={label}>{label}</span>
+                  {categoryChanged(id) && (
+                    <small className="unsaved-mark" aria-label="未保存">
+                      ●
+                    </small>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="settings-applet-list">
+              <h3>Applet別の設定</h3>
+              <input
+                aria-label="設定するAppletを検索"
+                placeholder="Appletを検索…"
+                value={appletSearch}
+                onChange={(event) => setAppletSearch(event.target.value)}
+              />
+              <div className="sidebar-extensions">
+                {extensions
+                  .filter((e) =>
+                    (e.displayName + ' ' + e.name + ' ' + e.id)
+                      .toLowerCase()
+                      .includes(appletSearch.toLowerCase()),
+                  )
+                  .map((e) => (
+                    <button
+                      key={e.id}
+                      className={
+                        category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
+                      }
+                      aria-current={
+                        category === 'extensions' && selectedApplet?.id === e.id
+                          ? 'true'
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (!switchToForm()) return;
+                        setCategory('extensions');
+                        setAppletId(e.id);
+                      }}
+                    >
+                      <span title={e.displayName}>{e.displayName}</span>
+                      {appletChanged(e.id) && (
+                        <small className="unsaved-mark" aria-label="未保存">
+                          ●
+                        </small>
+                      )}
+                    </button>
+                  ))}
+                {!extensions.some((e) =>
+                  (e.displayName + ' ' + e.name + ' ' + e.id)
+                    .toLowerCase()
+                    .includes(appletSearch.toLowerCase()),
+                ) && <p className="empty">該当するAppletはありません。</p>}
+              </div>
+            </div>
+            <div
+              className="sidebar-resizer"
+              {...sidebar.separatorProps}
+              aria-label="設定一覧の幅を変更"
+            />
+          </aside>,
+          sidebarHost,
+        )}
       <PageHeading
         title="設定"
         action={
@@ -1290,76 +1383,6 @@ function SettingsPage({
           </div>
         ) : (
           <div className="settings-layout">
-            <div className="settings-categories">
-              {(
-                [
-                  ['appearance', '表示', 'sun'],
-                  ['general', '一般', 'settings'],
-                  ['host-shortcuts', 'AppDockのキー', 'command'],
-                  ['shortcuts', 'ショートカット', 'command'],
-                  ['profile', 'プロフィール', 'home'],
-                ] as const
-              ).map(([id, label, icon]) => (
-                <button
-                  aria-current={category === id ? 'true' : undefined}
-                  className={category === id ? 'selected' : ''}
-                  key={id}
-                  onClick={() => setCategory(id)}
-                >
-                  <Icon name={icon} size={16} />
-                  {label}
-                  {categoryChanged(id) && (
-                    <span className="unsaved-mark" aria-label="未保存">
-                      ●
-                    </span>
-                  )}
-                </button>
-              ))}
-              <div className="settings-applet-list">
-                <h3>Applet別の設定</h3>
-                <input
-                  aria-label="設定するAppletを検索"
-                  placeholder="Appletを検索…"
-                  value={appletSearch}
-                  onChange={(event) => setAppletSearch(event.target.value)}
-                />
-                {extensions
-                  .filter((e) =>
-                    (e.displayName + ' ' + e.name + ' ' + e.id)
-                      .toLowerCase()
-                      .includes(appletSearch.toLowerCase()),
-                  )
-                  .map((e) => (
-                    <button
-                      key={e.id}
-                      className={
-                        category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
-                      }
-                      aria-current={
-                        category === 'extensions' && selectedApplet?.id === e.id
-                          ? 'true'
-                          : undefined
-                      }
-                      onClick={() => {
-                        setCategory('extensions');
-                        setAppletId(e.id);
-                      }}
-                    >
-                      {e.displayName}
-                      {appletChanged(e.id) && (
-                        <span className="unsaved-mark" aria-label="未保存">
-                          ●
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                {!extensions.some((e) =>
-                  (e.displayName + ' ' + e.name + ' ' + e.id)
-                    .toLowerCase()
-                    .includes(appletSearch.toLowerCase()),
-                ) && <p>該当するAppletはありません。</p>}
-              </div>
-            </div>
             <div className="settings-form">
               {category === 'extensions' && selectedApplet && (
                 <>
@@ -1603,7 +1626,6 @@ function LogsPage({
     <>
       <PageHeading
         title="ログ"
-        subtitle="ホストとAppletの動作を、ここから確認。"
         action={
           <button
             className="secondary"
