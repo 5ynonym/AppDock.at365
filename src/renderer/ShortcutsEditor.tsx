@@ -36,6 +36,7 @@ export function ShortcutsEditor({
   const visible = commands
     .filter(
       (command) =>
+        (!command.hidden || !!bindings[command.id]?.length) &&
         (owner === undefined || command.extensionId === owner) &&
         `${command.title} ${command.extension} ${command.id} ${(bindings[command.id] ?? []).join(' ')}`
           .toLowerCase()

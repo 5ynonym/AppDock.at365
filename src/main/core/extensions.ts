@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
-import { parseExtensionCommands } from '../../shared/extension-commands';
+import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import type {
   ExtensionManifest,
@@ -14,6 +14,7 @@ import type {
   TrayItem,
   Panel,
   SettingOption,
+  AppletCommand,
 } from '../../shared/contracts';
 function contained(root: string, entry: string) {
   const resolved = fs.realpathSync(path.resolve(root, entry));
@@ -56,6 +57,7 @@ function readManifest(folder: string): LoadedManifest {
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
+    commands: parseDeclaredCommands(m.id, m.commands),
     folder,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
@@ -160,11 +162,46 @@ class ExtensionManager extends EventEmitter {
       scheduledStartAt: e.scheduledStartAt,
       error: e.error,
       enabled: this.settings.value.extensions[e.manifest.id]?.enabled ?? false,
-      commands: e.commands,
+      commands: this.commandCatalog(e),
       tray: e.tray,
       panel: e.panel,
       settingOptions: e.settingOptions,
     }));
+  }
+  canActivateForCommand(e: ExtensionInstance, id: string) {
+    if (
+      this.shuttingDown ||
+      !['stopped', 'waiting'].includes(e.state) ||
+      !e.manifest.commands?.some((command) => command.id === id && command.activateOnExecute)
+    )
+      return false;
+    try {
+      this.checkCompatibility(e);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  commandCatalog(e: ExtensionInstance): AppletCommand[] {
+    const catalog = new Map<string, AppletCommand>();
+    for (const command of e.manifest.commands ?? [])
+      catalog.set(command.id, {
+        ...command,
+        available: this.canActivateForCommand(e, command.id),
+      });
+    for (const command of e.commands)
+      catalog.set(command.id, { ...command, available: e.state === 'running' });
+    for (const command of e.manifest.commands ?? [])
+      for (const alias of command.aliases ?? []) {
+        const target = catalog.get(command.id)!;
+        catalog.set(alias, {
+          id: alias,
+          title: target.title,
+          available: target.available,
+          hidden: true,
+        });
+      }
+    return [...catalog.values()];
   }
   reconcile() {
     this.queue = this.queue
@@ -375,12 +412,65 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   execute(id: string) {
-    const e = [...this.items.values()].find(
+    for (const item of this.items.values()) {
+      const target = item.manifest.commands?.find((command) => command.aliases?.includes(id));
+      if (target) {
+        id = target.id;
+        break;
+      }
+    }
+    const running = [...this.items.values()].find(
       (x) => x.state === 'running' && x.commands.some((c) => c.id === id),
     );
+    if (running) {
+      if (!running.peer || running.peer.closed) throw new Error('拡張との接続が終了しました。');
+      return running.peer.request('command.execute', { id });
+    }
+    const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));
     if (!e) throw new Error('このコマンドは現在利用できません。');
-    if (!e.peer || e.peer.closed) throw new Error('拡張との接続が終了しました。');
-    return e.peer.request('command.execute', { id });
+    const execution = this.queue
+      .catch((err) => this.log('error', 'host', err.message))
+      .then(async () => {
+        if (this.shuttingDown) throw new Error('AppDockは終了中です。');
+        if (e.state !== 'running') {
+          if (!this.canActivateForCommand(e, id))
+            throw new Error('このコマンドは現在利用できません。');
+          await this.stop(e);
+          this.settings.updateExtension(e.manifest.id, { enabled: true });
+          await this.start(e);
+        }
+        if (
+          e.state !== 'running' ||
+          !e.commands.some((command) => command.id === id) ||
+          !e.peer ||
+          e.peer.closed
+        )
+          throw new Error(e.error ?? 'Appletがコマンドを登録できませんでした。');
+        return e.peer.request('command.execute', { id });
+      });
+    this.queue = execution.then(
+      () => {},
+      () => {},
+    );
+    return execution;
+  }
+  executePanelAction(extensionId: string, actionId: string) {
+    const extension = this.items.get(extensionId);
+    const actions = [
+      ...(extension?.panel?.actions ?? []),
+      ...(extension?.panel?.tabs ?? []),
+      ...(extension?.panel?.images ?? []).flatMap((image) => image.actions ?? []),
+    ];
+    if (
+      this.shuttingDown ||
+      extension?.state !== 'running' ||
+      !extension.peer ||
+      extension.peer.closed ||
+      typeof actionId !== 'string' ||
+      !actions.some((action) => action.actionId === actionId)
+    )
+      throw new Error('この操作は現在利用できません。履歴を更新してください。');
+    return extension.peer.request('panel.action', { id: actionId });
   }
   restart(id: string, immediate = false) {
     this.queue = this.queue

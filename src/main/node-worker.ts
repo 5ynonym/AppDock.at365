@@ -11,7 +11,7 @@ export interface NodeExtensionContext {
     setOptions(key: string, options: SettingOption[]): Promise<unknown>;
   };
   notifications: { show(title: string, body: string): Promise<unknown> };
-  ui: { showPanel(panel: Panel): Promise<unknown> };
+  ui: { showPanel(panel: Panel): Promise<unknown>; getImageDirectory(): Promise<string> };
   browser: { open(url: string): Promise<unknown> };
   log: { info(message: string): Promise<unknown>; error(message: string): Promise<unknown> };
   scheduler: { every(milliseconds: number, callback: Handler): () => void };
@@ -28,6 +28,7 @@ export interface NodeExtensionContext {
 export interface NodeExtension {
   activate(context: NodeExtensionContext): Promise<void>;
   deactivate?(): Promise<void>;
+  onPanelAction?(actionId: string): Promise<void>;
 }
 const commands: (Command & { handler: Handler })[] = [];
 const tray: TrayItem[] = [];
@@ -64,7 +65,10 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           },
           setOptions: (key, options) => peer.request('host.settings.options', { key, options }),
         },
-        ui: { showPanel: (panel) => peer.request('host.ui.panel', panel) },
+        ui: {
+          showPanel: (panel) => peer.request('host.ui.panel', panel),
+          getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,
+        },
         notifications: {
           show: (title, body) => peer.request('host.notifications.show', { title, body }),
         },
@@ -112,6 +116,10 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       if (!cmd) throw new Error('Unknown command');
       return await cmd.handler();
     }
+    case 'panel.action':
+      if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
+      await extension.onPanelAction(p.id);
+      return null;
     case 'settings.changed': {
       const changed = JSON.stringify(configuration) !== JSON.stringify(p);
       configuration = p;

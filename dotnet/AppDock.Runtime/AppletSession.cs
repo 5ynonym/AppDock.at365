@@ -29,6 +29,11 @@ public static class AppletSession
                         if (context is null) throw new InvalidOperationException("Not activated.");
                         await context.ExecuteAsync(parameters.GetProperty("id").GetString()!);
                         return null;
+                    case "panel.action":
+                        if (context is null || applet is not IPanelActionHandler panelActions)
+                            throw new InvalidOperationException("Panel actions are not supported.");
+                        await panelActions.HandlePanelActionAsync(parameters.GetProperty("id").GetString()!, active.Token);
+                        return null;
                     case "deactivate":
                         await active.CancelAsync();
                         if (context is not null) await context.DisposeAsync();

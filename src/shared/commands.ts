@@ -8,6 +8,7 @@ export interface UiCommand extends Command {
   /** Stable owner ID; null is the host, undefined is an unknown saved command. */
   extensionId?: string | null;
   available: boolean;
+  hidden?: boolean;
 }
 export const defaultShortcuts: Record<string, string[]> = {
   'appdock.commands.search': ['Ctrl+P', 'Ctrl+Shift+P'],

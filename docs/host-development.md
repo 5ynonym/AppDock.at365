@@ -98,3 +98,13 @@ node scripts/test-ui.cjs ../AppDock.at365/publish/win-unpacked/AppDock.at365.exe
 Windows SDKへのアクセス制限がある環境はビルド未確認として扱い、許可された実行環境で再確認します。実行中EXEの書き込みロックがあれば、その配置先を通常終了するか別出力先を使います。無関係な既存アプリを止めません。
 
 完成後は必要なホストバージョン、配置するファイル、検証コマンド、実機条件と限界、成果物のVersion／SHA256をREADME・VERIFICATIONへ更新します。Gitではsourceとdocsをコミットし、publish・artifacts・設定・秘密情報は除外します。
+
+## v0.6.0の追加契約と検証
+
+ロード前コマンドは`parseDeclaredCommands` / `ExtensionManager.commandCatalog`で検証・公開します。通常のruntimeコマンドを優先し、起動可能な宣言だけ明示実行で有効化・即時起動します。互換性チェックと起動キューを共有し、遅延タイマーを取り消します。旧IDの別名は保存されたホットキーを維持し、新規候補に重複表示しません。
+
+構造化フォームは`ObjectListSetting`と共有の`object-list`変換・設定検証で扱います。旧JSON・Folder・数値enum、モニター別Padding、未知のデータの保持を回帰確認します。フォルダー選択は既存のIPC呼び出し元検証を通します。
+
+履歴専用操作は一般コマンドとは独立した`panel.action`です。現在のパネル（actions / tabs / images）にあるIDだけ許可します。ローカル画像は`panel-images.ts`で実パスの包含を確認し、CSPを緩めず`appdock://host/panel-images`で配信します。ホスト管理外のファイルや外部画像URLは受け付けません。
+
+[panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDK既存コンストラクターは維持し、新機能のminimumHostVersionは0.6.0です。

@@ -138,8 +138,9 @@ function syncHotKeys(retry = false) {
     ...hostCommands.map((command) => command.id),
     ...manager
       .snapshot()
-      .filter((extension) => extension.enabled && extension.state === 'running')
-      .flatMap((extension) => extension.commands.map((command) => command.id)),
+      .flatMap((extension) =>
+        extension.commands.filter((command) => command.available).map((command) => command.id),
+      ),
   ];
   return hotKeys.sync(settings.value, available, shortcutRecording, retry);
 }
@@ -163,6 +164,13 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:chooseDirectory', async () => {
+    const result = await dialog.showOpenDialog(window!, {
+      title: '画像ソースフォルダーを選ぶ',
+      properties: ['openDirectory'],
+    });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
   handle('dock:checkUpdates', (id?: string) => {
     const target = updateTarget(id);
     return checkUpdate(target.version, target.repository, net.fetch);
@@ -199,6 +207,9 @@ function registerIpc() {
   });
   handle('dock:restartExtension', (id: string) => manager.restart(id));
   handle('dock:executeCommand', (id: string) => manager.execute(id));
+  handle('dock:executePanelAction', (id: string, actionId: string) =>
+    manager.executePanelAction(id, actionId),
+  );
   handle('dock:openPath', async (kind: string) => {
     const target = (
       {
@@ -303,6 +314,27 @@ async function initialize() {
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
+    if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
+      const image = [...manager.items.values()]
+        .flatMap((extension) => extension.panel?.images ?? [])
+        .find((item) => item.image === url.href);
+      if (!image?.imageFile || !fs.existsSync(image.imageFile))
+        return new Response('Not found', { status: 404 });
+      return net.fetch(pathToFileURL(image.imageFile).href).then(
+        (response) =>
+          new Response(response.body, {
+            headers: {
+              'Content-Type': /\.png$/i.test(image.imageFile!)
+                ? 'image/png'
+                : /\.webp$/i.test(image.imageFile!)
+                  ? 'image/webp'
+                  : 'image/jpeg',
+              'Cache-Control': 'no-store',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          }),
+      );
+    }
     if (url.host === 'host' && url.pathname === '/avatar.png') {
       const file = path.join(baseDirectory, 'avatar.png');
       if (!settings.value.profile.avatar || !fs.existsSync(file))

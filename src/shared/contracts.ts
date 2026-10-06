@@ -27,6 +27,14 @@ export interface Command {
   id: string;
   title: string;
 }
+export interface DeclaredCommand extends Command {
+  activateOnExecute?: boolean;
+  aliases?: string[];
+}
+export interface AppletCommand extends DeclaredCommand {
+  available: boolean;
+  hidden?: boolean;
+}
 export interface TrayItem {
   title: string;
   command: string;
@@ -34,7 +42,15 @@ export interface TrayItem {
 export interface SettingDefinition {
   key: string;
   title: string;
-  type: 'boolean' | 'number' | 'string' | 'json' | 'select' | 'shortcut-list';
+  type:
+    | 'boolean'
+    | 'number'
+    | 'string'
+    | 'json'
+    | 'select'
+    | 'shortcut-list'
+    | 'string-list'
+    | 'object-list';
   description?: string;
   default?: unknown;
   minimum?: number;
@@ -42,6 +58,11 @@ export interface SettingDefinition {
   step?: number;
   options?: SettingOption[];
   dynamic?: boolean;
+  fields?: SettingDefinition[];
+  itemTitle?: string;
+  aliases?: string[];
+  format?: 'directory';
+  numericOptions?: boolean;
 }
 export interface SettingOption {
   label: string;
@@ -51,13 +72,22 @@ export interface Panel {
   title: string;
   description?: string;
   facts?: { label: string; value: string }[];
-  actions?: { title: string; command: string }[];
+  actions?: PanelAction[];
+  tabs?: PanelAction[];
   images?: {
     title: string;
+    tooltip?: string;
+    imageFile?: string;
     description?: string;
     image?: string;
-    actions?: { title: string; command: string }[];
+    actions?: PanelAction[];
   }[];
+}
+export interface PanelAction {
+  title: string;
+  command: string;
+  actionId?: string;
+  selected?: boolean;
 }
 export interface ExtensionManifest {
   apiVersion: 1;
@@ -73,6 +103,7 @@ export interface ExtensionManifest {
   type?: string;
   capabilities?: string[];
   settings?: SettingDefinition[];
+  commands?: DeclaredCommand[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
   folder: string;
@@ -80,7 +111,7 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   scheduledStartAt?: number;
   error: string | null;
   enabled: boolean;
-  commands: Command[];
+  commands: AppletCommand[];
   tray: TrayItem[];
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
@@ -108,6 +139,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  chooseDirectory(): Promise<string | null>;
   checkUpdates(id?: string): Promise<UpdateResult>;
   openReleases(id?: string): Promise<void>;
   startExtensionNow(id: string): Promise<void>;
@@ -124,6 +156,7 @@ export interface DockApi {
   toggleExtension(id: string, enabled: boolean): Promise<void>;
   restartExtension(id: string): Promise<void>;
   executeCommand(id: string): Promise<unknown>;
+  executePanelAction(id: string, actionId: string): Promise<unknown>;
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   onChanged(callback: () => void): () => void;

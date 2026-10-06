@@ -153,3 +153,11 @@ AppDockはdeactivateを最大2秒待ってからプロセスを停止します�
 UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--test-profile=<絶対パス>` を渡します。実利用のsettings.jsonや認証データを変更しません。[時計のUIテスト](../../Applet.Watch.at365/scripts/test-ui.cjs)はPlaywrightでテスト対象AppDockを起動し、登録完了・2台のモニター・ショートカット・終了したPIDを確認する例です。[検証結果と限界](../../Applet.Watch.at365/VERIFICATION.md)も参照してください。
 
 時計のテストはマウスジェスチャー・OSホットキー・AutoLock等を検証しません。モニターの抜き差し、異なるDPIの実機、RDP、スリープ復帰、長期常駐も、次の機能で必要なら別途確認します。
+
+## v0.6.0のApplet設計
+
+モニターごとのフォームには`object-list`とフィールド内の`string-list`を使います。旧Folderや数値enumの移行を宣言でき、JSON文字列からも設定を引き継げます。ロード前に設定したいコマンドはmanifestの`commands`へ宣言し、即時ロードを許す開始操作だけ`activateOnExecute`を指定します。旧IDは`aliases`で維持できます。
+
+履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
+
+契約と範囲は[拡張API](extensions.md#v060-宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshow](../../Applet.WallpaperSlideshow.at365/README.md)を参照してください。必要ホストをv0.6.0へ上げ、SDK・Runtimeを含めて再publishします。

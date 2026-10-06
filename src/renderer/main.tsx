@@ -1,3 +1,4 @@
+import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
@@ -284,7 +285,7 @@ function App() {
         Object.entries(snapshot?.settings.value.shortcuts ?? {}).find(([, values]) =>
           values.includes(shortcut),
         )?.[0];
-      if (commandId && commands.some((c) => c.id === commandId)) {
+      if (commandId && commands.some((c) => c.id === commandId && c.available)) {
         e.preventDefault();
         if (!busy || hostCommands.some((c) => c.id === commandId)) void execute(commandId);
       }
@@ -322,7 +323,7 @@ function App() {
   const commands: UiCommand[] = [
     ...hostCommands.map((command) => ({ ...command, extensionId: null })),
     ...(snapshot?.extensions.flatMap((e) =>
-      e.commands.map((c) => ({ ...c, extension: e.name, extensionId: e.id, available: true })),
+      e.commands.map((c) => ({ ...c, extension: e.name, extensionId: e.id })),
     ) ?? []),
   ];
   for (const command of commands) knownCommands.current.set(command.id, command);
@@ -343,8 +344,10 @@ function App() {
   ];
   const pins = snapshot?.settings.value.pinnedCommands ?? [];
   const filteredCommands = rankCommands(
-    commands.filter((c) =>
-      (c.title + ' ' + c.extension + ' ' + c.id).toLowerCase().includes(query.toLowerCase()),
+    commands.filter(
+      (c) =>
+        !c.hidden &&
+        (c.title + ' ' + c.extension + ' ' + c.id).toLowerCase().includes(query.toLowerCase()),
     ),
     pins,
   );
@@ -563,7 +566,7 @@ function App() {
                       <button
                         key={c.id}
                         className="secondary"
-                        disabled={busy}
+                        disabled={busy || !c.available}
                         onClick={() => void execute(c.id)}
                       >
                         {c.title}
@@ -739,7 +742,7 @@ function App() {
                       .getElementById(`palette-option-${next}`)
                       ?.scrollIntoView({ block: 'nearest' });
                   }
-                  if (event.key === 'Enter' && !busy && filteredCommands[paletteIndex]) {
+                  if (event.key === 'Enter' && !busy && filteredCommands[paletteIndex]?.available) {
                     event.preventDefault();
                     event.stopPropagation();
                     void execute(filteredCommands[paletteIndex].id);
@@ -767,7 +770,7 @@ function App() {
                   >
                     <button
                       className="palette-execute"
-                      disabled={busy}
+                      disabled={busy || !c.available}
                       onClick={() => void execute(c.id)}
                     >
                       <Icon name="play" size={16} />
@@ -775,6 +778,7 @@ function App() {
                         {c.title}
                         <small>
                           {c.extension}
+                          {!c.available && <span> · Applet起動後に利用できます</span>}
                           {pinned && <span className="pin-badge">PINNED</span>}
                         </small>
                       </div>
@@ -940,24 +944,37 @@ function ExtensionDetail({
         <div className="extension-panel">
           <h3>{e.panel.title}</h3>
           <p>{e.panel.description}</p>
+          {!!e.panel.tabs?.length && (
+            <nav className="panel-tabs" aria-label="モニターごとの履歴">
+              {e.panel.tabs.map((tab) => (
+                <button
+                  className="secondary"
+                  key={tab.actionId ?? tab.command}
+                  aria-pressed={tab.selected ?? false}
+                  disabled={
+                    busy ||
+                    (!tab.actionId &&
+                      !e.commands.some(
+                        (command) => command.id === tab.command && command.available,
+                      ))
+                  }
+                  onClick={() =>
+                    void run(() =>
+                      tab.actionId
+                        ? window.dock.executePanelAction(e.id, tab.actionId)
+                        : window.dock.executeCommand(tab.command),
+                    )
+                  }
+                >
+                  {tab.title}
+                </button>
+              ))}
+            </nav>
+          )}
           {!!e.panel.images?.length && (
             <div className="panel-images">
               {e.panel.images.map((item, i) => (
-                <article key={i}>
-                  {item.image && <img src={item.image} alt={item.title} />}
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                  {item.actions?.map((action) => (
-                    <button
-                      className="secondary"
-                      key={action.command}
-                      disabled={busy || !e.commands.some((c) => c.id === action.command)}
-                      onClick={() => void run(() => window.dock.executeCommand(action.command))}
-                    >
-                      {action.title}
-                    </button>
-                  ))}
-                </article>
+                <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
               ))}
             </div>
           )}
@@ -973,10 +990,17 @@ function ExtensionDetail({
             {e.panel.actions?.map((a) => (
               <button
                 className="secondary"
-                key={a.command}
-                disabled={busy || !e.commands.some((c) => c.id === a.command)}
+                key={a.actionId ?? a.command}
+                disabled={
+                  busy ||
+                  (!a.actionId && !e.commands.some((c) => c.id === a.command && c.available))
+                }
                 onClick={() =>
-                  void run(() => window.dock.executeCommand(a.command), 'コマンドを実行しました。')
+                  void run(() =>
+                    a.actionId
+                      ? window.dock.executePanelAction(e.id, a.actionId)
+                      : window.dock.executeCommand(a.command),
+                  )
                 }
               >
                 {a.title}
