@@ -336,6 +336,9 @@ function App() {
         ...Object.keys(snapshot?.settings.value.shortcuts ?? {}),
         ...(snapshot?.settings.value.trayCommands ?? []),
         ...(snapshot ? [snapshot.settings.value.host.trayClickCommand] : []),
+        ...(snapshot?.settings.value.host.trayDoubleClickCommand
+          ? [snapshot.settings.value.host.trayDoubleClickCommand]
+          : []),
       ]),
     ]
       .filter((id) => !commandIds.has(id))
@@ -1444,37 +1447,54 @@ function SettingsPage({
             {category === 'general' && (
               <>
                 <h3>一般</h3>
-                <SettingRow
-                  title="トレイクリックのコマンド"
-                  description="トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。"
-                >
-                  <select
-                    aria-label="トレイクリックのコマンド"
-                    value={draft.host.trayClickCommand}
-                    onChange={(event) =>
-                      edit({
-                        ...draft,
-                        host: { ...draft.host, trayClickCommand: event.target.value },
-                      })
+                {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
+                  <SettingRow
+                    key={key}
+                    title={
+                      key === 'trayClickCommand'
+                        ? 'トレイクリックのコマンド'
+                        : 'トレイダブルクリックのコマンド'
+                    }
+                    description={
+                      key === 'trayClickCommand'
+                        ? 'トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。'
+                        : '既定は未設定です。割り当てると、シングルクリックはWindowsの判定時間だけ待機し、ダブルクリック時はこのコマンドだけを実行します。'
                     }
                   >
-                    {commands
-                      .filter(
-                        (command) => !command.hidden || command.id === draft.host.trayClickCommand,
-                      )
-                      .map((command) => (
-                        <option key={command.id} value={command.id}>
-                          {command.extension} / {command.title}
-                          {command.available ? '' : '（現在利用できません）'}
-                        </option>
-                      ))}
-                    {!commands.some((command) => command.id === draft.host.trayClickCommand) && (
-                      <option value={draft.host.trayClickCommand}>
-                        {draft.host.trayClickCommand}（現在利用できません）
-                      </option>
-                    )}
-                  </select>
-                </SettingRow>
+                    <select
+                      aria-label={
+                        key === 'trayClickCommand'
+                          ? 'トレイクリックのコマンド'
+                          : 'トレイダブルクリックのコマンド'
+                      }
+                      value={draft.host[key] ?? ''}
+                      onChange={(event) =>
+                        edit({
+                          ...draft,
+                          host: { ...draft.host, [key]: event.target.value || null },
+                        })
+                      }
+                    >
+                      {key === 'trayDoubleClickCommand' && (
+                        <option value="">未設定（シングルクリックをすぐ実行）</option>
+                      )}
+                      {commands
+                        .filter((command) => !command.hidden || command.id === draft.host[key])
+                        .map((command) => (
+                          <option key={command.id} value={command.id}>
+                            {command.extension} / {command.title}
+                            {command.available ? '' : '（現在利用できません）'}
+                          </option>
+                        ))}
+                      {draft.host[key] &&
+                        !commands.some((command) => command.id === draft.host[key]) && (
+                          <option value={draft.host[key]}>
+                            {draft.host[key]}（現在利用できません）
+                          </option>
+                        )}
+                    </select>
+                  </SettingRow>
+                ))}
                 {(
                   [
                     [

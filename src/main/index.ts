@@ -28,6 +28,7 @@ import { parseSettings } from '../shared/settings-schema';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
+import { TrayClickDispatcher, readDoubleClickTime } from './core/tray-clicks';
 import type { HostSnapshot, Settings } from '../shared/contracts';
 
 protocol.registerSchemesAsPrivileged([
@@ -65,6 +66,7 @@ if (locked) {
 }
 let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
@@ -95,27 +97,28 @@ function showWindow() {
 }
 function trayMenu() {
   if (!tray || !manager) return;
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      ...trayCommandGroups(settings.value, manager.snapshot()).map((group) => ({
-        label: group.title,
-        submenu: group.commands.map((command) => ({
-          label: command.title,
-          enabled: command.enabled,
-          click: () => runTrayCommand(command.id),
-        })),
+  const groups = trayCommandGroups(settings.value, manager.snapshot());
+  const menu = Menu.buildFromTemplate([
+    ...groups.map((group) => ({
+      label: group.title,
+      submenu: group.commands.map((command) => ({
+        label: command.title,
+        enabled: command.enabled,
+        click: () => runTrayCommand(command.id),
       })),
-      ...(settings.value.trayCommands.length ? [{ type: 'separator' as const }] : []),
-      { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
-      {
-        label: '終了',
-        click: () => {
-          quitting = true;
-          app.quit();
-        },
+    })),
+    ...(groups.length ? [{ type: 'separator' as const }] : []),
+    { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
+    {
+      label: '終了',
+      click: () => {
+        quitting = true;
+        app.quit();
       },
-    ]),
-  );
+    },
+  ]);
+  menu.on('menu-will-show', () => trayClicks?.cancel());
+  tray.setContextMenu(menu);
 }
 async function executeCommand(id: string) {
   if (quitting) return;
@@ -149,6 +152,7 @@ function snapshot(): HostSnapshot {
   };
 }
 function applySettings() {
+  trayClicks?.cancel();
   nativeTheme.themeSource = settings.value.host.theme;
   trayMenu();
   changed();
@@ -451,7 +455,17 @@ async function initialize() {
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
   tray = new Tray(icon.resize({ width: 20, height: 20 }));
   tray.setToolTip('AppDock.at365');
-  tray.on('click', () => runTrayCommand(settings.value.host.trayClickCommand));
+  trayClicks = new TrayClickDispatcher(
+    () => settings.value.host,
+    runTrayCommand,
+    () =>
+      readDoubleClickTime(hotKeyHost).catch((error) => {
+        log.write('warn', 'tray', `${String(error)} 最大判定時間の5秒で待機します。`);
+        return 5000;
+      }),
+  );
+  tray.on('click', () => trayClicks?.click());
+  tray.on('double-click', () => trayClicks?.doubleClick());
   trayMenu();
   await window.loadURL('appdock://host/index.html');
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
@@ -621,6 +635,7 @@ async function runSmoke() {
 app.on('second-instance', () => showWindow());
 app.on('before-quit', (event) => {
   quitting = true;
+  trayClicks?.close();
   windowState?.flush();
   if (shutdownFinished || !manager) return;
   event.preventDefault();

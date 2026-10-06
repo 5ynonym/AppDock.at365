@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "A personal Electron dock for Node.js and .NET extensions",
   "author": "at365",

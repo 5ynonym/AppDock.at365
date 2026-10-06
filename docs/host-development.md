@@ -122,3 +122,11 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 `host.hardwareAcceleration`はboolean、既定true。単一インスタンスのロック取得後、`app.whenReady()`より前に同じ`SettingsStore`で設定を読み込み、falseの場合だけ`app.disableHardwareAcceleration()`を呼びます。不正な設定は既存のエラー表示で起動を中止し、ファイルを保持します。設定保存・外部編集による変更は次の完全起動で適用し、実行中のGPUプロセスへ変更を加えません。
 
 一般設定の説明には完全終了・再起動が必要なことを表示します。[設定回帰](../tests/preferences.test.cjs)は旧設定補完・OFF保持・不正型を確認し、[UIテスト](../scripts/hardware-acceleration-ui-test.cjs)は3回の起動でON→OFF→ONを実測します。GPU情報取得後の`app.isHardwareAccelerationEnabled()`とOFF時の`getGPUFeatureStatus().gpu_compositing`を確認します。Applet APIとSDKは変更しません。
+
+## v0.9.0のクリック判定
+
+`host.trayDoubleClickCommand`はコマンドIDまたはnull、既定null。v0.7.0のclickのみの処理を`TrayClickDispatcher`へ置き換え、Windowsのclick→double-click通知で後者が来たときに前者の待機を取り消します。未設定時は即時実行。設定変更・メニュー表示・終了では待機を取り消し、非同期の判定時間取得が後から完了しても復活させません。
+
+ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの最大判定時間5000msを使います。SDK/Runtime/Applet APIは変更しません。
+
+[クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。

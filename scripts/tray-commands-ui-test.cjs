@@ -2,6 +2,7 @@ const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, 'artifacts', `tray-ui-${Date.now()}`);
 const folder = path.join(profile, 'extensions', 'test-tray');
@@ -90,6 +91,14 @@ const trayItems = () =>
   );
 (async () => {
   try {
+    const systemDelay = Number(
+      execFileSync(
+        path.join(root, 'artifacts/dotnet-host/AppDock.ExtensionHost.exe'),
+        ['--double-click-time'],
+        { windowsHide: true, encoding: 'utf8' },
+      ).trim(),
+    );
+    assert.ok(Number.isInteger(systemDelay) && systemDelay >= 1 && systemDelay <= 5000);
     let page = await launch();
     let snapshot = await page.evaluate(() => window.dock.snapshot());
     assert.equal(snapshot.settings.value.shortcuts['appdock.dotnet-demo.refresh'], undefined);
@@ -129,6 +138,34 @@ const trayItems = () =>
     await application.evaluate(() => globalThis.testTray.emit('double-click'));
     await page.waitForTimeout(200);
     assert.equal(await count(page), '2');
+    await page
+      .getByLabel('トレイクリックのコマンド', { exact: true })
+      .selectOption('appdock.settings.open');
+    await page
+      .getByLabel('トレイダブルクリックのコマンド', { exact: true })
+      .selectOption('test.tray.run');
+    await save(page);
+    await page.getByRole('button', { name: 'ホーム', exact: true }).first().click();
+    await application.evaluate(() => {
+      globalThis.testTray.emit('click');
+      globalThis.testTray.emit('double-click');
+    });
+    await page.waitForFunction(() =>
+      window.dock.snapshot().then((s) => s.extensions[0].panel.facts[0].value === '3'),
+    );
+    await page.waitForTimeout(systemDelay + 100);
+    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    assert.equal(await count(page), '3');
+    await application.evaluate(() => globalThis.testTray.emit('click'));
+    await page.getByRole('heading', { name: '設定', exact: true }).waitFor();
+    await page.getByRole('button', { name: '一般', exact: true }).click();
+    await page
+      .getByLabel('トレイクリックのコマンド', { exact: true })
+      .selectOption('test.tray.run');
+    await page
+      .getByLabel('トレイダブルクリックのコマンド', { exact: true })
+      .selectOption('appdock.settings.open');
+    await save(page);
     await application.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0].setSize(900, 700),
     );
@@ -140,14 +177,26 @@ const trayItems = () =>
     snapshot = await page.evaluate(() => window.dock.snapshot());
     assert.deepEqual(snapshot.settings.value.trayCommands, ['test.tray.run']);
     assert.equal(snapshot.settings.value.host.trayClickCommand, 'test.tray.run');
+    assert.equal(snapshot.settings.value.host.trayDoubleClickCommand, 'appdock.settings.open');
     await page.evaluate(() => window.dock.toggleExtension('test.tray', false));
     assert.deepEqual(await trayItems(), [{ label: 'トレイテストを実行', enabled: false }]);
     await application.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0].hide();
       globalThis.testTray.emit('click');
     });
-    await page.waitForFunction(() =>
-      window.dock.snapshot().then((s) => s.logs.some((entry) => entry.source === 'tray')),
+    for (let retry = 0; retry < 100; retry++) {
+      if (
+        await application.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()[0].isVisible(),
+        )
+      )
+        break;
+      await page.waitForTimeout(100);
+    }
+    assert.ok(
+      (await page.evaluate(() => window.dock.snapshot())).logs.some(
+        (entry) => entry.source === 'tray',
+      ),
     );
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
@@ -162,6 +211,7 @@ const trayItems = () =>
       'test.tray.run',
     );
     await page.getByLabel('トレイクリックのコマンド', { exact: true }).selectOption('appdock.open');
+    await page.getByLabel('トレイダブルクリックのコマンド', { exact: true }).selectOption('');
     await save(page);
     await application.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0].hide();
@@ -193,7 +243,8 @@ const trayItems = () =>
         ok: true,
         profile,
         checks:
-          'legacy migration, opt-in/out, real menu callback and click events, Applet execution, persistence, default open, 900/1280px UI',
+          'legacy migration, opt-in/out, real menu callback, separate single/double actions without duplicate execution, Windows interval, persistence, default open, 900/1280px UI',
+        systemDelay,
       }),
     );
   } catch (error) {
