@@ -52,9 +52,19 @@ fs.mkdirSync(dataDirectory, { recursive: true });
 app.setPath('userData', path.join(dataDirectory, 'chromium'));
 app.setAppUserModelId('at365.appdock');
 const locked = app.requestSingleInstanceLock({ baseDirectory });
+const settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
+let settingsLoadError: Error | undefined;
+if (locked) {
+  try {
+    settings.load();
+    // Electron requires this before app.ready and before the renderer/GPU starts.
+    if (!settings.value.host.hardwareAcceleration) app.disableHardwareAcceleration();
+  } catch (error) {
+    settingsLoadError = error instanceof Error ? error : new Error(String(error));
+  }
+}
 let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let settings: SettingsStore;
 let manager: ExtensionManager;
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
@@ -254,13 +264,10 @@ function registerIpc() {
   });
 }
 async function initialize() {
-  settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
-  try {
-    settings.load();
-  } catch (e) {
+  if (settingsLoadError) {
     dialog.showErrorBox(
       'AppDock — 設定を読み込めません',
-      `${e instanceof Error ? e.message : e}\n\n${settings.file}\n元のファイルは保持しています。JSONを修正して起動し直してください。`,
+      `${settingsLoadError.message}\n\n${settings.file}\n元のファイルは保持しています。JSONを修正して起動し直してください。`,
     );
     app.quit();
     return;

@@ -3,6 +3,7 @@ export interface HostSettings {
   closeToTray: boolean;
   notifications: boolean;
   startMinimized: boolean;
+  hardwareAcceleration: boolean;
   trayClickCommand: string;
 }
 export interface ExtensionSettings {

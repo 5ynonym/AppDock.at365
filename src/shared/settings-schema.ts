@@ -14,6 +14,7 @@ export const createDefaultSettings = (): Settings => ({
     closeToTray: true,
     notifications: true,
     startMinimized: false,
+    hardwareAcceleration: true,
     trayClickCommand: 'appdock.open',
   },
   extensions: {},
@@ -38,6 +39,10 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   for (const key of ['closeToTray', 'notifications', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
+  const hardwareAcceleration =
+    value.host.hardwareAcceleration === undefined ? true : value.host.hardwareAcceleration;
+  if (typeof hardwareAcceleration !== 'boolean')
+    throw new Error('host.hardwareAcceleration は true / false です。');
   const trayClickCommand =
     value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
   if (!validCommandId(trayClickCommand))
@@ -98,7 +103,7 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
   const next = {
     ...value,
-    host: { ...value.host, trayClickCommand },
+    host: { ...value.host, trayClickCommand, hardwareAcceleration },
     trayCommands,
     shortcuts,
     globalShortcutCommands,

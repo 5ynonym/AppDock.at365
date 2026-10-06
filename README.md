@@ -165,3 +165,9 @@ manifestで宣言したコマンドはロード前からショートカットを
 JSONでは`trayCommands`に表示するコマンドIDの配列、`host.trayClickCommand`にクリック時のIDを保存します。旧設定は既定値で読み込みます。未インストールの旧サンプル`appdock.welcome` / `appdock.dotnet-demo`の設定・ショートカット・ピン留め等は起動時に整理し、`appdock.dotnet-demo.refresh`が未確認のコマンドとして残る問題を解消します。明示的にインストールしたテスト用サンプルは保持します。
 
 `dev.bat run test:tray`で隔離profileの設定フォーム、再起動後の保持、実Trayのメニューとクリックイベント、停止時の扱いを検証します。
+
+## v0.8.0: ハードウェアアクセラレーション
+
+「一般」の「ハードウェアアクセラレーション」で、AppDockの画面描画にGPUを使用するか切り替えられます。既定はON。変更を保存後、トレイの「終了」でAppDockを完全終了し、起動し直すと反映します。ウィンドウを閉じてトレイへ格納するだけでは反映されません。
+
+JSONでは`host.hardwareAcceleration`に`true` / `false`を保存します。項目がない旧設定はONで読み込みます。OFF時はElectronの初期化前に無効化します。Applet独自の描画設定は変更しません。`dev.bat run test:hardware-acceleration`でON→OFF→ONの保存と再起動後のElectron実状態を確認します。

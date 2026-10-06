@@ -5,6 +5,7 @@
     "closeToTray": true,
     "notifications": true,
     "startMinimized": false,
+    "hardwareAcceleration": true,
     "trayClickCommand": "appdock.open"
   },
   "shortcuts": {

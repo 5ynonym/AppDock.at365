@@ -1484,6 +1484,11 @@ function SettingsPage({
                     ],
                     ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
                     [
+                      'hardwareAcceleration',
+                      'ハードウェアアクセラレーション',
+                      'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
+                    ],
+                    [
                       'startMinimized',
                       'トレイから起動',
                       '次の起動時はウィンドウを表示せず、トレイに常駐します。',
