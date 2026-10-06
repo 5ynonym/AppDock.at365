@@ -57,7 +57,11 @@ public interface ISchedulerService
     // The next tick is skipped until the previous callback completes.
     IDisposable Every(TimeSpan interval, Func<CancellationToken, Task> callback);
 }
-public sealed record Panel(string Title, string? Description = null, IReadOnlyList<PanelFact>? Facts = null, IReadOnlyList<PanelAction>? Actions = null);
+public sealed record Panel(string Title, string? Description = null, IReadOnlyList<PanelFact>? Facts = null, IReadOnlyList<PanelAction>? Actions = null)
+{
+    public IReadOnlyList<PanelImage>? Images { get; init; }
+}
+public sealed record PanelImage(string Title, string? Description = null, string? Image = null, IReadOnlyList<PanelAction>? Actions = null);
 public sealed record PanelFact(string Label, string Value);
 public sealed record PanelAction(string Title, string Command);
 public sealed record SettingOption(string Label, string Value);

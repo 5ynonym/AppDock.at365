@@ -139,3 +139,11 @@ GmailChecker、WallpaperSlideshow、Watchの時計以外の機能は移行して
 - [Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)
 
 署名証明書は設定していないため、このビルドは未署名です。
+
+## v0.5.0: 遅延開始・バージョン確認・画像付きパネル
+
+すべてのAppletに「開始までの秒数」を設定できます。有効化・再起動から指定秒数後にプロセスを起動し、待機中もAppDockの設定は編集できます。0で即時、最大86400秒。無効化・AppDock終了で取り消し、待機中の秒数変更で待ち直します。実行中の変更は次回から適用します。manifestの既定値がない既存Appletは即時起動のままです。開始待ちの詳細画面には予定時刻と「今すぐ開始」が表示されます。
+
+ホストの画面下部、Appletの詳細画面に「更新を確認」を追加しました。クリック時だけGitHubの最新正式リリースを問い合わせます。公開リリースがない場合、通信エラー、更新ありを区別し、更新があればリリースページを開けます。設定・画像・ログは問い合わせに含めず、公開リポジトリ名と標準HTTPヘッダーだけを送信します。自動更新は行いません。
+
+`minimumHostVersion`を宣言したAppletは起動前にホストのバージョンを確認し、非対応ならエラーを表示します。画像付きパネルとJSON入力設定を追加し、[WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md)の履歴をAppDock内で表示できます。既存のAPI v1、Applet設定・コマンドIDは維持しています。

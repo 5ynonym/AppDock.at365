@@ -20,10 +20,13 @@ const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require(
 if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executable);
 const args = portable ? ['--smoke-test'] : [root, '--smoke-test', `--smoke-dir=${profile}`];
 if (clockApplet) args.push('--smoke-clock');
+const childEnvironment = { ...process.env };
+delete childEnvironment.ELECTRON_RUN_AS_NODE;
 const child = spawn(executable, args, {
   cwd: root,
   windowsHide: true,
   stdio: 'pipe',
+  env: childEnvironment,
 });
 let output = '';
 child.stdout.on('data', (d) => {

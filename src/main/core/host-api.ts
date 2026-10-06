@@ -90,6 +90,37 @@ export function createHostApi(
       case 'host.ui.panel': {
         requireCapability('ui');
         if (
+          p.images != null &&
+          (!Array.isArray(p.images) ||
+            p.images.length > 4 ||
+            p.images.some(
+              (item: unknown) =>
+                !isObject(item) ||
+                typeof item.title !== 'string' ||
+                item.title.length > 200 ||
+                (item.description != null &&
+                  (typeof item.description !== 'string' || item.description.length > 1000)) ||
+                (item.image != null &&
+                  (typeof item.image !== 'string' ||
+                    item.image.length > 200000 ||
+                    !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(
+                      item.image,
+                    ))) ||
+                (item.actions != null &&
+                  (!Array.isArray(item.actions) ||
+                    item.actions.length > 4 ||
+                    item.actions.some(
+                      (a: unknown) =>
+                        !isObject(a) ||
+                        typeof a.title !== 'string' ||
+                        a.title.length > 200 ||
+                        typeof a.command !== 'string' ||
+                        !a.command.startsWith(id + '.'),
+                    ))),
+            ))
+        )
+          throw new Error('パネルの画像は4件以内のサムネイルを指定してください。');
+        if (
           typeof p.title !== 'string' ||
           p.title.length > 200 ||
           (p.description !== undefined && typeof p.description !== 'string') ||

@@ -122,3 +122,16 @@ Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト�
 UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上限1MB、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
 
 拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
+
+## v0.5.0: manifestとホスト共通設定
+
+- `minimumHostVersion`: 必要なホストの安定版SemVer (`0.5.0`など)。省略時は従来どおりAPI v1として起動。
+- `startupDelaySeconds`: 既定の遅延秒数、0～86400の整数。省略は0。
+- `updateRepository`: GitHubの`owner/repository`。省略時は更新確認非対応。更新比較には`major.minor.patch`の正式版タグ（先頭`v`も可）が必要。
+- 保存先は`extensions[id].startupDelaySeconds`。Applet固有の`settings`とは別で、旧設定をそのまま読み込める。待機のタイマーを起動・RPCのキューで待たず、ほかのAppletの起動を妨げない。
+- snapshotの`state: waiting`、`scheduledStartAt`（Unixミリ秒）で待機を表示。無効化・再起動・終了でタイマーを解放。再起動も遅延を適用し、「今すぐ開始」だけ即時にする。
+- `type: json`の設定値は最大10000文字のJSON文字列。ホストで構文、Appletで意味と範囲を検証。
+
+パネルの`images`は4件まで。各項目は`title`、任意の`description`、`image`（JPEG/PNG/WebPのbase64 data URL、200000文字以内）、名前空間内の`actions`（4件まで）。ホストは外部URL・SVG・HTMLを受け付けない。.NETの既存`Panel`コンストラクターは維持し、任意の`Images`プロパティと`PanelImage`を追加。Nodeの`ui.showPanel`でも同じJSON型を使用できる。
+
+これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
