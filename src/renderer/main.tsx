@@ -323,7 +323,7 @@ function App() {
   const commands: UiCommand[] = [
     ...hostCommands.map((command) => ({ ...command, extensionId: null })),
     ...(snapshot?.extensions.flatMap((e) =>
-      e.commands.map((c) => ({ ...c, extension: e.name, extensionId: e.id })),
+      e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
     ) ?? []),
   ];
   for (const command of commands) knownCommands.current.set(command.id, command);
@@ -478,7 +478,9 @@ function App() {
           <div className="sidebar-extensions">
             {snapshot?.extensions
               .filter((e) =>
-                (e.name + ' ' + e.id).toLowerCase().includes(appletFilter.toLowerCase()),
+                (e.displayName + ' ' + e.name + ' ' + e.id)
+                  .toLowerCase()
+                  .includes(appletFilter.toLowerCase()),
               )
               .map((e) => (
                 <button
@@ -487,13 +489,15 @@ function App() {
                   aria-current={selectedApplet?.id === e.id ? 'true' : undefined}
                   className={selectedApplet?.id === e.id ? 'selected' : ''}
                 >
-                  <span title={e.name}>{e.name}</span>
+                  <span title={e.displayName}>{e.displayName}</span>
                   <small>{states[e.state]}</small>
                 </button>
               ))}
             {snapshot &&
               !snapshot.extensions.some((e) =>
-                (e.name + ' ' + e.id).toLowerCase().includes(appletFilter.toLowerCase()),
+                (e.displayName + ' ' + e.name + ' ' + e.id)
+                  .toLowerCase()
+                  .includes(appletFilter.toLowerCase()),
               ) && <p className="empty">該当するAppletはありません。</p>}
           </div>
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
@@ -601,7 +605,7 @@ function App() {
                         </span>
                         <StateBadge extension={e} />
                       </div>
-                      <h3>{e.name}</h3>
+                      <h3>{e.displayName}</h3>
                       <p>{e.description}</p>
                       <div className="card-bottom">
                         <span>
@@ -886,7 +890,7 @@ function ExtensionDetail({
           <Icon name="extensions" size={30} />
         </span>
         <div>
-          <h2>{e.name}</h2>
+          <h2>{e.displayName}</h2>
           <p>
             v{e.version} <span className="divider">/</span>{' '}
             {e.runtime === 'node' ? 'TypeScript · Node.js' : 'C# · .NET 10'}
@@ -894,7 +898,7 @@ function ExtensionDetail({
         </div>
         <Toggle
           checked={e.enabled}
-          label={`${e.name}を有効にする`}
+          label={`${e.displayName}を有効にする`}
           disabled={busy}
           onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
         />
@@ -934,7 +938,7 @@ function ExtensionDetail({
       {e.state === 'waiting' && (
         <div className="extension-panel">
           <p>
-            {e.name} は {new Date(e.scheduledStartAt!).toLocaleTimeString()} に開始します。
+            {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()} に開始します。
           </p>
           <button
             className="secondary"
@@ -1316,7 +1320,9 @@ function SettingsPage({
               />
               {extensions
                 .filter((e) =>
-                  (e.name + ' ' + e.id).toLowerCase().includes(appletSearch.toLowerCase()),
+                  (e.displayName + ' ' + e.name + ' ' + e.id)
+                    .toLowerCase()
+                    .includes(appletSearch.toLowerCase()),
                 )
                 .map((e) => (
                   <button
@@ -1332,7 +1338,7 @@ function SettingsPage({
                       setAppletId(e.id);
                     }}
                   >
-                    {e.name}
+                    {e.displayName}
                     {appletChanged(e.id) && (
                       <span className="unsaved-mark" aria-label="未保存">
                         ●
@@ -1341,7 +1347,9 @@ function SettingsPage({
                   </button>
                 ))}
               {!extensions.some((e) =>
-                (e.name + ' ' + e.id).toLowerCase().includes(appletSearch.toLowerCase()),
+                (e.displayName + ' ' + e.name + ' ' + e.id)
+                  .toLowerCase()
+                  .includes(appletSearch.toLowerCase()),
               ) && <p>該当するAppletはありません。</p>}
             </div>
           </div>
@@ -1349,7 +1357,7 @@ function SettingsPage({
             {category === 'extensions' && selectedApplet && (
               <>
                 <div className="applet-settings-heading">
-                  <h3>{selectedApplet.name}</h3>
+                  <h3>{selectedApplet.displayName}</h3>
                   <button className="text-button" onClick={() => onApplet(selectedApplet.id)}>
                     Appletに戻る
                   </button>
@@ -1621,7 +1629,7 @@ function LogsPage({
             ]),
           ].map((id) => (
             <option key={id} value={id}>
-              {snapshot.extensions.find((e) => e.id === id)?.name ?? id}
+              {snapshot.extensions.find((e) => e.id === id)?.displayName ?? id}
             </option>
           ))}
         </select>

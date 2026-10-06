@@ -7,6 +7,7 @@ import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
+import { appletDisplayName } from '../../shared/applet-display-name';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -39,6 +40,11 @@ function readManifest(folder: string): LoadedManifest {
     throw new Error('拡張マニフェストの形式が正しくありません。');
   if (m.runtime === 'dotnet' && (typeof m.type !== 'string' || !m.type))
     throw new Error('.NET拡張のtypeが必要です。');
+  if (
+    m.displayName !== undefined &&
+    (typeof m.displayName !== 'string' || !m.displayName.trim() || m.displayName.length > 100)
+  )
+    throw new Error('displayName は空白だけではない1～100文字の文字列です。');
   if (m.minimumHostVersion !== undefined) parseVersion(m.minimumHostVersion);
   if (m.updateRepository !== undefined && !validRepository(m.updateRepository))
     throw new Error('updateRepository はGitHubの owner/repo を指定してください。');
@@ -158,6 +164,7 @@ class ExtensionManager extends EventEmitter {
   snapshot(): ExtensionSnapshot[] {
     return [...this.items.values()].map((e) => ({
       ...e.manifest,
+      displayName: appletDisplayName(e.manifest),
       state: e.state,
       scheduledStartAt: e.scheduledStartAt,
       error: e.error,
@@ -282,7 +289,11 @@ class ExtensionManager extends EventEmitter {
           await this.start(e);
         });
     }, delay * 1000);
-    this.log('info', e.manifest.id, `${delay}秒後に ${e.manifest.name} を起動します。`);
+    this.log(
+      'info',
+      e.manifest.id,
+      `${delay}秒後に ${appletDisplayName(e.manifest)} を起動します。`,
+    );
     this.emit('changed');
   }
   async start(e: ExtensionInstance) {
@@ -368,7 +379,7 @@ class ExtensionManager extends EventEmitter {
           )
         : [];
       e.state = 'running';
-      this.log('info', m.id, `${m.name} を起動しました。`);
+      this.log('info', m.id, `${appletDisplayName(m)} を起動しました。`);
     } catch (err: any) {
       e.child?.kill();
       this.crashed(e, err.message);

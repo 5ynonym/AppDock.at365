@@ -4,6 +4,8 @@ AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証
 
 ## まず変更範囲を決める
 
+Applet名の画面表示にはsnapshotの`displayName`を使用します。manifestの任意の`displayName`を優先し、省略時は`src/shared/applet-display-name.ts`で`name`の先頭の`Applet.`を除去します。元の`name`と`id`を識別・保存に使う契約は維持し、検索には表示名・元の名前・IDを含めます。manifestの検証、snapshot、renderer、トレイ、ログを一緒に整合させてください。
+
 ホストのビルトインコマンドは`src/shared/commands.ts`の`hostCommands`へ登録し、`src/main/index.ts`の`executeCommand`で実行します。`appdock.restart` / `appdock.quit`はウィンドウを表示せず`quitHost`へ渡し、既存の`before-quit`でキー登録・Applet・設定監視・トレイを終了します。再起動予約は一度だけ行い、portable版は`PORTABLE_EXECUTABLE_FILE`を再起動先として、作業ディレクトリも元のEXEの隣へ移します。開発版はElectronの既定の起動引数を維持します。`dev.bat run test:host-commands`で実プロセスの再起動と終了、保存済み設定、Appletのdeactivateを確認できます。引数に配布EXEを指定するとportable版も検証します。
 
 設定項目の追加だけなら、Appletのmanifestと設定読み取りを追加します。boolean / number / string / select、説明、範囲、動的選択肢はすでに対応しています。コマンド・ピン・ショートカットも登録から利用できます。

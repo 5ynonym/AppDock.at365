@@ -72,7 +72,8 @@ public sealed class Applet : IAppDockExtension
 {
   "apiVersion": 1,
   "id": "at365.sample",
-  "name": "Sample",
+  "name": "Applet.Sample.at365",
+  "displayName": "Sample.at365",
   "version": "0.1.0",
   "runtime": "dotnet",
   "entry": "Applet.Sample.dll",
@@ -167,3 +168,5 @@ UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--t
 登録・宣言した一般コマンドは、ユーザーがホスト設定の「トレイに表示」を有効にするとトレイメニューへ追加されます。既定はOFFです。Applet側の`context.Tray.Add` / `context.tray.add`はメニューラベルの提案で、表示を強制しません。これらを呼ばないAppletでも登録コマンドを選択できます。クリック時のコマンドもホスト設定から選べるため、Appletごとに独自トレイを追加する必要はありません。安定したコマンドIDを維持し、実行中の動的置換には従来の`ReplaceAsync`を使います。
 
 v0.9.0ではシングルクリックとダブルクリックを別々の一般コマンドへ割り当てられます。ダブルは既定未設定。割り当てた場合はホストが単クリックを判定時間だけ待機し、ダブル時に単クリックを取り消します。Applet側の実装・API変更は不要です。
+
+表示名はmanifestの任意の`displayName`で指定します（1～100文字、空白のみは不可）。AppDock v0.9.1以降は一覧・設定・コマンド候補・トレイ等でこの名前を使います。省略時は`name`の先頭の`Applet.`を除去します。元の名前・ID・実行ファイル名は維持し、manifest更新後はホストを再起動します。詳細は[Applet API](extensions.md)を参照してください。
