@@ -83,10 +83,24 @@ const count = (page) =>
   page.evaluate(() => window.dock.snapshot().then((s) => s.extensions[0].panel.facts[0].value));
 const trayItems = () =>
   application.evaluate(() =>
-    globalThis.testTrayMenu.items.flatMap((item) =>
+    globalThis.testTrayMenu.items
+      .slice(0, -2)
+      .flatMap((item) =>
+        item.submenu
+          ? item.submenu.items.map((child) => ({ label: child.label, enabled: child.enabled }))
+          : item.type === 'separator'
+            ? []
+            : [{ label: item.label, enabled: item.enabled }],
+      ),
+  );
+const trayStructure = () =>
+  application.evaluate(() =>
+    globalThis.testTrayMenu.items.map((item) =>
       item.submenu
-        ? item.submenu.items.map((child) => ({ label: child.label, enabled: child.enabled }))
-        : [],
+        ? { [item.label]: item.submenu.items.map((child) => child.label) }
+        : item.type === 'separator'
+          ? '---'
+          : item.label,
     ),
   );
 (async () => {
@@ -119,6 +133,12 @@ const trayItems = () =>
     await checkbox.check();
     await save(page);
     assert.deepEqual(await trayItems(), [{ label: 'トレイテストを実行', enabled: true }]);
+    assert.deepEqual(await trayStructure(), [
+      { 'Tray Test': ['トレイテストを実行'] },
+      '---',
+      '設定…',
+      '終了',
+    ]);
     await page.screenshot({ path: path.join(profile, 'commands-1280.png') });
     await application.evaluate(() =>
       globalThis.testTrayMenu.items.find((i) => i.label === 'Tray Test').submenu.items[0].click(),
@@ -225,25 +245,61 @@ const trayItems = () =>
     );
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
     await page.getByRole('checkbox', { name: 'AppDockを開くをトレイに表示', exact: true }).check();
+    await page.getByRole('checkbox', { name: '再起動をトレイに表示', exact: true }).check();
+    await page.getByRole('checkbox', { name: '終了をトレイに表示', exact: true }).check();
     await save(page);
     assert.deepEqual(await trayItems(), [
-      { label: 'AppDockを開く', enabled: true },
       { label: 'トレイテストを実行', enabled: false },
+      { label: 'AppDockを開く', enabled: true },
+      { label: '再起動', enabled: true },
+      { label: '終了', enabled: true },
     ]);
-    await page
-      .getByRole('checkbox', { name: 'AppDockを開くをトレイに表示', exact: true })
-      .uncheck();
+    assert.deepEqual(await trayStructure(), [
+      { 'Tray Test': ['トレイテストを実行'] },
+      '---',
+      'AppDockを開く',
+      '再起動',
+      '終了',
+      '---',
+      '設定…',
+      '終了',
+    ]);
+    await application.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0].hide();
+      globalThis.testTrayMenu.items.find((item) => item.label === 'AppDockを開く').click();
+    });
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0].isVisible(),
+      ),
+      true,
+    );
     await page
       .getByRole('checkbox', { name: 'トレイテストを実行をトレイに表示', exact: true })
       .uncheck();
     await save(page);
+    assert.deepEqual(await trayStructure(), [
+      'AppDockを開く',
+      '再起動',
+      '終了',
+      '---',
+      '設定…',
+      '終了',
+    ]);
+    await page
+      .getByRole('checkbox', { name: 'AppDockを開くをトレイに表示', exact: true })
+      .uncheck();
+    await page.getByRole('checkbox', { name: '再起動をトレイに表示', exact: true }).uncheck();
+    await page.getByRole('checkbox', { name: '終了をトレイに表示', exact: true }).uncheck();
+    await save(page);
     assert.deepEqual(await trayItems(), []);
+    assert.deepEqual(await trayStructure(), ['設定…', '終了']);
     console.log(
       JSON.stringify({
         ok: true,
         profile,
         checks:
-          'legacy migration, opt-in/out, real menu callback, separate single/double actions without duplicate execution, Windows interval, persistence, default open, 900/1280px UI',
+          'legacy migration, opt-in/out, Applet submenus then flat builtins then fixed settings/quit, empty sections without redundant separators, real menu callbacks, separate single/double actions, Windows interval, persistence, default open, 900/1280px UI',
         systemDelay,
       }),
     );

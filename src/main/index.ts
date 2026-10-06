@@ -98,8 +98,10 @@ function showWindow() {
 function trayMenu() {
   if (!tray || !manager) return;
   const groups = trayCommandGroups(settings.value, manager.snapshot());
+  const appletGroups = groups.filter((group) => group.extensionId !== null);
+  const builtins = groups.find((group) => group.extensionId === null)?.commands ?? [];
   const menu = Menu.buildFromTemplate([
-    ...groups.map((group) => ({
+    ...appletGroups.map((group) => ({
       label: group.title,
       submenu: group.commands.map((command) => ({
         label: command.title,
@@ -107,21 +109,40 @@ function trayMenu() {
         click: () => runTrayCommand(command.id),
       })),
     })),
-    ...(groups.length ? [{ type: 'separator' as const }] : []),
+    ...(appletGroups.length ? [{ type: 'separator' as const }] : []),
+    ...builtins.map((command) => ({
+      label: command.title,
+      enabled: command.enabled,
+      click: () => runTrayCommand(command.id),
+    })),
+    ...(builtins.length ? [{ type: 'separator' as const }] : []),
     { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
-    {
-      label: '終了',
-      click: () => {
-        quitting = true;
-        app.quit();
-      },
-    },
+    { label: '終了', click: () => runTrayCommand('appdock.quit') },
   ]);
   menu.on('menu-will-show', () => trayClicks?.cancel());
   tray.setContextMenu(menu);
 }
+function quitHost(restart = false) {
+  if (quitting) return;
+  if (restart) {
+    const portableExecutable = app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE;
+    if (portableExecutable) {
+      // The portable launcher removes the extracted app directory on exit.
+      process.chdir(path.dirname(portableExecutable));
+      app.relaunch({ execPath: portableExecutable, args: process.argv.slice(1) });
+    } else {
+      app.relaunch();
+    }
+  }
+  quitting = true;
+  app.quit();
+}
 async function executeCommand(id: string) {
   if (quitting) return;
+  if (id === 'appdock.restart' || id === 'appdock.quit') {
+    quitHost(id === 'appdock.restart');
+    return;
+  }
   if (hostCommands.some((command) => command.id === id)) {
     showWindow();
     if (id !== 'appdock.open') window?.webContents.send('dock:hostCommand', id);
@@ -259,8 +280,7 @@ function registerIpc() {
         window?.close();
         break;
       case 'quit':
-        quitting = true;
-        app.quit();
+        quitHost();
         break;
       default:
         throw new Error('未対応のウィンドウ操作です。');

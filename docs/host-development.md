@@ -4,6 +4,8 @@ AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証
 
 ## まず変更範囲を決める
 
+ホストのビルトインコマンドは`src/shared/commands.ts`の`hostCommands`へ登録し、`src/main/index.ts`の`executeCommand`で実行します。`appdock.restart` / `appdock.quit`はウィンドウを表示せず`quitHost`へ渡し、既存の`before-quit`でキー登録・Applet・設定監視・トレイを終了します。再起動予約は一度だけ行い、portable版は`PORTABLE_EXECUTABLE_FILE`を再起動先として、作業ディレクトリも元のEXEの隣へ移します。開発版はElectronの既定の起動引数を維持します。`dev.bat run test:host-commands`で実プロセスの再起動と終了、保存済み設定、Appletのdeactivateを確認できます。引数に配布EXEを指定するとportable版も検証します。
+
 設定項目の追加だけなら、Appletのmanifestと設定読み取りを追加します。boolean / number / string / select、説明、範囲、動的選択肢はすでに対応しています。コマンド・ピン・ショートカットも登録から利用できます。
 
 機能固有の時計描画、画像処理、WindowsフックなどはAppletへ置きます。複数Appletで共有したい操作、ホストの保存・通知・アカウント管理、ユーザー向けの共通画面はHost APIやReact UIを拡張します。Appletのために任意のElectron APIやファイル操作をrendererへ公開しません。
@@ -112,6 +114,8 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 [panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDK既存コンストラクターは維持し、新機能のminimumHostVersionは0.6.0です。
 
 ## v0.7.0のトレイコマンド
+
+トレイのグループは`extensionId: null`でビルトイン、AppletのIDでAppletを区別します。表示名には依存せず、`index.ts`はAppletサブメニュー→ビルトインの最上位項目→固定の設定/終了の順で構成します。セパレータは空でない区画の末尾だけに追加し、先頭や連続したセパレータを防ぎます。選択済みの設定/終了コマンドもビルトイン区画に含み、固定の末尾2項目は維持します。
 
 表示可否はホスト設定`trayCommands`（既定`[]`）、クリック先は`host.trayClickCommand`（既定`appdock.open`）で管理します。`tray-commands.ts`はコマンドカタログとユーザーの選択からメニューを構成し、従来の`Tray.Add`はラベルの提案としてのみ参照します。設定保存・外部編集・Appletのコマンド置換・状態変更で再構成します。保存された未取得のIDは保持し、利用不可の宣言は無効表示、`activateOnExecute`は共通の実行経路を利用します。
 
