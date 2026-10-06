@@ -52,6 +52,11 @@ async function launch() {
     page.on('pageerror', (error) => errors.push(error.message));
     assert.equal(await width(), 280);
     assert.equal(await page.locator('.sidebar-extensions i').count(), 0);
+    assert.deepEqual(await page.locator('.sidebar-extensions button > span').allTextContents(), [
+      'Watch',
+      'WindowsMover',
+      'WindowsTools',
+    ]);
     const starts = await page.locator('.sidebar-extensions button > span').evaluateAll((items) =>
       items.map((el) => {
         const range = document.createRange();

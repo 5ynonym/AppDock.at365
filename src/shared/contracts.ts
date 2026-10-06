@@ -97,6 +97,7 @@ export interface ExtensionManifest {
   apiVersion: 1;
   id: string;
   name: string;
+  displayName?: string;
   version: string;
   minimumHostVersion?: string;
   updateRepository?: string;
@@ -110,6 +111,7 @@ export interface ExtensionManifest {
   commands?: DeclaredCommand[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
+  displayName: string;
   folder: string;
   state: 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'error';
   scheduledStartAt?: number;

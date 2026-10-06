@@ -20,7 +20,8 @@
 {
   "apiVersion": 1,
   "id": "at365.my-tool",
-  "name": "My Tool",
+  "name": "Applet.MyTool",
+  "displayName": "My Tool",
   "version": "0.1.0",
   "runtime": "dotnet",
   "entry": "MyTool.dll",
@@ -124,6 +125,12 @@ Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト�
 UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上限1MB、通常タイムアウト15秒）。ホスト→拡張は `activate` / `settings.changed` / `command.execute` / `deactivate`。activateは `{commands:[{id,title}],tray:[{title,command}]}` を返します。
 
 拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
+
+## v0.9.1: Appletの表示名
+
+`extension.json`の任意項目`displayName`（空白だけではない1～100文字の文字列）で表示名を指定できます。前後の空白を除いた名前をホストの一覧・詳細・設定・コマンド候補・トレイのサブメニュー・起動ログに使用します。明示した表示名はそのまま尊重します。
+
+省略時は`name`の先頭の`Applet.`だけを取り除きます（例: `Applet.Watch.at365` → `Watch.at365`）。除去して空になる場合は元の名前を使います。`name`・`id`・実行ファイル名・設定やコマンドIDは変更しません。検索は表示名・元の名前・IDのすべてに対応します。snapshotは元の`name`と、解決済みの`displayName`を別々に返します。旧ホストはこの項目を無視して従来の`name`を表示するため、既存Appletの最低ホスト版を変更する必要はありません。反映にはAppDockの再起動が必要です。
 
 ## v0.5.0: manifestとホスト共通設定
 

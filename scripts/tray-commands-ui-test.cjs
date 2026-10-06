@@ -12,7 +12,8 @@ fs.writeFileSync(
   JSON.stringify({
     apiVersion: 1,
     id: 'test.tray',
-    name: 'Tray Test',
+    name: 'Applet.Tray.InternalName',
+    displayName: 'Tray Test',
     version: '1.0.0',
     runtime: 'node',
     entry: 'index.js',
@@ -115,12 +116,45 @@ const trayStructure = () =>
     assert.ok(Number.isInteger(systemDelay) && systemDelay >= 1 && systemDelay <= 5000);
     let page = await launch();
     let snapshot = await page.evaluate(() => window.dock.snapshot());
+    assert.equal(snapshot.extensions[0].name, 'Applet.Tray.InternalName');
+    assert.equal(snapshot.extensions[0].displayName, 'Tray Test');
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await page.locator('.sidebar-extensions button').filter({ hasText: 'Tray Test' }).click();
+    await page.getByRole('heading', { name: 'Tray Test', exact: true }).waitFor();
+    await page.getByLabel('Tray Testを有効にする', { exact: true }).waitFor();
+    await page.getByLabel('Appletを検索', { exact: true }).fill('Applet.Tray.InternalName');
+    assert.equal(await page.locator('.sidebar-extensions button').count(), 1);
+    await page.getByLabel('Appletを検索', { exact: true }).fill('Tray Test');
+    assert.equal(await page.locator('.sidebar-extensions button').count(), 1);
     assert.equal(snapshot.settings.value.shortcuts['appdock.dotnet-demo.refresh'], undefined);
     assert.equal(snapshot.settings.value.extensions['appdock.dotnet-demo'], undefined);
     assert.deepEqual(snapshot.settings.value.trayCommands, []);
     assert.equal(snapshot.settings.value.host.trayClickCommand, 'appdock.open');
     await page.keyboard.press('Control+,');
+    await page.getByLabel('設定するAppletを検索').fill('Applet.Tray.InternalName');
+    await page
+      .locator('.settings-applet-list')
+      .getByRole('button', { name: 'Tray Test', exact: true })
+      .click();
+    await page
+      .locator('.applet-settings-heading')
+      .getByRole('heading', { name: 'Tray Test', exact: true })
+      .waitFor();
+    await page.getByLabel('設定するAppletを検索').fill('Tray Test');
+    assert.equal(
+      await page
+        .locator('.settings-applet-list')
+        .getByRole('button', { name: 'Tray Test', exact: true })
+        .count(),
+      1,
+    );
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    assert.equal(
+      await page
+        .locator('[data-shortcut-command="test.tray.run"] .shortcut-meta span')
+        .textContent(),
+      'Tray Test',
+    );
     assert.equal(
       await page.locator('[data-shortcut-command="appdock.dotnet-demo.refresh"]').count(),
       0,
@@ -147,6 +181,13 @@ const trayStructure = () =>
       window.dock.snapshot().then((s) => s.extensions[0].panel.facts[0].value === '1'),
     );
     await page.getByRole('button', { name: '一般', exact: true }).click();
+    assert.equal(
+      await page
+        .getByLabel('トレイクリックのコマンド', { exact: true })
+        .locator('option[value="test.tray.run"]')
+        .textContent(),
+      'Tray Test / トレイテストを実行',
+    );
     await page
       .getByLabel('トレイクリックのコマンド', { exact: true })
       .selectOption('test.tray.run');

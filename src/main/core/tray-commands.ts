@@ -1,5 +1,6 @@
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { hostCommands } from '../../shared/commands';
+import { appletDisplayName } from '../../shared/applet-display-name';
 
 export interface TrayCommandGroup {
   extensionId: string | null;
@@ -25,7 +26,7 @@ export function trayCommandGroups(
   for (const extension of extensions) {
     groups.push({
       extensionId: extension.id,
-      title: extension.name,
+      title: appletDisplayName(extension),
       commands: extension.commands
         .filter((command) => selected.has(command.id))
         .map((command) => ({
