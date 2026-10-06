@@ -1,5 +1,5 @@
 import { PanelImageCard } from './PanelImageCard';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   DockApi,
@@ -503,7 +503,7 @@ function App() {
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
       )}
-      <main>
+      <main className={page === 'settings' ? 'settings-main' : undefined}>
         {error && (
           <div className="error-banner" role="alert">
             {error}
@@ -648,7 +648,7 @@ function App() {
                 </div>
               </>
             )}
-            <div hidden={page !== 'settings'}>
+            <div className="settings-page" hidden={page !== 'settings'}>
               <SettingsPage
                 snapshot={snapshot.settings}
                 extensions={snapshot.extensions}
@@ -1096,6 +1096,11 @@ function SettingsPage({
   const [appletTab, setAppletTab] = useState<SettingsTarget['tab']>('settings');
   const [appletSearch, setAppletSearch] = useState('');
   const selectedApplet = extensions.find((e) => e.id === appletId) ?? extensions[0];
+  const settingsBody = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // Reset before paint so the next category never appears at the previous offset.
+    if (settingsBody.current) settingsBody.current.scrollTop = 0;
+  }, [category, selectedApplet?.id, appletTab, mode]);
   const switchToForm = () => {
     if (mode === 'json') {
       try {
@@ -1257,299 +1262,306 @@ function SettingsPage({
           変更をすべて保存
         </button>
       </div>
-      {parseError && (
-        <div className="error-text" role="alert">
-          {parseError}
-        </div>
-      )}
-      {dirty && revision !== snapshot.revision && (
-        <div className="error-text">
-          別の場所で設定が変わりました。編集中の内容は保持しています。再読み込みして変更をやり直してください。
-        </div>
-      )}
-      {mode === 'json' ? (
-        <div className="json-editor">
-          <div>
-            <span>settings.json</span>
-            <span>JSON · UTF-8</span>
+      <div className="settings-body" ref={settingsBody}>
+        {parseError && (
+          <div className="error-text" role="alert">
+            {parseError}
           </div>
-          <textarea
-            spellCheck={false}
-            aria-label="設定JSON"
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setDirty(true);
-            }}
-          />
-        </div>
-      ) : (
-        <div className="settings-layout">
-          <div className="settings-categories">
-            {(
-              [
-                ['appearance', '表示', 'sun'],
-                ['general', '一般', 'settings'],
-                ['host-shortcuts', 'AppDockのキー', 'command'],
-                ['shortcuts', 'ショートカット', 'command'],
-                ['profile', 'プロフィール', 'home'],
-              ] as const
-            ).map(([id, label, icon]) => (
-              <button
-                aria-current={category === id ? 'true' : undefined}
-                className={category === id ? 'selected' : ''}
-                key={id}
-                onClick={() => setCategory(id)}
-              >
-                <Icon name={icon} size={16} />
-                {label}
-                {categoryChanged(id) && (
-                  <span className="unsaved-mark" aria-label="未保存">
-                    ●
-                  </span>
-                )}
-              </button>
-            ))}
-            <div className="settings-applet-list">
-              <h3>Applet別の設定</h3>
-              <input
-                aria-label="設定するAppletを検索"
-                placeholder="Appletを検索…"
-                value={appletSearch}
-                onChange={(event) => setAppletSearch(event.target.value)}
-              />
-              {extensions
-                .filter((e) =>
+        )}
+        {dirty && revision !== snapshot.revision && (
+          <div className="error-text">
+            別の場所で設定が変わりました。編集中の内容は保持しています。再読み込みして変更をやり直してください。
+          </div>
+        )}
+        {mode === 'json' ? (
+          <div className="json-editor">
+            <div>
+              <span>settings.json</span>
+              <span>JSON · UTF-8</span>
+            </div>
+            <textarea
+              spellCheck={false}
+              aria-label="設定JSON"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setDirty(true);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="settings-layout">
+            <div className="settings-categories">
+              {(
+                [
+                  ['appearance', '表示', 'sun'],
+                  ['general', '一般', 'settings'],
+                  ['host-shortcuts', 'AppDockのキー', 'command'],
+                  ['shortcuts', 'ショートカット', 'command'],
+                  ['profile', 'プロフィール', 'home'],
+                ] as const
+              ).map(([id, label, icon]) => (
+                <button
+                  aria-current={category === id ? 'true' : undefined}
+                  className={category === id ? 'selected' : ''}
+                  key={id}
+                  onClick={() => setCategory(id)}
+                >
+                  <Icon name={icon} size={16} />
+                  {label}
+                  {categoryChanged(id) && (
+                    <span className="unsaved-mark" aria-label="未保存">
+                      ●
+                    </span>
+                  )}
+                </button>
+              ))}
+              <div className="settings-applet-list">
+                <h3>Applet別の設定</h3>
+                <input
+                  aria-label="設定するAppletを検索"
+                  placeholder="Appletを検索…"
+                  value={appletSearch}
+                  onChange={(event) => setAppletSearch(event.target.value)}
+                />
+                {extensions
+                  .filter((e) =>
+                    (e.displayName + ' ' + e.name + ' ' + e.id)
+                      .toLowerCase()
+                      .includes(appletSearch.toLowerCase()),
+                  )
+                  .map((e) => (
+                    <button
+                      key={e.id}
+                      className={
+                        category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
+                      }
+                      aria-current={
+                        category === 'extensions' && selectedApplet?.id === e.id
+                          ? 'true'
+                          : undefined
+                      }
+                      onClick={() => {
+                        setCategory('extensions');
+                        setAppletId(e.id);
+                      }}
+                    >
+                      {e.displayName}
+                      {appletChanged(e.id) && (
+                        <span className="unsaved-mark" aria-label="未保存">
+                          ●
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                {!extensions.some((e) =>
                   (e.displayName + ' ' + e.name + ' ' + e.id)
                     .toLowerCase()
                     .includes(appletSearch.toLowerCase()),
-                )
-                .map((e) => (
-                  <button
-                    key={e.id}
-                    className={
-                      category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
-                    }
-                    aria-current={
-                      category === 'extensions' && selectedApplet?.id === e.id ? 'true' : undefined
-                    }
-                    onClick={() => {
-                      setCategory('extensions');
-                      setAppletId(e.id);
-                    }}
-                  >
-                    {e.displayName}
-                    {appletChanged(e.id) && (
-                      <span className="unsaved-mark" aria-label="未保存">
-                        ●
-                      </span>
-                    )}
-                  </button>
-                ))}
-              {!extensions.some((e) =>
-                (e.displayName + ' ' + e.name + ' ' + e.id)
-                  .toLowerCase()
-                  .includes(appletSearch.toLowerCase()),
-              ) && <p>該当するAppletはありません。</p>}
+                ) && <p>該当するAppletはありません。</p>}
+              </div>
             </div>
-          </div>
-          <div className="settings-form">
-            {category === 'extensions' && selectedApplet && (
-              <>
-                <div className="applet-settings-heading">
-                  <h3>{selectedApplet.displayName}</h3>
-                  <button className="text-button" onClick={() => onApplet(selectedApplet.id)}>
-                    Appletに戻る
-                  </button>
-                </div>
-                <div className="tabs" aria-label="Applet設定の表示">
-                  <button
-                    aria-pressed={appletTab === 'settings'}
-                    className={appletTab === 'settings' ? 'selected' : ''}
-                    onClick={() => setAppletTab('settings')}
-                  >
-                    設定項目
-                  </button>
-                  <button
-                    aria-pressed={appletTab === 'shortcuts'}
-                    className={appletTab === 'shortcuts' ? 'selected' : ''}
-                    onClick={() => setAppletTab('shortcuts')}
-                  >
-                    ショートカットキー
-                  </button>
-                </div>
-              </>
-            )}
-            {(category === 'shortcuts' ||
-              category === 'host-shortcuts' ||
-              (category === 'extensions' && appletTab === 'shortcuts' && selectedApplet)) && (
-              <ShortcutsEditor
-                key={category === 'extensions' ? selectedApplet?.id : category}
-                commands={commands}
-                owner={
-                  category === 'extensions'
-                    ? selectedApplet?.id
-                    : category === 'host-shortcuts'
-                      ? null
-                      : undefined
-                }
-                bindings={draft.shortcuts}
-                onChange={(shortcuts) => edit({ ...draft, shortcuts })}
-                globalCommands={draft.globalShortcutCommands}
-                onGlobalChange={(globalShortcutCommands) =>
-                  edit({ ...draft, globalShortcutCommands })
-                }
-                statuses={globalHotKeys}
-                trayCommands={draft.trayCommands}
-                onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
-                onRestore={(id) =>
-                  edit({
-                    ...draft,
-                    shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
-                    globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
-                      ? [...new Set([...draft.globalShortcutCommands, id])]
-                      : draft.globalShortcutCommands.filter((command) => command !== id),
-                    trayCommands: draft.trayCommands.filter((command) => command !== id),
-                  })
-                }
-              />
-            )}
-            {category === 'profile' && (
-              <ProfileEditor
-                name={draft.profile.name}
-                avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
-                busy={busy}
-                onLoading={setAvatarLoading}
-                onName={(name) => edit({ ...draft, profile: { ...draft.profile, name } })}
-                onAvatar={(bytes, preview) => {
-                  setAvatarDraft(bytes);
-                  setAvatarPreview(preview);
-                  edit({
-                    ...draft,
-                    profile: { ...draft.profile, avatar: bytes ? 'avatar.png' : null },
-                  });
-                }}
-              />
-            )}
-            {category === 'appearance' && (
-              <>
-                <h3>表示</h3>
-                <SettingRow title="テーマ" description="ワークスペースの配色を選びます。">
-                  <select
-                    aria-label="テーマ"
-                    value={draft.host.theme}
-                    onChange={(e) =>
-                      edit({
-                        ...draft,
-                        host: { ...draft.host, theme: e.target.value as Settings['host']['theme'] },
-                      })
-                    }
-                  >
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                    <option value="system">System</option>
-                  </select>
-                </SettingRow>
-              </>
-            )}
-            {category === 'general' && (
-              <>
-                <h3>一般</h3>
-                {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
-                  <SettingRow
-                    key={key}
-                    title={
-                      key === 'trayClickCommand'
-                        ? 'トレイクリックのコマンド'
-                        : 'トレイダブルクリックのコマンド'
-                    }
-                    description={
-                      key === 'trayClickCommand'
-                        ? 'トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。'
-                        : '既定は未設定です。割り当てると、シングルクリックはWindowsの判定時間だけ待機し、ダブルクリック時はこのコマンドだけを実行します。'
-                    }
-                  >
+            <div className="settings-form">
+              {category === 'extensions' && selectedApplet && (
+                <>
+                  <div className="applet-settings-heading">
+                    <h3>{selectedApplet.displayName}</h3>
+                    <button className="text-button" onClick={() => onApplet(selectedApplet.id)}>
+                      Appletに戻る
+                    </button>
+                  </div>
+                  <div className="tabs" aria-label="Applet設定の表示">
+                    <button
+                      aria-pressed={appletTab === 'settings'}
+                      className={appletTab === 'settings' ? 'selected' : ''}
+                      onClick={() => setAppletTab('settings')}
+                    >
+                      設定項目
+                    </button>
+                    <button
+                      aria-pressed={appletTab === 'shortcuts'}
+                      className={appletTab === 'shortcuts' ? 'selected' : ''}
+                      onClick={() => setAppletTab('shortcuts')}
+                    >
+                      ショートカットキー
+                    </button>
+                  </div>
+                </>
+              )}
+              {(category === 'shortcuts' ||
+                category === 'host-shortcuts' ||
+                (category === 'extensions' && appletTab === 'shortcuts' && selectedApplet)) && (
+                <ShortcutsEditor
+                  key={category === 'extensions' ? selectedApplet?.id : category}
+                  commands={commands}
+                  owner={
+                    category === 'extensions'
+                      ? selectedApplet?.id
+                      : category === 'host-shortcuts'
+                        ? null
+                        : undefined
+                  }
+                  bindings={draft.shortcuts}
+                  onChange={(shortcuts) => edit({ ...draft, shortcuts })}
+                  globalCommands={draft.globalShortcutCommands}
+                  onGlobalChange={(globalShortcutCommands) =>
+                    edit({ ...draft, globalShortcutCommands })
+                  }
+                  statuses={globalHotKeys}
+                  trayCommands={draft.trayCommands}
+                  onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
+                  onRestore={(id) =>
+                    edit({
+                      ...draft,
+                      shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
+                      globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
+                        ? [...new Set([...draft.globalShortcutCommands, id])]
+                        : draft.globalShortcutCommands.filter((command) => command !== id),
+                      trayCommands: draft.trayCommands.filter((command) => command !== id),
+                    })
+                  }
+                />
+              )}
+              {category === 'profile' && (
+                <ProfileEditor
+                  name={draft.profile.name}
+                  avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
+                  busy={busy}
+                  onLoading={setAvatarLoading}
+                  onName={(name) => edit({ ...draft, profile: { ...draft.profile, name } })}
+                  onAvatar={(bytes, preview) => {
+                    setAvatarDraft(bytes);
+                    setAvatarPreview(preview);
+                    edit({
+                      ...draft,
+                      profile: { ...draft.profile, avatar: bytes ? 'avatar.png' : null },
+                    });
+                  }}
+                />
+              )}
+              {category === 'appearance' && (
+                <>
+                  <h3>表示</h3>
+                  <SettingRow title="テーマ" description="ワークスペースの配色を選びます。">
                     <select
-                      aria-label={
+                      aria-label="テーマ"
+                      value={draft.host.theme}
+                      onChange={(e) =>
+                        edit({
+                          ...draft,
+                          host: {
+                            ...draft.host,
+                            theme: e.target.value as Settings['host']['theme'],
+                          },
+                        })
+                      }
+                    >
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                      <option value="system">System</option>
+                    </select>
+                  </SettingRow>
+                </>
+              )}
+              {category === 'general' && (
+                <>
+                  <h3>一般</h3>
+                  {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
+                    <SettingRow
+                      key={key}
+                      title={
                         key === 'trayClickCommand'
                           ? 'トレイクリックのコマンド'
                           : 'トレイダブルクリックのコマンド'
                       }
-                      value={draft.host[key] ?? ''}
-                      onChange={(event) =>
-                        edit({
-                          ...draft,
-                          host: { ...draft.host, [key]: event.target.value || null },
-                        })
+                      description={
+                        key === 'trayClickCommand'
+                          ? 'トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。'
+                          : '既定は未設定です。割り当てると、シングルクリックはWindowsの判定時間だけ待機し、ダブルクリック時はこのコマンドだけを実行します。'
                       }
                     >
-                      {key === 'trayDoubleClickCommand' && (
-                        <option value="">未設定（シングルクリックをすぐ実行）</option>
-                      )}
-                      {commands
-                        .filter((command) => !command.hidden || command.id === draft.host[key])
-                        .map((command) => (
-                          <option key={command.id} value={command.id}>
-                            {command.extension} / {command.title}
-                            {command.available ? '' : '（現在利用できません）'}
-                          </option>
-                        ))}
-                      {draft.host[key] &&
-                        !commands.some((command) => command.id === draft.host[key]) && (
-                          <option value={draft.host[key]}>
-                            {draft.host[key]}（現在利用できません）
-                          </option>
+                      <select
+                        aria-label={
+                          key === 'trayClickCommand'
+                            ? 'トレイクリックのコマンド'
+                            : 'トレイダブルクリックのコマンド'
+                        }
+                        value={draft.host[key] ?? ''}
+                        onChange={(event) =>
+                          edit({
+                            ...draft,
+                            host: { ...draft.host, [key]: event.target.value || null },
+                          })
+                        }
+                      >
+                        {key === 'trayDoubleClickCommand' && (
+                          <option value="">未設定（シングルクリックをすぐ実行）</option>
                         )}
-                    </select>
-                  </SettingRow>
-                ))}
-                {(
-                  [
+                        {commands
+                          .filter((command) => !command.hidden || command.id === draft.host[key])
+                          .map((command) => (
+                            <option key={command.id} value={command.id}>
+                              {command.extension} / {command.title}
+                              {command.available ? '' : '（現在利用できません）'}
+                            </option>
+                          ))}
+                        {draft.host[key] &&
+                          !commands.some((command) => command.id === draft.host[key]) && (
+                            <option value={draft.host[key]}>
+                              {draft.host[key]}（現在利用できません）
+                            </option>
+                          )}
+                      </select>
+                    </SettingRow>
+                  ))}
+                  {(
                     [
-                      'closeToTray',
-                      '閉じるとトレイに常駐',
-                      'ウィンドウを閉じた後もAppletを動かします。',
-                    ],
-                    ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
-                    [
-                      'hardwareAcceleration',
-                      'ハードウェアアクセラレーション',
-                      'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
-                    ],
-                    [
-                      'startMinimized',
-                      'トレイから起動',
-                      '次の起動時はウィンドウを表示せず、トレイに常駐します。',
-                    ],
-                  ] as const
-                ).map(([key, title, description]) => (
-                  <SettingRow key={key} title={title} description={description}>
-                    <Toggle
-                      label={title}
-                      checked={draft.host[key]}
-                      onChange={(v) => edit({ ...draft, host: { ...draft.host, [key]: v } })}
-                    />
-                  </SettingRow>
-                ))}
-              </>
-            )}
-            {category === 'extensions' && appletTab === 'settings' && selectedApplet && (
-              <AppletSettings
-                key={selectedApplet.id}
-                applet={selectedApplet}
-                draft={draft}
-                onChange={edit}
-              />
-            )}
-            {category === 'extensions' && !selectedApplet && (
-              <p className="empty">Appletはまだありません。</p>
-            )}
+                      [
+                        'closeToTray',
+                        '閉じるとトレイに常駐',
+                        'ウィンドウを閉じた後もAppletを動かします。',
+                      ],
+                      ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
+                      [
+                        'hardwareAcceleration',
+                        'ハードウェアアクセラレーション',
+                        'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
+                      ],
+                      [
+                        'startMinimized',
+                        'トレイから起動',
+                        '次の起動時はウィンドウを表示せず、トレイに常駐します。',
+                      ],
+                    ] as const
+                  ).map(([key, title, description]) => (
+                    <SettingRow key={key} title={title} description={description}>
+                      <Toggle
+                        label={title}
+                        checked={draft.host[key]}
+                        onChange={(v) => edit({ ...draft, host: { ...draft.host, [key]: v } })}
+                      />
+                    </SettingRow>
+                  ))}
+                </>
+              )}
+              {category === 'extensions' && appletTab === 'settings' && selectedApplet && (
+                <AppletSettings
+                  key={selectedApplet.id}
+                  applet={selectedApplet}
+                  draft={draft}
+                  onChange={edit}
+                />
+              )}
+              {category === 'extensions' && !selectedApplet && (
+                <p className="empty">Appletはまだありません。</p>
+              )}
+            </div>
           </div>
+        )}
+        <div className="settings-path">
+          <Icon name="folder" size={16} />
+          <code>{snapshot.path}</code>
         </div>
-      )}
-      <div className="settings-path">
-        <Icon name="folder" size={16} />
-        <code>{snapshot.path}</code>
       </div>
     </>
   );
