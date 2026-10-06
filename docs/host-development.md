@@ -116,3 +116,9 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 トレイ、IPC、グローバルキーはmainの`executeCommand`でホスト/Appletを振り分けます。`appdock.open`はウィンドウ表示、検索・設定はrenderer通知。トレイは`click`だけを処理し、`double-click`に追加の実行を登録しません。クリック先の失敗はログとウィンドウ表示で復旧し、固定の「設定…」「終了」で管理画面への入口を確保します。
 
 未インストールの旧サンプル設定はdiscover後に整理して既存の原子的な保存を使います。インストール済みfixtureとほかの未知コマンドは保持します。[回帰テスト](../tests/tray-commands.test.cjs)、[実トレイUIテスト](../scripts/tray-commands-ui-test.cjs)、完成EXEのsmokeで検証します。Applet API v1とSDKは変更しません。
+
+## v0.8.0の描画設定
+
+`host.hardwareAcceleration`はboolean、既定true。単一インスタンスのロック取得後、`app.whenReady()`より前に同じ`SettingsStore`で設定を読み込み、falseの場合だけ`app.disableHardwareAcceleration()`を呼びます。不正な設定は既存のエラー表示で起動を中止し、ファイルを保持します。設定保存・外部編集による変更は次の完全起動で適用し、実行中のGPUプロセスへ変更を加えません。
+
+一般設定の説明には完全終了・再起動が必要なことを表示します。[設定回帰](../tests/preferences.test.cjs)は旧設定補完・OFF保持・不正型を確認し、[UIテスト](../scripts/hardware-acceleration-ui-test.cjs)は3回の起動でON→OFF→ONを実測します。GPU情報取得後の`app.isHardwareAccelerationEnabled()`とOFF時の`getGPUFeatureStatus().gpu_compositing`を確認します。Applet APIとSDKは変更しません。

@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "A personal Electron dock for Node.js and .NET extensions",
   "author": "at365",
@@ -21,6 +21,7 @@
     "test:hotkeys": "pnpm run build:test-extensions && node scripts/hotkeys-ui-test.cjs",
     "test:window-state": "node scripts/window-state-ui-test.cjs",
     "test:tray": "node scripts/tray-commands-ui-test.cjs",
+    "test:hardware-acceleration": "node scripts/hardware-acceleration-ui-test.cjs",
     "test:applet-sidebar": "node scripts/applet-sidebar-ui-test.cjs",
     "format": "prettier --write --ignore-path .gitignore src scripts tests"
   },

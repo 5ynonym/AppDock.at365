@@ -15,11 +15,30 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   };
   const result = parseSettings(original);
   assert.deepEqual(result.extensions, original.extensions);
-  assert.deepEqual(result.host, { ...original.host, trayClickCommand: 'appdock.open' });
+  assert.deepEqual(result.host, {
+    ...original.host,
+    trayClickCommand: 'appdock.open',
+    hardwareAcceleration: true,
+  });
   assert.equal(result.shortcuts['appdock.commands.search'][0], 'Ctrl+P');
   assert.deepEqual(result.pinnedCommands, []);
   assert.equal(result.profile.avatar, null);
   assert.equal(original.shortcuts, undefined);
+});
+test('hardware acceleration defaults on for legacy profiles, preserves explicit off and rejects invalid values', () => {
+  const settings = createDefaultSettings();
+  assert.equal(settings.host.hardwareAcceleration, true);
+  delete settings.host.hardwareAcceleration;
+  assert.equal(parseSettings(settings).host.hardwareAcceleration, true);
+  assert.equal(settings.host.hardwareAcceleration, undefined);
+  settings.host.hardwareAcceleration = false;
+  assert.equal(parseSettings(settings).host.hardwareAcceleration, false);
+  for (const invalid of [null, 0, 1, 'false', {}, []])
+    assert.throws(
+      () =>
+        parseSettings({ ...settings, host: { ...settings.host, hardwareAcceleration: invalid } }),
+      /hardwareAcceleration/,
+    );
 });
 test('shortcut normalization, duplicate detection, disabling and persisted unknown commands', () => {
   assert.equal(normalizeShortcut(' shift + control + p '), 'Ctrl+Shift+P');
