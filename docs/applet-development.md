@@ -114,7 +114,7 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 2. `[STAThread]`のMainでWPF Applicationを作り、`ShutdownMode.OnExplicitShutdown`でDispatcherを維持します。`AppletSession.RunAsync`はバックグラウンドで実行し、画面操作は `Dispatcher.InvokeAsync`へ渡します。接続処理をUIスレッドで待機しません。
 3. stdoutはUTF-8のJSON-RPC専用です。元の `Console.Out` を保存してセッションへ渡し、通常のConsole出力はstderrへ転送します。自作通信や生のstdout出力を追加すると接続が壊れます。
 4. セッション終了・stdinのEOF・異常時はApplicationを終了します。Deactivateでウィンドウ、タイマー、設定購読、SystemEvents、フックを解放します。非表示と終了を区別し、非表示の時計はタイマーも停止します。
-5. self-containedの `win-x64` でpublishします。単一EXEにするなら時計のpublish設定を参照し、nativeライブラリや必要なコンテンツも含めます。`extension.json`は別ファイルです。AppDock内のDLL用ランタイムはWindowsDesktopを含みません。
+5. 時計と同様にself-containedの `win-x64` でpublishできます。単一EXEにするなら時計のpublish設定を参照し、nativeライブラリや必要なコンテンツも含めます。`extension.json`は別ファイルです。AppDockのDLL用ホストは環境の.NET 10 Runtimeを使用します。native / WPF Appletをframework-dependentで配布する場合は、別途.NET 10 Desktop Runtime（Windows x64）が必要です。
 6. AssemblyName、namespace、StartupObject、XAMLのx:Class、manifestのentry、リソースのpack URIを一緒に整合させます。時計の `Watch.ico` やフォントを別機能へ無条件に流用しません。
 
 AppDockはdeactivateを最大2秒待ってからプロセスを停止します。終了処理は短く、複数回呼ばれても安全にしてください。強制停止もあるため、大切な状態を終了時だけ保存する設計は避けます。子プロセスを独自に起動する場合、その終了管理もAppletの責任です。
