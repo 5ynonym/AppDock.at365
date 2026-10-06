@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using AppDock.SDK;
@@ -9,6 +10,11 @@ Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = new UTF8Encoding(false);
 var wireOutput = Console.Out;
 Console.SetOut(Console.Error); // Extension Console.WriteLine cannot corrupt the protocol.
+if (args is ["--double-click-time"])
+{
+    wireOutput.WriteLine(NativeMouse.GetDoubleClickTime());
+    return 0;
+}
 if (args is ["--hotkeys"])
 {
     await WindowsHotKeySession.RunAsync(Console.In, wireOutput);
@@ -46,4 +52,10 @@ internal sealed class ExtensionLoadContext(string mainAssembly) : AssemblyLoadCo
         var file = resolver.ResolveUnmanagedDllToPath(name);
         return file is null ? nint.Zero : LoadUnmanagedDllFromPath(file);
     }
+}
+
+internal static class NativeMouse
+{
+    [DllImport("user32.dll")]
+    internal static extern uint GetDoubleClickTime();
 }

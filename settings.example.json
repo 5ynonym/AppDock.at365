@@ -6,7 +6,8 @@
     "notifications": true,
     "startMinimized": false,
     "hardwareAcceleration": true,
-    "trayClickCommand": "appdock.open"
+    "trayClickCommand": "appdock.open",
+    "trayDoubleClickCommand": null
   },
   "shortcuts": {
     "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],

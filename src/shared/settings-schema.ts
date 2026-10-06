@@ -16,6 +16,7 @@ export const createDefaultSettings = (): Settings => ({
     startMinimized: false,
     hardwareAcceleration: true,
     trayClickCommand: 'appdock.open',
+    trayDoubleClickCommand: null,
   },
   extensions: {},
   shortcuts: structuredClone(defaultShortcuts),
@@ -47,6 +48,10 @@ export function parseSettings(value: unknown): Settings {
     value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
   if (!validCommandId(trayClickCommand))
     throw new Error('host.trayClickCommand はコマンドIDです。');
+  const trayDoubleClickCommand =
+    value.host.trayDoubleClickCommand === undefined ? null : value.host.trayDoubleClickCommand;
+  if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
+    throw new Error('host.trayDoubleClickCommand はコマンドIDまたはnullです。');
   const trayCommands = value.trayCommands === undefined ? [] : value.trayCommands;
   if (
     !Array.isArray(trayCommands) ||
@@ -103,7 +108,7 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
   const next = {
     ...value,
-    host: { ...value.host, trayClickCommand, hardwareAcceleration },
+    host: { ...value.host, trayClickCommand, trayDoubleClickCommand, hardwareAcceleration },
     trayCommands,
     shortcuts,
     globalShortcutCommands,

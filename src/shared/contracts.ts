@@ -5,6 +5,7 @@ export interface HostSettings {
   startMinimized: boolean;
   hardwareAcceleration: boolean;
   trayClickCommand: string;
+  trayDoubleClickCommand: string | null;
 }
 export interface ExtensionSettings {
   enabled: boolean;

@@ -94,6 +94,7 @@ test('missing sample migration removes legacy references but preserves installed
   settings.globalShortcutCommands = ['appdock.dotnet-demo.refresh', 'test.applet.run'];
   settings.trayCommands = ['appdock.dotnet-demo.refresh', 'test.applet.run'];
   settings.host.trayClickCommand = 'appdock.dotnet-demo.refresh';
+  settings.host.trayDoubleClickCommand = 'appdock.dotnet-demo.refresh';
   const next = withoutMissingSamples(settings, ['appdock.welcome', 'test.applet']);
   assert.equal(next.extensions['appdock.dotnet-demo'], undefined);
   assert.equal(next.shortcuts['appdock.dotnet-demo.refresh'], undefined);
@@ -102,6 +103,7 @@ test('missing sample migration removes legacy references but preserves installed
   for (const key of ['pinnedCommands', 'globalShortcutCommands', 'trayCommands'])
     assert.deepEqual(next[key], ['test.applet.run']);
   assert.equal(next.host.trayClickCommand, 'appdock.open');
+  assert.equal(next.host.trayDoubleClickCommand, null);
   assert.deepEqual(settings.shortcuts['appdock.dotnet-demo.refresh'], []);
   assert.deepEqual(withoutMissingSamples(settings, Object.keys(settings.extensions)), settings);
 });
