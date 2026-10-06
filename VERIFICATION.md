@@ -270,3 +270,21 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 
 - 修正版を再起動しても、修正前から開いていたタスクマネージャーでは古い英文が残っていた。配置済みEXEのFileDescription/ProductNameはAppDock.at365で、確認したMuiCache内のAppDock表示名にも古い英文はなかった。
 - ユーザーがタスクマネージャーを閉じて開き直し、AppDockホストウィンドウを表示した状態でもAppDock.at365になることを確認。タスクマネージャー側の古い表示が再起動で解消した。キャッシュやレジストリの削除、追加のEXE修正は行っていない。
+
+## 2026-10-06: ビルトインの再起動・終了コマンド
+
+- `appdock.restart`（再起動）と`appdock.quit`（終了）をホストのコマンド一覧へ追加。パレット・ピン留め・ショートカット・トレイ設定が同じ一覧を利用し、既定キーは追加しない。既存トレイの終了とwindowActionのquitも同じ終了処理を利用する。
+- 再起動はElectronのrelaunchを予約してからquitし、既存のbefore-quitでホットキー・Applet・設定監視・トレイを終了する。終了開始後の再要求は無視する。portable版は元の配布EXEへ戻り、削除される展開先を作業ディレクトリに残さない。
+- main/rendererのTypeScript型検査とビルド成功。既存回帰55/55成功。変更したTypeScriptと新検証スクリプトのPrettier確認成功。
+- 開発版の実プロセス検証成功: `artifacts/host-commands-1791294664778/result.json`。パレットから再起動し、ホストPIDの切り替えと旧ホスト・workerの終了を確認。同時に2回の再起動要求でも1回だけ再起動。保存済み設定を保持し、割り当てたショートカットでcloseToTray設定にかかわらず完全終了。非同期deactivateの完了記録が各再起動・終了前に残り、最後にプロセスが残らないことを確認。
+- 単一EXEでも同じ検証成功: `artifacts/host-commands-1791294787489/result.json`。3回のホストPIDは52236 → 50272 → 54616。再起動後も隔離プロファイルを保持し、2回の再起動と完全終了を確認。パレットの表示はPNGでも確認。
+- GUI起動はWindows sandbox内で完了せず、許可された通常実行環境の隔離プロファイルで検証。パッケージはプロジェクト内Node/pnpmと既存Electronを指定して生成。実利用先のEXE・設定・Appletは変更していない。
+- 成果物: `publish/AppDock.at365.exe`、100,498,304 bytes。SHA256: `7909549E145F4229A20FEC56608499B6F7825EFFEF372A6D3DBC3DAC526FC9E9`。
+
+## 2026-10-06: トレイのビルトインコマンドを最上位へ移動
+
+- 選択されたビルトインをAppDockサブメニューから最上位へ移動。Appletサブメニュー→セパレータ→ビルトイン（フラット）→セパレータ→固定の設定/終了の順とし、空の区画では余分なセパレータを省く。グループの所有者IDで区別し、Appletの表示名に依存しない。既存の表示選択とコマンドIDを維持。
+- TypeScript main build、renderer型検査、Prettier、トレイ回帰4/4成功。開発版実トレイUI成功: `artifacts/tray-ui-1791295415722/`。
+- 発行したwin-unpacked版の実トレイUI成功: `artifacts/tray-ui-1791295488202/`。Appletのみ/両方/ビルトインのみ/選択なしの実Menu階層と区切り位置、最上位の開くコールバック、既存Applet実行、表示切り替え、単/ダブルクリック、保存・再起動を確認。物理的なWindows通知領域への入力は送っていない。
+- 更新した単一EXEの隔離smoke成功: `artifacts/smoke-1791295545430/smoke-result.json`。bridge/sandbox、設定・avatar・ピン保存、トレイコマンドと正常終了を確認。
+- 最新成果物: `publish/AppDock.at365.exe`、100,500,097 bytes。SHA256: `E9A5F315042CB71759231D28F3DB597CAED93F5BF234FB6F22F06EF37C8B7C65`。実利用先への配置は行っていない。

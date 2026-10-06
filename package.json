@@ -20,6 +20,7 @@
     "test:preferences": "pnpm run build:test-extensions && node scripts/preferences-ui-test.cjs",
     "test:hotkeys": "pnpm run build:test-extensions && node scripts/hotkeys-ui-test.cjs",
     "test:window-state": "node scripts/window-state-ui-test.cjs",
+    "test:host-commands": "node scripts/host-commands-ui-test.cjs",
     "test:tray": "node scripts/tray-commands-ui-test.cjs",
     "test:hardware-acceleration": "node scripts/hardware-acceleration-ui-test.cjs",
     "test:applet-sidebar": "node scripts/applet-sidebar-ui-test.cjs",

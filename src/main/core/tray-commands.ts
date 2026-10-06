@@ -2,6 +2,7 @@ import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { hostCommands } from '../../shared/commands';
 
 export interface TrayCommandGroup {
+  extensionId: string | null;
   title: string;
   commands: { id: string; title: string; enabled: boolean }[];
 }
@@ -14,6 +15,7 @@ export function trayCommandGroups(
   const selected = new Set(settings.trayCommands);
   const groups: TrayCommandGroup[] = [
     {
+      extensionId: null,
       title: 'AppDock',
       commands: hostCommands
         .filter((command) => selected.has(command.id))
@@ -22,6 +24,7 @@ export function trayCommandGroups(
   ];
   for (const extension of extensions) {
     groups.push({
+      extensionId: extension.id,
       title: extension.name,
       commands: extension.commands
         .filter((command) => selected.has(command.id))
