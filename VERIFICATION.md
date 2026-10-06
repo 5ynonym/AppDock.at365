@@ -296,3 +296,9 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - Initial sandbox launch was blocked by Electron install-directory ACL restrictions; the UI checks passed outside that sandbox without changing ACLs. Packaged EXE and deployed installation were not updated.
 
 - Deployment completed after user shutdown confirmation: portable smoke passed (artifacts/smoke-1791327621153); deployed EXE SHA-256 matches publish output, settings.json SHA-256 unchanged. Previous EXE retained in artifacts/settings-scroll-deployment-20261007-075937. App was not restarted.
+
+## Settings display cleanup (2026-10-07 JST)
+
+- Removed the settings subtitle and bottom settings-file path; the heading omits its paragraph when no subtitle is supplied.
+- Renderer typecheck/build and existing 1280/900/760px settings-scroll UI checks passed. Screenshot inspected at 900px.
+- Portable smoke passed (artifacts/smoke-1791328207131). Deployed with matching EXE SHA-256 and unchanged settings.json; previous EXE backed up in artifacts/settings-cleanup-deployment-20261007-081014. App was not restarted.
