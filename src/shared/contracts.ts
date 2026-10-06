@@ -3,6 +3,7 @@ export interface HostSettings {
   closeToTray: boolean;
   notifications: boolean;
   startMinimized: boolean;
+  trayClickCommand: string;
 }
 export interface ExtensionSettings {
   enabled: boolean;
@@ -15,6 +16,7 @@ export interface Settings {
   extensions: Record<string, ExtensionSettings>;
   shortcuts: Record<string, string[]>;
   globalShortcutCommands: string[];
+  trayCommands: string[];
   pinnedCommands: string[];
   profile: { name: string; avatar: 'avatar.png' | null };
 }

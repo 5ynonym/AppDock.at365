@@ -27,6 +27,7 @@ import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
+import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import type { HostSnapshot, Settings } from '../shared/contracts';
 
 protocol.registerSchemesAsPrivileged([
@@ -86,23 +87,16 @@ function trayMenu() {
   if (!tray || !manager) return;
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'AppDockを開く', click: showWindow },
-      { type: 'separator' },
-      ...manager
-        .snapshot()
-        .filter((e) => e.state === 'running' && e.tray.length)
-        .map((e) => ({
-          label: e.name,
-          submenu: e.tray.map((item) => ({
-            label: item.title,
-            click: () => {
-              void manager
-                .execute(item.command)
-                .catch((err) => log.write('error', e.id, err.message));
-            },
-          })),
+      ...trayCommandGroups(settings.value, manager.snapshot()).map((group) => ({
+        label: group.title,
+        submenu: group.commands.map((command) => ({
+          label: command.title,
+          enabled: command.enabled,
+          click: () => runTrayCommand(command.id),
         })),
-      { type: 'separator' },
+      })),
+      ...(settings.value.trayCommands.length ? [{ type: 'separator' as const }] : []),
+      { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
       {
         label: '終了',
         click: () => {
@@ -112,6 +106,22 @@ function trayMenu() {
       },
     ]),
   );
+}
+async function executeCommand(id: string) {
+  if (quitting) return;
+  if (hostCommands.some((command) => command.id === id)) {
+    showWindow();
+    if (id !== 'appdock.open') window?.webContents.send('dock:hostCommand', id);
+    return;
+  }
+  return manager.execute(id);
+}
+function runTrayCommand(id: string) {
+  void executeCommand(id).catch((error) => {
+    log.write('error', 'tray', `${id}: ${String(error)}`);
+    // Keep settings reachable when the selected Applet is no longer available.
+    showWindow();
+  });
 }
 function snapshot(): HostSnapshot {
   return {
@@ -130,6 +140,7 @@ function snapshot(): HostSnapshot {
 }
 function applySettings() {
   nativeTheme.themeSource = settings.value.host.theme;
+  trayMenu();
   changed();
 }
 function syncHotKeys(retry = false) {
@@ -206,7 +217,7 @@ function registerIpc() {
     await manager.reconcile();
   });
   handle('dock:restartExtension', (id: string) => manager.restart(id));
-  handle('dock:executeCommand', (id: string) => manager.execute(id));
+  handle('dock:executeCommand', (id: string) => executeCommand(id));
   handle('dock:executePanelAction', (id: string, actionId: string) =>
     manager.executePanelAction(id, actionId),
   );
@@ -282,12 +293,7 @@ async function initialize() {
     ),
     async (id) => {
       if (shortcutRecording || quitting) return;
-      if (hostCommands.some((command) => command.id === id)) {
-        showWindow();
-        window?.webContents.send('dock:hostCommand', id);
-      } else {
-        await manager.execute(id);
-      }
+      await executeCommand(id);
     },
     changed,
     (message) => log.write('error', 'hotkeys', message),
@@ -438,13 +444,15 @@ async function initialize() {
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
   tray = new Tray(icon.resize({ width: 20, height: 20 }));
   tray.setToolTip('AppDock.at365');
-  tray.on('double-click', showWindow);
-  tray.on('click', showWindow);
+  tray.on('click', () => runTrayCommand(settings.value.host.trayClickCommand));
   trayMenu();
   await window.loadURL('appdock://host/index.html');
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
   if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   manager.discover();
+  const migrated = withoutMissingSamples(settings.value, manager.items.keys());
+  if (JSON.stringify(migrated) !== JSON.stringify(settings.value))
+    settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
   log.write('info', 'host', 'AppDockを起動しました。');
@@ -477,6 +485,54 @@ async function runSmoke() {
       };
     }
     await new Promise((r) => setTimeout(r, 400));
+    tray!.emit('click');
+    if (!window!.isVisible()) throw new Error('Default tray click did not open AppDock');
+    settings.save(
+      {
+        ...settings.value,
+        host: { ...settings.value.host, trayClickCommand: 'appdock.settings.open' },
+      },
+      settings.revision,
+    );
+    tray!.emit('click');
+    await new Promise((r) => setTimeout(r, 250));
+    if (
+      !(await window!.webContents.executeJavaScript(
+        `Array.from(document.querySelectorAll('h1,h2')).some(element => element.textContent === '設定')`,
+      ))
+    )
+      throw new Error('Selected tray click did not open settings');
+    settings.save(
+      {
+        ...settings.value,
+        host: { ...settings.value.host, trayClickCommand: 'appdock.commands.search' },
+      },
+      settings.revision,
+    );
+    tray!.emit('click');
+    await new Promise((r) => setTimeout(r, 150));
+    if (
+      !(await window!.webContents.executeJavaScript(`!!document.querySelector('.command-palette')`))
+    )
+      throw new Error('Selected tray click did not open command palette');
+    window!.hide();
+    settings.save(
+      { ...settings.value, host: { ...settings.value.host, trayClickCommand: 'missing.command' } },
+      settings.revision,
+    );
+    tray!.emit('click');
+    await new Promise((r) => setTimeout(r, 150));
+    if (
+      !window!.isVisible() ||
+      !log.entries.some(
+        (entry) => entry.source === 'tray' && entry.message.includes('missing.command'),
+      )
+    )
+      throw new Error('Unavailable tray command did not report error and restore settings access');
+    settings.save(
+      { ...settings.value, host: { ...settings.value.host, trayClickCommand: 'appdock.open' } },
+      settings.revision,
+    );
     const avatarBytes = nativeImage
       .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
       .resize({ width: 64, height: 64 })
@@ -535,6 +591,11 @@ async function runSmoke() {
           settingsPath: settings.file,
           avatarPath: path.join(baseDirectory, 'avatar.png'),
           nativeClock,
+          trayCommands: {
+            defaultOpen: true,
+            selectedHostCommands: true,
+            unavailableFallback: true,
+          },
         },
         null,
         2,
