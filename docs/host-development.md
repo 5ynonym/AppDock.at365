@@ -48,6 +48,8 @@ Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイ�
 
 `nodeIntegration: false`、`contextIsolation: true`、`sandbox: true`、CSP、外部navigationの禁止を維持します。Appletから提供するパネルはReactでテキストとして描画し、生HTMLやスクリプトを受けません。
 
+メイン画面とウィジェット画面の`BrowserWindow`は、`webPreferences.spellcheck: false`でElectron内蔵スペルチェックを無効にします。画面作成前に共有セッションも`session.defaultSession.setSpellCheckerEnabled(false)`で無効にします（[Electron Session API](https://www.electronjs.org/docs/latest/api/session#sessetspellcheckerenabledenable)）。新しい入力欄にも共通で適用されるため、フォームごとの指定や設定JSONの項目追加は不要です。
+
 ## 設定スキーマと保存を変更する場合
 
 - ホストの永続設定は `Settings`、`createDefaultSettings`、`parseSettings`、設定フォーム、[settings.example.json](../settings.example.json)を一緒に更新します。古いsettings.jsonに項目がない場合の既定値を用意し、実利用の設定ファイルをビルド時に変更しません。
@@ -137,7 +139,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 `host.trayDoubleClickCommand`はコマンドIDまたはnull、既定null。v0.7.0のclickのみの処理を`TrayClickDispatcher`へ置き換え、Windowsのclick→double-click通知で後者が来たときに前者の待機を取り消します。未設定時は即時実行。設定変更・メニュー表示・終了では待機を取り消し、非同期の判定時間取得が後から完了しても復活させません。
 
-ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの最大判定時間5000msを使います。SDK/Runtime/Applet APIは変更しません。
+ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの既定判定時間500msを使います。`DEFAULT_DOUBLE_CLICK_TIME_MS`をログ側と`TrayClickDispatcher`側で共有し、待機には同じ25msの余裕を加えます。SDK/Runtime/Applet APIは変更しません。
 
 [クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。
 ## ウィジェット基盤（0.10.0）

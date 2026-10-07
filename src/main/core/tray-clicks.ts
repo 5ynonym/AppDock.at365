@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import type { HostSettings } from '../../shared/contracts';
 
 const executeFile = promisify(execFile);
+export const DEFAULT_DOUBLE_CLICK_TIME_MS = 500;
 export async function readDoubleClickTime(executable: string): Promise<number> {
   const { stdout } = await executeFile(executable, ['--double-click-time'], {
     windowsHide: true,
@@ -35,7 +36,7 @@ export class TrayClickDispatcher {
     // Start the window at mouse-down; the native query runs without blocking Electron.
     const started = performance.now();
     void this.delay()
-      .catch(() => 5000)
+      .catch(() => DEFAULT_DOUBLE_CLICK_TIME_MS)
       .then((delay) => {
         if (!this.pending.has(token)) return;
         this.pending.set(

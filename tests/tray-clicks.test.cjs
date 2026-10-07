@@ -90,27 +90,33 @@ test('independent single notifications remain independent; a following double ca
   t.mock.timers.tick(525);
   assert.deepEqual(executed, ['double.run', 'appdock.open']);
 });
-test('shutdown and configuration/menu cancellation discard delayed work; native query failure uses the Windows maximum', async (t) => {
+test('shutdown and configuration/menu cancellation discard delayed work; native query failure uses the Windows default', async (t) => {
   const { host, executed, dispatcher } = fixture(t, () =>
     Promise.reject(new Error('native unavailable')),
   );
   host.trayDoubleClickCommand = 'double.run';
   dispatcher.click();
   await flush();
-  t.mock.timers.tick(5000);
+  t.mock.timers.tick(500);
   assert.deepEqual(executed, []);
   t.mock.timers.tick(25);
   assert.deepEqual(executed, ['appdock.open']);
   dispatcher.click();
   await flush();
+  t.mock.timers.tick(499);
+  dispatcher.doubleClick();
+  t.mock.timers.tick(1000);
+  assert.deepEqual(executed, ['appdock.open', 'double.run']);
+  dispatcher.click();
+  await flush();
   dispatcher.cancel();
   t.mock.timers.tick(6000);
-  assert.deepEqual(executed, ['appdock.open']);
+  assert.deepEqual(executed, ['appdock.open', 'double.run']);
   dispatcher.click();
   dispatcher.close();
   await flush();
   dispatcher.click();
   dispatcher.doubleClick();
   t.mock.timers.tick(6000);
-  assert.deepEqual(executed, ['appdock.open']);
+  assert.deepEqual(executed, ['appdock.open', 'double.run']);
 });

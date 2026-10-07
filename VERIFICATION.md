@@ -351,3 +351,21 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ユーザーがデプロイ済み0.10.2で正常動作を確認。ユーザーの指示により、AppDockの`codex/widgets`（e04584a）とWatchの`codex/widgets`（90b3e2e）を各`main`へfast-forwardで統合。マージ前後のGit treeが同一で、検証済みコードへの変更がないことを確認。
 - 旧EXEのSHA256と配置済み0.10.2のSHA256を確認してから、今回の退避先`artifacts/widget-desktop-deployment-20261007-095802`の旧EXE・結果JSON・空フォルダーを削除し、消失を確認。以前のデプロイや別作業の退避物は対象外。
 - 両リポジトリのマージ済み`codex/widgets`を削除。実利用先のEXE・設定・Applet、発行版には変更なし。外部公開/pushなし。
+
+## 2026-10-07: テキスト入力のスペルチェックを無効化
+
+- メイン画面とウィジェット画面の`webPreferences.spellcheck`をfalseにし、画面作成前に共有セッションも`setSpellCheckerEnabled(false)`で無効化。設定JSONへの追加・移行は不要。
+- ローカルTypeScriptによるmainビルド・renderer型検査、Vite build成功。既存Electron/.NET host成果物からportable EXEを再発行。
+- win-unpacked版の隔離起動で`session.isSpellCheckerEnabled() === false`とプロフィール欄への文字入力を確認。スクリーンショットでもスペルチェックの赤い下線がないことを確認。結果: `artifacts/spellcheck-1791347487183/result.json`。
+- 完成した単一EXEの隔離smokeも成功: `artifacts/smoke-1791347529413/smoke-result.json`（ok=true）。この検証で実利用の設定やAppletは読み書きしていない。
+- `publish/AppDock.at365.exe`: 100,512,311 bytes、SHA256 `91005CC49BC2501A9A5367E5DBB8BED5203D91EC327CA6C430049A9B4B3090BB`。AppDockプロセス0件を確認して実利用先へ配置し、発行元とのハッシュ一致とsettings.jsonの前後SHA256不変を確認。旧EXEは`artifacts/spellcheck-deployment-20261007-133309`へ退避。実利用アプリの再起動は行っていない。
+
+## 2026-10-07: ダブルクリック判定時間の取得失敗時は既定500ms
+
+- 取得失敗時の判定時間を5000msからWindowsの既定値500msへ変更。ログ側とDispatcher側で定数を共有し、正常時のOS設定値と既存の25ms余裕は維持。READMEとホスト開発ガイドを更新。
+- 根拠: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setdoubleclicktime
+- mainビルド・renderer型検査・Vite build、関連回帰10件、変更したTypeScript/テストのPrettier、git diff --check成功。回帰では取得失敗後の単一操作、ダブルクリックによる取消、メニュー/設定変更/終了時の取消を確認。
+- portable発行と隔離smoke成功: artifacts/smoke-1791350201920/smoke-result.json。Watchの.NET拡張running、パネル/コマンド/設定保存を確認。
+- 元の配布EXEの7zip一覧にはruntimeconfig/depsが存在するが、稼働中のTemp展開先には両JSONとPDBが欠けていた。起動済み.NET拡張は存在しており、起動後の消失が疑われる。削除原因は未特定。PCのMicrosoft.NETCore.App 10.0.12と発行元の判定時間取得340msを確認。
+- ユーザーのdeploy依頼後、AppDock/ExtensionHostプロセス0件を確認して既存deploy.ps1で実利用先へ配置。SHA256 CF656034E722EC2B24FBC6D1EA86887BBA108D8688E553F9851F3AC2F89CC9AAが発行元と一致。settings.json不変。旧EXE退避: artifacts/tray-fallback-deployment-20261007-141726。実利用アプリの自動再起動は行っていない。
+- 500msフォールバック修正版について、ユーザーがdeploy後の実利用で正常動作を確認（2026-10-07 JST）。設定ファイル消失の原因は引き続き未特定。
