@@ -140,3 +140,6 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの最大判定時間5000msを使います。SDK/Runtime/Applet APIは変更しません。
 
 [クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。
+## ウィジェット基盤（0.10.0）
+
+契約・設定検証は`src/shared/widgets.ts`、Applet登録は`host-api.ts`、フォントの境界検証は`widget-fonts.ts`、透過画面と移動の寿命管理は`desktop-widgets.ts`、共通React描画は`Widgets.tsx`です。`WindowsWidgetSession`がデスクトップ固定だけを担当します。ウィジェット画面には専用preloadを使い、ホスト設定・コマンド・ファイル操作のIPCを公開しません。内容更新とホスト画面更新を毎秒同期せず、各描画面内の共有タイマーで時計を更新します。詳細は[widgets.md](widgets.md)を参照してください。

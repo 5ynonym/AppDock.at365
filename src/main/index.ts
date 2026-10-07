@@ -30,6 +30,9 @@ import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import { TrayClickDispatcher, readDoubleClickTime } from './core/tray-clicks';
 import type { HostSnapshot, Settings } from '../shared/contracts';
+import { widgetCatalog, parseWidgetPlacement } from '../shared/widgets';
+import { DesktopWidgets, widgetDisplays } from './core/desktop-widgets';
+import { widgetFontPath } from './core/widget-fonts';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'appdock', privileges: { standard: true, secure: true, supportFetchAPI: true } },
@@ -70,6 +73,7 @@ let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
+let desktopWidgets: DesktopWidgets | undefined;
 let shortcutRecording = false;
 let windowState: WindowStateStore | undefined;
 let restoreMaximized = false;
@@ -159,6 +163,9 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    widgets: widgetCatalog(manager.snapshot(), settings.value),
+    widgetDisplays: widgetDisplays(),
+    widgetErrors: desktopWidgets?.errors ?? [],
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
     extensions: manager.snapshot(),
@@ -210,6 +217,25 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:setWidgetPlacement', (id: string, placement: unknown, revision: number) => {
+    if (
+      !widgetCatalog(manager.snapshot(), settings.value).some((w) => w.id === id) &&
+      !Object.hasOwn(settings.value.widgets, id)
+    )
+      throw new Error('ウィジェットが見つかりません。');
+    return settings.save(
+      {
+        ...settings.value,
+        widgets: { ...settings.value.widgets, [id]: parseWidgetPlacement(placement) },
+      },
+      revision,
+    );
+  });
+  handle('dock:moveWidget', (id: string) => desktopWidgets!.move(id));
+  handle('dock:finishWidgetMove', (save: boolean) => {
+    if (typeof save !== 'boolean') throw new Error('移動の保存状態が正しくありません。');
+    return desktopWidgets!.finishMove(save);
+  });
   handle('dock:chooseDirectory', async () => {
     const result = await dialog.showOpenDialog(window!, {
       title: '画像ソースフォルダーを選ぶ',
@@ -314,6 +340,12 @@ async function initialize() {
   const hotKeyHost = app.isPackaged
     ? path.join(process.resourcesPath, 'dotnet-host', 'AppDock.ExtensionHost.exe')
     : path.join(app.getAppPath(), 'artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
+  desktopWidgets = new DesktopWidgets(
+    settings,
+    () => widgetCatalog(manager.snapshot(), settings.value),
+    hotKeyHost,
+    changed,
+  );
   hotKeys = new GlobalHotKeyManager(
     new WindowsHotKeyBackend(
       hotKeyHost,
@@ -330,11 +362,13 @@ async function initialize() {
     (message) => log.write('error', 'hotkeys', message),
   );
   manager.on('changed', () => {
+    void desktopWidgets?.sync();
     trayMenu();
     void syncHotKeys();
     changed();
   });
   settings.on('changed', () => {
+    void desktopWidgets?.sync();
     applySettings();
     void syncHotKeys(true);
     void manager.reconcile();
@@ -351,6 +385,29 @@ async function initialize() {
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
+    if (url.host === 'host' && url.pathname.startsWith('/widget-fonts/')) {
+      const id = decodeURIComponent(url.pathname.slice('/widget-fonts/'.length));
+      const extension = [...manager.items.values()].find(
+        (e) => e.state === 'running' && (e.widgets ?? []).some((w) => w.id === id),
+      );
+      const widget = extension?.widgets?.find((w) => w.id === id);
+      if (!extension || !widget) return new Response('Not found', { status: 404 });
+      try {
+        const file = widgetFontPath(extension.manifest.folder, widget);
+        if (!file) return new Response('Not found', { status: 404 });
+        return net.fetch(pathToFileURL(file).href).then(
+          (response) =>
+            new Response(response.body, {
+              headers: {
+                'Content-Type': file.endsWith('.woff2') ? 'font/woff2' : 'font/ttf',
+                'X-Content-Type-Options': 'nosniff',
+              },
+            }),
+        );
+      } catch {
+        return new Response('Not found', { status: 404 });
+      }
+    }
     if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
       const image = [...manager.items.values()]
         .flatMap((extension) => extension.panel?.images ?? [])
@@ -662,6 +719,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   void (async () => {
+    await desktopWidgets?.close();
     await hotKeys?.close();
     await manager.shutdown();
   })().finally(() => {

@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  setWidgetPlacement: (id, placement, revision) =>
+    ipcRenderer.invoke('dock:setWidgetPlacement', id, placement, revision),
+  moveWidget: (id) => ipcRenderer.invoke('dock:moveWidget', id),
+  finishWidgetMove: (save) => ipcRenderer.invoke('dock:finishWidgetMove', save),
   chooseDirectory: () => ipcRenderer.invoke('dock:chooseDirectory'),
   checkUpdates: (id) => ipcRenderer.invoke('dock:checkUpdates', id),
   openReleases: (id) => ipcRenderer.invoke('dock:openReleases', id),

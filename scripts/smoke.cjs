@@ -9,8 +9,16 @@ const clockApplet = process.argv[3] ? path.resolve(process.argv[3]) : null;
 if (clockApplet) {
   const folder = path.join(profile, 'extensions', 'Applet.Watch.at365');
   fs.mkdirSync(folder, { recursive: true });
-  for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
-    fs.copyFileSync(path.join(clockApplet, name), path.join(folder, name));
+  const manifest = JSON.parse(fs.readFileSync(path.join(clockApplet, 'extension.json'), 'utf8'));
+  const files = ['extension.json', manifest.entry];
+  const deps = manifest.entry.replace(/\.dll$/i, '.deps.json');
+  if (manifest.runtime === 'dotnet' && fs.existsSync(path.join(clockApplet, deps)))
+    files.push(deps);
+  for (const name of files) fs.copyFileSync(path.join(clockApplet, name), path.join(folder, name));
+  if (fs.existsSync(path.join(clockApplet, 'Resources')))
+    fs.cpSync(path.join(clockApplet, 'Resources'), path.join(folder, 'Resources'), {
+      recursive: true,
+    });
   const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
   const value = createDefaultSettings();
   value.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };

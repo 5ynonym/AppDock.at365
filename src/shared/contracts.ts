@@ -1,3 +1,4 @@
+import type { WidgetDefinition, WidgetDisplay, WidgetPlacement, WidgetSnapshot } from './widgets';
 export interface HostSettings {
   theme: 'dark' | 'light' | 'system';
   closeToTray: boolean;
@@ -20,6 +21,7 @@ export interface Settings {
   globalShortcutCommands: string[];
   trayCommands: string[];
   pinnedCommands: string[];
+  widgets: Record<string, WidgetPlacement>;
   profile: { name: string; avatar: 'avatar.png' | null };
 }
 export interface SettingsSnapshot {
@@ -109,6 +111,7 @@ export interface ExtensionManifest {
   capabilities?: string[];
   settings?: SettingDefinition[];
   commands?: DeclaredCommand[];
+  widgets?: WidgetDefinition[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
   displayName: string;
@@ -129,6 +132,9 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  widgets: WidgetSnapshot[];
+  widgetDisplays: WidgetDisplay[];
+  widgetErrors: string[];
   globalHotKeys: GlobalHotKeyStatus[];
   settings: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
@@ -145,6 +151,13 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  setWidgetPlacement(
+    id: string,
+    placement: WidgetPlacement,
+    revision: number,
+  ): Promise<SettingsSnapshot>;
+  moveWidget(id: string): Promise<void>;
+  finishWidgetMove(save: boolean): Promise<void>;
   chooseDirectory(): Promise<string | null>;
   checkUpdates(id?: string): Promise<UpdateResult>;
   openReleases(id?: string): Promise<void>;

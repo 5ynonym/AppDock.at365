@@ -1,4 +1,5 @@
 import type { Settings } from './contracts';
+import { parseWidgetSettings } from './widgets';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -23,6 +24,7 @@ export const createDefaultSettings = (): Settings => ({
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
   trayCommands: [],
   pinnedCommands: [],
+  widgets: {},
   profile: { name: 'ユキ', avatar: null },
 });
 export function parseSettings(value: unknown): Settings {
@@ -108,6 +110,7 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
   const next = {
     ...value,
+    widgets: parseWidgetSettings(value.widgets),
     host: { ...value.host, trayClickCommand, trayDoubleClickCommand, hardwareAcceleration },
     trayCommands,
     shortcuts,

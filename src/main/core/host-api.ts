@@ -8,6 +8,8 @@ import { atomicWrite, isObject } from './settings';
 import type { Panel } from '../../shared/contracts';
 import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
 import { parseExtensionCommands } from '../../shared/extension-commands';
+import { parseWidgetDefinitions, defaultWidgetPlacement } from '../../shared/widgets';
+import { registerWidgetFonts } from './widget-fonts';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -47,6 +49,55 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.widgets.replace': {
+        requireCapability('widgets');
+        const widgets = registerWidgetFonts(
+          e.manifest.folder,
+          parseWidgetDefinitions(id, p.widgets),
+        );
+        if (widgets.some((w) => !e.manifest.widgets?.some((d) => d.id === w.id)))
+          throw new Error('ウィジェットIDをmanifestで宣言してください。');
+        const placements = { ...settings.value.widgets };
+        let added = false;
+        for (const w of widgets)
+          if (!placements[w.id]) {
+            placements[w.id] = { ...defaultWidgetPlacement(), ...w.initialPlacement };
+            added = true;
+          }
+        if (added) settings.save({ ...settings.value, widgets: placements }, settings.revision);
+        e.widgets = widgets;
+        commandsChanged();
+        return null;
+      }
+      case 'host.widgets.placements': {
+        requireCapability('widgets');
+        return Object.fromEntries(
+          (e.widgets ?? e.manifest.widgets ?? []).map((w) => [
+            w.id,
+            settings.value.widgets[w.id] ?? defaultWidgetPlacement(),
+          ]),
+        );
+      }
+      case 'host.widgets.desktop': {
+        requireCapability('widgets');
+        if (
+          typeof p.enabled !== 'boolean' ||
+          !Array.isArray(p.ids) ||
+          !p.ids.length ||
+          p.ids.some(
+            (wid: unknown) => !(e.widgets ?? e.manifest.widgets ?? []).some((w) => w.id === wid),
+          )
+        )
+          throw new Error('このAppletのウィジェットを指定してください。');
+        const placements = { ...settings.value.widgets };
+        for (const wid of p.ids)
+          placements[wid] = {
+            ...(placements[wid] ?? defaultWidgetPlacement()),
+            desktop: p.enabled,
+          };
+        settings.save({ ...settings.value, widgets: placements }, settings.revision);
+        return null;
+      }
       case 'host.commands.replace': {
         requireCapability('dynamic-commands');
         const commands = parseExtensionCommands(id, p.commands);
@@ -142,15 +193,15 @@ export function createHostApi(
               p.tabs.length > 100 ||
               p.tabs.some((a: unknown) => !validAction(a)))) ||
           p.title.length > 200 ||
-          (p.description !== undefined && typeof p.description !== 'string') ||
-          (p.facts !== undefined &&
+          (p.description != null && typeof p.description !== 'string') ||
+          (p.facts != null &&
             (!Array.isArray(p.facts) ||
               p.facts.length > 30 ||
               p.facts.some(
                 (f: unknown) =>
                   !isObject(f) || typeof f.label !== 'string' || typeof f.value !== 'string',
               ))) ||
-          (p.actions !== undefined &&
+          (p.actions != null &&
             (!Array.isArray(p.actions) ||
               p.actions.length > 100 ||
               p.actions.some((a: unknown) => !validAction(a))))

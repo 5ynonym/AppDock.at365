@@ -9,7 +9,10 @@ const settings = require('../out/main/shared/settings-schema.js').createDefaultS
 require('../tests/fixtures/install.cjs')(profile, settings);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 (async () => {
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
   const application = await electron.launch({
+    env,
     executablePath: require('electron'),
     args: [root, `--test-profile=${profile}`],
     timeout: 30000,
