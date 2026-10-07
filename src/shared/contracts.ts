@@ -142,6 +142,7 @@ export interface HostSnapshot {
   logs: LogEntry[];
   version: string;
   dataDirectory: string;
+  runtime: { electron: string; chrome: string; node: string; platform: string; arch: string };
   dark: boolean;
   avatarUrl: string | null;
 }

@@ -6,6 +6,7 @@ import {
   dialog,
   shell,
   screen,
+  nativeTheme,
   type Input,
 } from 'electron';
 import fs from 'node:fs';
@@ -20,6 +21,7 @@ import type {
 } from '../../shared/web-accounts';
 import { WindowStateStore, restoreWindowBounds } from './window-state';
 import { queueSound } from './sounds';
+import { importSound, managedSound, pruneSounds } from './sound-assets';
 
 type Saved = {
   version: 1;
@@ -65,11 +67,19 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
     typeof sound.file !== 'string' ||
     sound.file.length > 4096 ||
     /[\u0000-\u001f\u007f]/.test(sound.file) ||
+    (sound.name !== undefined &&
+      (typeof sound.name !== 'string' ||
+        sound.name.length > 200 ||
+        /[\u0000-\u001f\u007f]/.test(sound.name))) ||
     (sound.file &&
       (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
   )
     throw Error('通知音にはWAVの絶対パスを指定してください。');
-  return { enabled: sound.enabled, file: sound.file };
+  return {
+    enabled: sound.enabled,
+    file: sound.file,
+    ...(sound.name !== undefined ? { name: sound.name } : {}),
+  };
 }
 let ipcInstalled = false;
 function asset(folder: string, relative: string): string {
@@ -154,6 +164,15 @@ export class WebAccountController {
   private itemOpener?: string;
   private file: string;
   private windowState: WindowStateStore;
+  private initializing?: Promise<void>;
+  private soundFailures = new Map<string, string>();
+  private themeChanged = () => this.changed();
+  private displaysChanged = () => {
+    if (this.background && !this.background.isDestroyed()) {
+      const right = Math.max(...screen.getAllDisplays().map((d) => d.bounds.x + d.bounds.width));
+      this.background.setPosition(right + 100, screen.getPrimaryDisplay().bounds.y);
+    }
+  };
   constructor(
     readonly id: string,
     readonly name: string,
@@ -205,6 +224,10 @@ export class WebAccountController {
       this.state = { version: 1, accounts: [{ id, name: 'アカウント 1' }], selected: id };
       this.save(this.state);
     }
+    nativeTheme.on('updated', this.themeChanged);
+    screen.on('display-added', this.displaysChanged);
+    screen.on('display-removed', this.displaysChanged);
+    screen.on('display-metrics-changed', this.displaysChanged);
     if (!ipcInstalled) {
       ipcInstalled = true;
       ipcMain.handle('web-account:invoke', async (event, method: string, ...args: unknown[]) => {
@@ -252,10 +275,22 @@ export class WebAccountController {
     if (!this.services.capabilities.includes(capability))
       throw Error(`manifest の capabilities に ${capability} が必要です。`);
   }
-  private sound(id: unknown, sound: unknown) {
+  private async sound(id: unknown, sound: unknown) {
     this.requireCapability('audio');
     const a = this.account(id);
     const parsed = parseWebAccountSound(sound);
+    if (parsed.file && (parsed.file !== a.sound?.file || !managedSound(this.root, parsed.file))) {
+      const original = parsed.file;
+      try {
+        parsed.file = await importSound(this.root, original);
+      } catch {
+        throw Error('通知音をコピーできませんでした。16MB以下のWAVファイルを確認してください。');
+      }
+      parsed.name = parsed.name || path.basename(original).slice(0, 200);
+    } else if (!parsed.file) delete parsed.name;
+    if (this.disposed) return;
+    this.account(a.id);
+    this.soundFailures.delete(a.id);
     this.save({
       ...this.state,
       accounts: this.state.accounts.map((item) =>
@@ -277,14 +312,17 @@ export class WebAccountController {
   }
   private backgroundWindow() {
     if (!this.background) {
-      // Detached/hidden native Views stop requestAnimationFrame even when
-      // backgroundThrottling is false. Keep them attached to a never-shown window.
+      // A never-shown parent advances rAF but suppresses first-contentful-paint.
+      // Start native painting outside every display without taking focus.
       this.background = new BrowserWindow({
         ...this.backgroundSize,
         useContentSize: true,
         show: false,
         skipTaskbar: true,
         focusable: false,
+        frame: false,
+        hasShadow: false,
+        opacity: 0,
         webPreferences: {
           sandbox: true,
           contextIsolation: true,
@@ -294,6 +332,8 @@ export class WebAccountController {
           partition: 'web-account-background-' + this.id,
         },
       });
+      this.displaysChanged();
+      this.background.showInactive();
     }
     return this.background;
   }
@@ -306,6 +346,7 @@ export class WebAccountController {
   }
   snapshot(includeData = true): WebAccountSnapshot {
     return {
+      dark: nativeTheme?.shouldUseDarkColors ?? true,
       selected: this.state.selected,
       accounts: this.state.accounts.map((a) => {
         const wc = this.views.get(a.id)?.webContents;
@@ -332,7 +373,10 @@ export class WebAccountController {
           status: status?.status ?? '受信トレイの表示を待っています',
           attention: status?.attention ?? false,
           data: includeData ? JSON.parse(status?.data ?? 'null') : null,
-          sound: a.sound ?? { enabled: false, file: '' },
+          sound: this.soundFailures.has(a.id)
+            ? { enabled: false, file: '' }
+            : (a.sound ?? { enabled: false, file: '' }),
+          soundError: this.soundFailures.get(a.id),
         };
       }),
     };
@@ -442,15 +486,50 @@ export class WebAccountController {
     void wc.loadURL(this.definition.url).catch(() => {});
     return view;
   }
-  start() {
+  async start() {
     if (this.disposed) throw Error('Web accounts are closed');
+    if (!this.initializing)
+      this.initializing = (async () => {
+        let changed = false;
+        const accounts = [] as Saved['accounts'];
+        for (const a of this.state.accounts) {
+          let next = a;
+          if (a.sound?.file && !managedSound(this.root, a.sound.file)) {
+            try {
+              const file = await importSound(this.root, a.sound.file);
+              next = {
+                ...a,
+                sound: { ...a.sound, file, name: path.basename(a.sound.file).slice(0, 200) },
+              };
+              changed = true;
+            } catch {
+              this.soundFailures.set(
+                a.id,
+                '以前の通知音をコピーできませんでした。WAVを選び直してください。',
+              );
+              this.services.failed(
+                '以前の通知音をコピーできませんでした。WAVを選び直してください。',
+              );
+            }
+          }
+          accounts.push(next);
+        }
+        if (!this.disposed && changed) this.save({ ...this.state, accounts });
+      })();
+    await this.initializing;
+    if (this.disposed) return;
     for (const a of this.state.accounts) this.view(a.id);
   }
   private layout() {
     if (!this.window || !this.attached) return;
     const [w, h] = this.window.getContentSize();
     const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
-    const visible = this.viewport !== null && area.x < w && area.y < h;
+    const visible =
+      this.window.isVisible() &&
+      !this.window.isMinimized() &&
+      this.viewport !== null &&
+      area.x < w &&
+      area.y < h;
     if (!visible) {
       this.park(this.attached);
       return;
@@ -496,7 +575,7 @@ export class WebAccountController {
     return this.opening;
   }
   private async openWindow() {
-    this.start();
+    await this.start();
     const primary = screen.getPrimaryDisplay();
     const saved = this.windowState.load(
       [primary, ...screen.getAllDisplays().filter((d) => d.id !== primary.id)].map(
@@ -530,6 +609,10 @@ export class WebAccountController {
     w.webContents.on('will-navigate', (event) => event.preventDefault());
     w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     w.on('resize', () => this.layout());
+    w.on('show', () => this.layout());
+    w.on('hide', () => this.layout());
+    w.on('minimize', () => this.layout());
+    w.on('restore', () => this.layout());
     // Closing the mail window hides it; monitoring remains active until Applet stop.
     w.on('close', (event) => {
       if (!this.disposed) {
@@ -602,7 +685,7 @@ export class WebAccountController {
       case 'cycle':
         return this.cycle(args[0]);
       case 'setSound':
-        this.sound(args[0], args[1]);
+        await this.sound(args[0], args[1]);
         return;
       case 'pickSound': {
         this.requireCapability('file-dialog');
@@ -614,9 +697,10 @@ export class WebAccountController {
           filters: [{ name: 'WAV', extensions: ['wav'] }],
         });
         if (!this.disposed && !this.deleting.has(a.id) && !result.canceled && result.filePaths[0])
-          this.sound(a.id, {
+          await this.sound(a.id, {
             ...(this.account(a.id).sound ?? { enabled: false }),
             file: result.filePaths[0],
+            name: undefined,
           });
         return;
       }
@@ -719,7 +803,7 @@ export class WebAccountController {
     }
   }
   async read() {
-    this.start();
+    await this.start();
     // Sequential reads keep the IPC response bounded and avoid parallel DOM scans.
     for (const a of this.state.accounts) {
       if (this.disposed || this.deleting.has(a.id)) continue;
@@ -804,6 +888,10 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
+    nativeTheme.removeListener('updated', this.themeChanged);
+    screen.removeListener('display-added', this.displaysChanged);
+    screen.removeListener('display-removed', this.displaysChanged);
+    screen.removeListener('display-metrics-changed', this.displaysChanged);
     this.windowState.flush();
     const ids = [...this.views.keys()];
     for (const view of this.views.values())
@@ -813,6 +901,11 @@ export class WebAccountController {
     this.window?.destroy();
     this.background?.destroy();
     this.background = undefined;
+    await this.initializing?.catch(() => {});
+    await pruneSounds(
+      this.root,
+      this.state.accounts.map((a) => a.sound?.file ?? ''),
+    );
     await Promise.allSettled(
       ids.map(async (id) => {
         const ses = this.accountSession(id);

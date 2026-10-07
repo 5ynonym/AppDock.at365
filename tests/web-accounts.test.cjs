@@ -26,6 +26,7 @@ test('Worker read excludes UI reports so multi-account history cannot overflow J
     definition: { url: 'https://mail.google.com' },
     views: new Map(),
     deleting: new Set(),
+    soundFailures: new Map(),
     acknowledgements: new Set(['0']),
     statuses: new Map(
       accounts.map((a) => [

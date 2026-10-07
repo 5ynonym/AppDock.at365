@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-08: v0.15.0 Web初回描画・テーマ・音声コピー・バージョン情報
+
+- 未表示のWebContentsViewはrAFが動いても初回描画が成立しないことを追加実測。透明・全ディスプレイ外・非フォーカス・タスクバー非表示の親WindowでshowInactiveし、非表示/最小化中もViewを背景へ移す。display変更時は画面外へ再配置し、停止時は購読とWindowを解放する。
+- Web snapshot.darkとnativeTheme変更通知でローカルUIのテーマを同期。sound.nameとsoundErrorを追加し、WAVを16MB/RIFF/WAVEで検証してsounds/<SHA256>.wavへコピー。旧設定を起動時に移行し、失敗時は元設定保持・実効音OFF・再選択案内。停止時は未参照の管理hash名WAVだけを削除する。
+- 設定に「バージョン情報・更新」を追加。HostSnapshot.runtimeで実行環境を表示し、既存更新確認APIを再利用。表示時の自動通信なし、手動確認とリリースページ案内。本体/各Appletの版・確認時刻・結果/エラーを表示し、未保存の設定draftを保持する。
+- main/renderer型検査・Vite・ホスト回帰79/79、Gmail回帰15/15成功。新しい音声コピー2回帰を含む。`dev.bat run dist`成功。.NETはframework-dependentクリーン発行でRuntime混入なし。
+- 配布版のテーマ/音声コピー・旧設定移行/更新確認: `../Applet.Gmail.at365/artifacts/ui-features-1791389267393/result.json`。未表示・非表示reload・背景同期/透明/画面外/非フォーカス・破棄: `../Applet.Gmail.at365/artifacts/background-1791389201924/result.json`。既存GUI: `../Applet.Gmail.at365/artifacts/gui-1791389317671/result.json`。単一EXE: `../Applet.Gmail.at365/artifacts/portable-1791389361232/result.json`（0.15.0、exitCode 0）。
+- 設定ナビゲーション: `artifacts/navigation-1791389280500/result.json`。about往復時のdraft保持、複数Applet/入力型/保存競合/無効JSON/両テーマ/狭い画面の既存操作が成功。同名の非表示保存ラベルを拾う旧locatorを可視toolbarへ限定した。
+- 実Gmailは操作UIを開く前の初回描画、保存済み認証、GPUオフを確認。ログイン済み1枠が9行/未読2/起動時新着2、2枠目は受信トレイ未到達。実複数アカウント・別ブラウザーからの実同期・音の聞こえ方・スリープ/長期常駐は別途確認。詳細と制約は[Gmail検証記録](../Applet.Gmail.at365/VERIFICATION.md)。
+- 最終EXE: 100,441,388 bytes、SHA256 `AA28B2BC11EBD62333221B43D90F71302A1D49EB27652D242515D6F321093212`。開発配置だけを更新し、実利用先へのdeploy・外部pushは行っていない。
+
 ## 2026-10-07: v0.14.0 Webアカウントの操作・個別音・ウィンドウ保存
 
 - 任意のitemOpener資産をApplet内/100KBの関数式として検証し、限定ローカルUIのopenItem(id,key)からだけ実行。読込済みobserveOrigin・isolated world 1001・JSON文字列化した200文字以内の引数で、remoteへHost bridgeを渡さない。cycle(1|-1)をNodeと限定UIへ追加し、現在の枠から循環して同じWebContentsViewを選ぶ。

@@ -7,7 +7,7 @@
 - [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。
 - [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
 - [Applet API](docs/extensions.md): APIと通信の契約。
-- [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）。
+- [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）、初回描画・テーマ同期・音声コピー（0.15.0）。
 - [ウィジェット開発ガイド](docs/widgets.md): ウィジェットSDK、描画方式、Watch DLLへの移行。
 - [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。

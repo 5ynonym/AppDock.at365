@@ -61,7 +61,7 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 | --- | --- |
 | [Watch](../Applet.Watch.at365/README.md) | 時計と日付のウィジェット |
 | [GmailChecker](../Applet.GmailChecker.at365/README.md) | 複数Gmailアカウントの新着確認とアカウント別の通知音（AppDock 0.11.0以降） |
-| [Gmail](../Applet.Gmail.at365/README.md) | GmailのWeb画面、ログイン保持、新着一覧・検索、アカウント切替と個別通知音（Gmail 0.3.0はAppDock 0.14.0以降） |
+| [Gmail](../Applet.Gmail.at365/README.md) | GmailのWeb画面、ログイン保持、新着一覧・検索、テーマ連動、アカウント切替と個別通知音（Gmail 0.4.0はAppDock 0.15.0以降） |
 | [WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md) | モニターごとの壁紙スライドショーと履歴 |
 | [WindowMover](../Applet.WindowMover.at365/README.md) | 最前面ウィンドウの移動・サイズ変更・終了 |
 | [WindowsTools](../Applet.WindowsTools.at365/README.md) | 消灯予約・キー送信・無操作時のPCロック |
@@ -79,7 +79,7 @@ Web画面対応のAppletは、アカウントごとに独立したブラウザ�
 
 ## 更新の確認
 
-ホストの画面下部、Appletの詳細画面に「更新を確認」があります。クリック時だけGitHubの最新正式リリースを問い合わせます。公開リリースがない場合、通信エラー、更新ありを区別し、更新があればリリースページを開けます。設定・画像・ログは問い合わせに含めず、公開リポジトリ名と標準HTTPヘッダーだけを送信します。自動更新は行いません。
+「設定 → バージョン情報・更新」で、本体・導入済みAppletのバージョン、Electron等の実行環境、本体と各Appletの「更新を確認」をまとめて表示します。画面下部とAppletの詳細画面からも確認できます。クリック時だけGitHubの最新正式リリースを問い合わせます。公開リリースがない場合、通信エラー、更新ありを区別し、更新があればリリースページを開けます。設定・画像・ログは問い合わせに含めず、公開リポジトリ名と標準HTTPヘッダーだけを送信します。自動更新は行いません。更新する場合はAppDockを完全終了して、取得した配布物を置き換えてください。
 
 ## モニター設定と画像履歴
 

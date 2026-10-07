@@ -42,6 +42,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## React UIとIPCを追加する手順
 
+0.15.0の設定「バージョン情報・更新」はSettingsPageのaboutカテゴリです。保存フォームを持たず、既存draftは保持します。HostSnapshot.runtimeでElectron/Chromium/Node/OS・アーキテクチャを受け、既存VersionCheckとcheckUpdates/openReleasesを再利用します。表示しただけでは問い合わせず、手動操作時だけ通信します。最終確認時刻はページ内の結果で、永続設定ではありません。Gmailのtest-ui-featuresでライト/ダーク/システムの連動、更新あり/最新版/未公開/未設定/HTTPエラーをオフライン検証します。
+
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
 Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイルを使います。幅はAppで一度だけ呼ぶ`useAppletSidebar`の状態と既存の`appdock.applet-sidebar-width`で共有し、各画面で独立した幅を持たせません。設定一覧はportalでshellの左パネルへ表示しますが、SettingsPage自体は画面移動時も保持して未保存のdraftを失わないようにします。ショートカットの検索と状態フィルターは`.shortcut-filters`で一行にそろえ、表示領域不足時のみ折り返します。状態フィルターは排他的な4つのボタンで、選択状態を`aria-pressed`へ反映します。`scripts/applet-sidebar-ui-test.cjs`と`scripts/navigation-ui-test.cjs`で共通幅・再起動・編集保持・絞り込みとキーボード操作・両テーマと狭い画面の配置を確認できます。

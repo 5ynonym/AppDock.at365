@@ -1,4 +1,4 @@
-# WebアカウントAPI（v0.14.0）
+# WebアカウントAPI（v0.15.0）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
@@ -6,7 +6,7 @@ Node Appletへ、Webサービスのアカウント別画面と永続セッショ
 
 基本APIは`minimumHostVersion: "0.12.0"`と`capabilities: ["web-accounts"]`が必要です。`report`のdataやUIの`viewport`を使用するAppletは`minimumHostVersion: "0.13.0"`を指定してください。
 
-背景でWebページの描画も継続させる必要があるAppletは、0.13.1以降を指定してください。非選択Viewは非表示専用Windowへ可視・実寸で接続したまま保持します。この親Windowは一度も表示せず、taskbar/フォーカス対象にしません。操作Windowと背景WindowはbackgroundThrottling=false。選択中Viewのみ操作Windowへ移し、非選択・viewport(null)では背景Windowへ戻します。全Viewと背景Windowを停止時に破棄します。
+初回未表示からWebページの描画を継続するAppletは、0.15.0以降を指定してください。非選択Viewは専用Windowへ可視・実寸で接続したまま保持します。この親Windowはopacity:0・全ディスプレイ外・frameなし・taskbar/フォーカス対象外でshowInactiveし、初回ネイティブ描画を開始します。ディスプレイ構成変更でも画面外へ配置し直します。0.13.1の一度も表示しない親WindowはrAFを維持してもfirst-contentful-paintを抑制することが追加実測で分かりました。操作Windowと背景WindowはbackgroundThrottling=false。選択中Viewのみ可視の操作Windowへ移し、非選択・viewport(null)・非表示・最小化では背景Windowへ戻します。全Viewと背景Windowを停止時に破棄します。
 
 ```json
 {
@@ -32,7 +32,7 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 | `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
 
-`read`の戻り値は`{ selected, accounts, acknowledged }`。アカウントは`id/name/url/loading/error/canGoBack/canGoForward/observation/status/attention/data`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnullにし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
+`read`の戻り値は`{ dark, selected, accounts, acknowledged }`。アカウントは`id/name/url/loading/error/canGoBack/canGoForward/observation/status/attention/data/sound/soundError`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnullにし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
 
 観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
 
@@ -40,7 +40,11 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 `openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
 
-0.14.0のアカウントsnapshotは`sound:{enabled:boolean,file:string}`も返します。初期値はfalse/空文字（標準ビープ）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileだけ変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず既存queueSoundで試聴します。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。ファイルは絶対パスのWAVのみで、元ファイルをコピーしません。
+0.14.0以降のアカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します（nameは0.15.0追加）。初期値はfalse/空文字（標準ビープ）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず既存queueSoundで試聴します。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
+
+0.15.0では選択した絶対パスのWAVをRIFF/WAVE・16MB以下で検証し、保存領域の`sounds/<SHA256>.wav`へコピーします。同じ内容は共有し、元ファイルは変更しません。nameは元のファイル名です。startで旧外部パスも移行し、失敗した枠は元設定を保持し、soundErrorと実効的なOFF/空パスを返します。再選択で復旧できます。コピーは一時ファイルからrenameし、停止時はアカウントが参照していない管理用hash名のWAVだけを削除します。利用者の任意ファイルは削除しません。
+
+0.15.0のsnapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 
 操作UIと各WebContentsのbefore-input-eventで、自分のAppletの登録済みコマンドに一致するローカルshortcutだけを実行します。利用者設定を毎回参照し、global指定済みのコマンドはここから実行しません。キー長押し・IME入力中は実行せず、同じキーに複数の自身のコマンドが一致した場合も実行しません。Gmailの初期Ctrl+Tab/Ctrl+Shift+Tabはホストの既定shortcutsで、明示の空配列/変更を保持します。
 

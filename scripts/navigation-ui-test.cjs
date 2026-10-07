@@ -84,7 +84,10 @@ const checks = [];
   const settingsNav = () => page.locator('.settings-categories');
   const save = async () => {
     await button('変更をすべて保存').click();
-    await page.getByText('すべて保存されています', { exact: true }).waitFor();
+    await page
+      .locator('.settings-toolbar:visible')
+      .getByText('すべて保存されています', { exact: true })
+      .waitFor();
   };
   const chooseApplet = async (name) => {
     await page.getByLabel('設定するAppletを検索').fill(name);
@@ -124,6 +127,11 @@ const checks = [];
     await button('Appletに戻る').click();
     assert.equal(await page.locator('.detail h2').textContent(), '検証Applet 02');
     await button('設定を開く').click();
+    await chooseApplet('検証Applet 01');
+    assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
+    await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
+    await page.getByRole('region', { name: 'バージョン情報・更新', exact: true }).waitFor();
+    assert.equal(await page.locator('.settings-toolbar:visible').count(), 0);
     await chooseApplet('検証Applet 01');
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await save();

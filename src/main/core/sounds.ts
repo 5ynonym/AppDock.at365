@@ -4,6 +4,22 @@ import { BrowserWindow, shell } from 'electron';
 
 let queue: Promise<void> = Promise.resolve();
 let pending = 0;
+export async function readWave(file: string): Promise<Buffer> {
+  if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
+    throw new Error('通知音にはWAVの絶対パスが必要です。');
+  const handle = await fs.open(file, 'r');
+  let bytes: Buffer;
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new Error('WAV too large');
+    bytes = await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+  if (bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE')
+    throw new Error('Invalid WAV');
+  return bytes;
+}
 /** Short notifications only. No shell commands, remote URLs or persistent renderer. */
 export function queueSound(file: string, alive: () => boolean, failed: () => void): void {
   if (file && (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav'))
@@ -17,17 +33,7 @@ export function queueSound(file: string, alive: () => boolean, failed: () => voi
         shell.beep();
         return;
       }
-      const handle = await fs.open(file, 'r');
-      let bytes: Buffer;
-      try {
-        const stat = await handle.stat();
-        if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new Error('WAV too large');
-        bytes = await handle.readFile();
-      } finally {
-        await handle.close();
-      }
-      if (bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE')
-        throw new Error('Invalid WAV');
+      const bytes = await readWave(file);
       if (!alive()) return;
       const player = new BrowserWindow({
         show: false,

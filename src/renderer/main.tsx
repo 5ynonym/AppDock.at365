@@ -675,6 +675,8 @@ function App() {
             <div className="settings-page" hidden={page !== 'settings'}>
               <SettingsPage
                 snapshot={snapshot.settings}
+                version={snapshot.version}
+                runtime={snapshot.runtime}
                 extensions={snapshot.extensions}
                 run={action}
                 busy={busy}
@@ -1080,6 +1082,8 @@ function ExtensionDetail({
 }
 function SettingsPage({
   snapshot,
+  version,
+  runtime,
   extensions,
   run,
   busy,
@@ -1094,6 +1098,8 @@ function SettingsPage({
   active,
 }: {
   snapshot: SettingsSnapshot;
+  version: string;
+  runtime: HostSnapshot['runtime'];
   extensions: ExtensionSnapshot[];
   run: Run;
   busy: boolean;
@@ -1114,7 +1120,7 @@ function SettingsPage({
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [parseError, setParseError] = useState('');
   const [category, setCategory] = useState<
-    'appearance' | 'general' | 'extensions' | 'shortcuts' | 'host-shortcuts' | 'profile'
+    'appearance' | 'general' | 'extensions' | 'shortcuts' | 'host-shortcuts' | 'profile' | 'about'
   >('appearance');
   const [appletId, setAppletId] = useState('');
   const [appletTab, setAppletTab] = useState<SettingsTarget['tab']>('settings');
@@ -1162,19 +1168,21 @@ function SettingsPage({
   const appletChanged = (id: string) =>
     changed(draft.extensions[id], snapshot.value.extensions[id]) || shortcutChanged(id);
   const categoryChanged = (id: string) =>
-    id === 'appearance'
-      ? draft.host.theme !== snapshot.value.host.theme
-      : id === 'general'
-        ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
-        : id === 'profile'
-          ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-          : id === 'host-shortcuts'
-            ? shortcutChanged(null)
-            : id === 'shortcuts'
-              ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
-                changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
-                changed(draft.trayCommands, snapshot.value.trayCommands)
-              : extensions.some((e) => appletChanged(e.id));
+    id === 'about'
+      ? false
+      : id === 'appearance'
+        ? draft.host.theme !== snapshot.value.host.theme
+        : id === 'general'
+          ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
+          : id === 'profile'
+            ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+            : id === 'host-shortcuts'
+              ? shortcutChanged(null)
+              : id === 'shortcuts'
+                ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                  changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
+                  changed(draft.trayCommands, snapshot.value.trayCommands)
+                : extensions.some((e) => appletChanged(e.id));
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
   const [avatarLoading, setAvatarLoading] = useState(false);
@@ -1240,6 +1248,7 @@ function SettingsPage({
                   ['host-shortcuts', 'AppDockのキー'],
                   ['shortcuts', 'ショートカット'],
                   ['profile', 'プロフィール'],
+                  ['about', 'バージョン情報・更新'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -1326,7 +1335,10 @@ function SettingsPage({
           </button>
         }
       />
-      <div className="settings-toolbar">
+      <div
+        className="settings-toolbar"
+        style={category === 'about' ? { display: 'none' } : undefined}
+      >
         <div className="tabs">
           <button
             className={mode === 'form' ? 'selected' : ''}
@@ -1402,6 +1414,55 @@ function SettingsPage({
         ) : (
           <div className="settings-layout">
             <div className="settings-form">
+              {category === 'about' && (
+                <section className="about-page" aria-label="バージョン情報・更新">
+                  <div className="about-host">
+                    <span className="section-label">APPDOCK</span>
+                    <h2>
+                      AppDock.at365 <span>v{version}</span>
+                    </h2>
+                    <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
+                    <VersionCheck details />
+                    <dl className="runtime-versions">
+                      <div>
+                        <dt>Electron</dt>
+                        <dd>{runtime.electron}</dd>
+                      </div>
+                      <div>
+                        <dt>Chromium</dt>
+                        <dd>{runtime.chrome}</dd>
+                      </div>
+                      <div>
+                        <dt>Node.js</dt>
+                        <dd>{runtime.node}</dd>
+                      </div>
+                      <div>
+                        <dt>実行環境</dt>
+                        <dd>
+                          {runtime.platform} / {runtime.arch}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="muted">
+                      確認はボタンを押したときに行います。更新がある場合はリリースページから入手し、AppDockを終了して置き換えてください。
+                    </p>
+                  </div>
+                  <h3>インストール済みのApplet</h3>
+                  <p className="muted">更新確認先を持つAppletは、ここから確認できます。</p>
+                  {extensions.length === 0 && <p>Appletはインストールされていません。</p>}
+                  <div className="about-applets">
+                    {extensions.map((e) => (
+                      <article key={e.id}>
+                        <div>
+                          <strong>{e.displayName}</strong>
+                          <span className="muted">v{e.version}</span>
+                        </div>
+                        <VersionCheck id={e.id} details />
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
               {category === 'extensions' && selectedApplet && (
                 <>
                   <div className="applet-settings-heading">
