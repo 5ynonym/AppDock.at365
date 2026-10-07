@@ -345,3 +345,9 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - main/renderer型検査・Vite build・Prettier・git diff --check、ホスト回帰67/67成功。Watchウィジェットの開発版UI: `artifacts/widgets-ui-1791334419882`、発行版UI: `artifacts/widgets-ui-1791334637705`。DLL起動、全9通りの文字寄せの秒更新、2モニターの親と座標、フォーカス維持、移動/保存/取消、停止/再起動、テーマ/保存バーを確認。単一EXE+Watch DLLの隔離smoke: `artifacts/smoke-1791334645561/smoke-result.json`（ok=true）。Explorer強制再起動、実モニター着脱、RDP、長期常駐は今回も未検証。
 - `publish/AppDock.at365.exe`: 100,512,630 bytes、SHA256 `5571AAF9B070E88F4DA9583AC08422FB5871F22538B894847399B596296AADED`。ローカルNode/pnpmと既存Electron/.NET host成果物で再発行。native bridge/APIとWatchソースに変更なし。
 - ユーザーから完成後の`deploy.bat`実行指示を受け、実行直前のAppDock/ExtensionHostプロセス0件を確認してデプロイ。デプロイ先のProductVersion 0.10.2と発行元SHA256一致、settings.jsonの前後SHA256不変を確認。旧EXEと結果を`artifacts/widget-desktop-deployment-20261007-095802`へ退避。実利用のアプリは起動していない。外部公開/pushなし。
+
+## 2026-10-07: ウィジェットの実利用確認・mainへ統合
+
+- ユーザーがデプロイ済み0.10.2で正常動作を確認。ユーザーの指示により、AppDockの`codex/widgets`（e04584a）とWatchの`codex/widgets`（90b3e2e）を各`main`へfast-forwardで統合。マージ前後のGit treeが同一で、検証済みコードへの変更がないことを確認。
+- 旧EXEのSHA256と配置済み0.10.2のSHA256を確認してから、今回の退避先`artifacts/widget-desktop-deployment-20261007-095802`の旧EXE・結果JSON・空フォルダーを削除し、消失を確認。以前のデプロイや別作業の退避物は対象外。
+- 両リポジトリのマージ済み`codex/widgets`を削除。実利用先のEXE・設定・Applet、発行版には変更なし。外部公開/pushなし。
