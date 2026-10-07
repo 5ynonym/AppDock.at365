@@ -112,6 +112,7 @@ export interface ExtensionManifest {
   settings?: SettingDefinition[];
   commands?: DeclaredCommand[];
   widgets?: WidgetDefinition[];
+  webAccounts?: import('./web-accounts').WebAccountDefinition;
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
   displayName: string;

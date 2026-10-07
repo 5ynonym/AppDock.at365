@@ -105,6 +105,8 @@ Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト�
 
 ## SDKで使えるサービス
 
+Webサービスのアカウント別ページには0.12.0の[WebアカウントAPI](web-accounts.md)（Nodeのみ）を使用できます。
+
 | API | 用途 | capabilities |
 | --- | --- | --- |
 | Commands | パレットとボタンから呼ぶ処理の登録 | 常時 |

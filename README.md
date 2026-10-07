@@ -61,6 +61,7 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 | --- | --- |
 | [Watch](../Applet.Watch.at365/README.md) | 時計と日付のウィジェット |
 | [GmailChecker](../Applet.GmailChecker.at365/README.md) | 複数Gmailアカウントの新着確認とアカウント別の通知音（AppDock 0.11.0以降） |
+| [Gmail](../Applet.Gmail.at365/README.md) | GmailのWeb画面、アカウント別ログイン保持、画面更新からの新着検知（AppDock 0.12.0以降） |
 | [WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md) | モニターごとの壁紙スライドショーと履歴 |
 | [WindowMover](../Applet.WindowMover.at365/README.md) | 最前面ウィンドウの移動・サイズ変更・終了 |
 | [WindowsTools](../Applet.WindowsTools.at365/README.md) | 消灯予約・キー送信・無操作時のPCロック |
@@ -69,6 +70,8 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 Appletは設定された表示名で表示します。表示名・元の名前・IDのいずれでも検索できます。
 
 通知対応のAppletが新着を知らせると、AppDockのトレイに橙色の印を表示します。対応Appletで通知を確認・クリアすると解除されます。トレイのクリック動作やメニュー表示は、従来どおりホスト設定で選択できます。
+
+Web画面対応のAppletは、アカウントごとに独立したブラウザー領域を使用します。ログインは表示されたWebサービスの画面で利用者自身が行い、ログイン状態はEXE隣の`.appdock/web-accounts/`へ保存します。Applet更新時もこのフォルダーを保持してください。Gmail画面の×は非表示、Appletの無効化で監視とページを停止します。
 
 ## Appletの遅延開始
 

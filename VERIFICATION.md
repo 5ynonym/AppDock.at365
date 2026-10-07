@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-07: v0.12.0 Webアカウントの共通管理
+
+- Nodeへ`webAccounts.start/open/read/report`と`web-accounts` capabilityを追加。Gmail固有のDOM観測は新しいAppletへ置き、ホストはWebContentsView・アカウント別永続セッション・限定UI IPC・破棄を担当。.NET/nativeの既存APIは維持し、今回は.NET SDK専用ラッパーは追加していない。
+- main/renderer型検査・Vite build成功、既存70＋境界3回帰で73/73成功。URL/capability/Web資産の境界、既存Node/.NETライフサイクルを確認。
+- 発行win-unpacked版の隔離オフラインGUIでDOM新着/未読返信、既読変更、フォルダー復帰時基準、背景監視、900×640のレイアウト、Cookie分離と再起動保持、削除、停止、リモートのNode/bridge非公開を検証。結果: `../Applet.Gmail.at365/artifacts/gui-1791363761348/result.json`。
+- portable＋未改変Gmail Appletで、明示コマンド起動、WebContentsView、新着/クリア、無効化/再有効化、正常終了コード0を確認。結果: `../Applet.Gmail.at365/artifacts/portable-1791363831174/result.json`。通信はオフラインfixtureへ差し替え。
+- 開発用Gmailの旧テストprofileを元を残して隔離コピーし、再入力なしで実受信トレイと識別子解析を確認。実メール到着/複数実アカウント/Google再認証/実空受信トレイ/実Windows通知/スリープ復帰/長期常駐は未確認。
+- `publish.bat`で.NETホストをクリーン発行し、portableを生成。EXEは100,437,305 bytes、SHA256 `7D9168E11D6194F2B87F689354D62A0D5E3AD83546947DF71C0732FDF76D7CC4`。実利用先へは配置していない。
+
 ## 環境の.NET 10 Runtimeを使用（2026-10-06 JST）
 
 .NETホストの発行を `win-x64` / `--self-contained false` に変更しました。発行前に専用の `artifacts/dotnet-host` を削除して再生成し、以前の同梱ランタイムが残らないようにしています。READMEとApplet開発ガイドに、利用先の.NET 10 Runtime（Windows x64）の要件とnative Appletとの違いを反映しました。

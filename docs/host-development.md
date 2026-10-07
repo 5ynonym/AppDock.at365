@@ -12,6 +12,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 機能固有の時計描画、画像処理、WindowsフックなどはAppletへ置きます。複数Appletで共有したい操作、ホストの保存・通知・アカウント管理、ユーザー向けの共通画面はHost APIやReact UIを拡張します。Appletのために任意のElectron APIやファイル操作をrendererへ公開しません。
 
+0.12.0の[WebアカウントAPI](web-accounts.md)では、ホストがWebContentsView・独立永続セッション・限定IPC・停止時の破棄を管理します。Gmailのセレクターと新着判定はApplet側です。追加のNode APIは`webAccounts.start/open/read/report`で、今回は.NET SDKのラッパーを提供していません。
+
 | 追加したいもの | 主な変更先 |
 | --- | --- |
 | Applet向けHost API | `src/main/core/host-api.ts` → .NET SDK/Runtime・Node SDK |

@@ -590,6 +590,11 @@ async function initialize() {
   log.write('info', 'host', 'AppDockを起動しました。');
   if (smoke) await runSmoke();
   else if (!settings.value.host.startMinimized) showWindow();
+  // Optional startup command only for an explicit isolated test profile.
+  const testCommand =
+    testDirectory &&
+    process.argv.find((a) => a.startsWith('--test-command='))?.slice('--test-command='.length);
+  if (!smoke && testCommand) await manager.execute(testCommand);
 }
 async function runSmoke() {
   try {

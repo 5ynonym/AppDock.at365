@@ -9,6 +9,7 @@ import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/exte
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
 import { parseWidgetDefinitions, type WidgetDefinition } from '../../shared/widgets';
+import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -63,6 +64,11 @@ function readManifest(folder: string): LoadedManifest {
     throw new Error('capabilities の形式が正しくありません。');
   if (m.widgets?.length && !m.capabilities?.includes('widgets'))
     throw new Error('ウィジェットの提供にはwidgets capabilityが必要です。');
+  if (m.webAccounts) {
+    if (!m.capabilities?.includes('web-accounts'))
+      throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
+    validateWebAccounts(folder, m.webAccounts);
+  }
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
@@ -396,6 +402,7 @@ class ExtensionManager extends EventEmitter {
   }
   crashed(e: ExtensionInstance, message: string) {
     if (e.state === 'stopping') return;
+    void closeWebAccounts(e.manifest.id);
     e.state = 'error';
     e.attention = false;
     e.error = message;
@@ -409,6 +416,7 @@ class ExtensionManager extends EventEmitter {
   async stop(e: ExtensionInstance) {
     this.cancelStart(e);
     e.state = 'stopping';
+    await closeWebAccounts(e.manifest.id);
     e.attention = false;
     this.emit('changed');
     const child = e.child;
