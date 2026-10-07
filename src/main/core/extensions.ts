@@ -74,6 +74,7 @@ function readManifest(folder: string): LoadedManifest {
 }
 type LoadedManifest = ExtensionManifest & { folder: string; entryPath: string };
 export interface ExtensionInstance {
+  attention?: boolean;
   manifest: LoadedManifest;
   state: ExtensionSnapshot['state'];
   commands: Command[];
@@ -396,6 +397,7 @@ class ExtensionManager extends EventEmitter {
   crashed(e: ExtensionInstance, message: string) {
     if (e.state === 'stopping') return;
     e.state = 'error';
+    e.attention = false;
     e.error = message;
     e.commands = [];
     e.tray = [];
@@ -407,6 +409,7 @@ class ExtensionManager extends EventEmitter {
   async stop(e: ExtensionInstance) {
     this.cancelStart(e);
     e.state = 'stopping';
+    e.attention = false;
     this.emit('changed');
     const child = e.child;
     try {

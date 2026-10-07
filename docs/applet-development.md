@@ -177,3 +177,8 @@ v0.9.0ではシングルクリックとダブルクリックを別々の一般�
 ## ウィジェットの提供
 
 AppDock 0.10.0以降は、manifestの`widgets`宣言と`widgets` capability、.NETの`IWidgetService`／Nodeの`context.widgets`で、ホームと透過デスクトップに共通の内容を提供できます。画面を自作しないAppletは.NET DLLで実装できます。Watch 0.2.0が移行例です。[ウィジェットの契約・移行・検証](widgets.md)を参照してください。
+## Node Appletのファイル選択・通知音（0.11.0）
+
+[GmailChecker](../../Applet.GmailChecker.at365/DEVELOPMENT.md)はTypeScript/Nodeの実利用例です。既存のパネルタブでアカウントを選択し、一般設定をホストフォーム、秘密をSecrets、履歴をStorageへ分けます。認証やポーリングはコマンド受付から切り離し、停止時にAbortControllerで中止してください。
+
+ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#v0110-node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。

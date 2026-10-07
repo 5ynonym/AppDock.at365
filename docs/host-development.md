@@ -147,3 +147,12 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 契約・設定検証は`src/shared/widgets.ts`、Applet登録は`host-api.ts`、フォントの境界検証は`widget-fonts.ts`、透過画面と移動の寿命管理は`desktop-widgets.ts`、共通React描画は`Widgets.tsx`です。`WindowsWidgetSession`がデスクトップ固定だけを担当します。ウィジェット画面には専用preloadを使い、ホスト設定・コマンド・ファイル操作のIPCを公開しません。内容更新とホスト画面更新を毎秒同期せず、各描画面内の共有タイマーで時計を更新します。詳細は[widgets.md](widgets.md)を参照してください。
 
 デスクトップ固定の初回と非表示からの復帰では、Shellへの接続後にElectronの`showInactive()`も呼び、Chromiumの描画を開始してから親と座標を再確認します。Win32の`SWP_SHOWWINDOW`と`IsWindowVisible`だけでは描画の開始を確認できません。定期確認では表示済み画面を繰り返しshowしません。`test:widget-desktop`は隔離Node fixtureを使い、実デスクトップの露出した180×120pxだけで表示・更新・通常ウィンドウによる遮蔽・非表示からの復帰・透過を検証します。
+## GmailChecker対応（0.11.0）
+
+- `node-worker.ts`: `ui.pickFile`、`audio.play`、`tray.attention`、通知オプションを追加。ファイル選択だけRPC期限を5分に拡張。
+- `core/host-api.ts`: capabilityと引数を検証。通知クリックは所有Appletと起動世代を照合。
+- `core/sounds.ts`: 上限付き順次再生。RIFF/WAVE確認、sandbox有効の短命な非表示renderer、停止・再起動時の中止。
+- `core/extensions.ts` / `index.ts`: 各Appletのattentionを集約し、共通トレイの印とツールチップへ反映。停止・異常終了時は解除。
+- `renderer/main.tsx`: タブのアクセシビリティ名をモニター専用から一般パネル向けに変更。
+
+既存API v1/.NET Appletとの互換を維持します。ホスト回帰は`tests/notification-services.test.cjs`、実Electron/Nodeの統合検証は[GmailCheckerの検証スクリプト](../../Applet.GmailChecker.at365/scripts/test-ui.cjs)を参照してください。

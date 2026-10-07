@@ -155,3 +155,19 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 `Panel.Images`は1000件まで、`Tabs`は100件までに拡張しました。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
 
 `local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。従来のbase64 `Image`は200000文字上限のまま使用可能です。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
+## v0.11.0: Node Appletの通知・ファイル選択
+
+既存API v1と従来の通知呼出しを維持した追加です。利用するAppletは`minimumHostVersion: "0.11.0"`を指定します。
+
+| Node API | capability | 動作 |
+| --- | --- | --- |
+| `ui.pickFile('json' \| 'wav')` | `file-dialog` | ホストのファイル選択。絶対パスまたはキャンセル時null。RPC待機は5分 |
+| `audio.play(file?)` | `audio` | ローカルWAVを順番に再生。空文字/省略はWindows標準音。キュー受付時に戻る |
+| `tray.attention(boolean)` | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示 |
+| `notifications.show(title, body, { silent?, command? })` | `notifications` | 音の抑制とクリック時の自Appletコマンドを任意指定 |
+
+WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の再生は30秒で打ち切ります。再生時だけsandbox/contextIsolation有効の非表示Electronウィンドウを作り、終了時に破棄します。停止・再起動したAppletの音は中止し、待機分は破棄します。再生失敗はホストログに記録します。外部URLやシェルによる再生は行いません。
+
+通知の`command`は登録済みの自Appletコマンドのみ受け付け、クリック時にも同じプロセスが稼働中であることを確認します。`silent`を省略した既存通知の動作は維持します。トレイのattentionは停止・異常終了で解除し、トレイメニューへのコマンド表示やクリック割当は変更しません。
+
+長い認証やファイル選択を行うAppletはコマンドを即時受付し、バックグラウンドで処理してパネルへ状態を反映してください。通常のコマンドRPCは従来どおり15秒です。GmailCheckerが利用例です。
