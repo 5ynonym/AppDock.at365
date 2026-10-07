@@ -2,6 +2,8 @@
 
 AppDock v0.3.0 / API v1を基準にした実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
+新しいAppletにも[ドキュメント方針](documentation.md)を適用し、利用者向けの`README.md`と開発者向けの`DEVELOPMENT.md`を分けて作成します。最低ホスト版・導入・操作・設定・利用上の制約はREADME、ビルド・テスト・発行・内部構造はDEVELOPMENT、実測結果はVERIFICATIONへ記載してください。
+
 ## 1. 機能と実行方式を決める
 
 Appletは1つの道具として有効化・停止・再起動できる単位です。時計、マウスジェスチャー、AutoLockなど、独立して切り替えたい機能は別Appletにします。次の機能のために、Applet内へ汎用的な拡張機構を先に作る必要はありません。
@@ -9,7 +11,7 @@ Appletは1つの道具として有効化・停止・再起動できる単位で�
 | runtime | 選ぶ場面 | 実装と参照例 |
 | --- | --- | --- |
 | `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#検証用拡張](../tests/fixtures/dotnet/AppDock.Extensions.Demo/DemoExtension.cs) |
-| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要 | 自身のランタイムを持つEXE。[時計Applet](../../Applet.Watch.at365/README.md) |
+| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要 | 自身のランタイムを持つEXE。[WebBrowserTools](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md)。現在のWatchはDLLウィジェット方式 |
 | `node` | TypeScriptで実装する処理。Electron同梱Nodeを利用 | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts) |
 
 独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。アカウント一覧等の専用画面が必要になった場合は、ホスト側の型とUIを追加します。
@@ -109,26 +111,28 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 
 ## 4. native / WPF Appletを作る場合
 
-時計の[プロジェクト](../../Applet.Watch.at365/Applet.Watch/Applet.Watch.csproj)、[起動処理](../../Applet.Watch.at365/Applet.Watch/Program.cs)、[SDK接続](../../Applet.Watch.at365/Applet.Watch/ClockApplet.cs)を参照してください。画面や時計ロジックを丸ごと複製する必要はありません。
+現在のnative実装例はWebBrowserToolsの[プロジェクト](../../Applet.WebBrowserTools.at365/Applet.WebBrowserTools/Applet.WebBrowserTools.csproj)、[起動処理](../../Applet.WebBrowserTools.at365/Applet.WebBrowserTools/Program.cs)、[SDK接続](../../Applet.WebBrowserTools.at365/Applet.WebBrowserTools/WebBrowserToolsApplet.cs)を参照してください。画面やブラウザー操作を丸ごと複製する必要はありません。Watch 0.2.0以降はDLLウィジェット方式のため、native EXEの雛形には使いません。
 
 1. `net10.0-windows` / `WinExe` / `UseWPF`で専用EXEを作り、`AppDock.Runtime`をProjectReferenceします。Runtime経由でSDKも参照されます。manifestは `runtime: native`、entryはEXE、typeは省略します。
 2. `[STAThread]`のMainでWPF Applicationを作り、`ShutdownMode.OnExplicitShutdown`でDispatcherを維持します。`AppletSession.RunAsync`はバックグラウンドで実行し、画面操作は `Dispatcher.InvokeAsync`へ渡します。接続処理をUIスレッドで待機しません。
 3. stdoutはUTF-8のJSON-RPC専用です。元の `Console.Out` を保存してセッションへ渡し、通常のConsole出力はstderrへ転送します。自作通信や生のstdout出力を追加すると接続が壊れます。
 4. セッション終了・stdinのEOF・異常時はApplicationを終了します。Deactivateでウィンドウ、タイマー、設定購読、SystemEvents、フックを解放します。非表示と終了を区別し、非表示の時計はタイマーも停止します。
-5. 時計と同様にself-containedの `win-x64` でpublishできます。単一EXEにするなら時計のpublish設定を参照し、nativeライブラリや必要なコンテンツも含めます。`extension.json`は別ファイルです。AppDockのDLL用ホストは環境の.NET 10 Runtimeを使用します。native / WPF Appletをframework-dependentで配布する場合は、別途.NET 10 Desktop Runtime（Windows x64）が必要です。
+5. WebBrowserToolsと同様にself-containedの `win-x64` でpublishできます。単一EXEにするなら同プロジェクトのpublish設定を参照し、nativeライブラリや必要なコンテンツも含めます。`extension.json`は別ファイルです。AppDockのDLL用ホストは環境の.NET 10 Runtimeを使用します。native / WPF Appletをframework-dependentで配布する場合は、別途.NET 10 Desktop Runtime（Windows x64）が必要です。
 6. AssemblyName、namespace、StartupObject、XAMLのx:Class、manifestのentry、リソースのpack URIを一緒に整合させます。時計の `Watch.ico` やフォントを別機能へ無条件に流用しません。
 
 AppDockはdeactivateを最大2秒待ってからプロセスを停止します。終了処理は短く、複数回呼ばれても安全にしてください。強制停止もあるため、大切な状態を終了時だけ保存する設計は避けます。子プロセスを独自に起動する場合、その終了管理もAppletの責任です。
 
-## 5. 時計Appletで得られた注意点
+## 5. 初期のnative時計Appletで得られた注意点
+
+以下は0.1.xのWPF時計で得た設計上の知見です。現在のWatch 0.2.0以降では描画・配置・フォントをホストのウィジェット機構へ移しています。現行の実装方法は[ウィジェット開発ガイド](widgets.md)と[Watchの開発ガイド](../../Applet.Watch.at365/DEVELOPMENT.md)を参照してください。
 
 | 項目 | 実装時の扱いと参照先 |
 | --- | --- |
-| 表示状態 | 設定UIと表示／非表示コマンドが同じ `visible` を保存する。再起動後も状態を維持する。[ClockApplet](../../Applet.Watch.at365/Applet.Watch/ClockApplet.cs) |
-| モニター | 配列番号ではなくDeviceNameを保存。切断時はメインへ退避し、元の保存値を保持する。[ClockLayout](../../Applet.Watch.at365/Applet.Watch/ClockLayout.cs) |
+| 表示状態 | 設定UIと表示／非表示コマンドが同じ `visible` を保存する。再起動後も状態を維持する |
+| モニター | 配列番号ではなくDeviceNameを保存。切断時はメインへ退避し、元の保存値を保持する |
 | 座標・DPI | 物理ピクセルとDIPを分け、負のモニター座標も扱う。対象モニターへ移動後にウィンドウのDPIを読み、幅と上下位置を決める |
 | Windowsイベント | DPI／表示構成変更で再配置し、SystemEventsの購読を解除する。Dispatcherへ送った遅延処理にもclosed確認と例外処理を置く |
-| オーバーレイ | 時計ではクリック透過・非アクティブ化・タスクバー非表示・topmostを設定。入力を必要とするAppletへそのまま適用しない。[NativeWindow](../../Applet.Watch.at365/Applet.Watch/NativeWindow.cs) |
+| オーバーレイ | 時計ではクリック透過・非アクティブ化・タスクバー非表示・topmostを設定。入力を必要とするAppletへそのまま適用しない |
 | フォント | WPF Resourceとして明示的に埋め込み、AssemblyNameを含むpack URIで参照。ビルド成功だけで判断せず、実際の描画も確認する |
 | 型と画面 | internalなWPFクラスにはXAMLの `x:ClassModifier="internal"` も揃える。WinForms Screenだけの利用で出るDPI警告は、WPFのmanifestによる設定を確認して理由付きで対象警告だけ扱う |
 | 同時処理 | .NETのコマンドと設定変更はRuntimeが直列化する。タイマー・OSイベントは別なので、画面はDispatcher、処理データは必要な排他で守る。Nodeのコマンド／通知は自動直列化されない |
@@ -141,7 +145,7 @@ AppDockはdeactivateを最大2秒待ってからプロセスを停止します�
 
 ソースは独立したAppletフォルダーで管理し、publish成果物だけをEXE隣の `extensions/<Appletフォルダー>`へ配置します。追加・削除・manifest変更後はAppDockを起動し直します。新しいAppletは既定で無効です。他のAppletと重複しないIDを使います。
 
-時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)と[ローカル配置スクリプト](../../Applet.Watch.at365/scripts/install-local.ps1)は、EXEとmanifestだけをコピーし、AppDockの設定を変更しない例です。EXEを置換する前にその配置先のAppDockを終了してください。既存Watch等の実行中出力やソースには上書きしません。
+時計の[発行スクリプト](../../Applet.Watch.at365/scripts/publish.ps1)と[ローカル配置スクリプト](../../Applet.Watch.at365/scripts/install-local.ps1)は、DLL・deps.json・manifest・フォントを配置し、AppDockの設定を変更しない例です。配置前に対象のAppDockを終了してください。native EXEの発行・配置は[WebBrowserToolsの開発ガイド](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md)を参照してください。既存Watch等の実行中出力やソースには上書きしません。
 
 最低限、次を確認して `VERIFICATION.md`へ実測と未検証事項を残します:
 
@@ -151,7 +155,7 @@ AppDockはdeactivateを最大2秒待ってからプロセスを停止します�
 - 他Appletやホストが動作を継続すること。OS全体に作用する機能は、隔離できる範囲と実機で必要な範囲を分ける。
 - publish成果物と完成AppDock EXEの組み合わせ。開発実行だけでは依存DLLやランタイムの欠落を検出できない。
 
-UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--test-profile=<絶対パス>` を渡します。実利用のsettings.jsonや認証データを変更しません。[時計のUIテスト](../../Applet.Watch.at365/scripts/test-ui.cjs)はPlaywrightでテスト対象AppDockを起動し、登録完了・2台のモニター・ショートカット・終了したPIDを確認する例です。[検証結果と限界](../../Applet.Watch.at365/VERIFICATION.md)も参照してください。
+UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--test-profile=<絶対パス>` を渡します。実利用のsettings.jsonや認証データを変更しません。[時計のUIテスト](../../Applet.Watch.at365/scripts/test-ui.cjs)は隔離profileにDLLを配置し、ホストのウィジェット検証を実行します。[検証結果と限界](../../Applet.Watch.at365/VERIFICATION.md)も参照してください。
 
 時計のテストはマウスジェスチャー・OSホットキー・AutoLock等を検証しません。モニターの抜き差し、異なるDPIの実機、RDP、スリープ復帰、長期常駐も、次の機能で必要なら別途確認します。
 
@@ -161,7 +165,7 @@ UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--t
 
 履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
 
-契約と範囲は[拡張API](extensions.md#v060-宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshow](../../Applet.WallpaperSlideshow.at365/README.md)を参照してください。必要ホストをv0.6.0へ上げ、SDK・Runtimeを含めて再publishします。
+契約と範囲は[拡張API](extensions.md#v060-宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshowの開発ガイド](../../Applet.WallpaperSlideshow.at365/DEVELOPMENT.md)を参照してください。必要ホストをv0.6.0へ上げ、SDK・Runtimeを含めて再publishします。
 
 ## v0.7.0のトレイ表示
 
