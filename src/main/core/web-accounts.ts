@@ -88,6 +88,8 @@ export function allowedWebNavigation(raw: string, origins: string[]): boolean {
 export class WebAccountController {
   private state: Saved;
   private window?: BrowserWindow;
+  private background?: BrowserWindow;
+  private backgroundSize = { width: 1044, height: 754 };
   private attached?: WebContentsView;
   private viewport: Viewport | null | undefined;
   private disposed = false;
@@ -174,6 +176,35 @@ export class WebAccountController {
   private accountSession(id: string) {
     return session.fromPath(path.join(this.root, 'sessions', id));
   }
+  private backgroundWindow() {
+    if (!this.background) {
+      // Detached/hidden native Views stop requestAnimationFrame even when
+      // backgroundThrottling is false. Keep them attached to a never-shown window.
+      this.background = new BrowserWindow({
+        ...this.backgroundSize,
+        useContentSize: true,
+        show: false,
+        skipTaskbar: true,
+        focusable: false,
+        webPreferences: {
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          spellcheck: false,
+          backgroundThrottling: false,
+          partition: 'web-account-background-' + this.id,
+        },
+      });
+    }
+    return this.background;
+  }
+  private park(view: WebContentsView) {
+    this.window?.contentView.removeChildView(view);
+    const background = this.backgroundWindow();
+    if (!background.contentView.children.includes(view)) background.contentView.addChildView(view);
+    view.setBounds({ x: 0, y: 0, ...this.backgroundSize });
+    view.setVisible(true);
+  }
   snapshot(includeData = true): WebAccountSnapshot {
     return {
       selected: this.state.selected,
@@ -246,7 +277,7 @@ export class WebAccountController {
         backgroundThrottling: false,
       },
     });
-    view.setVisible(false);
+    this.park(view);
     this.views.set(id, view);
     this.statuses.set(id, {
       error: '',
@@ -319,8 +350,21 @@ export class WebAccountController {
     const [w, h] = this.window.getContentSize();
     const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
     const visible = this.viewport !== null && area.x < w && area.y < h;
-    this.attached.setVisible(visible);
-    if (!visible) return;
+    if (!visible) {
+      this.park(this.attached);
+      return;
+    }
+    this.backgroundSize = {
+      width: Math.max(1, Math.min(area.width, w - area.x)),
+      height: Math.max(1, Math.min(area.height, h - area.y)),
+    };
+    this.backgroundWindow().setContentSize(this.backgroundSize.width, this.backgroundSize.height);
+    for (const child of this.backgroundWindow().contentView.children)
+      child.setBounds({ x: 0, y: 0, ...this.backgroundSize });
+    this.backgroundWindow().contentView.removeChildView(this.attached);
+    if (!this.window.contentView.children.includes(this.attached))
+      this.window.contentView.addChildView(this.attached);
+    this.attached.setVisible(true);
     this.attached.setBounds({
       x: area.x,
       y: area.y,
@@ -331,12 +375,9 @@ export class WebAccountController {
   private show(id: string) {
     if (!this.window) return;
     if (this.attached) {
-      this.window.contentView.removeChildView(this.attached);
-      this.attached.setVisible(false);
+      this.park(this.attached);
     }
     this.attached = this.view(id);
-    this.window.contentView.addChildView(this.attached);
-    this.attached.setVisible(true);
     this.layout();
     this.changed();
   }
@@ -370,6 +411,7 @@ export class WebAccountController {
         contextIsolation: true,
         nodeIntegration: false,
         spellcheck: false,
+        backgroundThrottling: false,
         partition: 'web-account-ui-' + this.id,
       },
     });
@@ -386,6 +428,8 @@ export class WebAccountController {
     });
     w.on('closed', () => {
       this.window = undefined;
+      if (!this.disposed && this.attached && !this.attached.webContents.isDestroyed())
+        this.park(this.attached);
       this.attached = undefined;
     });
     try {
@@ -484,6 +528,7 @@ export class WebAccountController {
             this.window!.contentView.removeChildView(view);
             this.attached = undefined;
           }
+          if (view) this.background?.contentView.removeChildView(view);
           if (view && !view.webContents.isDestroyed()) view.webContents.close();
           this.views.delete(a.id);
           this.statuses.delete(a.id);
@@ -600,6 +645,8 @@ export class WebAccountController {
     this.views.clear();
     this.attached = undefined;
     this.window?.destroy();
+    this.background?.destroy();
+    this.background = undefined;
     await Promise.allSettled(
       ids.map(async (id) => {
         const ses = this.accountSession(id);

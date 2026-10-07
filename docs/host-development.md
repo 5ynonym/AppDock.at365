@@ -14,6 +14,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 0.12.0の[WebアカウントAPI](web-accounts.md)では、ホストがWebContentsView・独立永続セッション・限定IPC・停止時の破棄を管理します。Gmailのセレクターと新着判定はApplet側です。Node APIは`webAccounts.start/open/read/report`で、.NET SDKのラッパーは提供していません。0.13.0では`report`の一時UIデータと、信頼済みローカルUIの`viewport`による表示領域変更・非表示を追加しています。
 
+0.13.1では、非選択Viewを可視・実寸のまま非表示専用Windowへ保持し、rAF/レイアウトが止まらないようにします。選択中だけ操作Windowへ移し、停止/異常終了で背景Windowも破棄します。`test-background.cjs`は外部状態のfetch結果をページ自身のrAFで反映するため、テストがDOMを直接更新する場合では見逃した停止を検証できます。実Googleサーバーとの同期は別確認です。
+
 | 追加したいもの | 主な変更先 |
 | --- | --- |
 | Applet向けHost API | `src/main/core/host-api.ts` → .NET SDK/Runtime・Node SDK |

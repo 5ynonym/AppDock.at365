@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-07: v0.13.1 非選択Webページの描画継続
+
+- ユーザーはGmail 0.2.1の未読集計を確認した一方、非アクティブなGmail側の更新が止まると報告。監視のタイマー停止とは区別して調査した。`backgroundThrottling:false`だけでは、nativeで非表示/取り外したWebContentsViewのrequestAnimationFrameが止まることをオフラインで再現。document.visibilityStateはvisibleのままでも停止する。記録: `../Applet.Gmail.at365/artifacts/visibility-1791372924502/result.json`。
+- Appletごとの非表示・非フォーカス・タスクバー非表示の背景BrowserWindowへ、非選択/ローカル一覧表示中のWebContentsViewを移す。View自体はvisibleと実サイズを保ち、初めて選択する前も描画を継続。UIへ戻す際は同じViewを移動する。削除/停止時にはViewと背景ウィンドウを破棄する。
+- main/renderer型検査・Vite build、ホスト回帰75/75、Gmail回帰14/14成功。発行版の2アカウントでサーバーfixtureの変更をfetchし、ページ自身のrequestAnimationFrameで行状態へ適用する検証に成功。未選択アカウント・新着一覧・トレイ非表示・最小化で未読/既読が同期し、選択アカウントは変わらず、停止で背景ウィンドウも破棄。記録: `../Applet.Gmail.at365/artifacts/background-1791373818907/result.json`。以前のDOMを直接変更する検証だけでは、ページ自身の描画停止を確認できなかった。
+- 発行版の既存GUI検証: `../Applet.Gmail.at365/artifacts/gui-1791373823236/result.json`。未読集計/履歴・初回未読・セッション保持/分離/削除・remote権限制限・停止/再開を確認。実portableと未改変Gmail 0.2.2: `../Applet.Gmail.at365/artifacts/portable-1791373893030/result.json`（version 0.13.1、exitCode 0）。
+- 保存済み実Gmailの認証保持・GPUオフ・受信トレイ7行（既読7/未読0）と、新着一覧の裏側でrequestAnimationFrameが実行されることを読み取りだけで確認。実メールの状態は変更していない。別ブラウザーからの実既読/未読変更・実受信による背景同期はユーザー確認待ち。実複数アカウント・スリープ・長期常駐は未確認。
+- `dev.bat run dist`成功。.NETはframework-dependentクリーン発行でRuntime混入なし。最終EXE: 100,440,091 bytes、SHA256 `32D58EF733AA4F91F2C53BB2FA85D09B7F26B3E1162F08DBE900D3C75F2B33D7`。Gmail 0.2.2を開発用publish/extensionsへ配置し全ファイルSHA256を照合。実利用先への配置・外部pushは行っていない。
+
 ## 2026-10-07: v0.13.0 Web表示領域と一時UIデータ
 
 - Node `webAccounts.report(id,status,attention,data?)`に50KB以下のJSON化可能な一時データを追加。アカウントsnapshotへ渡し、ファイル/ログへ保存しない。ローカルUIの限定IPCに`viewport`を追加し、整数/DIPの矩形をclient領域へ切り詰める。nullはView非表示でページ・背景監視を継続。旧UIの未指定時は236/146の既定レイアウトを維持する。
