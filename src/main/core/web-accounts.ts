@@ -1,12 +1,36 @@
-import { BrowserWindow, WebContentsView, session, ipcMain, dialog, shell } from 'electron';
+import {
+  BrowserWindow,
+  WebContentsView,
+  session,
+  ipcMain,
+  dialog,
+  shell,
+  screen,
+  type Input,
+} from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { atomicWrite } from './settings';
-import type { WebAccountDefinition, WebAccountSnapshot } from '../../shared/web-accounts';
+import type {
+  WebAccountDefinition,
+  WebAccountSnapshot,
+  WebAccountSound,
+} from '../../shared/web-accounts';
+import { WindowStateStore, restoreWindowBounds } from './window-state';
+import { queueSound } from './sounds';
 
-type Saved = { version: 1; selected: string; accounts: { id: string; name: string }[] };
+type Saved = {
+  version: 1;
+  selected: string;
+  accounts: { id: string; name: string; sound?: WebAccountSound }[];
+};
+interface WebAccountServices {
+  capabilities: string[];
+  shortcut(input: Input): boolean;
+  failed(message: string): void;
+}
 const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id);
 const controllers = new Map<string, WebAccountController>();
 type Viewport = { x: number; y: number; width: number; height: number };
@@ -27,6 +51,25 @@ export function serializeWebReport(raw: unknown): string {
   const json = JSON.stringify(raw ?? null);
   if (!json || Buffer.byteLength(json) > 50000) throw Error('Web account report data is too large');
   return json;
+}
+export function serializeWebItemKey(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw || raw.length > 200 || /[\u0000-\u001f\u007f]/.test(raw))
+    throw Error('Invalid Web account item key');
+  return JSON.stringify(raw);
+}
+export function parseWebAccountSound(raw: unknown): WebAccountSound {
+  const sound = raw as WebAccountSound;
+  if (
+    !sound ||
+    typeof sound.enabled !== 'boolean' ||
+    typeof sound.file !== 'string' ||
+    sound.file.length > 4096 ||
+    /[\u0000-\u001f\u007f]/.test(sound.file) ||
+    (sound.file &&
+      (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
+  )
+    throw Error('通知音にはWAVの絶対パスを指定してください。');
+  return { enabled: sound.enabled, file: sound.file };
 }
 let ipcInstalled = false;
 function asset(folder: string, relative: string): string {
@@ -69,6 +112,8 @@ export function validateWebAccounts(
   asset(folder, value.ui);
   const observer = asset(folder, value.observer);
   if (fs.statSync(observer).size > 100000) throw Error('Web observer is too large');
+  if (value.itemOpener !== undefined && fs.statSync(asset(folder, value.itemOpener)).size > 100000)
+    throw Error('Web item opener is too large');
   return value;
 }
 export function allowedWebNavigation(raw: string, origins: string[]): boolean {
@@ -106,18 +151,33 @@ export class WebAccountController {
   private definition: WebAccountDefinition;
   private uiURL: string;
   private source: string;
+  private itemOpener?: string;
   private file: string;
+  private windowState: WindowStateStore;
   constructor(
     readonly id: string,
     readonly name: string,
     folder: string,
     readonly root: string,
     definition: WebAccountDefinition,
+    private services: WebAccountServices = {
+      capabilities: [],
+      shortcut: () => false,
+      failed: () => {},
+    },
   ) {
     this.definition = validateWebAccounts(folder, definition);
     this.uiURL = pathToFileURL(asset(folder, definition.ui)).href;
     this.source = fs.readFileSync(asset(folder, definition.observer), 'utf8');
+    if (definition.itemOpener !== undefined)
+      this.itemOpener = fs
+        .readFileSync(asset(folder, definition.itemOpener), 'utf8')
+        .trim()
+        .replace(/;$/, '');
     this.file = path.join(root, 'accounts.json');
+    this.windowState = new WindowStateStore(path.join(root, 'window-state.json'), () =>
+      this.services.failed('Webウィンドウの位置・サイズを読み込み/保存できませんでした。'),
+    );
     fs.mkdirSync(root, { recursive: true });
     if (fs.existsSync(this.file)) {
       this.state = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -139,6 +199,7 @@ export class WebAccountController {
         !s.accounts.some((a) => a.id === s.selected)
       )
         throw Error('アカウント設定を読み込めません。元のファイルを保持しています。');
+      for (const a of s.accounts) if (a.sound !== undefined) parseWebAccountSound(a.sound);
     } else {
       const id = randomUUID();
       this.state = { version: 1, accounts: [{ id, name: 'アカウント 1' }], selected: id };
@@ -175,6 +236,44 @@ export class WebAccountController {
   }
   private accountSession(id: string) {
     return session.fromPath(path.join(this.root, 'sessions', id));
+  }
+  private bindShortcuts(wc: Electron.WebContents) {
+    wc.on('before-input-event', (event, input) => {
+      if (
+        !this.disposed &&
+        this.window?.isVisible() &&
+        !this.window.isMinimized() &&
+        this.services.shortcut(input)
+      )
+        event.preventDefault();
+    });
+  }
+  private requireCapability(capability: string) {
+    if (!this.services.capabilities.includes(capability))
+      throw Error(`manifest の capabilities に ${capability} が必要です。`);
+  }
+  private sound(id: unknown, sound: unknown) {
+    this.requireCapability('audio');
+    const a = this.account(id);
+    const parsed = parseWebAccountSound(sound);
+    this.save({
+      ...this.state,
+      accounts: this.state.accounts.map((item) =>
+        item.id === a.id ? { ...item, sound: parsed } : item,
+      ),
+    });
+  }
+  async cycle(direction: unknown) {
+    if (this.disposed) throw Error('Web accounts are closed');
+    if (direction !== 1 && direction !== -1) throw Error('Invalid account direction');
+    const accounts = this.state.accounts.filter((a) => !this.deleting.has(a.id));
+    if (!accounts.length) return;
+    const index = accounts.findIndex((a) => a.id === this.state.selected);
+    const next = accounts[(Math.max(0, index) + direction + accounts.length) % accounts.length];
+    this.save({ ...this.state, selected: next.id });
+    this.show(next.id);
+    await this.open();
+    if (this.viewport !== null) this.attached?.webContents.focus();
   }
   private backgroundWindow() {
     if (!this.background) {
@@ -233,6 +332,7 @@ export class WebAccountController {
           status: status?.status ?? '受信トレイの表示を待っています',
           attention: status?.attention ?? false,
           data: includeData ? JSON.parse(status?.data ?? 'null') : null,
+          sound: a.sound ?? { enabled: false, file: '' },
         };
       }),
     };
@@ -287,6 +387,7 @@ export class WebAccountController {
       data: 'null',
     });
     const wc = view.webContents;
+    this.bindShortcuts(wc);
     const allowed = (url: string) => allowedWebNavigation(url, this.definition.origins);
     wc.setWindowOpenHandler(({ url }) => {
       if (allowed(url)) void wc.loadURL(url).catch(() => {});
@@ -396,9 +497,17 @@ export class WebAccountController {
   }
   private async openWindow() {
     this.start();
+    const primary = screen.getPrimaryDisplay();
+    const saved = this.windowState.load(
+      [primary, ...screen.getAllDisplays().filter((d) => d.id !== primary.id)].map(
+        (d) => d.workArea,
+      ),
+      { width: 900, height: 640 },
+    );
     const w = new BrowserWindow({
       width: 1280,
       height: 900,
+      ...saved?.bounds,
       minWidth: 900,
       minHeight: 640,
       title: this.name,
@@ -416,6 +525,8 @@ export class WebAccountController {
       },
     });
     this.window = w;
+    this.windowState.track(w);
+    this.bindShortcuts(w.webContents);
     w.webContents.on('will-navigate', (event) => event.preventDefault());
     w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     w.on('resize', () => this.layout());
@@ -435,7 +546,9 @@ export class WebAccountController {
     try {
       await w.loadURL(this.uiURL);
       if (this.disposed || w.isDestroyed()) return;
+      if (saved) restoreWindowBounds(w, saved.bounds);
       this.show(this.state.selected);
+      if (saved?.maximized) w.maximize();
       w.show();
     } catch {
       if (!w.isDestroyed()) w.destroy();
@@ -486,6 +599,58 @@ export class WebAccountController {
       case 'acknowledge':
         this.acknowledgements.add(this.account(args[0]).id);
         return;
+      case 'cycle':
+        return this.cycle(args[0]);
+      case 'setSound':
+        this.sound(args[0], args[1]);
+        return;
+      case 'pickSound': {
+        this.requireCapability('file-dialog');
+        this.requireCapability('audio');
+        const a = this.account(args[0]);
+        const result = await dialog.showOpenDialog(this.window!, {
+          title: '通知音を選択',
+          properties: ['openFile'],
+          filters: [{ name: 'WAV', extensions: ['wav'] }],
+        });
+        if (!this.disposed && !this.deleting.has(a.id) && !result.canceled && result.filePaths[0])
+          this.sound(a.id, {
+            ...(this.account(a.id).sound ?? { enabled: false }),
+            file: result.filePaths[0],
+          });
+        return;
+      }
+      case 'testSound': {
+        this.requireCapability('audio');
+        const a = this.account(args[0]);
+        queueSound(
+          a.sound?.file ?? '',
+          () =>
+            !this.disposed &&
+            this.state.accounts.some((item) => item.id === a.id) &&
+            !this.deleting.has(a.id),
+          () => this.services.failed('通知音を再生できません。WAVファイルを確認してください。'),
+        );
+        return;
+      }
+      case 'openItem': {
+        const a = this.account(args[0]);
+        const key = serializeWebItemKey(args[1]);
+        if (!this.itemOpener) return false;
+        this.save({ ...this.state, selected: a.id });
+        this.show(a.id);
+        const wc = this.view(a.id).webContents;
+        if (wc.isLoading() || new URL(wc.getURL()).origin !== this.definition.observeOrigin)
+          return false;
+        // Only the bundled function runs, with a JSON string argument, in the
+        // same bridge-free isolated world as observation. Never accept UI code.
+        const opened = await wc.executeJavaScriptInIsolatedWorld(
+          1001,
+          [{ code: `(${this.itemOpener})(${key})` }],
+          true,
+        );
+        return !this.disposed && !this.deleting.has(a.id) && opened === true;
+      }
       case 'navigate': {
         const wc = this.view(this.state.selected).webContents;
         switch (args[0]) {
@@ -639,6 +804,7 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
+    this.windowState.flush();
     const ids = [...this.views.keys()];
     for (const view of this.views.values())
       if (!view.webContents.isDestroyed()) view.webContents.close();
@@ -662,6 +828,7 @@ export function getWebAccounts(
   folder: string,
   dataRoot: string,
   definition?: WebAccountDefinition,
+  services?: WebAccountServices,
 ) {
   const existing = controllers.get(id);
   if (existing) return existing;
@@ -672,6 +839,7 @@ export function getWebAccounts(
     folder,
     path.join(dataRoot, 'web-accounts', id),
     definition,
+    services,
   );
   controllers.set(id, controller);
   return controller;

@@ -47,15 +47,19 @@ export function parseWindowState(value: unknown): WindowState {
 }
 
 // Electron bounds and display work areas both use device-independent pixels.
-export function fitWindowState(state: WindowState, workAreas: Rectangle[]): WindowState {
+export function fitWindowState(
+  state: WindowState,
+  workAreas: Rectangle[],
+  minimum = windowMinimum,
+): WindowState {
   if (!workAreas.length) return state;
   const b = state.bounds;
   const overlap = (area: Rectangle) =>
     Math.max(0, Math.min(b.x + b.width, area.x + area.width) - Math.max(b.x, area.x)) *
     Math.max(0, Math.min(b.y + b.height, area.y + area.height) - Math.max(b.y, area.y));
   const area = workAreas.reduce((best, next) => (overlap(next) > overlap(best) ? next : best));
-  const width = Math.min(area.width, Math.max(windowMinimum.width, b.width));
-  const height = Math.min(area.height, Math.max(windowMinimum.height, b.height));
+  const width = Math.min(area.width, Math.max(minimum.width, b.width));
+  const height = Math.min(area.height, Math.max(minimum.height, b.height));
   return {
     bounds: {
       x: Math.max(area.x, Math.min(b.x, area.x + area.width - width)),
@@ -77,12 +81,13 @@ export class WindowStateStore {
     private onError: (error: unknown) => void,
   ) {}
 
-  load(workAreas: Rectangle[]) {
+  load(workAreas: Rectangle[], minimum = windowMinimum) {
     try {
       if (fs.existsSync(this.file)) {
         this.state = fitWindowState(
           parseWindowState(JSON.parse(fs.readFileSync(this.file, 'utf8').replace(/^\uFEFF/, ''))),
           workAreas,
+          minimum,
         );
       }
     } catch (error) {

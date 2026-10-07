@@ -4,6 +4,7 @@ export interface WebAccountDefinition {
   observeOrigin: string;
   ui: string;
   observer: string;
+  itemOpener?: string;
 }
 export interface WebAccount {
   id: string;
@@ -17,6 +18,11 @@ export interface WebAccount {
   status: string;
   attention: boolean;
   data: unknown;
+  sound: WebAccountSound;
+}
+export interface WebAccountSound {
+  enabled: boolean;
+  file: string;
 }
 export interface WebAccountSnapshot {
   selected: string;
@@ -29,6 +35,11 @@ export interface WebAccountUi {
   rename(id: string, name: string): Promise<void>;
   remove(id: string): Promise<void>;
   navigate(action: 'back' | 'forward' | 'reload' | 'inbox'): Promise<void>;
+  openItem(id: string, key: string): Promise<boolean>;
+  cycle(direction: 1 | -1): Promise<void>;
+  setSound(id: string, sound: WebAccountSound): Promise<void>;
+  pickSound(id: string): Promise<void>;
+  testSound(id: string): Promise<void>;
   acknowledge(id: string): Promise<void>;
   viewport(bounds: { x: number; y: number; width: number; height: number } | null): Promise<void>;
   onChanged(callback: () => void): () => void;

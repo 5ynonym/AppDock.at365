@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld('webAccounts', {
     ipcRenderer.invoke('web-account:invoke', 'rename', id, name),
   remove: (id: string) => ipcRenderer.invoke('web-account:invoke', 'remove', id),
   navigate: (action: string) => ipcRenderer.invoke('web-account:invoke', 'navigate', action),
+  openItem: (id: string, key: string) =>
+    ipcRenderer.invoke('web-account:invoke', 'openItem', id, key),
+  cycle: (direction: number) => ipcRenderer.invoke('web-account:invoke', 'cycle', direction),
+  setSound: (id: string, sound: unknown) =>
+    ipcRenderer.invoke('web-account:invoke', 'setSound', id, sound),
+  pickSound: (id: string) => ipcRenderer.invoke('web-account:invoke', 'pickSound', id),
+  testSound: (id: string) => ipcRenderer.invoke('web-account:invoke', 'testSound', id),
   acknowledge: (id: string) => ipcRenderer.invoke('web-account:invoke', 'acknowledge', id),
   viewport: (bounds: unknown) => ipcRenderer.invoke('web-account:invoke', 'viewport', bounds),
   onChanged: (callback: () => void) => {

@@ -1,4 +1,4 @@
-# WebアカウントAPI（v0.13.1）
+# WebアカウントAPI（v0.14.0）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
@@ -20,7 +20,7 @@ Node Appletへ、Webサービスのアカウント別画面と永続セッショ
 }
 ```
 
-URLは宣言したHTTPS origin内、観測先もその1つに限定します。ui/observerは実パスでもApplet内のファイルだけを許可し、observerは100KB以内。既定の画面枠は左236px・上146pxを予約します。0.13.0ではUIが`viewport`で変更できます。最小ウィンドウ900×640、既定1280×900です。
+URLは宣言したHTTPS origin内、観測先もその1つに限定します。ui/observerは実パスでもApplet内のファイルだけを許可し、observerは100KB以内。任意の`itemOpener`も同じ資産境界・100KB上限の関数式ファイルです。既定の画面枠は左236px・上146pxを予約します。0.13.0ではUIが`viewport`で変更できます。最小ウィンドウ900×640、既定1280×900です。
 
 ## Node/RPC
 
@@ -28,6 +28,7 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 | --- | --- | --- |
 | `context.webAccounts.start()` | `host.webAccounts.start` | 全枠を非表示で読込開始、UIを開かない |
 | `context.webAccounts.open()` | `host.webAccounts.open` | 操作用ウィンドウを表示・復帰 |
+| `context.webAccounts.cycle(1|-1)` | `host.webAccounts.cycle` | 次/前の枠へ循環して選択・画面表示（0.14.0） |
 | `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
 
@@ -35,7 +36,13 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
 
-ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`だけを公開します。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
+ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`を公開します。0.14.0は`cycle/openItem/setSound/pickSound/testSound`を追加します。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
+
+`openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
+
+0.14.0のアカウントsnapshotは`sound:{enabled:boolean,file:string}`も返します。初期値はfalse/空文字（標準ビープ）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileだけ変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず既存queueSoundで試聴します。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。ファイルは絶対パスのWAVのみで、元ファイルをコピーしません。
+
+操作UIと各WebContentsのbefore-input-eventで、自分のAppletの登録済みコマンドに一致するローカルshortcutだけを実行します。利用者設定を毎回参照し、global指定済みのコマンドはここから実行しません。キー長押し・IME入力中は実行せず、同じキーに複数の自身のコマンドが一致した場合も実行しません。Gmailの初期Ctrl+Tab/Ctrl+Shift+Tabはホストの既定shortcutsで、明示の空配列/変更を保持します。
 
 `viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は操作WindowからViewを外して背景Windowへ戻し、アカウント切替後も操作画面へ表示せず、ページと監視を続けます。UIではResizeObserver等で実領域を再送してください。未呼出しの旧UIは既定レイアウトを維持します。
 
@@ -45,11 +52,13 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 `.appdock/web-accounts/<extension-id>/accounts.json`に安定したUUIDと表示名、`sessions/<account-id>/`にChromiumの永続セッションを保存します。`session.fromPath`を使うので複数のApplet・アカウント間でCookieを共有しません。アカウント保存はatomicWrite、不正な既存JSONは上書きせず起動エラーとして報告します。停止・異常終了でWebContents/UIを明示破棄し、Cookieをflushします。ウィンドウの×は非表示にし、Appletを止めるまで背景のページ更新を維持します。
 
+soundはaccounts.jsonの各枠へ追加し、旧データは未指定ならOFFで扱います。0.14.0は同じ保存先のwindow-state.jsonへ通常の位置・サイズ/最大化を記録します。共通WindowStateStoreで300ms遅延保存、終了時flush、DIP丸め補正とモニター作業領域への復帰を再利用します。最小化/非表示では通常枠を上書きしません。保存失敗はホストログへ内容を含まない診断を残し、ページを閉じません。
+
 削除は利用者確認後、対象枠のWebContentsを閉じ、storage/cache/Cookieを消去して一覧から外します。最後の枠は残します。削除処理中の枠は観測から除外します。Webページ内のアカウント切替はGoogle自身の操作で、追加枠とは異なります。
 
 リモートページはpreloadなし、Nodeなし、contextIsolation/sandbox/webSecurityを有効にします。権限要求は拒否し、トップレベル移動先を宣言originへ制限します。子フレームのリダイレクトにトップレベル制限を適用しません。認証URLのquery/fragmentは診断へ記録せず、ローカルUIでは認証originだけ表示します。外部リンクは利用者確認後に開きます。認証偽装・User-Agent変更はしません。
 
-Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコードであり、capabilitiesはOSのサンドボックスではありません。observer.jsにもその信頼境界が適用されます。ページ上で動かすコードはサービスの読取目的に限定してください。
+Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコードであり、capabilitiesはOSのサンドボックスではありません。observer/itemOpenerにもその信頼境界が適用されます。observerは読取に限定し、項目を開く操作はitemOpenerへ分離して明示的なUI操作でだけ実行してください。
 
 ## 検証
 
