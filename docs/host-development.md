@@ -42,7 +42,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## React UIとIPCを追加する手順
 
-0.15.1のwindow-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。web-page-activity.tsは宣言されたkeepActiveだけをobserveOriginへ適用し、ページのアクティブ状態をChromiumへ設定します。メインフレーム遷移/破棄・認証origin・別Debugger/DevToolsを扱い、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使います。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
+window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。0.15.2のweb-page-activity.tsはkeepActiveのobserveOriginでobserver.readyを待ち、背景のアクティブ状態を30秒ごとに更新します。native focus中はエミュレーションを解除します。同一文書の移動では状態を保ち、別文書のメインフレーム遷移/破棄・認証originで周期/250ms待機/接続を解除します。別Debugger/DevToolsへ干渉せず、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使い、DOM準備後に受信処理が遅れて始まる条件も検証します。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
 
 0.15.0の設定「バージョン情報・更新」はSettingsPageのaboutカテゴリです。保存フォームを持たず、既存draftは保持します。HostSnapshot.runtimeでElectron/Chromium/Node/OS・アーキテクチャを受け、既存VersionCheckとcheckUpdates/openReleasesを再利用します。表示しただけでは問い合わせず、手動操作時だけ通信します。最終確認時刻はページ内の結果で、永続設定ではありません。Gmailのtest-ui-featuresでライト/ダーク/システムの連動、更新あり/最新版/未公開/未設定/HTTPエラーをオフライン検証します。
 
