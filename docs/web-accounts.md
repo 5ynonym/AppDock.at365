@@ -1,12 +1,18 @@
-# WebアカウントAPI（v0.15.0）
+# WebアカウントAPI（v0.15.1）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
 ## manifest
 
+0.15.1の任意の`keepActive:boolean`は既定falseです。trueの場合は、observeOriginの読み込み完了後にChromiumの`Emulation.setFocusEmulationEnabled`でページをアクティブに保ちます。Windowsのフォーカス・選択枠・入力を動かさず、サイトのJSや認証を改変しません。メインフレーム遷移開始時に自身のDebugger接続を解除し、認証等の他originには適用しません。利用者がDevToolsを開いている間は干渉せず、閉じたときに再適用します。他のDebugger接続を切断しません。この機能を使うAppletの最低ホスト版は0.15.1です。
+
+Windowsでは起動前に`CalculateNativeWinOcclusion`をdisable-featuresへ追加します。既存のfeature指定を保ち、画面外/透明Windowに対する描画停止を防ぎます。0.15.0の透明Windowだけでは、通常起動の初回描画/アクティブ状態が不足する場合がありました。GmailはkeepActiveを明示的に有効にしています。
+
+参照: [Chromiumのページアクティブ設定](https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setFocusEmulationEnabled)、[Electron Debugger](https://www.electronjs.org/docs/latest/api/debugger)。アクティブ維持の接続はWebContentsの破棄より前に解放し、破棄後にWebContents.debuggerを再取得しません。
+
 基本APIは`minimumHostVersion: "0.12.0"`と`capabilities: ["web-accounts"]`が必要です。`report`のdataやUIの`viewport`を使用するAppletは`minimumHostVersion: "0.13.0"`を指定してください。
 
-初回未表示からWebページの描画を継続するAppletは、0.15.0以降を指定してください。非選択Viewは専用Windowへ可視・実寸で接続したまま保持します。この親Windowはopacity:0・全ディスプレイ外・frameなし・taskbar/フォーカス対象外でshowInactiveし、初回ネイティブ描画を開始します。ディスプレイ構成変更でも画面外へ配置し直します。0.13.1の一度も表示しない親WindowはrAFを維持してもfirst-contentful-paintを抑制することが追加実測で分かりました。操作Windowと背景WindowはbackgroundThrottling=false。選択中Viewのみ可視の操作Windowへ移し、非選択・viewport(null)・非表示・最小化では背景Windowへ戻します。全Viewと背景Windowを停止時に破棄します。
+初回未表示からWebページの描画を継続するAppletは、0.15.1以降を指定してください。非選択Viewは専用Windowへ可視・実寸で接続したまま保持します。この親Windowはopacity:0・全ディスプレイ外・frameなし・taskbar/フォーカス対象外でshowInactiveし、初回ネイティブ描画を開始します。ディスプレイ構成変更でも画面外へ配置し直します。0.13.1の一度も表示しない親WindowはrAFを維持してもfirst-contentful-paintを抑制することが追加実測で分かりました。操作Windowと背景WindowはbackgroundThrottling=false。選択中Viewのみ可視の操作Windowへ移し、非選択・viewport(null)・非表示・最小化では背景Windowへ戻します。全Viewと背景Windowを停止時に破棄します。
 
 ```json
 {

@@ -5,6 +5,7 @@ export interface WebAccountDefinition {
   ui: string;
   observer: string;
   itemOpener?: string;
+  keepActive?: boolean;
 }
 export interface WebAccount {
   id: string;
