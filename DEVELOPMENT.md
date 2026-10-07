@@ -7,6 +7,7 @@
 - [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。
 - [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
 - [Applet API](docs/extensions.md): APIと通信の契約。
+- [WebアカウントAPI](docs/web-accounts.md): WebContentsView・アカウント別永続セッション・DOM観測と終了処理（0.12.0、Node）。
 - [ウィジェット開発ガイド](docs/widgets.md): ウィジェットSDK、描画方式、Watch DLLへの移行。
 - [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
@@ -87,7 +88,7 @@ scripts/                   ビルドと実機UI/portable検証
 
 electron-builderのportable形式を使用します。起動時にElectronと.NETホストを一時フォルダーへ展開し、`PORTABLE_EXECUTABLE_DIR`で元のEXEの隣に設定を保存します。.NETの単一ファイルと同じ方式ではありません。
 
-Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します。React画面にはNodeを公開せず、AppletのUIはホストの宣言的な契約で描画します。manifestのcapabilitiesはHost APIの使用宣言・検査であり、直接のファイル操作やネットワーク通信の権限制限ではありません。
+Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します。React画面にはNodeを公開せず、Appletのパネルはホストの宣言的な契約で描画します。Webアカウント対応Appletの操作画面は、限定preloadを持つ別BrowserWindowとリモートのWebContentsViewを組み合わせます。manifestのcapabilitiesはHost APIの使用宣言・検査であり、直接のファイル操作やネットワーク通信の権限制限ではありません。
 
 `minimumHostVersion`を宣言したAppletは起動前にホストバージョンを検査します。既存のAPI v1、設定・コマンドIDは維持します。manifestで宣言したコマンドはロード前から公開し、旧IDは別名として維持できます。履歴画像のボタンやモニター切替は一般コマンドではなく専用のパネル操作です。
 

@@ -3,6 +3,14 @@ import type { Command, TrayItem, Panel, SettingOption } from '../shared/contract
 import type { WidgetDefinition, WidgetPlacement } from '../shared/widgets';
 type Handler = () => unknown | Promise<unknown>;
 export interface NodeExtensionContext {
+  webAccounts: {
+    start(): Promise<unknown>;
+    open(): Promise<unknown>;
+    read(): Promise<
+      import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
+    >;
+    report(id: string, status: string, attention: boolean): Promise<unknown>;
+  };
   widgets: {
     replace(widgets: WidgetDefinition[]): Promise<unknown>;
     placements(): Promise<Record<string, WidgetPlacement>>;
@@ -59,6 +67,16 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
+        webAccounts: {
+          start: () => peer.request('host.webAccounts.start', {}),
+          open: () => peer.request('host.webAccounts.open', {}),
+          read: () =>
+            peer.request('host.webAccounts.read', {}) as Promise<
+              import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
+            >,
+          report: (id, status, attention) =>
+            peer.request('host.webAccounts.report', { id, status, attention }),
+        },
         widgets: {
           replace: (widgets) => peer.request('host.widgets.replace', { widgets }),
           placements: () => peer.request('host.widgets.placements', {}),

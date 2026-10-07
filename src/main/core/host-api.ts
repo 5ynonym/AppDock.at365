@@ -11,6 +11,7 @@ import { parseSettingOptions, validateSettingValue } from '../../shared/setting-
 import { parseExtensionCommands } from '../../shared/extension-commands';
 import { parseWidgetDefinitions, defaultWidgetPlacement } from '../../shared/widgets';
 import { registerWidgetFonts } from './widget-fonts';
+import { getWebAccounts } from './web-accounts';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -51,6 +52,32 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.webAccounts.start':
+      case 'host.webAccounts.open':
+      case 'host.webAccounts.read':
+      case 'host.webAccounts.report': {
+        requireCapability('web-accounts');
+        const web = getWebAccounts(
+          id,
+          e.manifest.displayName ?? e.manifest.name,
+          e.manifest.folder,
+          dataRoot,
+          e.manifest.webAccounts,
+        );
+        if (method.endsWith('.start')) {
+          web.start();
+          return null;
+        }
+        if (method.endsWith('.open')) {
+          await web.open();
+          return null;
+        }
+        if (method.endsWith('.report')) {
+          web.report(p.id as string, p.status as string, p.attention as boolean);
+          return null;
+        }
+        return web.read();
+      }
       case 'host.ui.pickFile': {
         requireCapability('file-dialog');
         if (p.kind !== 'json' && p.kind !== 'wav')

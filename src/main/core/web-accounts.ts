@@ -1,0 +1,602 @@
+import { BrowserWindow, WebContentsView, session, ipcMain, dialog, shell } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { atomicWrite } from './settings';
+import type { WebAccountDefinition, WebAccountSnapshot } from '../../shared/web-accounts';
+
+type Saved = { version: 1; selected: string; accounts: { id: string; name: string }[] };
+const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id);
+const controllers = new Map<string, WebAccountController>();
+let ipcInstalled = false;
+function asset(folder: string, relative: string): string {
+  if (typeof relative !== 'string' || path.isAbsolute(relative))
+    throw Error('Web asset must be relative');
+  const file = fs.realpathSync(path.resolve(folder, relative));
+  const rel = path.relative(fs.realpathSync(folder), file);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !fs.statSync(file).isFile())
+    throw Error('Web asset must be inside the Applet');
+  return file;
+}
+export function validateWebAccounts(
+  folder: string,
+  value: WebAccountDefinition,
+): WebAccountDefinition {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !Array.isArray(value.origins) ||
+    !value.origins.length ||
+    value.origins.length > 20
+  )
+    throw Error('webAccounts definition is invalid');
+  for (const origin of value.origins) {
+    const url = new URL(origin);
+    if (
+      url.protocol !== 'https:' ||
+      url.origin !== origin ||
+      url.username ||
+      url.password ||
+      url.port
+    )
+      throw Error('webAccounts origins must be HTTPS origins');
+  }
+  if (
+    !value.origins.includes(value.observeOrigin) ||
+    !allowedWebNavigation(value.url, value.origins)
+  )
+    throw Error('webAccounts URL and observeOrigin must match declared origins');
+  asset(folder, value.ui);
+  const observer = asset(folder, value.observer);
+  if (fs.statSync(observer).size > 100000) throw Error('Web observer is too large');
+  return value;
+}
+export function allowedWebNavigation(raw: string, origins: string[]): boolean {
+  try {
+    const url = new URL(raw);
+    return (
+      url.protocol === 'https:' &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      origins.includes(url.origin)
+    );
+  } catch {
+    return false;
+  }
+}
+export class WebAccountController {
+  private state: Saved;
+  private window?: BrowserWindow;
+  private attached?: WebContentsView;
+  private disposed = false;
+  private opening?: Promise<void>;
+  private reads = new Map<string, Promise<unknown>>();
+  private generation = new Map<string, number>();
+  private views = new Map<string, WebContentsView>();
+  private statuses = new Map<
+    string,
+    { error: string; status: string; attention: boolean; observation: unknown }
+  >();
+  private acknowledgements = new Set<string>();
+  private deleting = new Set<string>();
+  private definition: WebAccountDefinition;
+  private uiURL: string;
+  private source: string;
+  private file: string;
+  constructor(
+    readonly id: string,
+    readonly name: string,
+    folder: string,
+    readonly root: string,
+    definition: WebAccountDefinition,
+  ) {
+    this.definition = validateWebAccounts(folder, definition);
+    this.uiURL = pathToFileURL(asset(folder, definition.ui)).href;
+    this.source = fs.readFileSync(asset(folder, definition.observer), 'utf8');
+    this.file = path.join(root, 'accounts.json');
+    fs.mkdirSync(root, { recursive: true });
+    if (fs.existsSync(this.file)) {
+      this.state = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      const s = this.state;
+      if (
+        s.version !== 1 ||
+        !Array.isArray(s.accounts) ||
+        !s.accounts.length ||
+        s.accounts.length > 10 ||
+        s.accounts.some(
+          (a) =>
+            !a ||
+            !validId(a.id) ||
+            typeof a.name !== 'string' ||
+            !a.name.trim() ||
+            a.name.length > 60,
+        ) ||
+        new Set(s.accounts.map((a) => a.id)).size !== s.accounts.length ||
+        !s.accounts.some((a) => a.id === s.selected)
+      )
+        throw Error('アカウント設定を読み込めません。元のファイルを保持しています。');
+    } else {
+      const id = randomUUID();
+      this.state = { version: 1, accounts: [{ id, name: 'アカウント 1' }], selected: id };
+      this.save(this.state);
+    }
+    if (!ipcInstalled) {
+      ipcInstalled = true;
+      ipcMain.handle('web-account:invoke', async (event, method: string, ...args: unknown[]) => {
+        const c = [...controllers.values()].find((c) => c.window?.webContents === event.sender);
+        if (
+          !c ||
+          c.disposed ||
+          event.senderFrame !== event.sender.mainFrame ||
+          event.senderFrame.url !== c.uiURL
+        )
+          throw Error('Untrusted Web account IPC source');
+        return c.invoke(method, args);
+      });
+    }
+  }
+  private save(next: Saved) {
+    atomicWrite(this.file, JSON.stringify(next, null, 2));
+    this.state = next;
+    this.changed();
+  }
+  private changed() {
+    if (this.window && !this.window.isDestroyed())
+      this.window.webContents.send('web-account:changed');
+  }
+  private account(id: unknown) {
+    const a = this.state.accounts.find((a) => a.id === id);
+    if (!a || this.deleting.has(a.id)) throw Error('アカウントがありません。');
+    return a;
+  }
+  private accountSession(id: string) {
+    return session.fromPath(path.join(this.root, 'sessions', id));
+  }
+  snapshot(): WebAccountSnapshot {
+    return {
+      selected: this.state.selected,
+      accounts: this.state.accounts.map((a) => {
+        const wc = this.views.get(a.id)?.webContents;
+        const status = this.statuses.get(a.id);
+        let url = this.definition.url;
+        if (wc && !wc.isDestroyed()) {
+          // OAuth queries/fragments must not reach the local UI or diagnostics.
+          try {
+            const u = new URL(wc.getURL());
+            url =
+              u.origin === this.definition.observeOrigin
+                ? u.origin + u.pathname + u.hash
+                : u.origin;
+          } catch {}
+        }
+        return {
+          ...a,
+          url,
+          loading: !!wc && !wc.isDestroyed() && wc.isLoading(),
+          error: status?.error ?? '',
+          canGoBack: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoBack(),
+          canGoForward: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoForward(),
+          observation: status?.observation ?? null,
+          status: status?.status ?? '受信トレイの表示を待っています',
+          attention: status?.attention ?? false,
+        };
+      }),
+    };
+  }
+  private async outside(raw: string) {
+    if (!this.window || this.disposed) return;
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return;
+    }
+    if (!['https:', 'http:', 'mailto:'].includes(url.protocol) || url.username || url.password)
+      return;
+    const result = await dialog.showMessageBox(this.window, {
+      type: 'question',
+      title: 'リンクを外部で開く',
+      message: 'このリンクを既定のアプリで開きますか？',
+      detail: url.protocol === 'mailto:' ? 'メール作成リンク' : url.origin,
+      buttons: ['キャンセル', '開く'],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (!this.disposed && result.response === 1) await shell.openExternal(url.href);
+  }
+  private view(id: string): WebContentsView {
+    this.account(id);
+    const existing = this.views.get(id);
+    if (existing && !existing.webContents.isDestroyed()) return existing;
+    const ses = this.accountSession(id);
+    ses.setSpellCheckerEnabled(false);
+    ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    ses.setPermissionCheckHandler(() => false);
+    const view = new WebContentsView({
+      webPreferences: {
+        session: ses,
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        webSecurity: true,
+        spellcheck: false,
+        backgroundThrottling: false,
+      },
+    });
+    view.setVisible(false);
+    this.views.set(id, view);
+    this.statuses.set(id, {
+      error: '',
+      status: '受信トレイの表示を待っています',
+      attention: false,
+      observation: null,
+    });
+    const wc = view.webContents;
+    const allowed = (url: string) => allowedWebNavigation(url, this.definition.origins);
+    wc.setWindowOpenHandler(({ url }) => {
+      if (allowed(url)) void wc.loadURL(url).catch(() => {});
+      else void this.outside(url);
+      return { action: 'deny' };
+    });
+    wc.on('will-navigate', (event, url) => {
+      if (!allowed(url)) {
+        event.preventDefault();
+        void this.outside(url);
+      }
+    });
+    wc.on('will-redirect', (event) => {
+      if (event.isMainFrame && !allowed(event.url)) {
+        event.preventDefault();
+        this.statuses.get(id)!.error =
+          `アプリ内で未対応の移動先です（${new URL(event.url).origin}）。`;
+        this.changed();
+      }
+    });
+    const invalidate = () => {
+      this.generation.set(id, (this.generation.get(id) ?? 0) + 1);
+      const s = this.statuses.get(id);
+      if (s) s.observation = null;
+    };
+    wc.on('did-start-navigation', (event) => {
+      if (!event.isMainFrame) return;
+      invalidate();
+      const s = this.statuses.get(id);
+      if (s) {
+        s.error = '';
+        s.status = '受信トレイの表示を待っています';
+      }
+      this.changed();
+    });
+    wc.on('did-stop-loading', () => this.changed());
+    wc.on('did-navigate', () => this.changed());
+    wc.on('did-navigate-in-page', () => this.changed());
+    wc.on('did-fail-load', (_event, code, _description, _url, main) => {
+      if (main && code !== -3) {
+        invalidate();
+        this.statuses.get(id)!.error =
+          `ページを読み込めませんでした（${code}）。再読み込みしてください。`;
+        this.changed();
+      }
+    });
+    wc.on('render-process-gone', () => {
+      invalidate();
+      this.statuses.get(id)!.error = '表示処理が終了しました。再読み込みしてください。';
+      this.changed();
+    });
+    void wc.loadURL(this.definition.url).catch(() => {});
+    return view;
+  }
+  start() {
+    if (this.disposed) throw Error('Web accounts are closed');
+    for (const a of this.state.accounts) this.view(a.id);
+  }
+  private layout() {
+    if (!this.window || !this.attached) return;
+    const [w, h] = this.window.getContentSize();
+    this.attached.setBounds({
+      x: 236,
+      y: 146,
+      width: Math.max(1, w - 236),
+      height: Math.max(1, h - 146),
+    });
+  }
+  private show(id: string) {
+    if (!this.window) return;
+    if (this.attached) {
+      this.window.contentView.removeChildView(this.attached);
+      this.attached.setVisible(false);
+    }
+    this.attached = this.view(id);
+    this.window.contentView.addChildView(this.attached);
+    this.attached.setVisible(true);
+    this.layout();
+    this.changed();
+  }
+  async open() {
+    if (this.disposed) throw Error('Web accounts are closed');
+    if (this.opening) return this.opening;
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.show();
+      this.window.focus();
+      return;
+    }
+    this.opening = this.openWindow().finally(() => {
+      this.opening = undefined;
+    });
+    return this.opening;
+  }
+  private async openWindow() {
+    this.start();
+    const w = new BrowserWindow({
+      width: 1280,
+      height: 900,
+      minWidth: 900,
+      minHeight: 640,
+      title: this.name,
+      show: false,
+      autoHideMenuBar: true,
+      backgroundColor: '#101318',
+      webPreferences: {
+        preload: path.resolve(__dirname, '../web-account-preload.js'),
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        partition: 'web-account-ui-' + this.id,
+      },
+    });
+    this.window = w;
+    w.webContents.on('will-navigate', (event) => event.preventDefault());
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    w.on('resize', () => this.layout());
+    // Closing the mail window hides it; monitoring remains active until Applet stop.
+    w.on('close', (event) => {
+      if (!this.disposed) {
+        event.preventDefault();
+        w.hide();
+      }
+    });
+    w.on('closed', () => {
+      this.window = undefined;
+      this.attached = undefined;
+    });
+    try {
+      await w.loadURL(this.uiURL);
+      if (this.disposed || w.isDestroyed()) return;
+      this.show(this.state.selected);
+      w.show();
+    } catch {
+      if (!w.isDestroyed()) w.destroy();
+      throw Error('Web画面を開けませんでした。');
+    }
+  }
+  private async invoke(method: string, args: unknown[]) {
+    switch (method) {
+      case 'snapshot':
+        return this.snapshot();
+      case 'add': {
+        if (this.state.accounts.length >= 10) throw Error('10アカウントまで追加できます。');
+        const id = randomUUID();
+        this.save({
+          ...this.state,
+          accounts: [
+            ...this.state.accounts,
+            { id, name: `アカウント ${this.state.accounts.length + 1}` },
+          ],
+          selected: id,
+        });
+        this.show(id);
+        return;
+      }
+      case 'select': {
+        const a = this.account(args[0]);
+        this.save({ ...this.state, selected: a.id });
+        this.show(a.id);
+        return;
+      }
+      case 'rename': {
+        const a = this.account(args[0]),
+          name = args[1];
+        if (typeof name !== 'string' || !name.trim() || name.length > 60)
+          throw Error('表示名は1～60文字です。');
+        this.save({
+          ...this.state,
+          accounts: this.state.accounts.map((item) =>
+            item.id === a.id ? { ...a, name: name.trim() } : item,
+          ),
+        });
+        return;
+      }
+      case 'acknowledge':
+        this.acknowledgements.add(this.account(args[0]).id);
+        return;
+      case 'navigate': {
+        const wc = this.view(this.state.selected).webContents;
+        switch (args[0]) {
+          case 'back':
+            if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+            break;
+          case 'forward':
+            if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
+            break;
+          case 'reload':
+            wc.reload();
+            break;
+          case 'inbox':
+            await wc.loadURL(this.definition.url);
+            break;
+          default:
+            throw Error('Invalid navigation action');
+        }
+        return;
+      }
+      case 'remove': {
+        const a = this.account(args[0]);
+        if (this.state.accounts.length < 2)
+          throw Error('最後のアカウントは残してください。ログアウトはWeb画面から行えます。');
+        this.deleting.add(a.id);
+        try {
+          const result = await dialog.showMessageBox(this.window!, {
+            type: 'warning',
+            title: 'アカウントを削除',
+            message: `「${a.name}」の保存済みログイン情報とサイトデータを削除しますか？`,
+            detail: 'Googleアカウントやメールそのものは削除しません。',
+            buttons: ['キャンセル', '削除'],
+            defaultId: 0,
+            cancelId: 0,
+          });
+          if (this.disposed || result.response !== 1) return;
+          if (this.state.accounts.length < 2) throw Error('最後のアカウントは残してください。');
+          const view = this.views.get(a.id);
+          if (view && this.attached === view) {
+            this.window!.contentView.removeChildView(view);
+            this.attached = undefined;
+          }
+          if (view && !view.webContents.isDestroyed()) view.webContents.close();
+          this.views.delete(a.id);
+          this.statuses.delete(a.id);
+          this.acknowledgements.delete(a.id);
+          const ses = this.accountSession(a.id);
+          await ses.clearStorageData();
+          await ses.clearCache();
+          await ses.cookies.flushStore();
+          const accounts = this.state.accounts.filter((item) => item.id !== a.id);
+          this.save({
+            ...this.state,
+            accounts,
+            selected: this.state.selected === a.id ? accounts[0].id : this.state.selected,
+          });
+          this.show(this.state.selected);
+        } finally {
+          this.deleting.delete(a.id);
+        }
+        return;
+      }
+      default:
+        throw Error('Unknown Web account action');
+    }
+  }
+  async read() {
+    this.start();
+    // Sequential reads keep the IPC response bounded and avoid parallel DOM scans.
+    for (const a of this.state.accounts) {
+      if (this.disposed || this.deleting.has(a.id)) continue;
+      const wc = this.views.get(a.id)?.webContents,
+        status = this.statuses.get(a.id);
+      if (!wc || wc.isDestroyed() || !status) continue;
+      if (wc.isLoadingMainFrame() || status.error) {
+        status.observation = null;
+        continue;
+      }
+      let origin = '';
+      try {
+        origin = new URL(wc.getURL()).origin;
+      } catch {}
+      if (origin !== this.definition.observeOrigin) {
+        status.observation = null;
+        status.status = 'ログインが必要です';
+        continue;
+      }
+      const generation = this.generation.get(a.id);
+      const url = wc.getURL();
+      try {
+        let read = this.reads.get(a.id);
+        if (!read) {
+          // Applet-owned source runs in an isolated world; remote pages receive no host bridge.
+          read = wc.executeJavaScriptInIsolatedWorld(1001, [{ code: this.source }]);
+          this.reads.set(a.id, read);
+          void read
+            .finally(() => {
+              if (this.reads.get(a.id) === read) this.reads.delete(a.id);
+            })
+            .catch(() => {});
+        }
+        const timedOut = Symbol('timeout');
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const result = await Promise.race([
+          read,
+          new Promise<symbol>((resolve) => {
+            timer = setTimeout(() => resolve(timedOut), 800);
+          }),
+        ]).finally(() => clearTimeout(timer));
+        if (result === timedOut) {
+          status.observation = null;
+          status.status = '画面の応答を待っています';
+          continue;
+        }
+        if (
+          this.disposed ||
+          this.deleting.has(a.id) ||
+          wc.isDestroyed() ||
+          wc.getURL() !== url ||
+          this.generation.get(a.id) !== generation
+        )
+          continue;
+        if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
+          throw Error('Observation too large');
+        status.observation = result;
+      } catch {
+        status.observation = null;
+        status.status = '画面の解析を待っています';
+      }
+    }
+    const acknowledged = [...this.acknowledgements];
+    this.acknowledgements.clear();
+    return { ...this.snapshot(), acknowledged };
+  }
+  report(id: string, status: string, attention: boolean) {
+    this.account(id);
+    if (typeof status !== 'string' || status.length > 200 || typeof attention !== 'boolean')
+      throw Error('Invalid Web account report');
+    const s = this.statuses.get(id);
+    if (s && (s.status !== status || s.attention !== attention)) {
+      s.status = status;
+      s.attention = attention;
+      this.changed();
+    }
+  }
+  async close() {
+    if (this.disposed) return;
+    this.disposed = true;
+    const ids = [...this.views.keys()];
+    for (const view of this.views.values())
+      if (!view.webContents.isDestroyed()) view.webContents.close();
+    this.views.clear();
+    this.attached = undefined;
+    this.window?.destroy();
+    await Promise.allSettled(
+      ids.map(async (id) => {
+        const ses = this.accountSession(id);
+        ses.flushStorageData();
+        await ses.cookies.flushStore();
+      }),
+    );
+  }
+}
+export function getWebAccounts(
+  id: string,
+  name: string,
+  folder: string,
+  dataRoot: string,
+  definition?: WebAccountDefinition,
+) {
+  const existing = controllers.get(id);
+  if (existing) return existing;
+  if (!definition) throw Error('manifest.webAccounts が必要です。');
+  const controller = new WebAccountController(
+    id,
+    name,
+    folder,
+    path.join(dataRoot, 'web-accounts', id),
+    definition,
+  );
+  controllers.set(id, controller);
+  return controller;
+}
+export async function closeWebAccounts(id: string) {
+  const c = controllers.get(id);
+  controllers.delete(id);
+  await c?.close();
+}
