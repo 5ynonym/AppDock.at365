@@ -369,3 +369,4 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 元の配布EXEの7zip一覧にはruntimeconfig/depsが存在するが、稼働中のTemp展開先には両JSONとPDBが欠けていた。起動済み.NET拡張は存在しており、起動後の消失が疑われる。削除原因は未特定。PCのMicrosoft.NETCore.App 10.0.12と発行元の判定時間取得340msを確認。
 - ユーザーのdeploy依頼後、AppDock/ExtensionHostプロセス0件を確認して既存deploy.ps1で実利用先へ配置。SHA256 CF656034E722EC2B24FBC6D1EA86887BBA108D8688E553F9851F3AC2F89CC9AAが発行元と一致。settings.json不変。旧EXE退避: artifacts/tray-fallback-deployment-20261007-141726。実利用アプリの自動再起動は行っていない。
 - 500msフォールバック修正版について、ユーザーがdeploy後の実利用で正常動作を確認（2026-10-07 JST）。設定ファイル消失の原因は引き続き未特定。
+- ユーザーの依頼で今回の退避フォルダーartifacts/tray-fallback-deployment-20261007-141726を削除。旧EXE・配置結果JSONを照合後に削除し、空フォルダーも除去、消失を確認。実利用EXE/settings.jsonは削除前後のSHA256一致。他作業の退避物は対象外。
