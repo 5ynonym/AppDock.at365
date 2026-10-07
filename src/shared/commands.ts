@@ -17,6 +17,8 @@ export const defaultShortcuts: Record<string, string[]> = {
   'appdock.commands.search': ['Ctrl+P', 'Ctrl+Shift+P'],
   'appdock.settings.open': ['Ctrl+,'],
   'at365.watch.toggle': ['Pause'],
+  'at365.gmail.nextAccount': ['Ctrl+Tab'],
+  'at365.gmail.previousAccount': ['Ctrl+Shift+Tab'],
 };
 export const defaultGlobalShortcutCommands = ['at365.watch.toggle'];
 export function validCommandId(id: unknown): id is string {

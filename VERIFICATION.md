@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-07: v0.14.0 Webアカウントの操作・個別音・ウィンドウ保存
+
+- 任意のitemOpener資産をApplet内/100KBの関数式として検証し、限定ローカルUIのopenItem(id,key)からだけ実行。読込済みobserveOrigin・isolated world 1001・JSON文字列化した200文字以内の引数で、remoteへHost bridgeを渡さない。cycle(1|-1)をNodeと限定UIへ追加し、現在の枠から循環して同じWebContentsViewを選ぶ。
+- アカウントsoundはenabled:false/file:""が既定。WAV絶対パス・4096文字以内・制御文字なしで検証し、accounts.jsonへ保存。設定/試聴にはaudio、親付きWAV選択にはfile-dialogを要求。既存queueSoundとWindowStateStoreを再利用し、位置/サイズ/最大化はweb-accounts/<Applet>/window-state.jsonへ保存。Gmailの復元下限は900×640。モニター切断/縮小・DIP丸め・最小化/非表示・終了時flushは共通処理を維持。
+- Gmailの次/前コマンドへ既定Ctrl+Tab/Ctrl+Shift+Tabを追加。自身のAppletの登録済みコマンドだけをローカルUI/remoteのbefore-input-eventで処理し、利用者設定を毎回参照。global指定時は重複実行を避ける。旧設定へ既定キーを補い、明示の空配列/変更は保持する。
+- main/renderer型検査・Vite・ホスト回帰77/77、Gmail回帰15/15成功。新しい境界でJSONキーのコード注入、音パス/資産の制限、循環と削除中/停止、最大10枠の観測＋音パスが1MB RPC内であることを確認。
+- 発行版Gmail 0.3.0の追加UI: `../Applet.Gmail.at365/artifacts/ui-features-1791382644378/result.json`。検索/未読絞り込み、同じIDを持つ別セッションの正しいメールを開く操作と消えたメールの案内、Web/ローカルキー・キー変更、音選択/試聴/ON/OFF・保持、通常枠と最大化の再起動復元、900×640のレイアウトが成功。ホスト/Appletの通知OFFでも音ONの1枠だけ無音WAVの実プレーヤーが起動し、音/位置保存のエラーログなし。
+- 既存GUI `../Applet.Gmail.at365/artifacts/gui-1791382808256/result.json`、背景描画 `../Applet.Gmail.at365/artifacts/background-1791382726283/result.json`、portableと未改変Applet `../Applet.Gmail.at365/artifacts/portable-1791382860793/result.json`（version 0.14.0、exitCode 0）成功。
+- 保存済み実GmailはGPUオフ/認証保持・既読7行/未読0。既読行だけのitemOpenerで実ページ移動を確認して戻り、本文は取得せず未読を操作していない。裏側のrAFも継続。実新着の音の聞こえ方、別ブラウザーからの状態変更/実受信による背景同期、実複数アカウント/スリープ/長期常駐は別途確認。
+- `dev.bat run dist`成功。framework-dependent .NETクリーン発行でRuntime混入なし。最終EXE: 100,441,648 bytes、SHA256 `B13FD8556362975E7100DB443DC8C3FA50AF66F955CA4E2A8D329B5008F42B05`。Gmailは開発用publish/extensionsへの配置のみで、実利用先へのdeploy・外部pushは行っていない。
+
 ## 2026-10-07: v0.13.1 非選択Webページの描画継続
 
 - ユーザーはGmail 0.2.1の未読集計を確認した一方、非アクティブなGmail側の更新が止まると報告。監視のタイマー停止とは区別して調査した。`backgroundThrottling:false`だけでは、nativeで非表示/取り外したWebContentsViewのrequestAnimationFrameが止まることをオフラインで再現。document.visibilityStateはvisibleのままでも停止する。記録: `../Applet.Gmail.at365/artifacts/visibility-1791372924502/result.json`。

@@ -12,6 +12,7 @@ import { parseExtensionCommands } from '../../shared/extension-commands';
 import { parseWidgetDefinitions, defaultWidgetPlacement } from '../../shared/widgets';
 import { registerWidgetFonts } from './widget-fonts';
 import { getWebAccounts } from './web-accounts';
+import { shortcutFromEvent } from '../../shared/commands';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -54,6 +55,7 @@ export function createHostApi(
     switch (method) {
       case 'host.webAccounts.start':
       case 'host.webAccounts.open':
+      case 'host.webAccounts.cycle':
       case 'host.webAccounts.read':
       case 'host.webAccounts.report': {
         requireCapability('web-accounts');
@@ -63,6 +65,34 @@ export function createHostApi(
           e.manifest.folder,
           dataRoot,
           e.manifest.webAccounts,
+          {
+            capabilities: e.manifest.capabilities ?? [],
+            failed: (message) => log('error', id, message),
+            shortcut: (input) => {
+              if (input.type !== 'keyDown' || input.isAutoRepeat || e.state !== 'running')
+                return false;
+              const shortcut = shortcutFromEvent({
+                key: input.key,
+                code: input.code,
+                ctrlKey: input.control,
+                altKey: input.alt,
+                shiftKey: input.shift,
+                metaKey: input.meta,
+                isComposing: input.isComposing,
+              });
+              const matches = e.commands.filter(
+                (command) =>
+                  !settings.value.globalShortcutCommands.includes(command.id) &&
+                  !!shortcut &&
+                  settings.value.shortcuts[command.id]?.includes(shortcut),
+              );
+              if (matches.length !== 1) return false;
+              void executeCommand(matches[0].id).catch(() =>
+                log('error', id, 'ショートカットのコマンドを実行できませんでした。'),
+              );
+              return true;
+            },
+          },
         );
         if (method.endsWith('.start')) {
           web.start();
@@ -70,6 +100,10 @@ export function createHostApi(
         }
         if (method.endsWith('.open')) {
           await web.open();
+          return null;
+        }
+        if (method.endsWith('.cycle')) {
+          await web.cycle(p.direction);
           return null;
         }
         if (method.endsWith('.report')) {

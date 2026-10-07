@@ -186,3 +186,5 @@ AppDock 0.10.0以降は、manifestの`widgets`宣言と`widgets` capability、.N
 Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、0.12.0の[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。0.13.0の`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
 
 非選択ページの描画も背景で継続する必要がある場合、最低ホスト版は0.13.1としてください。ホストは非表示専用WindowへViewを保持し、選択時だけ操作Windowへ移します。サービス固有の通知・観測処理は引き続きApplet側です。
+
+0.14.0では`webAccounts.cycle(1|-1)`とローカルUIの`openItem/setSound/pickSound/testSound`を追加し、ウィンドウ位置・サイズを保存します。項目を開く処理は任意で宣言するitemOpenerの関数式へkeyを渡し、明示的なUI操作でだけ実行します。音はアカウントごとのsoundをreadから参照して既存audio APIで再生してください。APIと境界は[WebアカウントAPI](web-accounts.md)を参照します。

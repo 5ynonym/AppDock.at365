@@ -6,6 +6,7 @@ export interface NodeExtensionContext {
   webAccounts: {
     start(): Promise<unknown>;
     open(): Promise<unknown>;
+    cycle(direction: 1 | -1): Promise<unknown>;
     read(): Promise<
       import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
     >;
@@ -70,6 +71,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         webAccounts: {
           start: () => peer.request('host.webAccounts.start', {}),
           open: () => peer.request('host.webAccounts.open', {}),
+          cycle: (direction) => peer.request('host.webAccounts.cycle', { direction }),
           read: () =>
             peer.request('host.webAccounts.read', {}) as Promise<
               import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }

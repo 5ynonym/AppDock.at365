@@ -16,6 +16,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 0.13.1では、非選択Viewを可視・実寸のまま非表示専用Windowへ保持し、rAF/レイアウトが止まらないようにします。選択中だけ操作Windowへ移し、停止/異常終了で背景Windowも破棄します。`test-background.cjs`は外部状態のfetch結果をページ自身のrAFで反映するため、テストがDOMを直接更新する場合では見逃した停止を検証できます。実Googleサーバーとの同期は別確認です。
 
+0.14.0はcycleと限定UIのitemOpener呼び出し、アカウント別soundの保存/選択/試聴を追加。自身のAppletのローカルshortcutsをUI/WebContents双方で処理し、Nodeの循環コマンドへ接続します。Gmailの初期Ctrl+Tab/Ctrl+Shift+Tabはglobalにしません。操作Windowの位置・サイズ/最大化は既存WindowStateStoreで保存し、Gmailの高さ640pxを復元下限にします。静的な境界/ライフサイクル回帰とGmailのtest-ui-features.cjsを併用し、音は無音WAVで実プレーヤーまで確認します。
+
 | 追加したいもの | 主な変更先 |
 | --- | --- |
 | Applet向けHost API | `src/main/core/host-api.ts` → .NET SDK/Runtime・Node SDK |
