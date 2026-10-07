@@ -184,3 +184,5 @@ AppDock 0.10.0以降は、manifestの`widgets`宣言と`widgets` capability、.N
 ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#v0110-node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。
 
 Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、0.12.0の[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。0.13.0の`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
+
+非選択ページの描画も背景で継続する必要がある場合、最低ホスト版は0.13.1としてください。ホストは非表示専用WindowへViewを保持し、選択時だけ操作Windowへ移します。サービス固有の通知・観測処理は引き続きApplet側です。

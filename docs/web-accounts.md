@@ -1,10 +1,12 @@
-# WebアカウントAPI（v0.13.0）
+# WebアカウントAPI（v0.13.1）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
 ## manifest
 
 基本APIは`minimumHostVersion: "0.12.0"`と`capabilities: ["web-accounts"]`が必要です。`report`のdataやUIの`viewport`を使用するAppletは`minimumHostVersion: "0.13.0"`を指定してください。
+
+背景でWebページの描画も継続させる必要があるAppletは、0.13.1以降を指定してください。非選択Viewは非表示専用Windowへ可視・実寸で接続したまま保持します。この親Windowは一度も表示せず、taskbar/フォーカス対象にしません。操作Windowと背景WindowはbackgroundThrottling=false。選択中Viewのみ操作Windowへ移し、非選択・viewport(null)では背景Windowへ戻します。全Viewと背景Windowを停止時に破棄します。
 
 ```json
 {
@@ -35,7 +37,9 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`だけを公開します。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
 
-`viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は選択中のViewを隠すだけで、アカウント切替後も非表示を維持し、ページと監視は続きます。UIではResizeObserver等で実領域を再送してください。[Electron View](https://www.electronjs.org/docs/latest/api/view)の可視制御を使用しています。未呼出しの旧UIは既定レイアウトを維持します。
+`viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は操作WindowからViewを外して背景Windowへ戻し、アカウント切替後も操作画面へ表示せず、ページと監視を続けます。UIではResizeObserver等で実領域を再送してください。未呼出しの旧UIは既定レイアウトを維持します。
+
+[Electron WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)のbackgroundThrottling=falseだけでは、非表示・切り離しされたViewのrAFを維持できないことを実測しました。document.visibilityStateがvisibleでもrAFが止まるため、DOMの可視性判定だけを検証して済ませません。背景保持はGmailのスクリプト改変やフォーカス移動・周期的reloadを行わず、サイト側の通常の更新を待ちます。描画を維持する資源コストはアカウント数に応じます。
 
 ## 保存とライフサイクル
 
