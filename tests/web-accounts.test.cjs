@@ -28,6 +28,7 @@ test('Worker read excludes UI reports so multi-account history cannot overflow J
     deleting: new Set(),
     soundFailures: new Map(),
     acknowledgements: new Set(['0']),
+    monitoringResets: new Set(),
     statuses: new Map(
       accounts.map((a) => [
         a.id,
@@ -109,6 +110,57 @@ test('Web account cycle wraps, preserves one account and rejects invalid directi
   await assert.rejects(cycle(0), /direction/);
   fake.disposed = true;
   await assert.rejects(cycle(1), /closed/);
+});
+
+test('Account ordering preserves selected IDs, sessions and settings; monitoring transitions reset worker state', async () => {
+  const { WebAccountController: Controller } = require('../out/main/main/core/web-accounts');
+  const fake = {
+    state: {
+      accounts: [
+        { id: 'a', name: 'A', sound: { enabled: true, file: '' } },
+        { id: 'b', name: 'B' },
+      ],
+      selected: 'a',
+    },
+    deleting: new Set(),
+    monitoringResets: new Set(),
+    statuses: new Map([['a', { attention: true, data: '{"pending":3}' }]]),
+    views: new Map([['a', { session: 'preserved' }]]),
+    changed() {},
+    save(next) {
+      this.state = next;
+    },
+    account: Controller.prototype.account,
+  };
+  const invoke = (method, ...args) => Controller.prototype.invoke.call(fake, method, args);
+  await invoke('move', 'a', 1);
+  assert.deepEqual(
+    fake.state.accounts.map((a) => a.id),
+    ['b', 'a'],
+  );
+  assert.equal(fake.state.selected, 'a');
+  assert.equal(fake.views.get('a').session, 'preserved');
+  assert.equal(fake.state.accounts[1].sound.enabled, true);
+  await invoke('move', 'a', 1); // End of list is a no-op.
+  assert.deepEqual(
+    fake.state.accounts.map((a) => a.id),
+    ['b', 'a'],
+  );
+  await assert.rejects(invoke('move', 'missing', -1), /ありません/);
+  await assert.rejects(invoke('move', 'a', 0), /direction/);
+  await assert.rejects(invoke('setMonitoring', 'a', 'false'), /monitoring/);
+  await invoke('setMonitoring', 'a', false);
+  assert.equal(fake.state.accounts[1].monitoring, false);
+  assert.equal(fake.statuses.get('a').attention, false);
+  assert.equal(fake.statuses.get('a').data, 'null');
+  assert.ok(fake.monitoringResets.has('a'));
+  // A stale report from an in-flight worker must not resurrect a paused badge.
+  Controller.prototype.report.call(fake, 'a', 'new', true, { pending: 1 });
+  assert.equal(fake.statuses.get('a').attention, false);
+  assert.equal(fake.statuses.get('a').data, 'null');
+  await invoke('setMonitoring', 'a', true);
+  assert.equal(fake.state.accounts[1].monitoring, true);
+  assert.ok(fake.monitoringResets.has('a'));
 });
 
 test('Web account viewport and transient UI report are bounded', () => {

@@ -190,3 +190,5 @@ Webサービスの対話ログインとアカウント別ページが必要なNo
 通常起動でGmailの初回更新を維持する場合は0.15.2を指定し、webAccounts.keepActive:trueを宣言します。observerのready:trueを受けたobserveOriginだけを対象にし、背景では30秒ごとに同期再開を促します。native focusがあるWebContentsは通常のfocus/blurを使い、認証originではタイマーも解除します。Windowsのフォーカス/選択を自動変更する方式ではありません。通常起動での検証はテストツールによるfocus overrideを避けてください。
 
 0.14.0では`webAccounts.cycle(1|-1)`とローカルUIの`openItem/setSound/pickSound/testSound`を追加し、ウィンドウ位置・サイズを保存します。項目を開く処理は任意で宣言するitemOpenerの関数式へkeyを渡し、明示的なUI操作でだけ実行します。音はアカウントごとのsoundをreadから参照して既存audio APIで再生してください。APIと境界は[WebアカウントAPI](web-accounts.md)を参照します。
+
+0.16.0はローカルUIの`move/setMonitoring`と、readの`monitoring/monitoringResets`を追加します。Appletは個別OFFで基準・履歴・件数をresetし、read間のOFF→ONにも対応します。ヘッダー画像を観測結果のavatar URLへ置く場合は、manifestのavatarOriginsに画像のHTTPS originを明示してください。画像取得・変換・ローカルUIへのdata画像はホストが担当し、Nodeへ画像バイトを送りません。

@@ -6,10 +6,13 @@ export interface WebAccountDefinition {
   observer: string;
   itemOpener?: string;
   keepActive?: boolean;
+  avatarOrigins?: string[];
 }
 export interface WebAccount {
   id: string;
   name: string;
+  monitoring: boolean;
+  avatar: string;
   url: string;
   loading: boolean;
   error: string;
@@ -37,6 +40,8 @@ export interface WebAccountUi {
   add(): Promise<void>;
   select(id: string): Promise<void>;
   rename(id: string, name: string): Promise<void>;
+  move(id: string, direction: 1 | -1): Promise<void>;
+  setMonitoring(id: string, enabled: boolean): Promise<void>;
   remove(id: string): Promise<void>;
   navigate(action: 'back' | 'forward' | 'reload' | 'inbox'): Promise<void>;
   openItem(id: string, key: string): Promise<boolean>;
