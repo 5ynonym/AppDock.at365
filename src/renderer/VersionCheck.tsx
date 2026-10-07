@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import type { UpdateResult } from '../shared/contracts';
+const updateError = (error: unknown) => {
+  const message = (error instanceof Error ? error.message : '').replace(
+    /^Error invoking remote method '[^']+': (?:Error: )?/,
+    '',
+  );
+  return /^(更新|正式版|リリース)/.test(message)
+    ? message
+    : '更新を確認できませんでした。通信環境を確認して、もう一度お試しください。';
+};
 
-export function VersionCheck({ id }: { id?: string }) {
+export function VersionCheck({ id, details = false }: { id?: string; details?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateResult>();
   const [error, setError] = useState('');
@@ -12,7 +21,7 @@ export function VersionCheck({ id }: { id?: string }) {
     try {
       setResult(await window.dock.checkUpdates(id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(updateError(err));
     } finally {
       setBusy(false);
     }
@@ -37,11 +46,19 @@ export function VersionCheck({ id }: { id?: string }) {
         <button
           className="text-button"
           onClick={() => {
-            void window.dock.openReleases(id).catch((err: Error) => setError(err.message));
+            void window.dock.openReleases(id).catch((err: Error) => setError(updateError(err)));
           }}
         >
           リリースを開く
         </button>
+      )}
+      {details && result && (
+        <time dateTime={result.checkedAt} className="muted">
+          最終確認:{' '}
+          {new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
+            new Date(result.checkedAt),
+          )}
+        </time>
       )}
       {error && (
         <span className="error-text" role="alert">

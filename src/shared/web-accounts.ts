@@ -19,12 +19,15 @@ export interface WebAccount {
   attention: boolean;
   data: unknown;
   sound: WebAccountSound;
+  soundError?: string;
 }
 export interface WebAccountSound {
   enabled: boolean;
   file: string;
+  name?: string;
 }
 export interface WebAccountSnapshot {
+  dark: boolean;
   selected: string;
   accounts: WebAccount[];
 }

@@ -95,7 +95,7 @@ export function createHostApi(
           },
         );
         if (method.endsWith('.start')) {
-          web.start();
+          await web.start();
           return null;
         }
         if (method.endsWith('.open')) {

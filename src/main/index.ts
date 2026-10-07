@@ -192,6 +192,13 @@ function snapshot(): HostSnapshot {
     extensions: manager.snapshot(),
     logs: log.entries,
     version: app.getVersion(),
+    runtime: {
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+      platform: process.platform,
+      arch: process.arch,
+    },
     dataDirectory,
     dark: nativeTheme.shouldUseDarkColors,
     avatarUrl:
