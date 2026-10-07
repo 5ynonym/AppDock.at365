@@ -73,7 +73,7 @@ export function createHostApi(
           return null;
         }
         if (method.endsWith('.report')) {
-          web.report(p.id as string, p.status as string, p.attention as boolean);
+          web.report(p.id as string, p.status as string, p.attention as boolean, p.data);
           return null;
         }
         return web.read();
