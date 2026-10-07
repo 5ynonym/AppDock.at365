@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -24,7 +24,8 @@
     "test:tray": "node scripts/tray-commands-ui-test.cjs",
     "test:hardware-acceleration": "node scripts/hardware-acceleration-ui-test.cjs",
     "test:applet-sidebar": "node scripts/applet-sidebar-ui-test.cjs",
-    "format": "prettier --write --ignore-path .gitignore src scripts tests"
+    "format": "prettier --write --ignore-path .gitignore src scripts tests",
+    "test:widgets": "node scripts/widgets-ui-test.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

@@ -170,3 +170,6 @@ UIテストは一意の `artifacts` フォルダーを作り、ホストへ `--t
 v0.9.0ではシングルクリックとダブルクリックを別々の一般コマンドへ割り当てられます。ダブルは既定未設定。割り当てた場合はホストが単クリックを判定時間だけ待機し、ダブル時に単クリックを取り消します。Applet側の実装・API変更は不要です。
 
 表示名はmanifestの任意の`displayName`で指定します（1～100文字、空白のみは不可）。AppDock v0.9.1以降は一覧・設定・コマンド候補・トレイ等でこの名前を使います。省略時は`name`の先頭の`Applet.`を除去します。元の名前・ID・実行ファイル名は維持し、manifest更新後はホストを再起動します。詳細は[Applet API](extensions.md)を参照してください。
+## ウィジェットの提供
+
+AppDock 0.10.0以降は、manifestの`widgets`宣言と`widgets` capability、.NETの`IWidgetService`／Nodeの`context.widgets`で、ホームと透過デスクトップに共通の内容を提供できます。画面を自作しないAppletは.NET DLLで実装できます。Watch 0.2.0が移行例です。[ウィジェットの契約・移行・検証](widgets.md)を参照してください。

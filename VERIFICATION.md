@@ -313,3 +313,15 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ナビゲーションUI検証成功。検索・全4種類の絞り込み・Spaceでのボタン選択、複数Appletの編集保存、JSON不正時の保持、外部変更との競合保護、24 Applet、ライト/ダーク、1280/900/700pxでの検索とフィルターの同一行配置・同じ高さ・横はみ出しなしを確認。開発版: `artifacts/navigation-1791329154290`、発行版: `artifacts/navigation-1791329206049`。既存検証の古い期待件数を共通開始遅延設定と現行5件のホストコマンドに合わせた。
 - 900pxの設定フォーム・ショートカットと700pxの設定をPNGで確認。初回のsandbox GUI起動はElectronのinstall-directory ACL制限で失敗したため、ACLを変更せず許可された通常実行環境の隔離profileで検証した。
 - プロジェクト内の既存ツールとElectron、既存.NET host成果物で単一EXEを再発行。portable smoke成功: `artifacts/smoke-1791329218130/smoke-result.json`。bridge/sandbox、設定・avatar・ピン保存、トレイ操作、正常終了を確認。実利用先への配置は行っていない。
+## 2026-10-07: Appletウィジェット基盤 v0.10.0
+
+- manifest宣言、widgets capability、Node/.NET SDKの登録・配置取得・表示操作API、配置JSON検証を追加。時計・日付・テキスト/値一覧を共通Reactで描画し、ホームのピン留めとデスクトップを独立管理。9アンカー、自由位置、モニター、前面/デスクトップ、サイズ/色/不透明度、移動完了/取消/期限を実装。
+- モニター/階層ごとに透過画面を共有。画面単位の日時タイマーを使い、Appletとの毎秒通信なし。バックグラウンドのShell確認時、親・座標が変わっていれば再接続し、変わっていなければSetParent/再配置を省く。背面表示を使うときだけ共通のShellブリッジを起動し、停止時に解放。専用preload、登録済みフォントの実パス検証、設定revisionで境界を維持。
+- Watch 0.2.0をDLLへ移行。SDKのnull省略値（地域設定・パネル）を受け付ける互換処理も確認。既存のnative/.NET/Node Appletを維持。UIテストのElectron子プロセスからだけELECTRON_RUN_AS_NODEを外す。
+- main/renderer型検査・Vite build成功。ホスト回帰64/64（ウィジェット6件を含む）、Watch回帰14/14成功。実Nodeウィジェットの内容更新とクラッシュ時の内容解放、配置の保持を検証。
+- 最終開発版UI: `artifacts/widgets-ui-1791331213323`、最終win-unpacked版UI: `artifacts/widgets-ui-1791331254254`。Watch DLL実通信、初回移行/再登録時の配置保持、ピン/フォーム、共有画面、秒更新、透明画素、専用IPC、移動保存/取消、表示コマンド、停止/有効化/再起動、下書きの画面移動時保持、ライト/ダーク、900pxでの横はみ出しなしを確認。
+- 接続済み2画面へ時計と日付を独立配置し、前面・デスクトップの両方で確認。未接続IDを保持してメインへ退避。Win32の親クラスProgman、WS_CHILD、WS_EX_LAYERED/TRANSPARENT/NOACTIVATE、前面と背面のTOPMOST状態、固定前後のフォーカス不変、実ピクセル座標を確認。PNGを目視確認。
+- 既存Applet/設定/JSON/コマンドのGUI: `artifacts/ui-1791331012145`、設定スクロール1280/900/760pxも成功。単一EXE+Watch DLLの最終smoke: `artifacts/smoke-1791331259893/smoke-result.json`（ok=true）。
+- Windows sandbox内のGUI起動、NuGet設定アクセスは制限されたため、ACL/グローバルツールを変更せず、許可された環境で隔離profileを使って検証。プロジェクト内Node/pnpmと既存Electronで発行。
+- `publish/AppDock.at365.exe`: 100,511,894 bytes、SHA256 `18B06407B4B761734F3AB409E96895927F27E65B97C6DF07A80B12AC9E93A15D`。framework-dependentの.NETホストにcoreclr.dll同梱なし。プロジェクトの`publish/extensions/Applet.Watch.at365`だけDLLに更新し、発行元との4ファイルのハッシュ一致、旧Watch EXEなしを確認。実利用先への配置・公開・pushは行っていない。
+- 未確認: 物理マウスによるドラッグと下側ウィンドウの操作、実モニター着脱、異なるDPI間の移動、Explorer強制再起動、RDP、スリープの実往復、長期常駐。配置ドラッグの保存検証はウィンドウ座標をプログラムから変更して実施。Shell表示面はWindows依存。

@@ -22,6 +22,44 @@ public interface IExtensionContext
     IStorageService Storage { get; }
     ISecretService Secrets { get; }
     ISchedulerService Scheduler { get; }
+    IWidgetService Widgets => throw new NotSupportedException("Widget services require AppDock 0.10.0.");
+}
+public interface IWidgetService
+{
+    Task ReplaceAsync(IReadOnlyList<WidgetDefinition> widgets, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<string, WidgetPlacement>> GetPlacementsAsync(CancellationToken cancellationToken = default);
+    Task SetDesktopAsync(IReadOnlyList<string> ids, bool enabled, CancellationToken cancellationToken = default);
+}
+public sealed record WidgetDefinition(string Id, string Title, WidgetContent Content)
+{
+    public string? Description { get; init; }
+    public string? FontFile { get; init; }
+    public WidgetPlacement? InitialPlacement { get; init; }
+}
+public sealed record WidgetContent(string Kind)
+{
+    public bool? ShowSeconds { get; init; }
+    public string? Locale { get; init; }
+    public string? TimeZone { get; init; }
+    public string? Body { get; init; }
+    public IReadOnlyList<PanelFact>? Facts { get; init; }
+}
+public sealed record WidgetPlacement
+{
+    public bool Home { get; init; }
+    public int Order { get; init; }
+    public bool Desktop { get; init; }
+    public string Monitor { get; init; } = "primary";
+    public string Layer { get; init; } = "front";
+    public string Position { get; init; } = "anchor";
+    public string Anchor { get; init; } = "top-right";
+    public double X { get; init; } = 20;
+    public double Y { get; init; } = 20;
+    public double Width { get; init; } = 360;
+    public double Height { get; init; } = 160;
+    public double FontSize { get; init; } = 80;
+    public double Opacity { get; init; } = 0.8;
+    public string Color { get; init; } = "#ffffff";
 }
 public interface ICommandService
 {

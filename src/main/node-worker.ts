@@ -1,7 +1,13 @@
 import { JsonLinePeer } from './core/rpc';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
+import type { WidgetDefinition, WidgetPlacement } from '../shared/widgets';
 type Handler = () => unknown | Promise<unknown>;
 export interface NodeExtensionContext {
+  widgets: {
+    replace(widgets: WidgetDefinition[]): Promise<unknown>;
+    placements(): Promise<Record<string, WidgetPlacement>>;
+    setDesktop(ids: string[], enabled: boolean): Promise<unknown>;
+  };
   commands: { register(id: string, title: string, handler: Handler): void };
   tray: { add(title: string, command: string): void };
   settings: {
@@ -42,6 +48,11 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
+        widgets: {
+          replace: (widgets) => peer.request('host.widgets.replace', { widgets }),
+          placements: () => peer.request('host.widgets.placements', {}),
+          setDesktop: (ids, enabled) => peer.request('host.widgets.desktop', { ids, enabled }),
+        },
         commands: {
           register: (id, title, handler) => {
             if (commands.some((c) => c.id === id)) throw new Error('Duplicate command');

@@ -6,7 +6,7 @@ namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
     IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
-    IUiService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
+    IUiService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IWidgetService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
@@ -27,6 +27,13 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public IStorageService Storage => this;
     public ISecretService Secrets => this;
     public ISchedulerService Scheduler => this;
+    public IWidgetService Widgets => this;
+    public Task ReplaceAsync(IReadOnlyList<WidgetDefinition> widgets, CancellationToken cancellationToken = default)
+        => CallAsync("host.widgets.replace", new { widgets }, cancellationToken);
+    public async Task<IReadOnlyDictionary<string, WidgetPlacement>> GetPlacementsAsync(CancellationToken cancellationToken = default)
+        => (await connection.RequestAsync("host.widgets.placements", new { }, cancellationToken)).Deserialize<Dictionary<string, WidgetPlacement>>(JsonRpcConnection.Json) ?? [];
+    public Task SetDesktopAsync(IReadOnlyList<string> ids, bool enabled, CancellationToken cancellationToken = default)
+        => CallAsync("host.widgets.desktop", new { ids, enabled }, cancellationToken);
     public object Contributions => new { commands = commands.Select(c => new { id = c.Key, title = c.Value.Title }).ToArray(), tray };
     public void Register(string commandId, string title, Func<CancellationToken, Task> handler)
     {

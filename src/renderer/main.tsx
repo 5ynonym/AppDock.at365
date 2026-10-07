@@ -1,4 +1,5 @@
 import { PanelImageCard } from './PanelImageCard';
+import { HomeWidgets, WidgetsPage, WidgetSurface } from './Widgets';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
@@ -32,11 +33,12 @@ declare global {
     dock: DockApi;
   }
 }
-type Page = 'home' | 'extensions' | 'settings' | 'logs';
+type Page = 'home' | 'extensions' | 'widgets' | 'settings' | 'logs';
 type SettingsTarget = { appletId: string; tab: 'settings' | 'shortcuts'; request: number };
 type IconName =
   | 'home'
   | 'extensions'
+  | 'widgets'
   | 'settings'
   | 'logs'
   | 'search'
@@ -56,6 +58,12 @@ type IconName =
   | 'sun'
   | 'moon';
 const paths: Record<IconName, React.ReactNode> = {
+  widgets: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M3 10h18M11 10v11" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />
@@ -167,6 +175,7 @@ function Brand({ small = false }: { small?: boolean }) {
 const labels: Record<Page, string> = {
   home: 'ホーム',
   extensions: 'Applet',
+  widgets: 'ウィジェット',
   settings: '設定',
   logs: 'ログ',
 };
@@ -417,7 +426,7 @@ function App() {
       </header>
       <aside className="activity-rail">
         <Brand />
-        {(['home', 'extensions', 'settings', 'logs'] as Page[]).map((p) => (
+        {(['home', 'extensions', 'widgets', 'settings', 'logs'] as Page[]).map((p) => (
           <button
             key={p}
             title={labels[p]}
@@ -526,6 +535,7 @@ function App() {
             {page === 'home' && (
               <>
                 <PageHeading title="ホーム" />
+                <HomeWidgets snapshot={snapshot} manage={() => setPage('widgets')} />
                 <div className="stats">
                   <div>
                     <span className="stat-icon green">
@@ -626,6 +636,14 @@ function App() {
                 </div>
               </>
             )}
+            <div hidden={page !== 'widgets'}>
+              <WidgetsPage
+                snapshot={snapshot}
+                run={action}
+                busy={busy}
+                active={page === 'widgets'}
+              />
+            </div>
             {page === 'extensions' && (
               <>
                 <PageHeading
@@ -1694,4 +1712,6 @@ function LogsPage({
     </>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  new URLSearchParams(location.search).get('surface') === 'widget' ? <WidgetSurface /> : <App />,
+);
