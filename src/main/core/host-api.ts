@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
-import { Notification, safeStorage, shell } from 'electron';
+import { Notification, safeStorage, shell, dialog } from 'electron';
+import { queueSound } from './sounds';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
 import { atomicWrite, isObject } from './settings';
@@ -16,6 +17,7 @@ export function createHostApi(
   log: (level: string, source: string, message: string) => void,
   changed: () => void,
   commandsChanged: () => void = changed,
+  executeCommand: (id: string) => Promise<unknown> = async () => {},
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -49,6 +51,34 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.ui.pickFile': {
+        requireCapability('file-dialog');
+        if (p.kind !== 'json' && p.kind !== 'wav')
+          throw new Error('JSONまたはWAVを指定してください。');
+        const result = await dialog.showOpenDialog({
+          title: p.kind === 'json' ? 'OAuthクライアントJSONを選択' : '通知音を選択',
+          properties: ['openFile'],
+          filters: [{ name: p.kind.toUpperCase(), extensions: [p.kind] }],
+        });
+        return result.canceled ? null : (result.filePaths[0] ?? null);
+      }
+      case 'host.audio.play': {
+        requireCapability('audio');
+        if (typeof p.file !== 'string') throw new Error('音声ファイルを指定してください。');
+        const child = e.child;
+        queueSound(
+          p.file,
+          () => e.child === child && ['starting', 'running'].includes(e.state),
+          () => log('error', id, '通知音を再生できません。WAVファイルを確認してください。'),
+        );
+        return null;
+      }
+      case 'host.tray.attention':
+        requireCapability('tray-attention');
+        if (typeof p.active !== 'boolean') throw new Error('activeはbooleanです。');
+        e.attention = p.active;
+        commandsChanged();
+        return null;
       case 'host.widgets.replace': {
         requireCapability('widgets');
         const widgets = registerWidgetFonts(
@@ -136,13 +166,35 @@ export function createHostApi(
         }
         return null;
       }
-      case 'host.notifications.show':
+      case 'host.notifications.show': {
         requireCapability('notifications');
         if (typeof p.title !== 'string' || typeof p.body !== 'string')
           throw new Error('title と body が必要です。');
-        if (settings.value.host.notifications && Notification.isSupported())
-          new Notification({ title: p.title.slice(0, 100), body: p.body.slice(0, 500) }).show();
+        if (p.silent != null && typeof p.silent !== 'boolean')
+          throw new Error('silentはbooleanです。');
+        if (
+          p.command != null &&
+          (typeof p.command !== 'string' || !e.commands.some((c) => c.id === p.command))
+        )
+          throw new Error('このAppletの登録済みコマンドを指定してください。');
+        if (settings.value.host.notifications && Notification.isSupported()) {
+          const notification = new Notification({
+            title: p.title.slice(0, 100),
+            body: p.body.slice(0, 500),
+            silent: p.silent === true,
+          });
+          const child = e.child;
+          if (p.command)
+            notification.on('click', () => {
+              if (e.state === 'running' && e.child === child)
+                void executeCommand(p.command).catch(() =>
+                  log('error', id, '通知のコマンドを実行できませんでした。'),
+                );
+            });
+          notification.show();
+        }
         return null;
+      }
       case 'host.browser.open': {
         requireCapability('browser');
         const url = new URL(String(p.url));

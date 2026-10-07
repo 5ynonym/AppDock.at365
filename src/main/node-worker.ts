@@ -9,15 +9,26 @@ export interface NodeExtensionContext {
     setDesktop(ids: string[], enabled: boolean): Promise<unknown>;
   };
   commands: { register(id: string, title: string, handler: Handler): void };
-  tray: { add(title: string, command: string): void };
+  tray: { add(title: string, command: string): void; attention(active: boolean): Promise<unknown> };
+  audio: { play(file?: string): Promise<unknown> };
   settings: {
     get<T>(key: string, fallback: T): T;
     set(key: string, value: unknown): Promise<unknown>;
     onChanged(handler: Handler): () => void;
     setOptions(key: string, options: SettingOption[]): Promise<unknown>;
   };
-  notifications: { show(title: string, body: string): Promise<unknown> };
-  ui: { showPanel(panel: Panel): Promise<unknown>; getImageDirectory(): Promise<string> };
+  notifications: {
+    show(
+      title: string,
+      body: string,
+      options?: { silent?: boolean; command?: string },
+    ): Promise<unknown>;
+  };
+  ui: {
+    showPanel(panel: Panel): Promise<unknown>;
+    getImageDirectory(): Promise<string>;
+    pickFile(kind: 'json' | 'wav'): Promise<string | null>;
+  };
   browser: { open(url: string): Promise<unknown> };
   log: { info(message: string): Promise<unknown>; error(message: string): Promise<unknown> };
   scheduler: { every(milliseconds: number, callback: Handler): () => void };
@@ -59,7 +70,11 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             commands.push({ id, title, handler });
           },
         },
-        tray: { add: (title, command) => tray.push({ title, command }) },
+        tray: {
+          add: (title, command) => tray.push({ title, command }),
+          attention: (active) => peer.request('host.tray.attention', { active }),
+        },
+        audio: { play: (file = '') => peer.request('host.audio.play', { file }) },
         settings: {
           get: (key, fallback) => (configuration[key] ?? fallback) as typeof fallback,
           set: async (key, value) => {
@@ -77,11 +92,13 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           setOptions: (key, options) => peer.request('host.settings.options', { key, options }),
         },
         ui: {
+          pickFile: (kind) => peer.request('host.ui.pickFile', { kind }, 300000),
           showPanel: (panel) => peer.request('host.ui.panel', panel),
           getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,
         },
         notifications: {
-          show: (title, body) => peer.request('host.notifications.show', { title, body }),
+          show: (title, body, options) =>
+            peer.request('host.notifications.show', { title, body, ...options }),
         },
         browser: { open: (url) => peer.request('host.browser.open', { url }) },
         log: {

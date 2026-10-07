@@ -370,3 +370,11 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ユーザーのdeploy依頼後、AppDock/ExtensionHostプロセス0件を確認して既存deploy.ps1で実利用先へ配置。SHA256 CF656034E722EC2B24FBC6D1EA86887BBA108D8688E553F9851F3AC2F89CC9AAが発行元と一致。settings.json不変。旧EXE退避: artifacts/tray-fallback-deployment-20261007-141726。実利用アプリの自動再起動は行っていない。
 - 500msフォールバック修正版について、ユーザーがdeploy後の実利用で正常動作を確認（2026-10-07 JST）。設定ファイル消失の原因は引き続き未特定。
 - ユーザーの依頼で今回の退避フォルダーartifacts/tray-fallback-deployment-20261007-141726を削除。旧EXE・配置結果JSONを照合後に削除し、空フォルダーも除去、消失を確認。実利用EXE/settings.jsonは削除前後のSHA256一致。他作業の退避物は対象外。
+## 2026-10-07: v0.11.0 GmailChecker向けの共通通知API
+
+- Node APIへファイル選択（JSON/WAV）、短いWAVの順次再生、Appletごとのトレイattention、デスクトップ通知のsilent/クリックコマンドを追加。既存API v1/.NET呼出しは維持。停止・異常終了でattentionを解除し、音声は起動世代を確認して中止する。
+- main/rendererのTypeScript型検査・Vite build成功。ホスト回帰70/70（既存67＋追加3）成功。Gmail側は16/16。既存Node/.NETの実プロセス起動・異常終了・再起動の回帰も成功。
+- 実Electronで暗号化fixtureとGmail AppletのNode workerを接続し、新着表示、クリア、監視切替、削除取消、WAV選択、無音WAV再生、設定保持、停止を確認。発行版の結果は`../Applet.GmailChecker.at365/artifacts/ui-1791355520145/result.json`。通常幅/900px幅の画面を目視確認。
+- 完成したportable EXEと未改変のAppletでも、初回案内、設定、消音、無効化/再有効化、終了コード0を確認。結果は`../Applet.GmailChecker.at365/artifacts/portable-1791355697468/result.json`。
+- .NETホストを既存build-dotnet手順でクリーン発行し、ローカルElectronからportableを作成。単独electron-builder実行はpnpm PATH不足で失敗したが、dev.bat経由で成功。EXE SHA256: `4A6B3D6DBD4302C7A6A3015731344E8795CE7473CC760909EBB580F9C89F4275`。
+- Gmail Appletを開発用publish/extensionsに配置し、5ファイルのハッシュ一致を確認。実利用先へのdeploy・外部pushは実施していない。実Google OAuth/新着、Windows通知の実表示とクリック、実音の聴感、スリープ復帰・長時間常駐は未確認。

@@ -10,6 +10,7 @@
 - [ウィジェット開発ガイド](docs/widgets.md): ウィジェットSDK、描画方式、Watch DLLへの移行。
 - [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
+- [GmailCheckerの開発ガイド](../Applet.GmailChecker.at365/DEVELOPMENT.md): 0.11.0のNode通知APIを使うAppletと、隔離GUI・portable検証。
 
 ## 構成
 

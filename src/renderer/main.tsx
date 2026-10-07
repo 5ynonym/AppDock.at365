@@ -972,7 +972,7 @@ function ExtensionDetail({
           <h3>{e.panel.title}</h3>
           <p>{e.panel.description}</p>
           {!!e.panel.tabs?.length && (
-            <nav className="panel-tabs" aria-label="モニターごとの履歴">
+            <nav className="panel-tabs" aria-label="パネルの切り替え">
               {e.panel.tabs.map((tab) => (
                 <button
                   className="secondary"

@@ -92,13 +92,13 @@ class JsonLinePeer extends EventEmitter {
     if (Buffer.byteLength(line) > MAX_LINE) throw new Error('RPCメッセージが1MBを超えました。');
     this.output.write(line);
   }
-  request(method: string, params: unknown = {}): Promise<any> {
+  request(method: string, params: unknown = {}, timeout = this.timeout): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = `host-${++this.sequence}`;
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`${method} がタイムアウトしました。`));
-      }, this.timeout);
+      }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.send({ jsonrpc: '2.0', id, method, params });

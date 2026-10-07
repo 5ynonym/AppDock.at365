@@ -105,6 +105,23 @@ function showWindow() {
 }
 function trayMenu() {
   if (!tray || !manager) return;
+  const attention = [...manager.items.values()].some((e) => e.state === 'running' && e.attention);
+  const icon = nativeImage
+    .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
+    .resize({ width: 20, height: 20 });
+  if (attention) {
+    const pixels = icon.toBitmap();
+    for (let y = 0; y < 8; y++)
+      for (let x = 12; x < 20; x++) {
+        const offset = (y * 20 + x) * 4;
+        pixels[offset] = 70;
+        pixels[offset + 1] = 170;
+        pixels[offset + 2] = 255;
+        pixels[offset + 3] = 255;
+      }
+    tray.setImage(nativeImage.createFromBitmap(pixels, { width: 20, height: 20 }));
+  } else tray.setImage(icon);
+  tray.setToolTip(attention ? 'AppDock.at365 — 新しい通知があります' : 'AppDock.at365');
   const groups = trayCommandGroups(settings.value, manager.snapshot());
   const appletGroups = groups.filter((group) => group.extensionId !== null);
   const builtins = groups.find((group) => group.extensionId === null)?.commands ?? [];
@@ -338,7 +355,14 @@ async function initialize() {
     dotnetHost: app.isPackaged
       ? path.join(process.resourcesPath, 'dotnet-host')
       : path.join(app.getAppPath(), 'artifacts', 'dotnet-host'),
-    api: createHostApi(settings, dataDirectory, log.write, changed, () => manager.emit('changed')),
+    api: createHostApi(
+      settings,
+      dataDirectory,
+      log.write,
+      changed,
+      () => manager.emit('changed'),
+      executeCommand,
+    ),
     log: log.write,
   });
   const hotKeyHost = app.isPackaged
