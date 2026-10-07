@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-08: v0.16.0 Webアカウント管理と画像取得
+
+- WebアカウントUIへmove/setMonitoring、snapshot/readへmonitoring/avatar、readへmonitoringResetsを追加。旧accounts.jsonは個別監視ONを既定とし、順番の保存でselected/UUID/セッションを変更しない。OFFはUI data/attentionを直ちに消去し、遅いreportも再計上しない。ON/OFFの遷移を次のreadまで保持する。
+- avatarOriginsを最大10個の厳密なHTTPS originとして検証。画像取得はNodeへのreadを待たせず、CookieなしのClientRequestで転送先を逐次検証（最大3転送/合計5秒）。入力64KBのストリーム上限、raster MIME、デコード後64px PNG/64KB、削除・停止時のabortを実装。UI snapshotだけへdata画像を返し、Nodeの1MB RPCへ画像バイトを送らない。実GmailでのSession.fetch manual redirectの取消エラーを確認し、ClientRequestへ修正した。[公式ClientRequest仕様](https://www.electronjs.org/docs/latest/api/client-request)と[関連するElectron issue](https://github.com/electron/electron/issues/43715)を参照。
+- 最終main/renderer型検査・Vite・ホスト90/90・Gmail20/20成功。新しい回帰は並べ替え・OFFと古いreport・read間の再開、画像の厳密origin/MIME/サイズ、転送/取消を含む。Gmailの最終配布版アカウントUI試験`../Applet.Gmail.at365/artifacts/accounts-1791404902870/result.json`、通常Electronの最終app.asar背景試験`../Applet.Gmail.at365/artifacts/native-background-1791404906576/result.json`、単一EXE`../Applet.Gmail.at365/artifacts/portable-1791404908006/result.json`（0.16.0、exitCode0）成功。
+- 実Gmailの保存済み2アカウントで両アバターをUI未表示の通常起動から取得、GPUオフ/認証保持。画像と監視のboolean・件数だけを診断し、本文/認証値を出力せず、メール状態を変更していない。実メールによる個別監視OFF/ON、長期常駐・スリープは未確認。詳細は[Gmail検証記録](../Applet.Gmail.at365/VERIFICATION.md)。
+- 最終EXE100,447,550 bytes、SHA256 `55860971131436395A82378679A93AC6CF766A5B90F44CFC9936A14E3C423BB7`。.NETはframework-dependentクリーン発行、Runtime混入なし。Gmailは0.5.0/最低host0.16.0。開発配置のみ更新、外部push・実利用先deployなし。文書リンク88件・Prettier・diff check成功。
+
 ## 2026-10-08: v0.15.2 背景同期の再開・通常フォーカス
 
 - 実利用版0.15.1/Gmail0.4.1でも、未表示の受信側は同期せず、表示しても反映せず、手動更新だけで反映するとの報告を受領。実Gmailでpaint/rAF/タイマー/document.hasFocusが正常でも受信同期が止まることを再現。DOMのreadyを待つだけの候補も実送信では不足したため、背景のアクティブ状態を30秒ごとに250msだけ解除して再適用する方式へ変更した。

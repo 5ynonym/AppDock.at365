@@ -7,6 +7,8 @@ import {
   shell,
   screen,
   nativeTheme,
+  nativeImage,
+  net,
   type Input,
 } from 'electron';
 import fs from 'node:fs';
@@ -23,11 +25,12 @@ import { WindowStateStore, restoreWindowBounds } from './window-state';
 import { queueSound } from './sounds';
 import { importSound, managedSound, pruneSounds } from './sound-assets';
 import { keepWebPageActive } from './web-page-activity';
+import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-avatar';
 
 type Saved = {
   version: 1;
   selected: string;
-  accounts: { id: string; name: string; sound?: WebAccountSound }[];
+  accounts: { id: string; name: string; sound?: WebAccountSound; monitoring?: boolean }[];
 };
 interface WebAccountServices {
   capabilities: string[];
@@ -106,7 +109,12 @@ export function validateWebAccounts(
     throw Error('webAccounts definition is invalid');
   if (value.keepActive !== undefined && typeof value.keepActive !== 'boolean')
     throw Error('webAccounts.keepActive must be boolean');
-  for (const origin of value.origins) {
+  if (
+    value.avatarOrigins !== undefined &&
+    (!Array.isArray(value.avatarOrigins) || value.avatarOrigins.length > 10)
+  )
+    throw Error('webAccounts.avatarOrigins must be an origin list');
+  for (const origin of [...value.origins, ...(value.avatarOrigins ?? [])]) {
     const url = new URL(origin);
     if (
       url.protocol !== 'https:' ||
@@ -161,6 +169,7 @@ export class WebAccountController {
     { error: string; status: string; attention: boolean; observation: unknown; data: string }
   >();
   private acknowledgements = new Set<string>();
+  private monitoringResets = new Set<string>();
   private deleting = new Set<string>();
   private definition: WebAccountDefinition;
   private uiURL: string;
@@ -170,6 +179,10 @@ export class WebAccountController {
   private windowState: WindowStateStore;
   private initializing?: Promise<void>;
   private soundFailures = new Map<string, string>();
+  private avatars = new Map<
+    string,
+    { url: string; image: string; retryAt: number; abort?: AbortController }
+  >();
   private themeChanged = () => this.changed();
   private displaysChanged = () => {
     if (this.background && !this.background.isDestroyed()) {
@@ -222,7 +235,11 @@ export class WebAccountController {
         !s.accounts.some((a) => a.id === s.selected)
       )
         throw Error('アカウント設定を読み込めません。元のファイルを保持しています。');
-      for (const a of s.accounts) if (a.sound !== undefined) parseWebAccountSound(a.sound);
+      for (const a of s.accounts) {
+        if (a.sound !== undefined) parseWebAccountSound(a.sound);
+        if (a.monitoring !== undefined && typeof a.monitoring !== 'boolean')
+          throw Error('アカウントの監視設定を読み込めません。元のファイルを保持しています。');
+      }
     } else {
       const id = randomUUID();
       this.state = { version: 1, accounts: [{ id, name: 'アカウント 1' }], selected: id };
@@ -263,6 +280,70 @@ export class WebAccountController {
   }
   private accountSession(id: string) {
     return session.fromPath(path.join(this.root, 'sessions', id));
+  }
+  private updateAvatar(id: string, raw: unknown) {
+    const url = webAvatarURL(raw, this.definition.avatarOrigins ?? []);
+    const previous = this.avatars.get(id);
+    if (!url) {
+      if (previous) {
+        previous.abort?.abort();
+        this.avatars.delete(id);
+        this.changed();
+      }
+      return;
+    }
+    if (
+      previous?.url === url &&
+      (previous.image || previous.abort || previous.retryAt > Date.now())
+    )
+      return;
+    previous?.abort?.abort();
+    const abort = new AbortController();
+    const entry = {
+      url,
+      image: '',
+      retryAt: Date.now() + 60000,
+      abort: abort as AbortController | undefined,
+    };
+    this.avatars.set(id, entry);
+    if (previous?.image) this.changed();
+    const timer = setTimeout(() => abort.abort(), 5000);
+    void (async () => {
+      try {
+        const bytes = await fetchWebAvatar(
+          url,
+          this.definition.avatarOrigins ?? [],
+          (url) =>
+            webAvatarResponse(abort.signal, () =>
+              net.request({
+                url,
+                session: this.accountSession(id),
+                credentials: 'omit',
+                redirect: 'manual',
+              }),
+            ),
+          abort.signal,
+        );
+        const image = nativeImage.createFromBuffer(bytes);
+        const size = image.getSize();
+        if (image.isEmpty() || size.width > 4096 || size.height > 4096) return;
+        const png = image.resize({ width: 64, height: 64 }).toPNG();
+        if (
+          png.length > 65536 ||
+          this.disposed ||
+          this.deleting.has(id) ||
+          this.avatars.get(id) !== entry
+        )
+          return;
+        entry.image = 'data:image/png;base64,' + png.toString('base64');
+        this.changed();
+      } catch {
+        /* Avatar failure must not interrupt monitoring or login. */
+      } finally {
+        clearTimeout(timer);
+        entry.abort = undefined;
+      }
+    })();
   }
   private bindShortcuts(wc: Electron.WebContents) {
     wc.on('before-input-event', (event, input) => {
@@ -368,6 +449,8 @@ export class WebAccountController {
         }
         return {
           ...a,
+          monitoring: a.monitoring !== false,
+          avatar: includeData ? (this.avatars?.get(a.id)?.image ?? '') : '',
           url,
           loading: !!wc && !wc.isDestroyed() && wc.isLoading(),
           error: status?.error ?? '',
@@ -679,6 +762,43 @@ export class WebAccountController {
         this.show(a.id);
         return;
       }
+      case 'move': {
+        const a = this.account(args[0]),
+          direction = args[1];
+        if (direction !== 1 && direction !== -1) throw Error('Invalid account direction');
+        const accounts = [...this.state.accounts];
+        const index = accounts.findIndex((item) => item.id === a.id),
+          next = index + direction;
+        if (next < 0 || next >= accounts.length) return;
+        if (this.deleting.has(accounts[next].id))
+          throw Error('アカウントの削除完了を待ってください。');
+        [accounts[index], accounts[next]] = [accounts[next], accounts[index]];
+        this.save({ ...this.state, accounts });
+        return;
+      }
+      case 'setMonitoring': {
+        const a = this.account(args[0]),
+          monitoring = args[1];
+        if (typeof monitoring !== 'boolean') throw Error('Invalid account monitoring setting');
+        if ((a.monitoring !== false) === monitoring) return;
+        this.save({
+          ...this.state,
+          accounts: this.state.accounts.map((item) =>
+            item.id === a.id ? { ...item, monitoring } : item,
+          ),
+        });
+        const status = this.statuses.get(a.id);
+        if (status) {
+          status.attention = false;
+          status.data = 'null';
+          status.status = monitoring ? '監視を再開しています…' : 'このアカウントの監視はOFFです';
+        }
+        // A worker can miss a rapid OFF/ON between reads. Explicitly reset its
+        // baseline on either transition, independently of display clearing.
+        this.monitoringResets.add(a.id);
+        this.changed();
+        return;
+      }
       case 'rename': {
         const a = this.account(args[0]),
           name = args[1];
@@ -795,6 +915,9 @@ export class WebAccountController {
           this.activityCleanup.delete(a.id);
           if (view && !view.webContents.isDestroyed()) view.webContents.close();
           this.views.delete(a.id);
+          this.avatars.get(a.id)?.abort?.abort();
+          this.avatars.delete(a.id);
+          this.monitoringResets.delete(a.id);
           this.statuses.delete(a.id);
           this.acknowledgements.delete(a.id);
           const ses = this.accountSession(a.id);
@@ -834,6 +957,7 @@ export class WebAccountController {
         origin = new URL(wc.getURL()).origin;
       } catch {}
       if (origin !== this.definition.observeOrigin) {
+        this.updateAvatar(a.id, null);
         status.observation = null;
         status.status = 'ログインが必要です';
         continue;
@@ -876,6 +1000,10 @@ export class WebAccountController {
         if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
           throw Error('Observation too large');
         status.observation = result;
+        this.updateAvatar(
+          a.id,
+          result && typeof result === 'object' && 'avatar' in result ? result.avatar : null,
+        );
         if (result && typeof result === 'object' && 'ready' in result && result.ready === true)
           this.activityCleanup.get(a.id)?.ready();
       } catch {
@@ -887,13 +1015,20 @@ export class WebAccountController {
     this.acknowledgements.clear();
     // Reports belong to the local UI, not the worker that produced them. Avoid
     // duplicating ten accounts' histories in the bounded 1 MB JSON-RPC response.
-    return { ...this.snapshot(false), acknowledged };
+    const monitoringResets = [...this.monitoringResets];
+    this.monitoringResets.clear();
+    return { ...this.snapshot(false), acknowledged, monitoringResets };
   }
   report(id: string, status: string, attention: boolean, data?: unknown) {
-    this.account(id);
+    const account = this.account(id);
     if (typeof status !== 'string' || status.length > 200 || typeof attention !== 'boolean')
       throw Error('Invalid Web account report');
     const s = this.statuses.get(id);
+    if (account.monitoring === false) {
+      status = 'このアカウントの監視はOFFです';
+      attention = false;
+      data = null;
+    }
     const json = serializeWebReport(data);
     if (s && (s.status !== status || s.attention !== attention || s.data !== json)) {
       s.status = status;
@@ -911,6 +1046,8 @@ export class WebAccountController {
     screen.removeListener('display-metrics-changed', this.displaysChanged);
     this.windowState.flush();
     const ids = [...this.views.keys()];
+    for (const avatar of this.avatars.values()) avatar.abort?.abort();
+    this.avatars.clear();
     for (const activity of this.activityCleanup.values()) activity.dispose();
     this.activityCleanup.clear();
     for (const view of this.views.values())

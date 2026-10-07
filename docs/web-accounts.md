@@ -1,4 +1,4 @@
-# WebアカウントAPI（v0.15.2）
+# WebアカウントAPI（v0.16.0）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
@@ -30,6 +30,12 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 ## Node/RPC
 
+0.16.0はローカルUIに`move(id, 1|-1)`（隣の枠と順番を交換、端では変更なし）と`setMonitoring(id, boolean)`を追加します。並べ替えはaccountsの配列順だけを保存し、UUID・選択枠・セッション・通知音を維持します。snapshot/readの各枠には`monitoring:boolean`を追加し、旧保存形式の未指定はtrueです。OFFではホストもattentionとdataを直ちにクリアし、遅延reportからの再計上を抑制します。ページ更新と読取は保持し、検知・通知・音を止める判断はNode Appletが行います。
+
+`read`は`monitoringResets:string[]`も返します。ON/OFFの遷移を次のreadまで保持し、OFF→ONが読取間隔内に発生しても基準を消去できます。Appletは該当するmonitorをresetし、個別/全体の監視OFFなら履歴・件数を消去してください。再開時の未読取り込みはAppletの方針です。
+
+任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（Cookieなし・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFのみ、ストリームを含め64KBまで。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
+
 | Node | RPC | 処理 |
 | --- | --- | --- |
 | `context.webAccounts.start()` | `host.webAccounts.start` | 全枠を非表示で読込開始、UIを開かない |
@@ -38,7 +44,7 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 | `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
 
-`read`の戻り値は`{ dark, selected, accounts, acknowledged }`。アカウントは`id/name/url/loading/error/canGoBack/canGoForward/observation/status/attention/data/sound/soundError`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnullにし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
+`read`の戻り値は`{ dark, selected, accounts, acknowledged, monitoringResets }`。アカウントは`id/name/monitoring/avatar/url/loading/error/canGoBack/canGoForward/observation/status/attention/data/sound/soundError`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnull、avatarを空文字にし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
 
 観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
 

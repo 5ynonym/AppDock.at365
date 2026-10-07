@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('webAccounts', {
   select: (id: string) => ipcRenderer.invoke('web-account:invoke', 'select', id),
   rename: (id: string, name: string) =>
     ipcRenderer.invoke('web-account:invoke', 'rename', id, name),
+  move: (id: string, direction: number) =>
+    ipcRenderer.invoke('web-account:invoke', 'move', id, direction),
+  setMonitoring: (id: string, enabled: boolean) =>
+    ipcRenderer.invoke('web-account:invoke', 'setMonitoring', id, enabled),
   remove: (id: string) => ipcRenderer.invoke('web-account:invoke', 'remove', id),
   navigate: (action: string) => ipcRenderer.invoke('web-account:invoke', 'navigate', action),
   openItem: (id: string, key: string) =>
