@@ -9,7 +9,7 @@ export interface NodeExtensionContext {
     read(): Promise<
       import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
     >;
-    report(id: string, status: string, attention: boolean): Promise<unknown>;
+    report(id: string, status: string, attention: boolean, data?: unknown): Promise<unknown>;
   };
   widgets: {
     replace(widgets: WidgetDefinition[]): Promise<unknown>;
@@ -74,8 +74,8 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             peer.request('host.webAccounts.read', {}) as Promise<
               import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
             >,
-          report: (id, status, attention) =>
-            peer.request('host.webAccounts.report', { id, status, attention }),
+          report: (id, status, attention, data) =>
+            peer.request('host.webAccounts.report', { id, status, attention, data }),
         },
         widgets: {
           replace: (widgets) => peer.request('host.widgets.replace', { widgets }),

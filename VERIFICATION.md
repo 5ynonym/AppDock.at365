@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-07: v0.13.0 Web表示領域と一時UIデータ
+
+- Node `webAccounts.report(id,status,attention,data?)`に50KB以下のJSON化可能な一時データを追加。アカウントsnapshotへ渡し、ファイル/ログへ保存しない。ローカルUIの限定IPCに`viewport`を追加し、整数/DIPの矩形をclient領域へ切り詰める。nullはView非表示でページ・背景監視を継続。旧UIの未指定時は236/146の既定レイアウトを維持する。
+- main/renderer型検査・Vite、ホスト回帰75/75成功。新しい境界テストで不正矩形・多バイトJSON上限・循環JSONを確認。最大10枠の履歴をNodeへ再送せず、観測結果をJSON-RPCの1MB以内で返すことも検証。既存Node/.NET起動・異常終了・再起動・設定・終了も成功。
+- Gmail 0.2.0の発行版GUI: `../Applet.Gmail.at365/artifacts/gui-1791368517560/result.json`。新着一覧/設定中のView非表示と背景検知、復帰とリサイズ、送信元/件名、複数アカウントの絞り込みとクリア、ログインCookieの分離/再起動保持/削除、停止時破棄、remote Node/IPC非公開を確認。
+- 最終portableと未改変Applet: `../Applet.Gmail.at365/artifacts/portable-1791368914954/result.json`（version 0.13.0、exitCode 0）。新UIとメタデータ、クリア、停止/再有効化、終了が成功。オフライン認証/GPU回帰は`../Applet.Gmail.at365/artifacts/auth-redirect-1791368563012/result.json`。
+- 実開発Gmailで保存済み認証の復帰・受信トレイ2行の送信元/件名抽出・初回履歴0・GPUオフを確認。今回の新着一覧での実受信・実返信やスリープは未確認。旧版の実到着→Windows通知とWorkspaceログアウト/再ログインのユーザー確認を引き続き区別して保持する。
+- .NETホストは既存手順でframework-dependentクリーン発行（coreclr.dll等のRuntimeなし）。単独electron-builderはpnpm PATH不足で失敗したが、プロジェクトの`dev.bat exec electron-builder --win portable --x64`で成功。最終発行EXE: 100,437,982 bytes、SHA256 `C6509735B60E29F09D3AD63FB5BB42E6461A18FAE4D264701648A356A210860C`。実利用先へのdeployは行っていない。
+
 ## 2026-10-07: v0.12.0 Webアカウントの共通管理
 
 - Nodeへ`webAccounts.start/open/read/report`と`web-accounts` capabilityを追加。Gmail固有のDOM観測は新しいAppletへ置き、ホストはWebContentsView・アカウント別永続セッション・限定UI IPC・破棄を担当。.NET/nativeの既存APIは維持し、今回は.NET SDK専用ラッパーは追加していない。

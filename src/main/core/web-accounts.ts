@@ -9,6 +9,25 @@ import type { WebAccountDefinition, WebAccountSnapshot } from '../../shared/web-
 type Saved = { version: 1; selected: string; accounts: { id: string; name: string }[] };
 const validId = (id: unknown): id is string => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id);
 const controllers = new Map<string, WebAccountController>();
+type Viewport = { x: number; y: number; width: number; height: number };
+export function parseWebViewport(raw: unknown): Viewport | null {
+  if (raw === null) return null;
+  const v = raw as Viewport;
+  if (
+    !v ||
+    ['x', 'y', 'width', 'height'].some((key) => {
+      const n = v[key as keyof Viewport];
+      return !Number.isSafeInteger(n) || n < (key === 'x' || key === 'y' ? 0 : 1) || n > 100000;
+    })
+  )
+    throw Error('Invalid Web account viewport');
+  return { x: v.x, y: v.y, width: v.width, height: v.height };
+}
+export function serializeWebReport(raw: unknown): string {
+  const json = JSON.stringify(raw ?? null);
+  if (!json || Buffer.byteLength(json) > 50000) throw Error('Web account report data is too large');
+  return json;
+}
 let ipcInstalled = false;
 function asset(folder: string, relative: string): string {
   if (typeof relative !== 'string' || path.isAbsolute(relative))
@@ -70,6 +89,7 @@ export class WebAccountController {
   private state: Saved;
   private window?: BrowserWindow;
   private attached?: WebContentsView;
+  private viewport: Viewport | null | undefined;
   private disposed = false;
   private opening?: Promise<void>;
   private reads = new Map<string, Promise<unknown>>();
@@ -77,7 +97,7 @@ export class WebAccountController {
   private views = new Map<string, WebContentsView>();
   private statuses = new Map<
     string,
-    { error: string; status: string; attention: boolean; observation: unknown }
+    { error: string; status: string; attention: boolean; observation: unknown; data: string }
   >();
   private acknowledgements = new Set<string>();
   private deleting = new Set<string>();
@@ -154,7 +174,7 @@ export class WebAccountController {
   private accountSession(id: string) {
     return session.fromPath(path.join(this.root, 'sessions', id));
   }
-  snapshot(): WebAccountSnapshot {
+  snapshot(includeData = true): WebAccountSnapshot {
     return {
       selected: this.state.selected,
       accounts: this.state.accounts.map((a) => {
@@ -181,6 +201,7 @@ export class WebAccountController {
           observation: status?.observation ?? null,
           status: status?.status ?? '受信トレイの表示を待っています',
           attention: status?.attention ?? false,
+          data: includeData ? JSON.parse(status?.data ?? 'null') : null,
         };
       }),
     };
@@ -232,6 +253,7 @@ export class WebAccountController {
       status: '受信トレイの表示を待っています',
       attention: false,
       observation: null,
+      data: 'null',
     });
     const wc = view.webContents;
     const allowed = (url: string) => allowedWebNavigation(url, this.definition.origins);
@@ -295,11 +317,15 @@ export class WebAccountController {
   private layout() {
     if (!this.window || !this.attached) return;
     const [w, h] = this.window.getContentSize();
+    const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
+    const visible = this.viewport !== null && area.x < w && area.y < h;
+    this.attached.setVisible(visible);
+    if (!visible) return;
     this.attached.setBounds({
-      x: 236,
-      y: 146,
-      width: Math.max(1, w - 236),
-      height: Math.max(1, h - 146),
+      x: area.x,
+      y: area.y,
+      width: Math.max(1, Math.min(area.width, w - area.x)),
+      height: Math.max(1, Math.min(area.height, h - area.y)),
     });
   }
   private show(id: string) {
@@ -374,6 +400,10 @@ export class WebAccountController {
   }
   private async invoke(method: string, args: unknown[]) {
     switch (method) {
+      case 'viewport':
+        this.viewport = parseWebViewport(args[0]);
+        this.layout();
+        return;
       case 'snapshot':
         return this.snapshot();
       case 'add': {
@@ -544,16 +574,20 @@ export class WebAccountController {
     }
     const acknowledged = [...this.acknowledgements];
     this.acknowledgements.clear();
-    return { ...this.snapshot(), acknowledged };
+    // Reports belong to the local UI, not the worker that produced them. Avoid
+    // duplicating ten accounts' histories in the bounded 1 MB JSON-RPC response.
+    return { ...this.snapshot(false), acknowledged };
   }
-  report(id: string, status: string, attention: boolean) {
+  report(id: string, status: string, attention: boolean, data?: unknown) {
     this.account(id);
     if (typeof status !== 'string' || status.length > 200 || typeof attention !== 'boolean')
       throw Error('Invalid Web account report');
     const s = this.statuses.get(id);
-    if (s && (s.status !== status || s.attention !== attention)) {
+    const json = serializeWebReport(data);
+    if (s && (s.status !== status || s.attention !== attention || s.data !== json)) {
       s.status = status;
       s.attention = attention;
+      s.data = json;
       this.changed();
     }
   }

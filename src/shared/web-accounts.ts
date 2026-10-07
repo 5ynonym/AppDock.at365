@@ -16,6 +16,7 @@ export interface WebAccount {
   observation: unknown;
   status: string;
   attention: boolean;
+  data: unknown;
 }
 export interface WebAccountSnapshot {
   selected: string;
@@ -29,5 +30,6 @@ export interface WebAccountUi {
   remove(id: string): Promise<void>;
   navigate(action: 'back' | 'forward' | 'reload' | 'inbox'): Promise<void>;
   acknowledge(id: string): Promise<void>;
+  viewport(bounds: { x: number; y: number; width: number; height: number } | null): Promise<void>;
   onChanged(callback: () => void): () => void;
 }

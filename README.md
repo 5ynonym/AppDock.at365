@@ -61,7 +61,7 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 | --- | --- |
 | [Watch](../Applet.Watch.at365/README.md) | 時計と日付のウィジェット |
 | [GmailChecker](../Applet.GmailChecker.at365/README.md) | 複数Gmailアカウントの新着確認とアカウント別の通知音（AppDock 0.11.0以降） |
-| [Gmail](../Applet.Gmail.at365/README.md) | GmailのWeb画面、アカウント別ログイン保持、画面更新からの新着検知（AppDock 0.12.0以降） |
+| [Gmail](../Applet.Gmail.at365/README.md) | GmailのWeb画面、アカウント別ログイン保持、新着の送信元・件名一覧（Gmail 0.2.0はAppDock 0.13.0以降） |
 | [WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md) | モニターごとの壁紙スライドショーと履歴 |
 | [WindowMover](../Applet.WindowMover.at365/README.md) | 最前面ウィンドウの移動・サイズ変更・終了 |
 | [WindowsTools](../Applet.WindowsTools.at365/README.md) | 消灯予約・キー送信・無操作時のPCロック |

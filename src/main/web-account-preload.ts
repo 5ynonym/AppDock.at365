@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('webAccounts', {
   remove: (id: string) => ipcRenderer.invoke('web-account:invoke', 'remove', id),
   navigate: (action: string) => ipcRenderer.invoke('web-account:invoke', 'navigate', action),
   acknowledge: (id: string) => ipcRenderer.invoke('web-account:invoke', 'acknowledge', id),
+  viewport: (bounds: unknown) => ipcRenderer.invoke('web-account:invoke', 'viewport', bounds),
   onChanged: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('web-account:changed', handler);
