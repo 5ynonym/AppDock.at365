@@ -26,6 +26,8 @@ export interface WidgetPlacement {
   fontSize: number;
   opacity: number;
   color: string;
+  horizontalAlign: 'auto' | 'left' | 'center' | 'right';
+  verticalAlign: 'auto' | 'top' | 'center' | 'bottom';
 }
 export interface WidgetContent {
   kind: 'clock' | 'date' | 'text';
@@ -71,6 +73,8 @@ export const defaultWidgetPlacement = (): WidgetPlacement => ({
   fontSize: 80,
   opacity: 0.8,
   color: '#ffffff',
+  horizontalAlign: 'auto',
+  verticalAlign: 'auto',
 });
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -90,6 +94,8 @@ export function parseWidgetPlacement(value: unknown): WidgetPlacement {
     !['front', 'desktop'].includes(p.layer) ||
     !['anchor', 'free'].includes(p.position) ||
     !widgetAnchors.includes(p.anchor) ||
+    !['auto', 'left', 'center', 'right'].includes(p.horizontalAlign) ||
+    !['auto', 'top', 'center', 'bottom'].includes(p.verticalAlign) ||
     typeof p.color !== 'string' ||
     !/^#[0-9a-f]{6}$/i.test(p.color)
   )
@@ -246,4 +252,27 @@ export function widgetBounds(p: WidgetPlacement, display: WidgetDisplay['bounds'
 }
 export function selectWidgetDisplay(displays: WidgetDisplay[], monitor: string) {
   return displays.find((d) => d.id === monitor) ?? displays.find((d) => d.primary) ?? displays[0];
+}
+export function widgetTextAlignment(p: WidgetPlacement, desktop: boolean) {
+  const horizontal =
+    p.horizontalAlign !== 'auto'
+      ? p.horizontalAlign
+      : !desktop
+        ? 'center'
+        : p.anchor.includes('left')
+          ? 'left'
+          : p.anchor.includes('right')
+            ? 'right'
+            : 'center';
+  const vertical =
+    p.verticalAlign !== 'auto'
+      ? p.verticalAlign
+      : !desktop
+        ? 'center'
+        : p.anchor.startsWith('top')
+          ? 'top'
+          : p.anchor.startsWith('bottom')
+            ? 'bottom'
+            : 'center';
+  return { horizontal, vertical };
 }

@@ -519,7 +519,7 @@ function App() {
         ref={setSettingsSidebarHost}
         hidden={page !== 'settings'}
       />
-      <main className={page === 'settings' ? 'settings-main' : undefined}>
+      <main className={page === 'settings' || page === 'widgets' ? 'settings-main' : undefined}>
         {error && (
           <div className="error-banner" role="alert">
             {error}
@@ -636,7 +636,7 @@ function App() {
                 </div>
               </>
             )}
-            <div hidden={page !== 'widgets'}>
+            <div className="settings-page" hidden={page !== 'widgets'}>
               <WidgetsPage
                 snapshot={snapshot}
                 run={action}

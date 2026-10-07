@@ -23,30 +23,59 @@ let application;
     for (const width of [1280, 900, 760]) {
       await page.setViewportSize({ width, height: 600 });
       await page.getByRole('button', { name: '一般', exact: true }).click();
-      const heading = await page.locator('.page-heading').boundingBox();
-      const toolbar = await page.locator('.settings-toolbar').boundingBox();
+      const heading = await page
+        .locator('.settings-page:not([hidden]) .page-heading')
+        .boundingBox();
+      const toolbar = await page
+        .locator('.settings-page:not([hidden]) .settings-toolbar')
+        .boundingBox();
       const form = await page.locator('.settings-form').boundingBox();
-      const scrollTop = await page.locator('.settings-body').evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-        return element.scrollTop;
-      });
+      const scrollTop = await page
+        .locator('.settings-page:not([hidden]) .settings-body')
+        .evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+          return element.scrollTop;
+        });
       assert.ok(scrollTop > 0, `long category scrolls at ${width}`);
-      assert.deepEqual(await page.locator('.page-heading').boundingBox(), heading);
-      assert.deepEqual(await page.locator('.settings-toolbar').boundingBox(), toolbar);
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        heading,
+      );
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        toolbar,
+      );
       await page.getByRole('button', { name: '表示', exact: true }).click();
-      assert.equal(await page.locator('.settings-body').evaluate((element) => element.scrollTop), 0);
-      assert.deepEqual(await page.locator('.page-heading').boundingBox(), heading);
-      assert.deepEqual(await page.locator('.settings-toolbar').boundingBox(), toolbar);
+      assert.equal(
+        await page
+          .locator('.settings-page:not([hidden]) .settings-body')
+          .evaluate((element) => element.scrollTop),
+        0,
+      );
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        heading,
+      );
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        toolbar,
+      );
       const shortForm = await page.locator('.settings-form').boundingBox();
       assert.equal(shortForm.x, form.x);
       assert.equal(shortForm.width, form.width);
       assert.equal(await page.locator('main').evaluate((element) => element.scrollTop), 0);
       await page.getByRole('button', { name: 'JSON', exact: true }).click();
-      await page.locator('.settings-body').evaluate((element) => {
+      await page.locator('.settings-page:not([hidden]) .settings-body').evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
-      assert.deepEqual(await page.locator('.page-heading').boundingBox(), heading);
-      assert.deepEqual(await page.locator('.settings-toolbar').boundingBox(), toolbar);
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        heading,
+      );
+      assert.deepEqual(
+        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        toolbar,
+      );
       await page.getByRole('button', { name: 'フォーム', exact: true }).click();
       await page.screenshot({ path: path.join(profile, `settings-${width}.png`) });
     }

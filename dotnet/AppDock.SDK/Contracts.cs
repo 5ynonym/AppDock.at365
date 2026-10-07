@@ -60,6 +60,8 @@ public sealed record WidgetPlacement
     public double FontSize { get; init; } = 80;
     public double Opacity { get; init; } = 0.8;
     public string Color { get; init; } = "#ffffff";
+    public string HorizontalAlign { get; init; } = "auto";
+    public string VerticalAlign { get; init; } = "auto";
 }
 public interface ICommandService
 {

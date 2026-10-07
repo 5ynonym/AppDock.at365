@@ -11,6 +11,7 @@ const {
   widgetBounds,
   widgetCatalog,
   selectWidgetDisplay,
+  widgetTextAlignment,
 } = require('../out/main/shared/widgets.js');
 const { parseSettings, createDefaultSettings } = require('../out/main/shared/settings-schema.js');
 const { SettingsStore } = require('../out/main/main/core/settings.js');
@@ -22,6 +23,82 @@ Module._load = function (name, ...args) {
 const { createHostApi } = require('../out/main/main/core/host-api.js');
 Module._load = load;
 const clock = { id: 'test.clock', title: 'Clock', content: { kind: 'clock' } };
+const {
+  widgetDateText,
+  clockTypography,
+  dateTypography,
+} = require('../out/main/shared/widget-typography.js');
+test('Watch date uses invariant M/d ddd order and retains the requested timezone', () => {
+  assert.equal(
+    widgetDateText(new Date('2026-10-07T12:00:00Z'), {
+      kind: 'date',
+      locale: 'en-US',
+      timeZone: 'UTC',
+    }),
+    '10/7 Wed',
+  );
+  assert.equal(
+    widgetDateText(new Date('2024-02-29T12:00:00Z'), {
+      kind: 'date',
+      locale: 'en-US',
+      timeZone: 'UTC',
+    }),
+    '2/29 Thu',
+  );
+  assert.equal(
+    widgetDateText(new Date('2026-10-07T23:30:00Z'), {
+      kind: 'date',
+      locale: 'en-US',
+      timeZone: 'Asia/Tokyo',
+    }),
+    '10/8 Thu',
+  );
+});
+test('legacy alignment follows the desktop anchor; explicit text alignment is independent of placement', () => {
+  const p = parseWidgetPlacement({ anchor: 'bottom-left', x: 0, y: 0 });
+  assert.deepEqual(widgetTextAlignment(p, true), { horizontal: 'left', vertical: 'bottom' });
+  assert.deepEqual(widgetTextAlignment(p, false), { horizontal: 'center', vertical: 'center' });
+  assert.deepEqual(
+    widgetTextAlignment({ ...p, horizontalAlign: 'right', verticalAlign: 'top' }, true),
+    { horizontal: 'right', vertical: 'top' },
+  );
+  assert.throws(() => parseWidgetPlacement({ horizontalAlign: 'unknown' }));
+  assert.throws(() => parseWidgetPlacement({ verticalAlign: 'unknown' }));
+});
+test('clock keeps proportional text runs and natural advances; clock and date exclude font gutters', () => {
+  const advance = (text, size) =>
+    [...text].reduce((sum, char) => sum + (char === '1' ? 0.2 : 0.6) * size, 0);
+  const measure = (text, size) => ({
+    left: -size * 0.03,
+    right: advance(text, size) - size * 0.02,
+    advance: advance(text, size),
+    ascent: 0.7 * size,
+    descent: 0.05 * size,
+  });
+  const widths = new Set();
+  for (let second = 0; second < 60; second++) {
+    const value = '12:34:' + String(second).padStart(2, '0');
+    const layout = clockTypography(value, 100, measure);
+    const [main, end] = layout.glyphs;
+    assert.equal(layout.glyphs.length, 2);
+    assert.equal(main.text, '12:34');
+    assert.equal(end.text, value.slice(5));
+    assert.equal(end.size, 50);
+    assert.equal(main.x - measure(main.text, main.size).left, 0);
+    assert.equal(end.x - main.x, measure(main.text, main.size).advance);
+    const m = measure(end.text, end.size);
+    assert.equal(end.x + m.right, layout.width);
+    widths.add(layout.width);
+  }
+  assert.ok(widths.size > 1, 'narrow digits must retain their smaller natural width');
+  const noSeconds = clockTypography('12:34', 100, measure);
+  assert.equal(noSeconds.glyphs.length, 1);
+  assert.equal(noSeconds.width, measure('12:34', 100).left + measure('12:34', 100).right);
+  const date = dateTypography('10/7 Wed', 100, measure);
+  assert.equal(date.glyphs[0].x - measure('10/7 Wed', 100).left, 0);
+  assert.equal(date.glyphs[0].y - measure('10/7 Wed', 100).ascent, 0);
+  assert.equal(date.height, 75);
+});
 test('legacy settings gain an empty widget layout; bad geometry and stale edits cannot overwrite a profile', (t) => {
   const legacy = createDefaultSettings();
   delete legacy.widgets;

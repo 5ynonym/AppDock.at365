@@ -2268,6 +2268,9 @@ summary {
   justify-content: space-between;
   gap: 16px;
 }
+.widget-save-toolbar {
+  justify-content: flex-end;
+}
 .home-widgets {
   margin-bottom: 28px;
 }
@@ -2307,24 +2310,16 @@ summary {
   filter: drop-shadow(0 2px 3px #0009);
 }
 .widget-time-text {
-  width: max-content;
   flex: none;
-  white-space: nowrap;
-  line-height: 1;
+  display: block;
   font-weight: 700;
   font-family: Impact, 'Arial Narrow', sans-serif;
-  font-variant-numeric: tabular-nums;
-  transform-origin: center;
-}
-.widget-seconds {
-  font-size: 0.5em;
-  margin-left: 0.04em;
 }
 .widget-text-content {
   width: 100%;
   overflow: auto;
   white-space: pre-wrap;
-  padding: 12px;
+  padding: 0;
 }
 .widget-text-content dl {
   display: grid;

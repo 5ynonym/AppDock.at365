@@ -48,14 +48,27 @@ async function launch() {
   );
 }
 async function placement(id, patch) {
-  await page.evaluate(
-    async ({ id, patch }) => {
-      const s = await window.dock.snapshot();
-      const w = s.widgets.find((w) => w.id === id);
-      await window.dock.setWidgetPlacement(id, { ...w.placement, ...patch }, s.settings.revision);
-    },
-    { id, patch },
-  );
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.evaluate(
+        async ({ id, patch }) => {
+          const s = await window.dock.snapshot();
+          const w = s.widgets.find((w) => w.id === id);
+          await window.dock.setWidgetPlacement(
+            id,
+            { ...w.placement, ...patch },
+            s.settings.revision,
+          );
+        },
+        { id, patch },
+      );
+      return;
+    } catch (error) {
+      // Windows scanners can briefly hold the test profile's JSON during atomic replacement.
+      if (attempt >= 2 || !String(error).includes('EPERM')) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
 }
 const planes = () =>
   app.evaluate(({ BrowserWindow }) =>
@@ -102,6 +115,8 @@ const nativeProbe = (handle) =>
       .getByRole('button', { name: 'ホームにピン留め', exact: true })
       .click();
     await until(async () => (await snap()).widgets[0].placement.home, 'pin did not persist');
+    await page.getByLabel('文字の左右揃え').selectOption('left');
+    await page.getByLabel('文字の上下揃え').selectOption('top');
     await page.getByLabel('幅', { exact: true }).fill('520');
     await page.getByLabel('高さ', { exact: true }).fill('150');
     await page.getByLabel('文字サイズ', { exact: true }).fill('128');
@@ -148,6 +163,136 @@ const nativeProbe = (handle) =>
       'clock did not tick',
     );
     assert.equal(await surface.evaluate(() => typeof window.dock), 'undefined');
+    await surface.clock.install({ time: new Date('2026-10-07T12:34:00Z') });
+    await surface.clock.pauseAt(new Date('2026-10-07T12:34:00.500Z'));
+    await surface.reload();
+    await surface.waitForFunction(() =>
+      getComputedStyle(document.querySelector('.widget-clock svg')).fontFamily.includes(
+        'widget-at365-watch-clock',
+      ),
+    );
+    const textBounds = () =>
+      surface.evaluate(() => {
+        const svg = document.querySelector('.widget-clock svg');
+        const r = svg.getBoundingClientRect();
+        return {
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          runs: [...svg.querySelectorAll('text')].map((t) => t.textContent),
+        };
+      });
+    const stable = await textBounds();
+    const widths = new Set([stable.width]);
+    for (let second = 1; second < 60; second++) {
+      await surface.clock.runFor(1000);
+      const current = await textBounds();
+      assert.equal(current.x, stable.x, 'left-aligned ink must retain its anchor distance');
+      assert.equal(current.y, stable.y, 'top-aligned ink must retain its anchor distance');
+      assert.deepEqual(current.runs, [stable.runs[0], ':' + String(second).padStart(2, '0')]);
+      widths.add(current.width);
+    }
+    assert.ok(widths.size > 1, 'real font ink widths must remain proportional');
+    assert.equal(await surface.locator('.widget-date svg').getAttribute('aria-label'), '10/7 Wed');
+    for (const horizontal of ['left', 'center', 'right'])
+      for (const vertical of ['top', 'center', 'bottom']) {
+        await placement('at365.watch.clock', {
+          anchor: 'top-left',
+          x: 0,
+          y: 0,
+          horizontalAlign: horizontal,
+          verticalAlign: vertical,
+        });
+        // Frozen page clocks need an explicit tick to flush the changed snapshot.
+        await surface.clock.runFor(100);
+        await surface.waitForFunction(
+          ({ horizontal, vertical }) => {
+            const v = document.querySelector('.widget-clock');
+            return (
+              getComputedStyle(v).justifyContent ===
+                { left: 'flex-start', center: 'center', right: 'flex-end' }[horizontal] &&
+              getComputedStyle(v).alignItems ===
+                { top: 'flex-start', center: 'center', bottom: 'flex-end' }[vertical]
+            );
+          },
+          { horizontal, vertical },
+        );
+        const alignedEdges = () =>
+          surface.evaluate(() => {
+            const box = document.querySelector('.widget-clock').getBoundingClientRect();
+            const text = document.querySelector('.widget-clock svg').getBoundingClientRect();
+            return {
+              left: text.left - box.left,
+              right: box.right - text.right,
+              top: text.top - box.top,
+              bottom: box.bottom - text.bottom,
+              cx: text.left + text.width / 2 - box.left - box.width / 2,
+              cy: text.top + text.height / 2 - box.top - box.height / 2,
+            };
+          });
+        for (let second = 0; second < 60; second++) {
+          const edges = await alignedEdges();
+          assert.ok(
+            Math.abs(edges[horizontal === 'center' ? 'cx' : horizontal]) <= 0.5,
+            `${horizontal} alignment moved: ${JSON.stringify(edges)}`,
+          );
+          assert.ok(
+            Math.abs(edges[vertical === 'center' ? 'cy' : vertical]) <= 0.5,
+            `${vertical} alignment moved: ${JSON.stringify(edges)}`,
+          );
+          await surface.clock.runFor(1000);
+        }
+      }
+    const ink = await surface.evaluate(() =>
+      [...document.querySelectorAll('.widget-time-text')].map((svg) => {
+        const v = svg.viewBox.baseVal;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(v.width) + 4;
+        canvas.height = Math.ceil(v.height) + 4;
+        const context = canvas.getContext('2d');
+        const style = getComputedStyle(svg);
+        for (const text of svg.querySelectorAll('text')) {
+          context.font = `${style.fontWeight} ${text.getAttribute('font-size')}px ${style.fontFamily}`;
+          context.fillText(
+            text.textContent,
+            +text.getAttribute('x') + 2,
+            +text.getAttribute('y') + 2,
+          );
+        }
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let left = canvas.width,
+          top = canvas.height,
+          right = 0,
+          bottom = 0;
+        for (let y = 0; y < canvas.height; y++)
+          for (let x = 0; x < canvas.width; x++)
+            if (pixels[(y * canvas.width + x) * 4 + 3] > 16) {
+              left = Math.min(left, x);
+              top = Math.min(top, y);
+              right = Math.max(right, x + 1);
+              bottom = Math.max(bottom, y + 1);
+            }
+        return {
+          label: svg.getAttribute('aria-label'),
+          left: left - 2,
+          top: top - 2,
+          right: right - 2 - v.width,
+          bottom: bottom - 2 - v.height,
+        };
+      }),
+    );
+    for (const edges of ink)
+      for (const edge of ['left', 'right', 'top', 'bottom'])
+        assert.ok(Math.abs(edges[edge]) <= 2, JSON.stringify(edges));
+    fs.writeFileSync(path.join(profile, 'typography-ink.json'), JSON.stringify(ink, null, 2));
+    await placement('at365.watch.clock', {
+      horizontalAlign: 'left',
+      verticalAlign: 'top',
+      x: 20,
+      y: 20,
+    });
+    await surface.clock.resume();
     await surface.screenshot({ path: path.join(profile, 'front-plane.png'), omitBackground: true });
     const displays = (await snap()).widgetDisplays;
     if (displays.length > 1) {
@@ -317,6 +462,34 @@ const nativeProbe = (handle) =>
       return m.scrollWidth > m.clientWidth + 1;
     });
     assert.equal(overflow, false, 'widget management must fit the narrow host window');
+    for (const width of [1280, 900, 760]) {
+      await app.evaluate(
+        ({ BrowserWindow }, width) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => !w.webContents.getURL().includes('surface=widget'))
+            .setSize(width, 760),
+        width,
+      );
+      const body = page.locator('.widget-management-body');
+      await body.evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      const before = await page
+        .getByRole('button', { name: '配置を保存', exact: true })
+        .boundingBox();
+      await body.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      const after = await page
+        .getByRole('button', { name: '配置を保存', exact: true })
+        .boundingBox();
+      assert.deepEqual(
+        after,
+        before,
+        'save toolbar must remain fixed while the widget form scrolls',
+      );
+      await page.screenshot({ path: path.join(profile, `toolbar-${width}.png`) });
+    }
     await app.close();
     app = undefined;
     await launch();
@@ -338,6 +511,11 @@ const nativeProbe = (handle) =>
             'home pin/form persistence',
             'shared transparent front plane',
             'rendered clock tick',
+            'proportional runs and variable ink width',
+            '60 ticks in all 9 text alignments',
+            'tight clock/date ink bounds',
+            'invariant Watch date format',
+            'fixed save toolbar at 1280/900/760',
             'restricted surface IPC',
             'Windows desktop shell attach',
             'move/save/cancel',
