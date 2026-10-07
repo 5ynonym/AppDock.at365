@@ -28,7 +28,11 @@ import { parseSettings } from '../shared/settings-schema';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
-import { TrayClickDispatcher, readDoubleClickTime } from './core/tray-clicks';
+import {
+  DEFAULT_DOUBLE_CLICK_TIME_MS,
+  TrayClickDispatcher,
+  readDoubleClickTime,
+} from './core/tray-clicks';
 import type { HostSnapshot, Settings } from '../shared/contracts';
 import { widgetCatalog, parseWidgetPlacement } from '../shared/widgets';
 import { DesktopWidgets, widgetDisplays } from './core/desktop-widgets';
@@ -445,6 +449,7 @@ async function initialize() {
       return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(file).href);
   });
+  session.defaultSession.setSpellCheckerEnabled(false);
   session.defaultSession.setPermissionRequestHandler((_, __, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   Menu.setApplicationMenu(null);
@@ -478,6 +483,7 @@ async function initialize() {
       contextIsolation: true,
       sandbox: true,
       webviewTag: false,
+      spellcheck: false,
     },
   });
   if (process.platform === 'win32') {
@@ -537,8 +543,12 @@ async function initialize() {
     runTrayCommand,
     () =>
       readDoubleClickTime(hotKeyHost).catch((error) => {
-        log.write('warn', 'tray', `${String(error)} 最大判定時間の5秒で待機します。`);
-        return 5000;
+        log.write(
+          'warn',
+          'tray',
+          `${String(error)} 既定のダブルクリック判定時間${DEFAULT_DOUBLE_CLICK_TIME_MS}msで待機します。`,
+        );
+        return DEFAULT_DOUBLE_CLICK_TIME_MS;
       }),
   );
   tray.on('click', () => trayClicks?.click());

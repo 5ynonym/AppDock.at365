@@ -108,6 +108,7 @@ export class DesktopWidgets {
         contextIsolation: true,
         nodeIntegration: false,
         webviewTag: false,
+        spellcheck: false,
       },
     });
     win.setMenu(null);
