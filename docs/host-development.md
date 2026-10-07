@@ -42,6 +42,8 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## React UIとIPCを追加する手順
 
+0.15.1のwindow-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。web-page-activity.tsは宣言されたkeepActiveだけをobserveOriginへ適用し、ページのアクティブ状態をChromiumへ設定します。メインフレーム遷移/破棄・認証origin・別Debugger/DevToolsを扱い、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使います。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
+
 0.15.0の設定「バージョン情報・更新」はSettingsPageのaboutカテゴリです。保存フォームを持たず、既存draftは保持します。HostSnapshot.runtimeでElectron/Chromium/Node/OS・アーキテクチャを受け、既存VersionCheckとcheckUpdates/openReleasesを再利用します。表示しただけでは問い合わせず、手動操作時だけ通信します。最終確認時刻はページ内の結果で、永続設定ではありません。Gmailのtest-ui-featuresでライト/ダーク/システムの連動、更新あり/最新版/未公開/未設定/HTTPエラーをオフライン検証します。
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。

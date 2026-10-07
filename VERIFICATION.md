@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-08: v0.15.1 通常起動のWeb初期化・アクティブ維持・終了処理
+
+- 初回未表示のGmailが0.15.0でも更新されないとユーザーが報告。Playwrightの自動focus emulationが通常起動の条件を変えていたことをローカル実装で確認し、背景関連の検証に通常Electron起動を追加した。
+- WindowsのCalculateNativeWinOcclusionを起動前に無効化し、既存のdisable-featuresを保持。任意のwebAccounts.keepActive（既定false）を追加し、observeOriginのロード停止後だけChromiumのページアクティブ状態を維持。メインフレーム移動/認証では解除、他Debugger/ユーザーDevToolsへ干渉せず、OSのフォーカス/選択/入力を移動しない。
+- 実Gmailの2通目のユーザー送信メールは、Gmail画面を開かずopacity0/OSフォーカスfalseのまま、ページアクティブ化後に16行/未読3へ更新。修正版も通常起動でUI未表示・初期新着3・保存認証/GPUオフを確認。実受信トレイは1枠で、実複数アカウント/スリープ/長期常駐は未確認。[Gmail検証記録](../Applet.Gmail.at365/VERIFICATION.md)に詳細。
+- ユーザーの終了エラー画像はWebContents.dispose / Object has been destroyed。WebContentsの破棄後にdebugger getterへ触れていた箇所を、生存中に参照取得・削除/停止前に解放する方式へ修正。破棄済みgetter・認証境界・外部Debuggerとの競合を3回帰で確認。
+- main/renderer型検査・Vite、ホスト82/82、Gmail15/15成功。通常Electronから最終app.asarの実装を使った2枠の初回未表示/未読更新/reload/認証時解除/正常破棄: `../Applet.Gmail.at365/artifacts/native-background-1791394005659/result.json`。最終単一EXE: `../Applet.Gmail.at365/artifacts/portable-1791394017868/result.json`（0.15.1、exitCode0、エラーダイアログなし）。
+- 最終EXEは100,443,530 bytes、SHA256 `D246228B7F8EB393FAA51E4ECAC25E4BD85EED0914C851AE764B755382ADAB8F`。.NETはframework-dependentクリーン発行でRuntime混入なし。開発配置だけを更新し、外部push/実利用先deployは行わない。
+
 ## 2026-10-08: v0.15.0 Web初回描画・テーマ・音声コピー・バージョン情報
 
 - 未表示のWebContentsViewはrAFが動いても初回描画が成立しないことを追加実測。透明・全ディスプレイ外・非フォーカス・タスクバー非表示の親WindowでshowInactiveし、非表示/最小化中もViewを背景へ移す。display変更時は画面外へ再配置し、停止時は購読とWindowを解放する。

@@ -37,6 +37,9 @@ import type { HostSnapshot, Settings } from '../shared/contracts';
 import { widgetCatalog, parseWidgetPlacement } from '../shared/widgets';
 import { DesktopWidgets, widgetDisplays } from './core/desktop-widgets';
 import { widgetFontPath } from './core/widget-fonts';
+import { configureWindowRendering } from './core/window-rendering';
+
+configureWindowRendering(app);
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'appdock', privileges: { standard: true, secure: true, supportFetchAPI: true } },
