@@ -187,6 +187,6 @@ Webサービスの対話ログインとアカウント別ページが必要なNo
 
 初回未表示からページの描画を背景で継続する必要がある場合、最低ホスト版は0.15.1としてください。ホストは透明・画面外・非フォーカスの専用WindowへViewを保持し、可視の操作Windowを選択した場合だけ移します。サービス固有の通知・観測処理は引き続きApplet側です。snapshot.darkでホストテーマを受け取り、通知音は管理領域へコピーします。
 
-通常起動でGmailの初回更新を維持する場合は0.15.1を指定し、webAccounts.keepActive:trueを宣言します。observeOriginのページだけをブラウザー内でアクティブに保ち、認証originでは解除します。フォーカス/選択を自動変更する方式ではありません。通常起動での検証はテストツールによるfocus overrideを避けてください。
+通常起動でGmailの初回更新を維持する場合は0.15.2を指定し、webAccounts.keepActive:trueを宣言します。observerのready:trueを受けたobserveOriginだけを対象にし、背景では30秒ごとに同期再開を促します。native focusがあるWebContentsは通常のfocus/blurを使い、認証originではタイマーも解除します。Windowsのフォーカス/選択を自動変更する方式ではありません。通常起動での検証はテストツールによるfocus overrideを避けてください。
 
 0.14.0では`webAccounts.cycle(1|-1)`とローカルUIの`openItem/setSound/pickSound/testSound`を追加し、ウィンドウ位置・サイズを保存します。項目を開く処理は任意で宣言するitemOpenerの関数式へkeyを渡し、明示的なUI操作でだけ実行します。音はアカウントごとのsoundをreadから参照して既存audio APIで再生してください。APIと境界は[WebアカウントAPI](web-accounts.md)を参照します。

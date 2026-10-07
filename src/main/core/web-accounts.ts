@@ -155,7 +155,7 @@ export class WebAccountController {
   private reads = new Map<string, Promise<unknown>>();
   private generation = new Map<string, number>();
   private views = new Map<string, WebContentsView>();
-  private activityCleanup = new Map<string, () => void>();
+  private activityCleanup = new Map<string, ReturnType<typeof keepWebPageActive>>();
   private statuses = new Map<
     string,
     { error: string; status: string; attention: boolean; observation: unknown; data: string }
@@ -435,7 +435,7 @@ export class WebAccountController {
       data: 'null',
     });
     const wc = view.webContents;
-    this.activityCleanup.get(id)?.();
+    this.activityCleanup.get(id)?.dispose();
     this.activityCleanup.delete(id);
     if (this.definition.keepActive)
       this.activityCleanup.set(
@@ -791,7 +791,7 @@ export class WebAccountController {
             this.attached = undefined;
           }
           if (view) this.background?.contentView.removeChildView(view);
-          this.activityCleanup.get(a.id)?.();
+          this.activityCleanup.get(a.id)?.dispose();
           this.activityCleanup.delete(a.id);
           if (view && !view.webContents.isDestroyed()) view.webContents.close();
           this.views.delete(a.id);
@@ -876,6 +876,8 @@ export class WebAccountController {
         if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
           throw Error('Observation too large');
         status.observation = result;
+        if (result && typeof result === 'object' && 'ready' in result && result.ready === true)
+          this.activityCleanup.get(a.id)?.ready();
       } catch {
         status.observation = null;
         status.status = '画面の解析を待っています';
@@ -909,7 +911,7 @@ export class WebAccountController {
     screen.removeListener('display-metrics-changed', this.displaysChanged);
     this.windowState.flush();
     const ids = [...this.views.keys()];
-    for (const dispose of this.activityCleanup.values()) dispose();
+    for (const activity of this.activityCleanup.values()) activity.dispose();
     this.activityCleanup.clear();
     for (const view of this.views.values())
       if (!view.webContents.isDestroyed()) view.webContents.close();

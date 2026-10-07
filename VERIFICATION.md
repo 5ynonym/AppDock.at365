@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-08: v0.15.2 背景同期の再開・通常フォーカス
+
+- 実利用版0.15.1/Gmail0.4.1でも、未表示の受信側は同期せず、表示しても反映せず、手動更新だけで反映するとの報告を受領。実Gmailでpaint/rAF/タイマー/document.hasFocusが正常でも受信同期が止まることを再現。DOMのreadyを待つだけの候補も実送信では不足したため、背景のアクティブ状態を30秒ごとに250msだけ解除して再適用する方式へ変更した。
+- keepActiveはobserver.ready:trueの後だけ開始。native focus中はエミュレーションを解除し、通常のfocus/blurを優先する。同一文書のhash/history移動で接続を切らず、別文書の移動・認証・停止・破棄で周期/待機/接続を解除。Windowsのフォーカス移動・画面切替・定期reloadは行わない。
+- main/renderer型検査・Vite、ホスト86/86・Gmail15/15成功。活動状態の7回帰には準備待ち、周期更新、native focus、認証へ移る途中の取消、破棄済みgetterへの非アクセスを含む。最終app.asarの通常Electron試験: `../Applet.Gmail.at365/artifacts/native-background-1791399095693/result.json`。DOMの準備より受信処理が遅れて初期化される2枠で、初回未表示・状態更新・hash/history移動・reload・認証・正常終了を確認。
+- ユーザーがログインした開発用2アカウント間で5通を送信。最終候補は再起動を挟んだ両方向の実メールを、受信側を一度も表示せず検知し、未読件数も反映。詳細と観測時刻の範囲は[Gmail検証記録](../Applet.Gmail.at365/VERIFICATION.md)参照。長期常駐・実スリープ復帰は未確認。
+- 最終単一EXE: `../Applet.Gmail.at365/artifacts/portable-1791399100255/result.json`（0.15.2、exitCode0、停止/再開/正常終了）。認証: `../Applet.Gmail.at365/artifacts/auth-redirect-1791399111873/result.json`（Google/YouTube/日本向けGoogle/Workspace、類似origin遮断、GPUオフ、認証中のアクティブ化解除）。
+- 最終EXE100,442,774 bytes、SHA256 `11D9CABB02DAF33388768D1E227DEB9DD1FEB990B1657EE4D03AAB203C8C4D95`。.NETはframework-dependentクリーン発行、Runtime混入なし。開発配置のみ更新し、保存認証を保持したGPUオフの通常テストアプリを起動。外部push/実利用先deployなし。
+
 ## 2026-10-08: v0.15.1 通常起動のWeb初期化・アクティブ維持・終了処理
 
 - 初回未表示のGmailが0.15.0でも更新されないとユーザーが報告。Playwrightの自動focus emulationが通常起動の条件を変えていたことをローカル実装で確認し、背景関連の検証に通常Electron起動を追加した。

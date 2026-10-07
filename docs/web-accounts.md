@@ -1,10 +1,10 @@
-# WebアカウントAPI（v0.15.1）
+# WebアカウントAPI（v0.15.2）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
 ## manifest
 
-0.15.1の任意の`keepActive:boolean`は既定falseです。trueの場合は、observeOriginの読み込み完了後にChromiumの`Emulation.setFocusEmulationEnabled`でページをアクティブに保ちます。Windowsのフォーカス・選択枠・入力を動かさず、サイトのJSや認証を改変しません。メインフレーム遷移開始時に自身のDebugger接続を解除し、認証等の他originには適用しません。利用者がDevToolsを開いている間は干渉せず、閉じたときに再適用します。他のDebugger接続を切断しません。この機能を使うAppletの最低ホスト版は0.15.1です。
+任意の`keepActive:boolean`は既定falseです。0.15.2ではobserveOriginの観測JSが`ready:true`を返した後、Chromiumの`Emulation.setFocusEmulationEnabled`を適用します。背景では30秒ごとに250msだけ解除して再適用し、DOMの準備後に初期化される受信処理の同期開始・再開を促します。native focusがあるWebContentsではエミュレーションを解除し、利用者の通常のfocus/blurを優先します。Windowsのフォーカス・選択枠・入力を動かさず、ページを再読み込みしません。同一文書のhash/history移動では維持し、別文書へのメインフレーム遷移開始時にタイマーと自身のDebugger接続を解除します。認証等の他originには適用しません。利用者がDevToolsを開いている間は干渉せず、閉じたときに再適用します。他のDebugger接続を切断しません。この契約を使うAppletの最低ホスト版は0.15.2です。
 
 Windowsでは起動前に`CalculateNativeWinOcclusion`をdisable-featuresへ追加します。既存のfeature指定を保ち、画面外/透明Windowに対する描画停止を防ぎます。0.15.0の透明Windowだけでは、通常起動の初回描画/アクティブ状態が不足する場合がありました。GmailはkeepActiveを明示的に有効にしています。
 
