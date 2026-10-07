@@ -335,3 +335,13 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 開発版UI: `artifacts/widgets-ui-1791333446251`、発行win-unpacked版UI: `artifacts/widgets-ui-1791333558608`。Playwrightの時計制御で00～59秒の自然な全体幅変化と、固定した左端/上端を確認。全9通りの揃えで各60秒進め、選択した端/中央とウィジェットの端/中央の距離が0.5DIP以内で一定。Hatten.ttfの実描画境界がSVG端から2px以内（実測は左右1px以内・上下0px）、日付`10/7 Wed`、揃え保存/再起動復元を確認。1280/900/760pxでスクロール前後の保存ボタン矩形不変、管理画面PNGを確認。実時刻での秒更新も確認。
 - 既存設定スクロールUIは1280/900/760pxで成功。単一EXE+Watch DLL smoke: `artifacts/smoke-1791333566349/smoke-result.json`（ok=true）。Windowsの一時的なJSONファイル占有（EPERM）が途中のUIテスト中に1回発生し、テスト内の配置操作だけ最大2回再試行するよう調整。本体の保存処理・失敗報告は変更していない。
 - `publish/AppDock.at365.exe`: 100,515,435 bytes、SHA256 `7C332C142040FB9D3669DFBA7227ADD068B1E4C65AFCD212D3AC170ED2818A38`。Watch Appletのソース・実利用先の設定/EXEは変更せず、プロジェクトの発行版だけ更新。外部公開/pushなし。
+
+## 2026-10-07: v0.10.2 デスクトップ固定の描画開始を修正・デプロイ
+
+- デスクトップ固定後のWin32親・座標・可視フラグは正常でも、実画面では表示されない症状を隔離fixtureで再現（`artifacts/widget-visibility-1791334244597`）。以前の親/スタイル検証と`capturePage()`だけではこの欠落を検出できなかった。
+- Shell接続後、初回と非表示からの復帰時にElectronの`showInactive()`も呼んでChromiumの描画を開始し、親と座標を再確認する。通常の5秒ごとの確認でshowを繰り返さない。デスクトップ固定は維持し、GPUやShellの設定は変更していない。
+- 新しい`test:widget-desktop`は隔離Node fixtureを使い、露出したデスクトップの180×120pxだけに色マーカーを描画して実画面を撮影。緑/紫の表示更新、通常のテストウィンドウによる遮蔽と復帰、非表示からの再接続、マーカー除去後の透明部分を確認。利用者のウィンドウ・壁紙を変更しない。画面の色管理を考慮し、色相と領域の90%以上の画素で判定。
+- 開発版の実描画検証: `artifacts/widget-visibility-1791334489928/result.json`。発行win-unpacked版: `artifacts/widget-visibility-1791334630152/result.json`。21,600画素中、緑21,309画素、紫21,301画素、通常ウィンドウの黒21,150画素。除去後は元の背景の画素集計に戻る。
+- main/renderer型検査・Vite build・Prettier・git diff --check、ホスト回帰67/67成功。Watchウィジェットの開発版UI: `artifacts/widgets-ui-1791334419882`、発行版UI: `artifacts/widgets-ui-1791334637705`。DLL起動、全9通りの文字寄せの秒更新、2モニターの親と座標、フォーカス維持、移動/保存/取消、停止/再起動、テーマ/保存バーを確認。単一EXE+Watch DLLの隔離smoke: `artifacts/smoke-1791334645561/smoke-result.json`（ok=true）。Explorer強制再起動、実モニター着脱、RDP、長期常駐は今回も未検証。
+- `publish/AppDock.at365.exe`: 100,512,630 bytes、SHA256 `5571AAF9B070E88F4DA9583AC08422FB5871F22538B894847399B596296AADED`。ローカルNode/pnpmと既存Electron/.NET host成果物で再発行。native bridge/APIとWatchソースに変更なし。
+- ユーザーから完成後の`deploy.bat`実行指示を受け、実行直前のAppDock/ExtensionHostプロセス0件を確認してデプロイ。デプロイ先のProductVersion 0.10.2と発行元SHA256一致、settings.jsonの前後SHA256不変を確認。旧EXEと結果を`artifacts/widget-desktop-deployment-20261007-095802`へ退避。実利用のアプリは起動していない。外部公開/pushなし。

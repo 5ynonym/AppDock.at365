@@ -171,6 +171,11 @@ export class DesktopWidgets {
         if (desktop) {
           // Revalidate the shell parent after Explorer restart, resume and DPI changes.
           await this.attach(plane.window, group.display.bounds);
+          if (!plane.attached || !plane.window.isVisible()) {
+            // SWP_SHOWWINDOW alone does not start Chromium's compositor for a hidden window.
+            plane.window.showInactive();
+            await this.attach(plane.window, group.display.bounds);
+          }
           plane.attached = true;
         }
         if (signature !== plane.signature) {
