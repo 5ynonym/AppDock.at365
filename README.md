@@ -88,6 +88,7 @@ Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジ�
 .\dev.bat run test:preferences
 .\dev.bat run test:hotkeys
 .\dev.bat run test:window-state
+.\dev.bat run test:widget-desktop
 .\dev.bat run smoke
 .\dev.bat run dist
 .\dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe

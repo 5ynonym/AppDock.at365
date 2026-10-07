@@ -143,3 +143,5 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 ## ウィジェット基盤（0.10.0）
 
 契約・設定検証は`src/shared/widgets.ts`、Applet登録は`host-api.ts`、フォントの境界検証は`widget-fonts.ts`、透過画面と移動の寿命管理は`desktop-widgets.ts`、共通React描画は`Widgets.tsx`です。`WindowsWidgetSession`がデスクトップ固定だけを担当します。ウィジェット画面には専用preloadを使い、ホスト設定・コマンド・ファイル操作のIPCを公開しません。内容更新とホスト画面更新を毎秒同期せず、各描画面内の共有タイマーで時計を更新します。詳細は[widgets.md](widgets.md)を参照してください。
+
+デスクトップ固定の初回と非表示からの復帰では、Shellへの接続後にElectronの`showInactive()`も呼び、Chromiumの描画を開始してから親と座標を再確認します。Win32の`SWP_SHOWWINDOW`と`IsWindowVisible`だけでは描画の開始を確認できません。定期確認では表示済み画面を繰り返しshowしません。`test:widget-desktop`は隔離Node fixtureを使い、実デスクトップの露出した180×120pxだけで表示・更新・通常ウィンドウによる遮蔽・非表示からの復帰・透過を検証します。

@@ -79,8 +79,12 @@ dotnet run --project ..\Applet.Watch.at365\Applet.Watch.RegressionTests -c Relea
 ..\Applet.Watch.at365\publish.bat
 .\dev.bat run test:widgets
 .\dev.bat exec node scripts/widgets-ui-test.cjs publish/win-unpacked/AppDock.at365.exe
+.\dev.bat run test:widget-desktop
+.\dev.bat exec node scripts/widget-desktop-visibility-test.cjs publish/win-unpacked/AppDock.at365.exe
 ```
 
 UI検証は隔離profileを作成し、Watchの発行済みDLLをコピーして使用します。実利用先の設定・Applet・壁紙を変更しません。移動検証ではWindowsのウィンドウ座標をプログラムから変更し、完了・取消を実画面で操作します。物理マウスでのドラッグ、実モニター着脱、Explorerの強制再起動、RDP、長期常駐は別途実機確認が必要です。
+
+`test:widget-desktop`は画面への接続成功や`capturePage()`の画像だけでなく、実際のデスクトップ合成結果を確認します。ほかのウィンドウで覆われていない180×120pxを探し、隔離fixtureの色マーカーを表示・更新して、その範囲だけを撮影します。テスト専用の通常ウィンドウでマーカーが隠れ、閉じると復帰すること、非表示から再接続しても描画が再開すること、空の部分で元のデスクトップが見えることも確認します。利用者のウィンドウは動かさず、露出した領域がなければ検証を中止します。
 
 APIの参照: [Electron BrowserWindow](https://www.electronjs.org/docs/latest/api/browser-window)、[Microsoft SetParent](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent)。SetParentのDPI制約に従い、固定の失敗を利用者に表示します。
