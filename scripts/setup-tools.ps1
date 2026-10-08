@@ -72,6 +72,18 @@ try {
         & (Join-Path $nodeDirectory 'npm.cmd') install --prefix $pnpmDirectory --no-audit --no-fund --no-update-notifier --ignore-scripts --save-exact "pnpm@$pnpmVersion"
         if ($LASTEXITCODE -ne 0) { throw "Local pnpm installation failed ($LASTEXITCODE)." }
     }
+    # pnpm 12 ships a native executable. Our initial npm install intentionally
+    # blocks dependency scripts; run only pnpm's own binary setup, then regenerate
+    # npm's Windows shims against the rewritten .exe bin entries.
+    $pnpmPackageDirectory = Join-Path $pnpmDirectory 'node_modules\pnpm'
+    if ([int]($pnpmVersion.Split('.')[0]) -ge 12) {
+        if (-not (Test-Path -LiteralPath (Join-Path $pnpmPackageDirectory 'pnpm.exe') -PathType Leaf)) {
+            & $nodeExecutable (Join-Path $pnpmPackageDirectory 'install.js')
+            if ($LASTEXITCODE -ne 0) { throw "Local pnpm binary setup failed ($LASTEXITCODE)." }
+        }
+        & (Join-Path $nodeDirectory 'npm.cmd') rebuild --prefix $pnpmDirectory --ignore-scripts pnpm
+        if ($LASTEXITCODE -ne 0) { throw "Local pnpm shim setup failed ($LASTEXITCODE)." }
+    }
     $actualPnpm = & $pnpmCommand --version
     if ($LASTEXITCODE -ne 0 -or $actualPnpm -ne $pnpmVersion) {
         throw "Expected local pnpm $pnpmVersion; found $actualPnpm."

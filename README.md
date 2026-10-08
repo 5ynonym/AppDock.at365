@@ -8,6 +8,8 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
+0.16.2はElectron 44.6.0を使用します。追加の導入手順は従来と同じで、EXEを更新して再起動すると利用できます。
+
 この配布版は未署名です。
 
 ## 基本の使い方
