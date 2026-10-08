@@ -292,6 +292,7 @@ function registerIpc() {
     await updater.check([id ?? 'host']);
     return updater.state.results.find((result) => result.id === (id ?? 'host'))!;
   });
+  handle('dock:cancelUpdates', () => updater.cancel());
   handle('dock:checkAllUpdates', () => updater.check());
   handle('dock:installUpdates', (target: string) => {
     if (

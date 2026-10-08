@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
@@ -55,27 +56,42 @@ export function safeRelative(value: unknown): value is string {
       )
   );
 }
-async function readBounded(location: string, max: number, fetcher: Fetcher): Promise<Buffer> {
+async function readBounded(
+  location: string,
+  max: number,
+  fetcher: Fetcher,
+  signal?: AbortSignal,
+  progress?: (received: number) => void,
+): Promise<Buffer> {
+  const combined = AbortSignal.any([
+    AbortSignal.timeout(max <= 1024 * 1024 ? 10000 : 120000),
+    ...(signal ? [signal] : []),
+  ]);
+  combined.throwIfAborted();
+  let stream: AsyncIterable<Uint8Array>;
   if (!/^https?:/i.test(location)) {
     const stat = await fs.stat(location);
     if (!stat.isFile() || stat.size > max)
       throw Error('更新ファイルが大きすぎるか、通常ファイルではありません。');
-    return fs.readFile(location);
+    stream = createReadStream(location, { signal: combined });
+  } else {
+    const response = await fetcher(location, { signal: combined, redirect: 'follow' });
+    if (!response.ok) throw Error(`更新ファイルを取得できませんでした (HTTP ${response.status})。`);
+    if (new URL(response.url || location).protocol !== new URL(location).protocol)
+      throw Error('更新URLの転送で通信方式が変更されました。');
+    if (!response.body) throw Error('更新ファイルの内容がありません。');
+    stream = response.body as unknown as AsyncIterable<Uint8Array>;
   }
-  const response = await fetcher(location, {
-    signal: AbortSignal.timeout(max <= 1024 * 1024 ? 10000 : 120000),
-    redirect: 'follow',
-  });
-  if (!response.ok) throw Error(`更新ファイルを取得できませんでした (HTTP ${response.status})。`);
-  if (new URL(response.url || location).protocol !== new URL(location).protocol)
-    throw Error('更新URLの転送で通信方式が変更されました。');
   const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of response.body as any) {
+  for await (const chunk of stream) {
+    combined.throwIfAborted();
     size += chunk.length;
     if (size > max) throw Error('更新ファイルが大きすぎます。');
     chunks.push(Buffer.from(chunk));
+    progress?.(size);
   }
+  combined.throwIfAborted();
   return Buffer.concat(chunks);
 }
 function validateFeed(value: any, target: UpdateTarget): Feed {
@@ -96,7 +112,14 @@ function validateFeed(value: any, target: UpdateTarget): Feed {
     throw Error('更新情報の配布ファイル・ハッシュ・サイズが正しくありません。');
   return value;
 }
-async function copyTree(source: string, destination: string, budget = { bytes: 0, files: 0 }) {
+async function copyTree(
+  source: string,
+  destination: string,
+  signal: AbortSignal,
+  progress: (bytes: number) => void,
+  budget = { bytes: 0, files: 0 },
+) {
+  signal.throwIfAborted();
   const stat = await fs.lstat(source);
   if (stat.isSymbolicLink()) throw Error('更新元のリンクは使用できません。');
   if (stat.isDirectory()) {
@@ -105,15 +128,24 @@ async function copyTree(source: string, destination: string, budget = { bytes: 0
       if (!safeRelative(entry)) throw Error('更新元に使用できないファイル名があります。');
       // Generated update packages are distribution metadata, not installed Applet files.
       if (entry === 'update.json' || entry === 'update.zip') continue;
-      await copyTree(path.join(source, entry), path.join(destination, entry), budget);
+      await copyTree(
+        path.join(source, entry),
+        path.join(destination, entry),
+        signal,
+        progress,
+        budget,
+      );
     }
   } else {
     if (!stat.isFile() || ++budget.files > 10000 || (budget.bytes += stat.size) > limit)
       throw Error('更新元のファイル数・サイズが上限を超えました。');
     await fs.copyFile(source, destination);
+    signal.throwIfAborted();
+    progress(budget.bytes);
   }
 }
-async function treeHash(directory: string): Promise<string> {
+async function treeHash(directory: string, signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const files: string[] = [];
   async function walk(current: string) {
     for (const entry of await fs.readdir(current, { withFileTypes: true })) {
@@ -128,7 +160,7 @@ async function treeHash(directory: string): Promise<string> {
     files.sort().map(
       async (file) =>
         `${file}\0${createHash('sha256')
-          .update(await fs.readFile(path.join(directory, file)))
+          .update(await fs.readFile(path.join(directory, file), { signal }))
           .digest('hex')}\n`,
     ),
   );
@@ -136,6 +168,15 @@ async function treeHash(directory: string): Promise<string> {
 }
 export class PortableUpdates {
   state: UpdateState = { busy: false, phase: '', results: [] };
+  private controller?: AbortController;
+  cancel(): boolean {
+    if (!this.state.busy || !this.state.cancellable || !this.controller) return false;
+    this.state.cancellable = false;
+    this.state.phase = '更新を取り消しています…';
+    this.controller.abort();
+    this.options.changed();
+    return true;
+  }
   constructor(
     private options: {
       targets(): UpdateTarget[];
@@ -178,6 +219,7 @@ export class PortableUpdates {
           `https://api.github.com/repos/${github[1]}/releases/${endpoint}`,
           1024 * 1024,
           this.fetcher,
+          this.controller?.signal,
         ),
       );
       if (release.draft || release.prerelease) throw Error('正式版のリリースではありません。');
@@ -194,7 +236,12 @@ export class PortableUpdates {
         // Existing Applet publish folders work even before publishing a feed/ZIP.
         if (target.kind === 'applet' && !(await fs.stat(feedLocation).catch(() => null))) {
           const manifest = json(
-            await readBounded(path.join(source, 'extension.json'), 1024 * 1024, this.fetcher),
+            await readBounded(
+              path.join(source, 'extension.json'),
+              1024 * 1024,
+              this.fetcher,
+              this.controller?.signal,
+            ),
           );
           if (manifest.id !== target.id || manifest.apiVersion !== 1)
             throw Error('更新元AppletのIDが一致しません。');
@@ -211,7 +258,7 @@ export class PortableUpdates {
       }
     }
     const feed = validateFeed(
-      json(await readBounded(feedLocation, 1024 * 1024, this.fetcher)),
+      json(await readBounded(feedLocation, 1024 * 1024, this.fetcher, this.controller?.signal)),
       target,
     );
     if (
@@ -262,6 +309,7 @@ export class PortableUpdates {
         },
       };
     } catch (error) {
+      this.controller?.signal.throwIfAborted();
       return {
         result: {
           ...base,
@@ -273,7 +321,10 @@ export class PortableUpdates {
   }
   private begin(phase: string) {
     if (this.state.busy) throw Error('更新処理が進行中です。');
+    this.controller = new AbortController();
     this.state.busy = true;
+    this.state.cancellable = true;
+    this.state.progress = undefined;
     this.state.phase = phase;
     this.options.changed();
   }
@@ -282,15 +333,21 @@ export class PortableUpdates {
     try {
       for (const target of this.options.targets().filter((t) => !ids || ids.includes(t.id)))
         this.update((await this.checkTarget(target)).result);
+      this.state.phase = '';
+    } catch (error) {
+      if (!this.controller?.signal.aborted) throw error;
+      this.state.phase = '更新確認を取り消しました。';
     } finally {
       this.state.busy = false;
-      this.state.phase = '';
+      this.state.cancellable = false;
+      this.controller = undefined;
       this.options.changed();
     }
     return structuredClone(this.state);
   }
   async install(scope: string): Promise<UpdateState> {
     this.begin('更新を準備中…');
+    const signal = this.controller!.signal;
     let temporary: string | undefined;
     let handedOff = false;
     try {
@@ -301,13 +358,14 @@ export class PortableUpdates {
       if (!this.options.executable) throw Error('更新の適用は配布版のAppDockで行ってください。');
       const candidates: Candidate[] = [];
       for (const target of targets) {
+        signal.throwIfAborted();
         const checked = await this.checkTarget(target);
         this.update(checked.result);
         if (checked.candidate && checked.result.installable) candidates.push(checked.candidate);
       }
       if (!candidates.length) {
         this.state.phase = '適用できる更新はありません。';
-        return structuredClone(this.state);
+        return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));
       const helper = path.join(temporary, 'AppDock.Updater.exe');
@@ -321,10 +379,31 @@ export class PortableUpdates {
         sha256?: string;
       }[] = [];
       for (const [index, candidate] of candidates.entries()) {
+        signal.throwIfAborted();
+        this.state.phase = `${candidate.target.name} を取得中…`;
+        this.state.progress = {
+          id: candidate.target.id,
+          name: candidate.target.name,
+          index: index + 1,
+          count: candidates.length,
+          receivedBytes: 0,
+          totalBytes: candidate.feed?.payload.size,
+        };
+        this.options.changed();
+        let lastNotice = 0;
+        const report = (receivedBytes: number) => {
+          this.state.progress!.receivedBytes = receivedBytes;
+          if (Date.now() - lastNotice >= 100 || receivedBytes === this.state.progress!.totalBytes) {
+            lastNotice = Date.now();
+            this.options.changed();
+          }
+        };
         const staged = path.join(temporary, `payload-${index}`);
-        if (candidate.directory) await copyTree(candidate.directory, staged);
+        if (candidate.directory) await copyTree(candidate.directory, staged, signal, report);
         else {
-          const data = await readBounded(candidate.payload!, limit, this.fetcher);
+          const data = await readBounded(candidate.payload!, limit, this.fetcher, signal, report);
+          this.state.phase = `${candidate.target.name} を検証中…`;
+          this.options.changed();
           const hash = createHash('sha256').update(data).digest('hex');
           if (
             data.length !== candidate.feed!.payload.size ||
@@ -338,12 +417,18 @@ export class PortableUpdates {
             await execute(helper, ['--extract', archive, staged], {
               windowsHide: true,
               timeout: 120000,
+              signal,
             });
           }
         }
         if (candidate.target.kind === 'applet') {
           const m = json(
-            await readBounded(path.join(staged, 'extension.json'), 1024 * 1024, this.fetcher),
+            await readBounded(
+              path.join(staged, 'extension.json'),
+              1024 * 1024,
+              this.fetcher,
+              this.controller?.signal,
+            ),
           );
           if (
             m.id !== candidate.target.id ||
@@ -375,17 +460,24 @@ export class PortableUpdates {
           sha256:
             candidate.target.kind === 'host'
               ? candidate.feed!.payload.sha256
-              : await treeHash(staged),
+              : await treeHash(staged, signal),
         });
       }
+      signal.throwIfAborted();
+      this.state.cancellable = false;
+      this.state.progress = undefined;
+      this.state.phase = '更新内容の確認を待っています…';
+      this.options.changed();
       if (
         !(await this.options.confirm(
           candidates.map((c) => `${c.target.name} ${c.target.version} → ${c.version}`),
         ))
       ) {
         this.state.phase = '更新を取り消しました。';
-        return structuredClone(this.state);
+        return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
+      this.state.phase = '再起動を準備中…';
+      this.options.changed();
       const job = {
         schemaVersion: 1,
         baseDirectory: this.options.baseDirectory,
@@ -422,15 +514,23 @@ export class PortableUpdates {
       this.options.shutdown();
       return structuredClone(this.state);
     } catch (error) {
-      this.state.phase = String(error).replace(/^Error: /, '');
-      throw error;
+      if (signal.aborted) {
+        this.state.phase = '更新を取り消しました。インストール済みのファイルは変更していません。';
+      } else {
+        this.state.phase = String(error).replace(/^Error: /, '');
+        throw error;
+      }
     } finally {
       if (!handedOff) {
         if (temporary) await fs.rm(temporary, { recursive: true, force: true }).catch(() => {});
         this.state.busy = false;
+        this.state.cancellable = false;
+        this.state.progress = undefined;
+        this.controller = undefined;
         this.options.changed();
       }
     }
+    return structuredClone(this.state);
   }
   scheduleStartup(
     smoke: boolean,

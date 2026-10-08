@@ -364,3 +364,156 @@ test('published Applet packages are consumable and corrupted ZIP paths are rejec
   );
   assert.equal(fs.existsSync(path.join(f.directory, 'bad.x')), false);
 });
+
+test('streaming download reports bytes, cancels without applying, and can be retried', async (t) => {
+  const f = fixture(t);
+  const packed = path.join(f.directory, 'package');
+  assert.equal(
+    spawnSync(helper, ['--pack', 'applet', f.source, 'unused', packed], { windowsHide: true })
+      .status,
+    0,
+  );
+  const feed = fs.readFileSync(path.join(packed, 'update.json'));
+  const zip = fs.readFileSync(path.join(packed, 'update.zip'));
+  let slow = true,
+    approvals = 0,
+    shutdowns = 0,
+    closed = false;
+  const server = require('node:http').createServer((request, response) => {
+    if (request.url === '/update.json') {
+      response.end(feed);
+      return;
+    }
+    if (!slow) {
+      response.end(zip);
+      return;
+    }
+    response.write(zip.subarray(0, 20));
+    response.on('close', () => {
+      closed = true;
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  f.target.source = `http://127.0.0.1:${server.address().port}/update.json`;
+  fs.mkdirSync(f.target.destination, { recursive: true });
+  fs.writeFileSync(path.join(f.target.destination, 'preserved.txt'), 'installed');
+  const seen = [];
+  let reached;
+  const ready = new Promise((resolve) => {
+    reached = resolve;
+  });
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    executable: process.execPath,
+    changed() {
+      if (updater.state.progress?.receivedBytes) {
+        seen.push(structuredClone(updater.state.progress));
+        reached();
+      }
+    },
+    confirm: async () => {
+      approvals++;
+      assert.equal(updater.cancel(), false);
+      return false;
+    },
+    shutdown() {
+      shutdowns++;
+    },
+  });
+  const installing = updater.install('fixture');
+  await ready;
+  assert.equal(updater.cancel(), true);
+  assert.equal(updater.cancel(), false);
+  const cancelled = await installing;
+  assert.equal(cancelled.busy, false);
+  assert.equal(cancelled.progress, undefined);
+  assert.match(cancelled.phase, /取り消しました/);
+  assert.equal(approvals, 0);
+  assert.equal(shutdowns, 0);
+  assert.equal(seen[0].receivedBytes, 20);
+  assert.equal(seen[0].totalBytes, zip.length);
+  for (let i = 0; i < 50 && !closed; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(closed, true);
+  assert.equal(
+    fs.readFileSync(path.join(f.target.destination, 'preserved.txt'), 'utf8'),
+    'installed',
+  );
+  slow = false;
+  assert.equal((await updater.install('fixture')).busy, false);
+  assert.equal(approvals, 1);
+  assert.equal(shutdowns, 0);
+  assert.ok(seen.some((p) => p.receivedBytes === zip.length));
+});
+
+test('metadata cancellation does not become an origin error or request a later target', async (t) => {
+  const f = fixture(t);
+  f.target.source = 'https://example.test/update.json';
+  let entered;
+  const ready = new Promise((resolve) => {
+    entered = resolve;
+  });
+  let calls = 0;
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    targets: () => [f.target, { ...f.target, id: 'later' }],
+    fetcher: (_url, { signal }) =>
+      new Promise((_resolve, reject) => {
+        calls++;
+        entered();
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      }),
+  });
+  const checking = updater.check();
+  await ready;
+  assert.equal(updater.cancel(), true);
+  const result = await checking;
+  assert.equal(result.busy, false);
+  assert.equal(calls, 1);
+  assert.deepEqual(result.results, []);
+  assert.match(result.phase, /取り消しました/);
+});
+
+test('recovery validates the complete journal before touching an installed Applet', (t) => {
+  const f = fixture(t);
+  const base = path.join(f.directory, 'installed');
+  const destination = path.join(base, 'extensions/fixture');
+  const suffix = 'a'.repeat(32);
+  const backup = destination + '.previous-' + suffix;
+  for (const [dir, value] of [
+    [destination, 'new'],
+    [backup, 'old'],
+  ]) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'payload'), value);
+  }
+  const safe = {
+    item: {
+      kind: 'applet',
+      id: 'fixture',
+      version: '2.0.0',
+      source: f.source,
+      destination,
+      sha256: 'a'.repeat(64),
+    },
+    next: destination + '.update-' + suffix,
+    backup,
+  };
+  const outside = path.join(f.directory, 'outside');
+  fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(outside, 'preserved'), 'untouched');
+  const invalid = { ...safe, item: { ...safe.item, destination: outside } };
+  fs.mkdirSync(path.join(base, '.appdock'), { recursive: true });
+  const journal = path.join(base, '.appdock/update-transaction.json');
+  // Reverse-order recovery used to touch the safe item before rejecting the invalid one.
+  const contents = JSON.stringify({ swaps: [invalid, safe] });
+  fs.writeFileSync(journal, contents);
+  assert.notEqual(spawnSync(helper, ['--recover', base], { windowsHide: true }).status, 0);
+  assert.equal(fs.readFileSync(path.join(destination, 'payload'), 'utf8'), 'new');
+  assert.equal(fs.readFileSync(path.join(backup, 'payload'), 'utf8'), 'old');
+  assert.equal(fs.readFileSync(path.join(outside, 'preserved'), 'utf8'), 'untouched');
+  assert.equal(fs.readFileSync(journal, 'utf8'), contents);
+});
