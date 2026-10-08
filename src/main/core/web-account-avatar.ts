@@ -1,5 +1,5 @@
-// Only declared HTTPS image origins can be fetched. Never forward cookies or
-// follow redirects outside those origins from a URL supplied by a remote page.
+// Only declared HTTPS image origins can be fetched. Cookies stay scoped to
+// the owning Chromium session; no redirects outside those origins are allowed.
 export function webAvatarURL(raw: unknown, origins: string[]): string {
   if (typeof raw !== 'string' || raw.length > 2048 || /[\u0000-\u0020\u007f]/.test(raw)) return '';
   try {
@@ -53,7 +53,7 @@ export async function fetchWebAvatar(
   let url = webAvatarURL(raw, origins);
   for (let hop = 0; hop < 4; hop++) {
     if (!url) throw Error('Invalid account image origin');
-    const response = await fetcher(url, { credentials: 'omit', redirect: 'manual', signal });
+    const response = await fetcher(url, { credentials: 'include', redirect: 'manual', signal });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       const location = response.headers.get('location');

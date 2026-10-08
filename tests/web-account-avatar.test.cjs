@@ -48,14 +48,14 @@ test('Native image requests expose redirects, bound response chunks and abort ou
   await assert.rejects(waiting, /aborted/);
   assert.equal(req.aborted, true);
 });
-test('Avatar redirects are bounded and revalidated before requesting a different origin, without cookies', async () => {
+test('Avatar redirects are bounded and revalidated, using only the owning account session', async () => {
   const origins = ['https://lh3.google.com', 'https://lh3.googleusercontent.com'];
   const start = origins[0] + '/a/fixture',
     final = origins[1] + '/a/fixture';
   const requests = [];
   const fetcher = async (url, init) => {
     requests.push(url);
-    assert.equal(init.credentials, 'omit');
+    assert.equal(init.credentials, 'include');
     assert.equal(init.redirect, 'manual');
     return url === start
       ? new Response('', { status: 302, headers: { location: final } })
