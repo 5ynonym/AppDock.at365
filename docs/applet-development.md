@@ -194,3 +194,5 @@ Webサービスの対話ログインとアカウント別ページが必要なNo
 0.16.0はローカルUIの`move/setMonitoring`と、readの`monitoring/monitoringResets`を追加します。Appletは個別OFFで基準・履歴・件数をresetし、read間のOFF→ONにも対応します。ヘッダー画像を観測結果のavatar URLへ置く場合は、manifestのavatarOriginsに画像のHTTPS originを明示してください。画像取得・変換・ローカルUIへのdata画像はホストが担当し、Nodeへ画像バイトを送りません。
 
 0.16.1のwebAccounts.cycleはウィンドウを開かず、既存の表示/最小化/非表示とフォーカスを維持します。表示が必要な明示操作だけでopenを呼んでください。アバターは当該アカウントのログイン済みsessionから取得します。
+
+0.16.3では、操作中のWebContentsでcycleを繰り返すときだけ入力を切替先へ引き継ぎます。ログイン後の自動命名にはobserverのaccountName（1〜60文字・制御文字なし）を返し、最低ホスト版を0.16.3にしてください。新規名は「新しいアカウント」で、明示rename後や一度取得した名前は自動変更しません。Gmailの日本語/英語ヘッダー抽出と連続キー入力の実装例は[Gmail開発ガイド](../../Applet.Gmail.at365/DEVELOPMENT.md)を参照します。

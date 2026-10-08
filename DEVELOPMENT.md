@@ -4,6 +4,8 @@
 
 ## 文書の入口
 
+0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
+
 - [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。
 - [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
 - [Applet API](docs/extensions.md): APIと通信の契約。

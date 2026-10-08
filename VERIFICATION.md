@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-08: v0.16.3 Gmail連続切替と仮名の自動設定
+
+- ユーザー補足の「1回目は効くが、クリックせず2回目が効かない」を旧0.16.2配布版で再現。以前のGUI試験は切替ごとに対象wc.focusを呼んでおり、入力先の消失を隠していた。新試験は初回だけfocusし、その後はgetFocusedWebContentsへキーを送る。修正は既にアクティブなGmail WebContentsの入力先だけを接続済みの切替先へ引き継ぐ。
+- `dev.bat run typecheck`、build、`dev.bat test`成功（92/92）。仮名/旧番号名の置換、無効な観測拒否、手動rename優先、一度取得した名前の保持、ローカル入力と別Windowのフォーカス保持を検証。
+- 最終win-unpackedのaccounts-1791438434630で新規仮名、日本語の名前、英語のメールのみ、取得後の変更抑止、ログイン前の手動名、再起動保持、前面別Window/未表示/表示/非表示/最小化、順序/監視/音/画像を確認。ui-features-1791438511879で再クリックなしの次キー4回・前キー2回と入力先、変更キー、既存の検索/削除/音/テーマ/位置保存が成功。最終単一EXE portable-1791438593328は0.16.3/ok:true/exitCode0、停止・再開・正常終了成功。
+- 保存済み開発profileの実Gmailは2枠とも本人ヘッダーからaccountName取得に成功。既存accounts.jsonのハッシュ不変、認証保持/GPUオフ/本文を開く操作なし/送信・削除・既読変更なし。診断はGmailのartifacts/gmail-dev/live-result.jsonで、名前/メール/認証値は出力していない。新規の実Googleログインからの自動改名、長期常駐/スリープは未確認。
+- `publish.bat`成功、framework-dependent .NETホストにRuntime混入なし。EXE100580178bytes、SHA256 A86DBFD0F350C6F4589869DCC560E57AE962D9C3F37E9DF14AFB254F55B56586。Gmail0.5.2は最低host0.16.3。実利用先deploy・commit・pushなし。通常exec/Node REPLのhelper_unknown_errorは許可されたWindows実行環境で検証。追加fixtureの未ロードへのアクセス/再起動前の古いlocatorは試験待機と再取得で解消し、最終試験が成功した。
+
 ## 2026-10-08: 実利用先へのdeploy
 
 - 配置後の実利用について、ユーザーが正常動作を確認したと報告（2026-10-08）。
