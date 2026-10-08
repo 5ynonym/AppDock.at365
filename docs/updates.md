@@ -4,6 +4,8 @@
 
 ## 設定と取得
 
+起動時の結果読取では`UpdateState.completion`へ成否とメッセージを渡す。成功だけを`UpdateCompletionNotice`でステータスバーへ表示し、`UpdateProgress`の上部進捗欄から外す。失敗・進行中・取消等は従来の進捗欄を使う。新しい更新操作の開始時にcompletionをクリアする。結果ファイルとログの保存形式は変えない。
+
 `settings.updates`はhostSource、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
 
 ローカル/UNCはupdate.jsonまたは発行フォルダー。Appletフォルダーにupdate.jsonがなければextension.jsonを読む。HTTP(S)はfeed URLまたは末尾/の配布ベースURL。GitHubはリポジトリ/Release URLからAPIとRelease assetsを使い、Source code ZIPは使わない。IDと正式版SemVer、最低本体版を照合する。非公開の認証トークンとプレリリースは扱わない。

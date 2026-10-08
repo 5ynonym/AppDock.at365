@@ -1,5 +1,12 @@
 # 検証記録
 
+## 2026-10-09: 更新適用後のお知らせをステータスバーへ移動
+
+- mainの既存cleanなcheckoutで、起動時結果の成功だけを左下のミント色のピル型通知へ変更。本文/リボン/ネイティブWebページの領域に重ねず、約5秒でフェードアウトし、×で即時に閉じる。失敗結果と更新中の進捗は従来の上部表示を維持。配布形式・更新用helper・設定保存形式は変更していない。
+- project-local Nodeでmain/rendererの型検査とTS/Vite build成功。既存`tests/portable-updates.test.cjs`12件成功、失敗/skip0。sandbox初回の4件はhelperのTEMP操作にAccess denied/EPERMが出たため、通常Windows環境で再実行して12/12を確認。
+- 隔離したElectron開発起動のGUI検証は`artifacts/update-notice-1791485945591/result.json`でok:true。dark/lightで22pxの通知がfooter内に収まり、隣の操作と重ならないこと、表示時のフォーカスを奪わないこと、自動消去前後のmain領域一致、手動消去、失敗結果の継続表示、トレイ開始から5秒以上後にWindowを開いても通知が表示されることを確認。両テーマのPNGを目視確認。
+- 非表示でもdocument.hiddenがfalseだったため、BrowserWindow実状態をsnapshotへ渡してtimerを制御。初回GUI起動はsandboxで失敗、通常Windows環境で検証。GUIで更新結果fixtureだけを書き、実ファイル交換・実メール/ログイン操作は今回実行していない。単一EXE再発行・実利用先deploy・commit・push・Releaseは未実施。
+
 ## 2026-10-09: publish.batでオールインワンZIPを生成
 
 - ユーザー指定の「Appletは拡張として同梱」に対応。cleanなmain 8a4d96eから`codex/all-in-one-package`を作成。`publish.bat`が呼ぶ`dist`を本体発行`dist:host`と`pack:all-in-one`へ分割し、単一EXEと更新JSONに加えて`extensions/<repo名>`入りZIPを生成する。BAT自体・文字コードは未変更。本体の版/API/UIコードは0.23.0のまま。

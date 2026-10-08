@@ -88,6 +88,10 @@ Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイ�
 
 ## 検証と成果物を更新する
 
+更新適用後の成功通知は`UpdateCompletionNotice.tsx`で左下のステータスバーに表示する。既存の稼働Applet数と一時的に入れ替え、約5秒でフェードアウト、×で即時に閉じる。本文の高さやAppletページの表示領域を変えず、ライト/ダークのaccent色を使う。`prefers-reduced-motion`ではアニメーションを省く。
+
+トレイ開始・最小化中の待機には`HostSnapshot.windowVisible`を使い、BrowserWindowのshow/hide/minimize/restoreでsnapshotを更新する。backgroundThrottling無効のrendererでは非表示Windowでもdocument.hiddenがfalseになるため、DOMの可視性だけを判定に使わない。実Windowが表示されている間だけ5200msの終了timerを開始し、非表示になったら解除する。成功の判定には`UpdateState.completion.ok`を使い、メッセージの文言では判定しない。
+
 Node.jsとpnpmのグローバルインストールは不要です。プロジェクトの `setup-tools.bat` で `.tools` に準備し、下記のpnpmコマンドは `dev.bat` 経由で実行できます。直接のNodeコマンドは `dev.bat exec node ...` を使います。バージョンは `toolchain.json` で指定します。
 
 グローバルホットキーは `src/main/core/global-hotkeys.ts` が設定とAppletの稼働状態に追従し、同梱.NETホストの `--hotkeys` モードがWindowsのRegisterHotKey / WM_HOTKEYを扱います。PauseはElectronのaccelerator対象外のため、Windows登録に統一しています。キー記録中は一時解除し、設定画面に登録結果・競合理由・再試行ボタンを表示します。`pnpm run test:hotkeys` で専用profileの時計Appletを使い、Windows入力、競合、再割り当て、停止と終了時の解除を確認します。先に元WatchなどのPause登録を解除してください。

@@ -908,6 +908,56 @@ main {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 36%;
+}
+.update-completion-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 22px;
+  padding: 0 7px 0 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  animation: update-notice-fade 5.2s ease both;
+}
+.update-completion-notice > svg {
+  flex-shrink: 0;
+}
+.update-completion-notice > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.update-completion-notice > button {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  color: inherit;
+}
+.update-completion-notice > button:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+@keyframes update-notice-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  5%,
+  94% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-completion-notice {
+    animation: none;
+  }
 }
 .statusbar i {
   background: var(--accent);
