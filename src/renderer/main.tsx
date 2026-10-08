@@ -26,7 +26,8 @@ import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { SettingsActions, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
-import { UpdateSettings } from './UpdateSettings';
+import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
+import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
@@ -217,8 +218,16 @@ function App() {
   const appletSidebar = useAppletSidebar();
   const [settingsSidebarHost, setSettingsSidebarHost] = useState<HTMLDivElement | null>(null);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
-  const [page, setPage] = useState<Page>('home');
-  const [selected, setSelected] = useState('');
+  const [page, setPage] = useRestartView<Page>(
+    'page',
+    'home',
+    (value) =>
+      ['home', 'extensions', 'settings', 'logs'].includes(value) ||
+      /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
+  );
+  const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
+  const openingRestoredPage = useRef(false);
+  const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [palette, setPalette] = useState(false);
@@ -228,8 +237,11 @@ function App() {
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
-  const [detailSettings, setDetailSettings] = useState(false);
-  const [detailTab, setDetailTab] = useState<AppletSettingsTab>('settings');
+  const [detailSettings, setDetailSettings] = useRestartView<boolean>('detailSettings', false);
+  const [detailTab, setDetailTab] = useRestartView<AppletSettingsTab>('detailTab', 'settings', [
+    'settings',
+    'shortcuts',
+  ]);
   const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
   useLayoutEffect(() => {
     // The retained detail view may be revisited after editing the shared JSON draft.
@@ -241,7 +253,7 @@ function App() {
     }
   }, [page, detailSettings, editor.mode]);
   const [appletFilter, setAppletFilter] = useState('');
-  const [logSource, setLogSource] = useState('');
+  const [logSource, setLogSource] = useRestartView<string>('logSource', '');
   const [paletteIndex, setPaletteIndex] = useState(0);
   const paletteRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -282,10 +294,38 @@ function App() {
       }),
     [],
   );
+  useEffect(() => {
+    if (!restoringPage || !snapshot?.startupReady || openingRestoredPage.current) return;
+    if (!page.startsWith('page:')) {
+      setRestoringPage(false);
+      return;
+    }
+    const [, id, pageId] = page.split(':');
+    const extension = snapshot.extensions.find((e) => e.id === id);
+    if (
+      !extension?.enabled ||
+      extension.state === 'error' ||
+      !extension.pages?.some((p) => p.id === pageId)
+    ) {
+      setPage('home');
+      setRestoringPage(false);
+      return;
+    }
+    if (extension.state !== 'running') return;
+    openingRestoredPage.current = true;
+    void window.dock
+      .openAppletPage(id, pageId)
+      .catch((error) => {
+        setError(String(error));
+        setPage('home');
+      })
+      .finally(() => setRestoringPage(false));
+  }, [snapshot, page, restoringPage]);
   useLayoutEffect(() => {
     const update = () => {
       const element = appletPageRef.current;
       const rect = element?.getBoundingClientRect();
+      if (restoringPage) return;
       const key = page.startsWith('page:') ? page : null;
       void window.dock
         .pageViewport(
@@ -309,7 +349,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [page, palette, error, !!snapshot]);
+  }, [page, palette, error, !!snapshot, restoringPage]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
@@ -823,7 +863,7 @@ function App() {
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
-          <VersionCheck disabled={editor.dirty} />
+          <VersionCheck compact disabled={editor.dirty} />
         </span>
         <button onClick={() => setPalette(true)}>
           <Icon name="command" size={12} />
@@ -1262,7 +1302,7 @@ function SettingsPage({
     edit,
     switchToForm,
   } = editor;
-  const [category, setCategory] = useState<
+  const [category, setCategory] = useRestartView<
     | 'appearance'
     | 'general'
     | 'extensions'
@@ -1271,9 +1311,21 @@ function SettingsPage({
     | 'profile'
     | 'about'
     | 'ribbon'
-  >('appearance');
-  const [appletId, setAppletId] = useState('');
-  const [appletTab, setAppletTab] = useState<AppletSettingsTab>('settings');
+  >('category', 'appearance', [
+    'appearance',
+    'general',
+    'extensions',
+    'shortcuts',
+    'host-shortcuts',
+    'profile',
+    'about',
+    'ribbon',
+  ]);
+  const [appletId, setAppletId] = useRestartView<string>('appletId', '');
+  const [appletTab, setAppletTab] = useRestartView<AppletSettingsTab>('appletTab', 'settings', [
+    'settings',
+    'shortcuts',
+  ]);
   const [appletSearch, setAppletSearch] = useState('');
   const selectedApplet = extensions.find((e) => e.id === appletId) ?? extensions[0];
   const settingsBody = useRef<HTMLDivElement>(null);
@@ -1512,35 +1564,40 @@ function SettingsPage({
                     </h2>
                     <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
                     <VersionCheck details disabled={dirty} />
-                    <dl className="runtime-versions">
-                      <div>
-                        <dt>Electron</dt>
-                        <dd>{runtime.electron}</dd>
-                      </div>
-                      <div>
-                        <dt>Chromium</dt>
-                        <dd>{runtime.chrome}</dd>
-                      </div>
-                      <div>
-                        <dt>Node.js</dt>
-                        <dd>{runtime.node}</dd>
-                      </div>
-                      <div>
-                        <dt>実行環境</dt>
-                        <dd>
-                          {runtime.platform} / {runtime.arch}
-                        </dd>
-                      </div>
-                    </dl>
                     <UpdateSettings
                       draft={draft}
                       edit={edit}
-                      extensions={extensions}
+                      appletCount={extensions.length}
                       dirty={dirty}
                     />
+                    <details className="update-disclosure">
+                      <summary>実行環境の詳細</summary>
+                      <dl className="runtime-versions">
+                        <div>
+                          <dt>Electron</dt>
+                          <dd>{runtime.electron}</dd>
+                        </div>
+                        <div>
+                          <dt>Chromium</dt>
+                          <dd>{runtime.chrome}</dd>
+                        </div>
+                        <div>
+                          <dt>Node.js</dt>
+                          <dd>{runtime.node}</dd>
+                        </div>
+                        <div>
+                          <dt>実行環境</dt>
+                          <dd>
+                            {runtime.platform} / {runtime.arch}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
                   </div>
                   <h3>インストール済みのApplet</h3>
-                  <p className="muted">更新確認先を持つAppletは、ここから確認できます。</p>
+                  <p className="muted">
+                    Appletごとに更新できます。更新元を変えるときは各欄の設定を開いてください。
+                  </p>
                   {extensions.length === 0 && <p>Appletはインストールされていません。</p>}
                   <div className="about-applets">
                     {extensions.map((e) => (
@@ -1550,6 +1607,7 @@ function SettingsPage({
                           <span className="muted">v{e.version}</span>
                         </div>
                         <VersionCheck id={e.id} details disabled={dirty} />
+                        <AppletUpdateSource extension={e} draft={draft} edit={edit} />
                       </article>
                     ))}
                   </div>

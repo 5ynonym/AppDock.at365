@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-09: v0.22.1 更新UIと再起動先の復元
+
+- ユーザーが0.22.0の実再起動成功を報告。既存codex/portable-updatesのcleanな0369100から継続し、同じcheckoutで実装。更新/一括/個別の主操作をラベンダー色にし、共通設定/実行環境/各Applet更新元を折りたたみ、Applet更新元をインストール済みカードへ移動。本体/各Appletに既定復帰、未保存時は確認も含めて操作を無効化。下端のステータスバーは小さいボタンを維持。
+- 通常再起動/helper再起動で--restore-viewを渡し、トレイ開始ONでも表示。ページ/設定カテゴリ/選択Applet/タブ/ログ対象をプロフィール内へ保存。Appletページは起動完了後に既存コマンドで開く。終了時のsurface破棄通知が保存先をホームへ変えていた不具合も修正。
+- main/renderer型検査、TS/Vite、portable発行成功。取得済みプロジェクト内Node/TypeScript/Viteを使用（dev.batのpnpmポリシー検証は停止していたため中断、依存/ポリシーの変更なし）。既存.NETホスト/helperは変更せず再使用。回帰100/100成功（artifacts/update-ui-regression.log）。
+- GUI: navigation-1791474293115、preferences-1791474300038、ui-1791474721303、host-commands-1791474669899はいずれもok:true。既存設定共有/保存/JSON/ショートカット/正常終了/多重再起動防止を確認。
+- 最終portable試験 artifacts/portable-updates-1791474708972/result.json はok:true、終了0。通常起動はトレイ非表示、dark/light・900pxの横はみ出しなし、初期折りたたみ/主操作/本体とAppletの既定復帰/保存・破棄/下書きガードを確認。実helperで.NET DLLを含む一括更新→本体EXE交換→個別同版更新を通し、毎回の設定/認証fixture保持と更新画面復元を確認。通常再起動で一般カテゴリとlocal Appletページも復元し、元のPID終了と新PIDを確認。
+- 試験の最初の通常再起動visibility検査はstartupReadyを待たず失敗し、待機条件を修正。続くAppletページ復元の失敗は製品側の終了通知による上書きを修正して解消。最終native確認dialogだけ試験内で承認に差替え、製品の確認処理は維持。
+- 単一EXE100596499 bytes、SHA256 2E6C7540E17A5593AE18F999BCFB27694A017826EC7F27AD7D654D6ACC24C43E。update.jsonの版/サイズ/hash一致。packaged main/core JS・helperのバイト一致と文書27 local linksを確認。画面画像を目視確認、Prettier/diff check成功。
+- 境界: 実UNC/実GitHub配布の取得、実Gmail内の操作/メール状態は今回試していない。画面復元は新版が保存する画面選択が対象で、旧0.22.0から初めて更新するときの未記録の画面やWebページ内部の状態/未保存フォームは復元しない。実利用先deploy/main統合/pushなし。
+
 ## 2026-10-08: worktree削除後のpublish.bat失敗を修復
 
 - 原因は共有node_modules内のpnpm生成参照。削除済みの`AppDock.at365.worktrees/applet-settings-panel`を指す12個のパッケージjunctionと24個の`.bin`起動スクリプトがmainに残り、ビルドツールを解決できなくなっていた。既存パッケージ本体・依存版・lockfileを維持し、存在するmain側の同一パッケージへの参照へ修復。全置換先の存在と対象パスを事前確認し、古い参照が残っていないことを確認。

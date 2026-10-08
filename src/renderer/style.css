@@ -2495,3 +2495,78 @@ summary {
 .update-options input[type='number'] {
   width: 110px;
 }
+
+/* Update actions stay visible; infrequent configuration opens on demand. */
+.update-primary {
+  background: #cbb9fa;
+  color: #302347;
+  border: 1px solid #cbb9fa;
+  border-radius: 10px;
+  padding: 11px 18px;
+  font-weight: 650;
+  flex-shrink: 0;
+}
+.update-primary:hover:not(:disabled) {
+  background: #dccfff;
+  border-color: #dccfff;
+}
+:root[data-theme='light'] .update-primary {
+  background: #7250a8;
+  border-color: #7250a8;
+  color: #fff;
+}
+:root[data-theme='light'] .update-primary:hover:not(:disabled) {
+  background: #61418f;
+}
+.update-primary:focus-visible,
+.update-disclosure > summary:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 4px;
+}
+.update-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.update-disclosure {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  min-width: 0;
+}
+.update-disclosure > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+.update-disclosure > summary .muted {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.update-settings-content {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  min-width: 0;
+}
+.update-settings-content > .text-button {
+  justify-self: start;
+}
+.update-settings-content .muted {
+  overflow-wrap: anywhere;
+}
+.update-settings {
+  margin-top: 0;
+}
+.update-feedback {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 12px 16px;
+  overflow-wrap: anywhere;
+}
+.update-actions {
+  flex-wrap: wrap;
+}
+.about-page .version-check > [role='status'],
+.about-page .version-check > time {
+  flex-basis: 100%;
+}

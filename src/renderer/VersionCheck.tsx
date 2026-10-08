@@ -12,10 +12,12 @@ export function VersionCheck({
   id,
   details = false,
   disabled = false,
+  compact = false,
 }: {
   id?: string;
   details?: boolean;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateResult>();
@@ -51,7 +53,26 @@ export function VersionCheck({
   };
   return (
     <span className="version-check">
-      <button className="text-button" disabled={busy || sharedBusy} onClick={() => void check()}>
+      <button
+        className={compact ? 'text-button' : 'update-primary'}
+        disabled={busy || sharedBusy || disabled}
+        title={disabled ? '未保存の設定を保存または破棄してから更新してください。' : undefined}
+        onClick={() => {
+          setError('');
+          setBusy(true);
+          void window.dock
+            .installUpdates(id ?? 'host')
+            .catch((error) => setError(updateError(error)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? '処理中…' : id ? 'このAppletを更新' : 'AppDockを更新'}
+      </button>
+      <button
+        className="text-button"
+        disabled={busy || sharedBusy || disabled}
+        onClick={() => void check()}
+      >
         {busy ? '更新を確認中…' : '更新を確認'}
       </button>
       {result && (
@@ -67,21 +88,6 @@ export function VersionCheck({
                   : result.message}
         </span>
       )}
-      <button
-        className="text-button"
-        disabled={busy || sharedBusy || disabled}
-        title={disabled ? '未保存の設定を保存または破棄してから更新してください。' : undefined}
-        onClick={() => {
-          setError('');
-          setBusy(true);
-          void window.dock
-            .installUpdates(id ?? 'host')
-            .catch((error) => setError(updateError(error)))
-            .finally(() => setBusy(false));
-        }}
-      >
-        {id ? 'このAppletを更新' : 'AppDockを更新'}
-      </button>
       {result?.status === 'available' && result.releaseUrl && (
         <button
           className="text-button"
