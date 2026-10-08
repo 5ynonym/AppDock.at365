@@ -8,7 +8,6 @@ import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
-import { parseWidgetDefinitions, type WidgetDefinition } from '../../shared/widgets';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import type {
   ExtensionManifest,
@@ -62,8 +61,6 @@ function readManifest(folder: string): LoadedManifest {
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))
   )
     throw new Error('capabilities の形式が正しくありません。');
-  if (m.widgets?.length && !m.capabilities?.includes('widgets'))
-    throw new Error('ウィジェットの提供にはwidgets capabilityが必要です。');
   if (m.webAccounts) {
     if (!m.capabilities?.includes('web-accounts'))
       throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
@@ -73,7 +70,6 @@ function readManifest(folder: string): LoadedManifest {
     ...m,
     settings: parseSettingDefinitions(m.settings),
     commands: parseDeclaredCommands(m.id, m.commands),
-    widgets: parseWidgetDefinitions(m.id, m.widgets),
     folder,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
@@ -88,7 +84,6 @@ export interface ExtensionInstance {
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
-  widgets?: WidgetDefinition[];
   scheduledStartAt?: number;
   scheduledDelay?: number;
   startTimer?: ReturnType<typeof setTimeout>;
@@ -185,7 +180,6 @@ class ExtensionManager extends EventEmitter {
       tray: e.tray,
       panel: e.panel,
       settingOptions: e.settingOptions,
-      widgets: e.state === 'running' ? (e.widgets ?? e.manifest.widgets) : e.manifest.widgets,
     }));
   }
   canActivateForCommand(e: ExtensionInstance, id: string) {
@@ -310,7 +304,6 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async start(e: ExtensionInstance) {
-    e.widgets = undefined;
     e.state = 'starting';
     e.error = null;
     this.emit('changed');
@@ -409,7 +402,6 @@ class ExtensionManager extends EventEmitter {
     e.commands = [];
     e.tray = [];
     e.panel = null;
-    e.widgets = undefined;
     this.log('error', e.manifest.id, message);
     this.emit('changed');
   }
@@ -439,7 +431,6 @@ class ExtensionManager extends EventEmitter {
     e.tray = [];
     e.panel = null;
     e.error = null;
-    e.widgets = undefined;
     this.emit('changed');
   }
   execute(id: string) {

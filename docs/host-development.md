@@ -60,7 +60,7 @@ Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイ�
 
 `nodeIntegration: false`、`contextIsolation: true`、`sandbox: true`、CSP、外部navigationの禁止を維持します。Appletから提供するパネルはReactでテキストとして描画し、生HTMLやスクリプトを受けません。
 
-メイン画面とウィジェット画面の`BrowserWindow`は、`webPreferences.spellcheck: false`でElectron内蔵スペルチェックを無効にします。画面作成前に共有セッションも`session.defaultSession.setSpellCheckerEnabled(false)`で無効にします（[Electron Session API](https://www.electronjs.org/docs/latest/api/session#sessetspellcheckerenabledenable)）。新しい入力欄にも共通で適用されるため、フォームごとの指定や設定JSONの項目追加は不要です。
+メイン画面の`BrowserWindow`は、`webPreferences.spellcheck: false`でElectron内蔵スペルチェックを無効にします。画面作成前に共有セッションも`session.defaultSession.setSpellCheckerEnabled(false)`で無効にします（[Electron Session API](https://www.electronjs.org/docs/latest/api/session#sessetspellcheckerenabledenable)）。新しい入力欄にも共通で適用されるため、フォームごとの指定や設定JSONの項目追加は不要です。
 
 ## 設定スキーマと保存を変更する場合
 
@@ -154,11 +154,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの既定判定時間500msを使います。`DEFAULT_DOUBLE_CLICK_TIME_MS`をログ側と`TrayClickDispatcher`側で共有し、待機には同じ25msの余裕を加えます。SDK/Runtime/Applet APIは変更しません。
 
 [クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。
-## ウィジェット基盤（0.10.0）
 
-契約・設定検証は`src/shared/widgets.ts`、Applet登録は`host-api.ts`、フォントの境界検証は`widget-fonts.ts`、透過画面と移動の寿命管理は`desktop-widgets.ts`、共通React描画は`Widgets.tsx`です。`WindowsWidgetSession`がデスクトップ固定だけを担当します。ウィジェット画面には専用preloadを使い、ホスト設定・コマンド・ファイル操作のIPCを公開しません。内容更新とホスト画面更新を毎秒同期せず、各描画面内の共有タイマーで時計を更新します。詳細は[widgets.md](widgets.md)を参照してください。
-
-デスクトップ固定の初回と非表示からの復帰では、Shellへの接続後にElectronの`showInactive()`も呼び、Chromiumの描画を開始してから親と座標を再確認します。Win32の`SWP_SHOWWINDOW`と`IsWindowVisible`だけでは描画の開始を確認できません。定期確認では表示済み画面を繰り返しshowしません。`test:widget-desktop`は隔離Node fixtureを使い、実デスクトップの露出した180×120pxだけで表示・更新・通常ウィンドウによる遮蔽・非表示からの復帰・透過を検証します。
 0.16.3はWebアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。詳細と旧保存形式の互換性は[WebアカウントAPI](web-accounts.md)を参照してください。
 
 0.16.4のportableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。

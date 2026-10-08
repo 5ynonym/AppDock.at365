@@ -29,6 +29,29 @@ test('invalid existing JSON is preserved', (t) => {
   assert.throws(() => new SettingsStore(file).load());
   assert.equal(fs.readFileSync(file, 'utf8'), '{broken');
 });
+
+test('settings retain supported preferences and Applet data while dropping obsolete top-level fields', (t) => {
+  const file = path.join(temporary(t), 'settings.json');
+  const value = defaults();
+  value.host.theme = 'light';
+  value.host.trayDoubleClickCommand = 'appdock.commands.search';
+  value.extensions['test.applet'] = {
+    enabled: true,
+    startupDelaySeconds: 5,
+    settings: { customData: { x: 1 }, widgets: 'Applet-owned data' },
+  };
+  value.shortcuts['test.applet.run'] = ['Ctrl+Alt+9'];
+  value.pinnedCommands = ['test.applet.run'];
+  value.trayCommands = ['test.applet.run'];
+  value.globalShortcutCommands = ['test.applet.run'];
+  value.profile.name = 'Test profile';
+  fs.writeFileSync(file, JSON.stringify({ ...value, widgets: { obsolete: 'unused' } }));
+  const store = new SettingsStore(file);
+  const loaded = store.load();
+  assert.deepEqual(loaded.value, value);
+  store.save(loaded.value, loaded.revision);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), value);
+});
 test('invalid settings do not overwrite valid settings', (t) => {
   const file = path.join(temporary(t), 'settings.json');
   const store = new SettingsStore(file);
