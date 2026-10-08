@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-08: v0.16.1 認証済みアバター・非アクティブなアカウント切替
+
+- 画像要求を当該アカウントのsession/credentials:includeへ変更。0.16.0の未認証取得ではGoogleの設定済みアバターURLが標準画像へ置き換わることを実Gmailで再現した。Cookieの適用はChromiumの各sessionへ閉じ、他枠へコピーせず、UI/Node/ログへ値を出さない。origin/転送数/時間/サイズ制限は維持する。
+- cycleはselectedの保存と既存Viewの切替だけを行い、openとWebContents.focusを呼ばない。Gmailウィンドウの未作成・表示・最小化・非表示の状態と現在の前面Windowを保持する。明示openの表示動作は維持。
+- main/renderer型検査・Vite、ホスト90/90・Gmail20/20成功。cycleのunit fakeはopen/focus呼出しで失敗する。最終配布版の`../Applet.Gmail.at365/artifacts/accounts-1791424612946/result.json`で、別Windowの前面/フォーカス保持と認証依存のセッション別画像を確認。最終既存UI/キー回帰は`../Applet.Gmail.at365/artifacts/ui-features-1791424637416/result.json`、単一EXEは`../Applet.Gmail.at365/artifacts/portable-1791424613849/result.json`（0.16.1、exitCode0）成功。
+- 実Gmail右上の画像領域だけを読み取り、匿名/認証済み/修正版を照合して設定済みアバターとの一致を目視確認。以前のPNG取得有無だけの確認を補完した。詳細は[Gmail検証記録](../Applet.Gmail.at365/VERIFICATION.md)。メール状態や認証値を操作/出力せず、画像はローカルのGit対象外artifactだけへ保存した。
+- 最終EXE100,446,218 bytes、SHA256 `8D5243653108108368DD5E04CC2C12DCBA688B4C028D07A53E6CF2CFF02C4B7F`。.NET framework-dependentクリーン発行、Runtime混入なし。Gmail0.5.1/最低host0.16.1を開発用配布先へハッシュ照合して配置。Prettier/diff check成功。既存の未配置GmailCheckerへの文書参照は確認不可。実利用先deploy/外部pushなし。長期常駐・スリープ復帰は未確認。
+
 ## 2026-10-08: v0.16.0 Webアカウント管理と画像取得
 
 - WebアカウントUIへmove/setMonitoring、snapshot/readへmonitoring/avatar、readへmonitoringResetsを追加。旧accounts.jsonは個別監視ONを既定とし、順番の保存でselected/UUID/セッションを変更しない。OFFはUI data/attentionを直ちに消去し、遅いreportも再計上しない。ON/OFFの遷移を次のreadまで保持する。

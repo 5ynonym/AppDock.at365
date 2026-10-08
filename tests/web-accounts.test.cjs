@@ -88,14 +88,23 @@ test('Web account cycle wraps, preserves one account and rejects invalid directi
   const fake = {
     state: { accounts: [{ id: 'a' }, { id: 'b' }], selected: 'a' },
     deleting: new Set(),
-    viewport: null,
+    viewport: { x: 0, y: 0, width: 800, height: 600 },
     save(next) {
       this.state = next;
     },
     show(id) {
       this.shown = id;
     },
-    async open() {},
+    async open() {
+      throw Error('Cycling must not open or activate a window');
+    },
+    attached: {
+      webContents: {
+        focus() {
+          throw Error('Cycling must not move keyboard focus');
+        },
+      },
+    },
   };
   const cycle = (direction) => WebAccountController.prototype.cycle.call(fake, direction);
   await cycle(1);

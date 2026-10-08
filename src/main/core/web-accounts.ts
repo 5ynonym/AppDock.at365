@@ -318,7 +318,8 @@ export class WebAccountController {
               net.request({
                 url,
                 session: this.accountSession(id),
-                credentials: 'omit',
+                // Match the signed-in header image in this account's own session.
+                credentials: 'include',
                 redirect: 'manual',
               }),
             ),
@@ -392,8 +393,6 @@ export class WebAccountController {
     const next = accounts[(Math.max(0, index) + direction + accounts.length) % accounts.length];
     this.save({ ...this.state, selected: next.id });
     this.show(next.id);
-    await this.open();
-    if (this.viewport !== null) this.attached?.webContents.focus();
   }
   private backgroundWindow() {
     if (!this.background) {

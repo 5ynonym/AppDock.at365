@@ -1,4 +1,4 @@
-# WebアカウントAPI（v0.16.0）
+# WebアカウントAPI（v0.16.1）
 
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
@@ -30,17 +30,19 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 ## Node/RPC
 
+0.16.1の画像要求は各アカウントのsessionとcredentials:includeを使用します。Googleの認証依存画像URLは未認証で取り直すと標準画像を返すためです。Cookieの適用と送信先はChromiumの当該セッションに閉じ、他アカウントのCookieをコピーしません。転送先の厳密なorigin制限とサイズ/時間上限は維持します。cycleは保存と既存Viewの切替だけを行い、未表示のUIは作成せず、非表示/最小化や現在のフォーカスを保ちます。明示的なopenは従来どおりウィンドウを表示します。
+
 0.16.0はローカルUIに`move(id, 1|-1)`（隣の枠と順番を交換、端では変更なし）と`setMonitoring(id, boolean)`を追加します。並べ替えはaccountsの配列順だけを保存し、UUID・選択枠・セッション・通知音を維持します。snapshot/readの各枠には`monitoring:boolean`を追加し、旧保存形式の未指定はtrueです。OFFではホストもattentionとdataを直ちにクリアし、遅延reportからの再計上を抑制します。ページ更新と読取は保持し、検知・通知・音を止める判断はNode Appletが行います。
 
 `read`は`monitoringResets:string[]`も返します。ON/OFFの遷移を次のreadまで保持し、OFF→ONが読取間隔内に発生しても基準を消去できます。Appletは該当するmonitorをresetし、個別/全体の監視OFFなら履歴・件数を消去してください。再開時の未読取り込みはAppletの方針です。
 
-任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（Cookieなし・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFのみ、ストリームを含め64KBまで。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
+任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（各アカウント固有のログイン済みセッション・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFのみ、ストリームを含め64KBまで。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
 
 | Node | RPC | 処理 |
 | --- | --- | --- |
 | `context.webAccounts.start()` | `host.webAccounts.start` | 全枠を非表示で読込開始、UIを開かない |
 | `context.webAccounts.open()` | `host.webAccounts.open` | 操作用ウィンドウを表示・復帰 |
-| `context.webAccounts.cycle(1|-1)` | `host.webAccounts.cycle` | 次/前の枠へ循環して選択・画面表示（0.14.0） |
+| `context.webAccounts.cycle(1|-1)` | `host.webAccounts.cycle` | 次/前の枠へ循環して選択。ウィンドウ表示/復元/フォーカス移動なし（0.16.1） |
 | `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
 

@@ -42,7 +42,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## React UIとIPCを追加する手順
 
-0.16.0のWebアカウント管理は`web-accounts.ts`の原子的な配列保存と`web-account-preload.ts`の限定IPCを使います。moveはselected/UUIDを変更せず、setMonitoringは遅いworker reportも抑制します。monitoringResetsはreadで一度だけ渡します。`web-account-avatar.ts`はURLとストリーム上限を検証し、ControllerがCookieなしのnet.requestとnativeImageの64px変換を行います。取得/再試行/破棄の寿命をControllerに閉じ、画像バイトはUI snapshotだけへ渡します。Gmailのtest-accounts.cjsはオフラインの画像/2アカウントで並べ替え・個別監視・設定保持・表示を確認します。
+0.16.0のWebアカウント管理は`web-accounts.ts`の原子的な配列保存と`web-account-preload.ts`の限定IPCを使います。moveはselected/UUIDを変更せず、setMonitoringは遅いworker reportも抑制します。monitoringResetsはreadで一度だけ渡します。`web-account-avatar.ts`はURLとストリーム上限を検証し、0.16.1のControllerが当該アカウントのsession/credentials:includeのnet.requestとnativeImageの64px変換を行います。取得/再試行/破棄の寿命をControllerに閉じ、画像バイトはUI snapshotだけへ渡します。Gmailのtest-accounts.cjsはオフラインの画像/2アカウントで並べ替え・個別監視・設定保持・表示を確認します。
 
 window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。0.15.2のweb-page-activity.tsはkeepActiveのobserveOriginでobserver.readyを待ち、背景のアクティブ状態を30秒ごとに更新します。native focus中はエミュレーションを解除します。同一文書の移動では状態を保ち、別文書のメインフレーム遷移/破棄・認証originで周期/250ms待機/接続を解除します。別Debugger/DevToolsへ干渉せず、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使い、DOM準備後に受信処理が遅れて始まる条件も検証します。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
 
