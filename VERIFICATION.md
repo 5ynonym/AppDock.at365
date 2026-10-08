@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-08: worktree削除後のpublish.bat失敗を修復
+
+- 原因は共有node_modules内のpnpm生成参照。削除済みの`AppDock.at365.worktrees/applet-settings-panel`を指す12個のパッケージjunctionと24個の`.bin`起動スクリプトがmainに残り、ビルドツールを解決できなくなっていた。既存パッケージ本体・依存版・lockfileを維持し、存在するmain側の同一パッケージへの参照へ修復。全置換先の存在と対象パスを事前確認し、古い参照が残っていないことを確認。
+- `dev.bat run typecheck`と、ユーザーが実行した入口の`publish.bat`が終了コード0。.NET framework-dependent発行、TypeScript/Vite、portableの単一EXE作成まで成功。Electron/TypeScript/Vite/electron-builder/Playwrightはmain配下から解決できる。
+- 発行後の単一EXEをコピーして`dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe`を実行。`artifacts/smoke-1791469453906/smoke-result.json`はok:true、終了コード0。起動・トレイ操作・設定/プロフィール画像保存・キー・正常終了を確認。初回`smoke-1791469407880`だけ設定ファイルrenameのEPERMで失敗し、同じEXE・スクリプトでの再試行は成功。初回の一時エラーの原因は確定していない。
+- 発行版win-unpackedの`navigation-1791469464113/result.json`はok:true。設定アクション、未保存下書き/JSON/外部競合、説明/設定切替の座標と見た目、dark/light・大小画面、ログの既存遷移を確認。
+- 最終`publish/AppDock.at365.exe`: 100574613 bytes、SHA256 `CEED52AE034DAE0867DD0846DF740A14951822BC6DD668551F07B760EBA6609F`。portable試験へコピーしたEXEとのSHA256一致を確認。実利用deploy・外部pushなし。
+- 前の統合作業はmainの071fa3bまで完了。worktreeは削除済み、`codex/applet-settings-panel`ブランチとmainへ引き継いだ検証資料は保持。今回の依存参照修復はGit管理外で、再発防止手順をDEVELOPMENT.mdへ記載。
+
 ## 2026-10-08: Applet設定パネルへ最新mainを取り込んで統合
 
 - ユーザーの指定により、共通設定パネルと説明/設定ボタン配置の変更をdc49658へ保存し、mainのc9b185a（設定アクション）をcodex/applet-settings-panelへ取り込み。自動マージで競合なし。既存のsettingActionsの型/検証/フォーム実行と文書・試験を保持し、共通設定パネルでも利用できる状態を確認。
