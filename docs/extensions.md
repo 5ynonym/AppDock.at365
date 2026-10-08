@@ -16,6 +16,26 @@
 
 ## マニフェスト
 
+### v0.21.0: 設定ページの操作ボタン
+
+`settingActions` は最大16件の `{ title, command, description?, successMessage? }` を宣言します。
+`command` は同じマニフェストの `commands` に宣言した正規IDに限定し、重複・別Applet・ホストのコマンドを拒否します。
+ボタンは既存のコマンド実行経路を使い、実行中は同じ設定パネルの操作ボタンを無効化します。
+成功・失敗をその場へ表示し、未保存の設定を保存・破棄しません。操作内容はsettings.jsonへ保存しません。
+実行可否はコマンドの現在のavailabilityに従います。Windows等への実際の操作と結果確認はAppletの責任です。
+`activateOnExecute` のないコマンドはApplet開始後に利用できます。この機能を使うAppletはminimumHostVersionを0.21.0以上にしてください。
+
+```json
+"settingActions": [
+  {
+    "title": "今すぐ確認",
+    "command": "at365.my-tool.check",
+    "description": "保存済みの設定を使って確認します。",
+    "successMessage": "確認しました。"
+  }
+]
+```
+
 ```json
 {
   "apiVersion": 1,

@@ -578,3 +578,13 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 完成したportable EXEと未改変のAppletでも、初回案内、設定、消音、無効化/再有効化、終了コード0を確認。結果は`../Applet.GmailChecker.at365/artifacts/portable-1791355697468/result.json`。
 - .NETホストを既存build-dotnet手順でクリーン発行し、ローカルElectronからportableを作成。単独electron-builder実行はpnpm PATH不足で失敗したが、dev.bat経由で成功。EXE SHA256: `4A6B3D6DBD4302C7A6A3015731344E8795CE7473CC760909EBB580F9C89F4275`。
 - Gmail Appletを開発用publish/extensionsに配置し、5ファイルのハッシュ一致を確認。実利用先へのdeploy・外部pushは実施していない。実Google OAuth/新着、Windows通知の実表示とクリック、実音の聴感、スリープ復帰・長時間常駐は未確認。
+
+## 2026-10-08: 0.21.0 設定ページの操作ボタン
+
+- settingActionsを宣言して自身の宣言済みコマンドを実行。結果表示、実行中の無効化、停止中の可用性、未保存draftの維持を追加。settingActionsは設定データへ保存しない。
+- ローカルツールによる型検査、TS/Vite build、ホスト回帰91/91、publish.bat成功。.NET発行物はframework-dependentで、hostpolicy/coreclr等のランタイムファイル混入なし。
+- WallpaperSlideshowの隔離native fixture＋最終win-unpackedを使ったGUI: `../Applet.WallpaperSlideshow.at365/artifacts/background-settings-1791464780421/result.json`。手動案内、成功/失敗、実行中のボタン無効化、未保存77秒の維持、paused維持、操作データ非保存、停止時無効化、900×720 DIP横はみ出しなしを確認。success/small画像を目視確認。
+- 最終単一EXEの隔離起動: `artifacts/smoke-1791464853687/smoke-result.json`、ok:true。初回smokeは発行完了前のコピーで最終ハッシュと違ったため、発行完了後に再実行した。最終EXE/検証コピーのハッシュ一致を確認。
+- 実利用先deploy、commit、pushなし。実Windows背景を変更する検証ではない。
+- 通常sandboxのpnpm呼出しはポリシー確認で進まず中断。プロジェクト内の既存Nodeで検査し、許可された通常Windows環境のdev.bat/publish.batでは成功。グローバルツールの導入なし。
+- 最終EXE: 100574539 bytes、SHA256 DDCCF49D9702CB8A2E879AD44552DF2AE36114EFA6E1A43BB841A0BDB7A05A7D。

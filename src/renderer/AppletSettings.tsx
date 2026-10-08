@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../shared/contracts';
 import { ShortcutListSetting } from './ShortcutListSetting';
 import { ObjectListSetting } from './ObjectListSetting';
@@ -14,6 +14,33 @@ export function AppletSettings({
   onChange(value: Settings): void;
 }) {
   const [filter, setFilter] = useState('');
+  const executing = useRef(false);
+  const [runningAction, setRunningAction] = useState<string | null>(null);
+  const [result, setResult] = useState<{ command: string; message: string; error: boolean } | null>(
+    null,
+  );
+  const actions = (applet.settingActions ?? []).filter((item) =>
+    `${item.title} ${item.description ?? ''}`.toLowerCase().includes(filter.toLowerCase()),
+  );
+  const executeAction = async (item: NonNullable<ExtensionSnapshot['settingActions']>[number]) => {
+    if (executing.current) return;
+    executing.current = true;
+    setRunningAction(item.command);
+    setResult(null);
+    try {
+      await window.dock.executeCommand(item.command);
+      setResult({
+        command: item.command,
+        message: item.successMessage ?? '実行しました。',
+        error: false,
+      });
+    } catch (error) {
+      setResult({ command: item.command, message: String(error), error: true });
+    } finally {
+      executing.current = false;
+      setRunningAction(null);
+    }
+  };
   const definitions = (applet.settings ?? []).filter((item) =>
     `${item.title} ${item.description ?? ''} ${item.key}`
       .toLowerCase()
@@ -93,9 +120,36 @@ export function AppletSettings({
         value={filter}
         onChange={(event) => setFilter(event.target.value)}
       />
-      {!definitions.length && (
+      {actions.map((item) => {
+        const available = applet.commands.some(
+          (command) => command.id === item.command && command.available,
+        );
+        const descriptionId = `setting-action-help-${item.command}`;
+        return (
+          <div className="setting-row setting-action-row" key={item.command}>
+            <div>
+              <strong>{item.title}</strong>
+              <p id={descriptionId}>{item.description}</p>
+              {!available && <p>Appletを開始してから操作できます。</p>}
+              {result?.command === item.command && (
+                <p role={result.error ? 'alert' : 'status'}>{result.message}</p>
+              )}
+            </div>
+            <button
+              className="secondary"
+              aria-describedby={descriptionId}
+              disabled={!available || runningAction !== null}
+              aria-busy={runningAction === item.command}
+              onClick={() => void executeAction(item)}
+            >
+              {runningAction === item.command ? '実行中…' : item.title}
+            </button>
+          </div>
+        );
+      })}
+      {!definitions.length && !actions.length && (
         <p className="empty">
-          {applet.settings?.length
+          {applet.settings?.length || applet.settingActions?.length
             ? '該当する設定項目はありません。'
             : 'このAppletには設定項目がありません。'}
         </p>

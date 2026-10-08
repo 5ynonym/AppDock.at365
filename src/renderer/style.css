@@ -1176,6 +1176,14 @@ main {
   padding: 16px 0;
   border-bottom: 1px solid var(--border);
 }
+.setting-action-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.setting-action-row > button {
+  max-width: 100%;
+  text-align: left;
+}
 .setting-row:last-child {
   border-bottom: 0;
 }

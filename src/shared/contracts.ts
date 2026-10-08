@@ -74,6 +74,12 @@ export interface SettingOption {
   label: string;
   value: string;
 }
+export interface SettingAction {
+  title: string;
+  command: string;
+  description?: string;
+  successMessage?: string;
+}
 export interface Panel {
   title: string;
   description?: string;
@@ -110,6 +116,7 @@ export interface ExtensionManifest {
   type?: string;
   capabilities?: string[];
   settings?: SettingDefinition[];
+  settingActions?: SettingAction[];
   commands?: DeclaredCommand[];
   webAccounts?: import('./web-accounts').WebAccountDefinition;
   pages?: import('./applet-pages').AppletPageDefinition[];
