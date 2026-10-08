@@ -4,6 +4,8 @@
 
 ## 文書の入口
 
+0.17.1ではWebアカウントのローカルUIへ、自身のAppletの宣言済みboolean/静的select設定の読み書きと変更通知を追加しました。保存は既存SettingsStore、詳細は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
+
 0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
 - [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。

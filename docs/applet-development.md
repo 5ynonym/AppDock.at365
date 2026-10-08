@@ -6,6 +6,8 @@ AppDock v0.3.0 / API v1を基準にした実装手順です。まずこのガイ
 
 ## 1. 機能と実行方式を決める
 
+Webアカウントの独自ローカルUIに自身のboolean/静的select設定を置く場合は、AppDock 0.17.1のsnapshot.settings/setSettingを使えます。manifestへ設定とsettings capabilityを宣言し、[WebアカウントAPI](web-accounts.md)の保存・同期契約に従ってください。
+
 Appletは1つの道具として有効化・停止・再起動できる単位です。時計、マウスジェスチャー、AutoLockなど、独立して切り替えたい機能は別Appletにします。次の機能のために、Applet内へ汎用的な拡張機構を先に作る必要はありません。
 
 | runtime | 選ぶ場面 | 実装と参照例 |

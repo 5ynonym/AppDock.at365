@@ -65,6 +65,44 @@ export function createHostApi(
           e.manifest.webAccounts,
           {
             capabilities: e.manifest.capabilities ?? [],
+            settings: () =>
+              Object.fromEntries(
+                (e.manifest.capabilities?.includes('settings') ? (e.manifest.settings ?? []) : [])
+                  .filter(
+                    (definition) =>
+                      definition.type === 'boolean' ||
+                      (definition.type === 'select' && !definition.dynamic),
+                  )
+                  .map((definition) => {
+                    const value =
+                      settings.value.extensions[id]?.settings[definition.key] ?? definition.default;
+                    return [
+                      definition.key,
+                      definition.type === 'boolean'
+                        ? value === true
+                        : typeof value === 'string'
+                          ? value
+                          : '',
+                    ];
+                  }),
+              ),
+            setSetting: (key, value) => {
+              requireCapability('settings');
+              const definition = e.manifest.settings?.find(
+                (definition) =>
+                  definition.key === key &&
+                  (definition.type === 'boolean' ||
+                    (definition.type === 'select' && !definition.dynamic)),
+              );
+              if (!definition) throw Error('宣言されたboolean/静的select設定を指定してください。');
+              validateSettingValue(definition, value);
+              const current = settings.value.extensions[id]?.settings ?? {};
+              settings.updateExtension(id, { settings: { ...current, [definition.key]: value } });
+            },
+            onSettingsChanged: (callback) => {
+              settings.on('changed', callback);
+              return () => settings.removeListener('changed', callback);
+            },
             failed: (message) => log('error', id, message),
             shortcut: (input) => {
               if (input.type !== 'keyDown' || input.isAutoRepeat || e.state !== 'running')
