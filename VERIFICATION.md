@@ -660,3 +660,7 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - tests/release.test.cjs 6件成功: 全添付後だけ公開、未完了準備拒否、ソース/asset/remote main変更拒否、アップロード中断と不足分再開、remote digest不一致/asset欠落で公開停止、版の増加と正式版制約。GitHub操作はfixtureであり、この作業で実Releaseは変更していない。
 - tests/all-in-one.test.cjs成功: 従来の異常時ZIP保持に加え、新しい兄弟repoを追加するとスクリプトの一覧編集なしで同梱されることを確認。WindowsのZIP区切りを正規化するverify-all-in-one.ps1で全収録hash/sizeと展開を検査。
 - sandbox内のTEMPファイルrenameはEPERM。許可された通常Windows環境で同じfixtureテストを実行して成功。製品コードや権限制約を回避する変更は行っていない。
+- 実Prepare通し検証: cleanなd142d62に対して `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Mode Prepare -NotesFile artifacts/github-releases-0.23.0/AppDock.at365.md -PlanPath artifacts/release-workflow-validation/plan.json` が終了0。型検査、回帰110/110、publish.bat、本体/一括/個別の実portable交換と再起動、進捗/取消/再試行、8停止点の復旧、全6Applet入りZIPの通常起動まで成功。plan.phase=prepared、全7ステップのログ/証跡/ハッシュを保存した。
+- 同梱ZIPの全ファイル照合・通常EXEとの一致・初期無効/版/エラーなしを検証。`artifacts/release-workflow-validation/bundle-ui.json` はok:true、profileは`artifacts/bundle-verify-37aa59db-7962-41b4-8856-b79fd7bd56b6`。EXE 100598967 bytes/SHA256 4ee27650e20d5a94701d7f241b2961fbaa2e2684b17933b0e98db3b3608bd92b、ZIP 275723780 bytes/SHA256 ff66809c47707ebcd591c3436e36bd04d62b832423c1d06d789d2454e9e0a951。これは今回のローカル検証物であり、既存GitHub v0.23.0の配布物とは別。
+- GitHubの新しいDraft/Publish/Verifyモードを実サービスへ実行して新Releaseを作る試験は行っていない。公開操作の順序/停止/再開はfixture、過去の実公開値は読み取りで確認。今回の版更新・main統合・push・Release変更・実利用deployはなし。
+- この検証記録を追加するコミットでもソースSHAが変わるため、上記planは当時の成功証跡として保持し、将来の公開には再Prepareを必須とする。PS1はUTF-8 BOM/CRLF、BATは未変更。文書リンクと差分を確認。
