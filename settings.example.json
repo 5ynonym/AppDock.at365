@@ -9,6 +9,14 @@
     "trayClickCommand": "appdock.open",
     "trayDoubleClickCommand": null
   },
+  "updates": {
+    "hostSource": "github:5ynonym/AppDock.at365",
+    "checkHostOnStartup": false,
+    "checkAppletsOnStartup": false,
+    "startupDelaySeconds": 10,
+    "notifyOnStartup": true,
+    "allowSameVersion": false
+  },
   "shortcuts": {
     "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
     "appdock.settings.open": ["Ctrl+,"],

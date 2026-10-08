@@ -9,6 +9,7 @@ export interface HostSettings {
 }
 export interface ExtensionSettings {
   enabled: boolean;
+  updateSource?: string;
   startupDelaySeconds?: number;
   pages?: Record<string, { display: import('./applet-pages').PageDisplay }>;
   settings: Record<string, unknown>;
@@ -16,6 +17,7 @@ export interface ExtensionSettings {
 export interface Settings {
   schemaVersion: 1;
   host: HostSettings;
+  updates: UpdateSettings;
   extensions: Record<string, ExtensionSettings>;
   shortcuts: Record<string, string[]>;
   globalShortcutCommands: string[];
@@ -140,6 +142,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  updates: UpdateState;
   globalHotKeys: GlobalHotKeyStatus[];
   settings: SettingsSnapshot;
   extensions: ExtensionSnapshot[];
@@ -157,6 +160,8 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  checkAllUpdates(): Promise<UpdateState>;
+  installUpdates(target: 'host' | 'applets' | string): Promise<UpdateState>;
   onAppletPage(callback: (key: string | null) => void): () => void;
   openAppletPage(extensionId: string, pageId: string): Promise<void>;
   pageViewport(
@@ -186,8 +191,26 @@ export interface DockApi {
   onChanged(callback: () => void): () => void;
 }
 export interface UpdateResult {
-  status: 'current' | 'available' | 'unpublished' | 'unsupported';
+  status: 'current' | 'available' | 'unpublished' | 'unsupported' | 'incompatible' | 'error';
   currentVersion: string;
   latestVersion?: string;
   checkedAt: string;
+  id?: string;
+  name?: string;
+  message?: string;
+  installable?: boolean;
+  releaseUrl?: string;
+}
+export interface UpdateSettings {
+  hostSource: string;
+  checkHostOnStartup: boolean;
+  checkAppletsOnStartup: boolean;
+  startupDelaySeconds: number;
+  notifyOnStartup: boolean;
+  allowSameVersion: boolean;
+}
+export interface UpdateState {
+  busy: boolean;
+  phase: string;
+  results: UpdateResult[];
 }

@@ -2466,3 +2466,32 @@ summary {
   width: 100px;
   flex-shrink: 0;
 }
+.update-settings {
+  margin-top: 24px;
+  display: grid;
+  gap: 14px;
+}
+.update-source {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.update-source input {
+  width: 100%;
+  min-width: 0;
+}
+.update-source .text-button {
+  justify-self: start;
+}
+.update-options {
+  display: grid;
+  gap: 12px;
+}
+.update-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.update-options input[type='number'] {
+  width: 110px;
+}

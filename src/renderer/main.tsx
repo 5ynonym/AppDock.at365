@@ -26,6 +26,7 @@ import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { SettingsActions, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
+import { UpdateSettings } from './UpdateSettings';
 import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
@@ -224,6 +225,7 @@ function App() {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [profileRequest, setProfileRequest] = useState(0);
+  const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   const [detailSettings, setDetailSettings] = useState(false);
@@ -413,6 +415,11 @@ function App() {
   const visiblePins = filteredCommands.filter((c) => pins.includes(c.id)).map((c) => c.id);
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
+    if (id === 'appdock.updates.open') {
+      setUpdatesRequest((value) => value + 1);
+      setPage('settings');
+      return;
+    }
     if (id === 'appdock.commands.search') {
       setPalette((v) => !v);
       setQuery('');
@@ -771,6 +778,7 @@ function App() {
                       setPage('logs');
                     }}
                     busy={busy}
+                    updateDisabled={editor.dirty}
                     run={action}
                   />
                 </div>
@@ -787,6 +795,7 @@ function App() {
                 commands={shortcutCommands}
                 avatarUrl={snapshot.avatarUrl}
                 profileRequest={profileRequest}
+                updatesRequest={updatesRequest}
                 ribbonRequest={ribbonRequest}
                 editor={editor}
                 onApplet={goExtension}
@@ -814,7 +823,7 @@ function App() {
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
-          <VersionCheck />
+          <VersionCheck disabled={editor.dirty} />
         </span>
         <button onClick={() => setPalette(true)}>
           <Icon name="command" size={12} />
@@ -992,6 +1001,7 @@ type Run = (work: () => Promise<unknown>, message?: string) => Promise<void>;
 function ExtensionDetail({
   extension: e,
   busy,
+  updateDisabled,
   run,
   onSettings,
   onLogs,
@@ -1004,6 +1014,7 @@ function ExtensionDetail({
   settingsPanel?: React.ReactNode;
   onLogs(id: string): void;
   busy: boolean;
+  updateDisabled: boolean;
   run: Run;
 }) {
   if (!e)
@@ -1054,7 +1065,7 @@ function ExtensionDetail({
           {e.minimumHostVersion && (
             <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
           )}
-          <VersionCheck key={e.id} id={e.id} />
+          <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
           <div className="detail-state">
             <StateBadge extension={e} />
             <button
@@ -1207,6 +1218,7 @@ function SettingsPage({
   commands,
   avatarUrl,
   profileRequest,
+  updatesRequest,
   ribbonRequest,
   globalHotKeys,
   editor,
@@ -1224,6 +1236,7 @@ function SettingsPage({
   commands: UiCommand[];
   avatarUrl: string | null;
   profileRequest: number;
+  updatesRequest: number;
   ribbonRequest: number;
   editor: SettingsEditor;
   onApplet(id: string): void;
@@ -1287,7 +1300,12 @@ function SettingsPage({
     id === 'ribbon'
       ? changed(draft.ribbon, snapshot.value.ribbon)
       : id === 'about'
-        ? false
+        ? changed(draft.updates, snapshot.value.updates) ||
+          extensions.some(
+            (e) =>
+              draft.extensions[e.id]?.updateSource !==
+              snapshot.value.extensions[e.id]?.updateSource,
+          )
         : id === 'appearance'
           ? draft.host.theme !== snapshot.value.host.theme
           : id === 'general'
@@ -1307,6 +1325,9 @@ function SettingsPage({
       switchToForm();
     }
   }, [profileRequest]);
+  useEffect(() => {
+    if (updatesRequest && switchToForm()) setCategory('about');
+  }, [updatesRequest]);
   useEffect(() => {
     if (ribbonRequest) {
       setCategory('ribbon');
@@ -1434,10 +1455,7 @@ function SettingsPage({
           </button>
         }
       />
-      <div
-        className="settings-toolbar"
-        style={category === 'about' ? { display: 'none' } : undefined}
-      >
+      <div className="settings-toolbar">
         <div className="tabs">
           <button
             className={mode === 'form' ? 'selected' : ''}
@@ -1493,7 +1511,7 @@ function SettingsPage({
                       AppDock.at365 <span>v{version}</span>
                     </h2>
                     <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
-                    <VersionCheck details />
+                    <VersionCheck details disabled={dirty} />
                     <dl className="runtime-versions">
                       <div>
                         <dt>Electron</dt>
@@ -1514,9 +1532,12 @@ function SettingsPage({
                         </dd>
                       </div>
                     </dl>
-                    <p className="muted">
-                      確認はボタンを押したときに行います。更新がある場合はリリースページから入手し、AppDockを終了して置き換えてください。
-                    </p>
+                    <UpdateSettings
+                      draft={draft}
+                      edit={edit}
+                      extensions={extensions}
+                      dirty={dirty}
+                    />
                   </div>
                   <h3>インストール済みのApplet</h3>
                   <p className="muted">更新確認先を持つAppletは、ここから確認できます。</p>
@@ -1528,7 +1549,7 @@ function SettingsPage({
                           <strong>{e.displayName}</strong>
                           <span className="muted">v{e.version}</span>
                         </div>
-                        <VersionCheck id={e.id} details />
+                        <VersionCheck id={e.id} details disabled={dirty} />
                       </article>
                     ))}
                   </div>

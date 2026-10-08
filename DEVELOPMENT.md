@@ -135,3 +135,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
 0.21.0はmanifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・未保存draft維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
+
+## 本体・Appletの自己更新
+
+0.22.0の取得元・更新情報JSON・共通ミニプログラム・発行・復元・隔離試験は[更新の開発ガイド](docs/updates.md)を参照してください。`publish.bat`は本体EXEと`publish/update.json`を生成します。

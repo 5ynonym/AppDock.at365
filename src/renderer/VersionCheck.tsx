@@ -1,19 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { UpdateResult } from '../shared/contracts';
 const updateError = (error: unknown) => {
   const message = (error instanceof Error ? error.message : '').replace(
     /^Error invoking remote method '[^']+': (?:Error: )?/,
     '',
   );
-  return /^(更新|正式版|リリース)/.test(message)
-    ? message
-    : '更新を確認できませんでした。通信環境を確認して、もう一度お試しください。';
+  return message || '更新を確認できませんでした。通信環境を確認して、もう一度お試しください。';
 };
 
-export function VersionCheck({ id, details = false }: { id?: string; details?: boolean }) {
+export function VersionCheck({
+  id,
+  details = false,
+  disabled = false,
+}: {
+  id?: string;
+  details?: boolean;
+  disabled?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateResult>();
   const [error, setError] = useState('');
+  const [sharedBusy, setSharedBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      void window.dock.snapshot().then((snapshot) => {
+        if (!alive) return;
+        setSharedBusy(snapshot.updates.busy);
+        setResult(snapshot.updates.results.find((result) => result.id === (id ?? 'host')));
+      });
+    };
+    refresh();
+    const unsubscribe = window.dock.onChanged(refresh);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, [id]);
   const check = async () => {
     setBusy(true);
     setError('');
@@ -28,7 +51,7 @@ export function VersionCheck({ id, details = false }: { id?: string; details?: b
   };
   return (
     <span className="version-check">
-      <button className="text-button" disabled={busy} onClick={() => void check()}>
+      <button className="text-button" disabled={busy || sharedBusy} onClick={() => void check()}>
         {busy ? '更新を確認中…' : '更新を確認'}
       </button>
       {result && (
@@ -39,10 +62,27 @@ export function VersionCheck({ id, details = false }: { id?: string; details?: b
               ? '最新版です。'
               : result.status === 'unpublished'
                 ? '公開リリースが見つかりません。'
-                : '更新確認先が設定されていません。'}
+                : result.status === 'unsupported'
+                  ? '更新元が設定されていません。'
+                  : result.message}
         </span>
       )}
-      {result?.status === 'available' && (
+      <button
+        className="text-button"
+        disabled={busy || sharedBusy || disabled}
+        title={disabled ? '未保存の設定を保存または破棄してから更新してください。' : undefined}
+        onClick={() => {
+          setError('');
+          setBusy(true);
+          void window.dock
+            .installUpdates(id ?? 'host')
+            .catch((error) => setError(updateError(error)))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {id ? 'このAppletを更新' : 'AppDockを更新'}
+      </button>
+      {result?.status === 'available' && result.releaseUrl && (
         <button
           className="text-button"
           onClick={() => {

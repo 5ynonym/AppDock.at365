@@ -1,4 +1,5 @@
 import type { Settings } from './contracts';
+import { validateUpdateSource } from './update-sources';
 import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
 import {
   defaultShortcuts,
@@ -20,6 +21,14 @@ export const createDefaultSettings = (): Settings => ({
     trayDoubleClickCommand: null,
   },
   extensions: {},
+  updates: {
+    hostSource: 'github:5ynonym/AppDock.at365',
+    checkHostOnStartup: false,
+    checkAppletsOnStartup: false,
+    startupDelaySeconds: 10,
+    notifyOnStartup: true,
+    allowSameVersion: false,
+  },
   shortcuts: structuredClone(defaultShortcuts),
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
   trayCommands: [],
@@ -78,6 +87,7 @@ export function parseSettings(value: unknown): Settings {
         Number(item.startupDelaySeconds) > 86400)
     )
       throw new Error(`拡張設定 ${id} の開始までの秒数は0～86400の整数です。`);
+    if (item.updateSource !== undefined) validateUpdateSource(item.updateSource);
     if (
       item.pages !== undefined &&
       (!object(item.pages) ||
@@ -148,7 +158,28 @@ export function parseSettings(value: unknown): Settings {
     (profile.avatar !== null && profile.avatar !== 'avatar.png')
   )
     throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
+  const updates = {
+    ...createDefaultSettings().updates,
+    ...(object(value.updates) ? value.updates : {}),
+  };
+  if (value.updates !== undefined && !object(value.updates))
+    throw Error('updates はオブジェクトです。');
+  validateUpdateSource(updates.hostSource);
+  for (const key of [
+    'checkHostOnStartup',
+    'checkAppletsOnStartup',
+    'notifyOnStartup',
+    'allowSameVersion',
+  ] as const)
+    if (typeof updates[key] !== 'boolean') throw Error(`updates.${key} は true / false です。`);
+  if (
+    !Number.isInteger(updates.startupDelaySeconds) ||
+    updates.startupDelaySeconds < 0 ||
+    updates.startupDelaySeconds > 3600
+  )
+    throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    updates,
     schemaVersion: value.schemaVersion,
     extensions: value.extensions,
     host: { ...value.host, trayClickCommand, trayDoubleClickCommand, hardwareAcceleration },

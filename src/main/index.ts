@@ -12,14 +12,17 @@ import {
   protocol,
   net,
   screen,
+  Notification,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
-import { checkUpdate, releasesUrl } from './core/updates';
+import { PortableUpdates, type UpdateTarget } from './core/portable-updates';
+import { execFileSync } from 'node:child_process';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
@@ -92,6 +95,8 @@ let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
 let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+let updater: PortableUpdates;
+let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
@@ -191,6 +196,7 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    updates: updater?.state ?? { busy: false, phase: '', results: [] },
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
     extensions: manager.snapshot(),
@@ -266,14 +272,29 @@ function registerIpc() {
     });
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
-  handle('dock:checkUpdates', (id?: string) => {
-    const target = updateTarget(id);
-    return checkUpdate(target.version, target.repository, net.fetch);
+  handle('dock:checkUpdates', async (id?: string) => {
+    updateTarget(id);
+    await updater.check([id ?? 'host']);
+    return updater.state.results.find((result) => result.id === (id ?? 'host'))!;
+  });
+  handle('dock:checkAllUpdates', () => updater.check());
+  handle('dock:installUpdates', (target: string) => {
+    if (
+      typeof target !== 'string' ||
+      (target !== 'host' && target !== 'applets' && !manager.items.has(target))
+    )
+      throw Error('更新対象が正しくありません。');
+    return updater.install(target);
   });
   handle('dock:openReleases', (id?: string) => {
-    const target = updateTarget(id);
-    if (!target.repository) throw new Error('更新確認先が設定されていません。');
-    return shell.openExternal(releasesUrl(target.repository));
+    updateTarget(id);
+    const result = updater.state.results.find((result) => result.id === (id ?? 'host'));
+    if (
+      !result?.releaseUrl ||
+      !/^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/releases$/.test(result.releaseUrl)
+    )
+      throw new Error('GitHubの更新元を確認してから開いてください。');
+    return shell.openExternal(result.releaseUrl);
   });
   handle('dock:startExtensionNow', (id: string) => {
     if (manager.items.get(id)?.state !== 'waiting')
@@ -346,6 +367,21 @@ async function initialize() {
     return;
   }
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
+  const helperPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'updater', 'AppDock.Updater.exe')
+    : path.join(app.getAppPath(), 'artifacts', 'updater', 'AppDock.Updater.exe');
+  if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) {
+    try {
+      execFileSync(helperPath, ['--recover', baseDirectory], { windowsHide: true });
+    } catch (error) {
+      dialog.showErrorBox(
+        'AppDock — 更新の復元が必要です',
+        `中断された更新を復元できませんでした。\n${String(error)}\n.appdock/update-transaction.json と更新用一時フォルダーを保持しています。`,
+      );
+      app.quit();
+      return;
+    }
+  }
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
@@ -366,6 +402,65 @@ async function initialize() {
       executeCommand,
     ),
     log: log.write,
+  });
+  updater = new PortableUpdates({
+    targets: (): UpdateTarget[] => [
+      {
+        id: 'host',
+        name: 'AppDock',
+        kind: 'host',
+        version: app.getVersion(),
+        source: settings.value.updates.hostSource,
+        destination: process.env.PORTABLE_EXECUTABLE_FILE || '',
+      },
+      ...manager.snapshot().map((extension) => ({
+        id: extension.id,
+        name: extension.displayName,
+        kind: 'applet' as const,
+        version: extension.version,
+        destination: extension.folder,
+        source:
+          settings.value.extensions[extension.id]?.updateSource ??
+          (extension.updateRepository ? `github:${extension.updateRepository}` : ''),
+      })),
+    ],
+    settings: () => settings.value.updates,
+    hostVersion: app.getVersion(),
+    helper: helperPath,
+    executable: app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
+    restartArgs: testDirectory
+      ? process.argv
+          .slice(1)
+          .filter(
+            (argument) =>
+              argument.startsWith('--test-profile=') ||
+              argument.startsWith('--remote-debugging-port=') ||
+              argument.startsWith('--inspect='),
+          )
+      : [],
+    baseDirectory,
+    fetcher: net.fetch,
+    changed,
+    confirm: async (names) => {
+      const response = await dialog.showMessageBox(window!, {
+        type: 'question',
+        title: '更新して再起動',
+        message: 'AppDockとすべてのAppletを終了し、更新して再起動します。',
+        detail: names.join('\n'),
+        buttons: ['更新して再起動', 'キャンセル'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      });
+      return response.response === 0;
+    },
+    processIds: () => [
+      process.pid,
+      ...(process.env.PORTABLE_EXECUTABLE_FILE ? [process.ppid] : []),
+      ...[...manager.items.values()].flatMap((item) => (item.child?.pid ? [item.child.pid] : [])),
+    ],
+    shutdown: () => quitHost(),
+    log: (message) => log.write('warn', 'updates', message),
   });
   const hotKeyHost = app.isPackaged
     ? path.join(process.resourcesPath, 'dotnet-host', 'AppDock.ExtensionHost.exe')
@@ -607,6 +702,55 @@ async function initialize() {
   await manager.reconcile();
   await syncHotKeys();
   log.write('info', 'host', 'AppDockを起動しました。');
+  const updateResultFile = path.join(dataDirectory, 'update-result.json');
+  if (fs.existsSync(updateResultFile)) {
+    try {
+      const result = JSON.parse(fs.readFileSync(updateResultFile, 'utf8'));
+      updater.state.phase = result.message;
+      log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
+      const temporary =
+        typeof result.temporaryDirectory === 'string'
+          ? path.resolve(result.temporaryDirectory)
+          : '';
+      if (
+        temporary &&
+        path.dirname(temporary).toLowerCase() === path.resolve(os.tmpdir()).toLowerCase() &&
+        /^AppDock-update-[A-Za-z0-9]{6}$/.test(path.basename(temporary))
+      ) {
+        setTimeout(() => {
+          if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) return;
+          if (fs.existsSync(temporary) && !fs.lstatSync(temporary).isSymbolicLink())
+            void fs.promises
+              .rm(temporary, { recursive: true, force: true })
+              .catch((error) =>
+                log.write(
+                  'warn',
+                  'updates',
+                  `更新用一時ファイルを削除できませんでした: ${String(error)}`,
+                ),
+              );
+        }, 5000);
+      }
+    } catch (error) {
+      log.write('warn', 'updates', String(error));
+    }
+  }
+  startupUpdateTimer = updater.scheduleStartup(smoke, (results) => {
+    if (!results.length || quitting) return;
+    log.write('info', 'updates', `${results.length}件の更新があります。`);
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: 'AppDock — 更新があります',
+        body: results.map((result) => `${result.name}: ${result.latestVersion}`).join('\n'),
+        silent: true,
+      });
+      notification.on('click', () => {
+        showWindow();
+        window?.webContents.send('dock:hostCommand', 'appdock.updates.open');
+      });
+      notification.show();
+    }
+  });
   if (smoke) await runSmoke();
   else if (!settings.value.host.startMinimized) showWindow();
   // Optional startup command only for an explicit isolated test profile.
@@ -769,6 +913,7 @@ async function runSmoke() {
 }
 app.on('second-instance', () => showWindow());
 app.on('before-quit', (event) => {
+  clearTimeout(startupUpdateTimer);
   quitting = true;
   trayClicks?.close();
   windowState?.flush();

@@ -2,4 +2,5 @@
   <Project Path="dotnet/AppDock.SDK/AppDock.SDK.csproj" />
   <Project Path="dotnet/AppDock.Runtime/AppDock.Runtime.csproj" />
   <Project Path="dotnet/AppDock.ExtensionHost/AppDock.ExtensionHost.csproj" />
+  <Project Path="dotnet/AppDock.Updater/AppDock.Updater.csproj" />
 </Solution>

@@ -228,7 +228,11 @@ const checks = [];
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
     await page.getByRole('region', { name: 'バージョン情報・更新', exact: true }).waitFor();
-    assert.equal(await page.locator('.settings-toolbar:visible').count(), 0);
+    assert.equal(await page.locator('.settings-toolbar:visible').count(), 1);
+    assert.equal(
+      await page.getByRole('button', { name: 'Appletを一括更新', exact: true }).isDisabled(),
+      true,
+    );
     await chooseApplet('検証Applet 01');
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await save();
