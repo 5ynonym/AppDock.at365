@@ -142,6 +142,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  startupReady: boolean;
   updates: UpdateState;
   globalHotKeys: GlobalHotKeyStatus[];
   settings: SettingsSnapshot;

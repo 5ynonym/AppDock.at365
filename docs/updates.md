@@ -34,3 +34,13 @@ Appletフォルダーは配布単位で交換。保存データはSDK/ホスト�
 tests/portable-updates.test.cjsは隔離ディレクトリーで設定移行、ローカル/URL/GitHub metadata、起動時確認だけ、同版再適用、互換性、helper交換/復元/ZIP拒否を検証する。helperは事前にbuild:updaterする。
 
 scripts/portable-updates-ui-test.cjsは配布EXEをartifactsの専用profileへコピーし、実helper/ランチャーで本体/一括/個別交換と再起動を確認する。DevTools/Node inspectorは隔離試験に明示指定し、最終のnative確認ダイアログだけ試験内で差し替える。通常起動にdebug/inspector引数を追加しない。結果/画像は専用profileへ保存。
+
+## 0.22.1 の操作画面と再起動
+
+更新・一括更新を先頭に置き、UpdateSettingsの共通設定と各AppletカードのAppletUpdateSourceをdetailsで折りたたむ。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存useSettingsEditorの下書き・revision付き保存へ統一する。
+
+通常のrelaunchとhelperのrestartArgsへ`--restore-view`を付ける。ホストはこの起動時だけstartMinimizedを上書きしてshowし、信頼済みホスト文書の固定URLへrestoreViewクエリーを付ける。IPCはその完全一致URLと送信元WebContents/mainFrameを照合する。通常起動の設定は変更しない。
+
+useRestartViewはページ・選択Applet・設定カテゴリ/タブ・ログの対象だけをプロフィール内localStorageへ保存し、復元指定の起動時だけ読み取る。フォームの未保存値やWebページ内の状態は復元対象外。AppletページはstartupReadyと対象のrunning状態を待ち、既存openAppletPage経路で再表示する。削除/無効/起動失敗した対象はホームへ戻す。更新前の旧版が画面状態を保存していない場合、その状態は復元できない。
+
+portable-updates-ui-testはトレイ開始ONの通常起動非表示、更新後の設定/更新ページへの復帰、通常再起動で別カテゴリとAppletページへの復帰、dark/light・900px・折りたたみ/既定復帰/下書きガードも検証する。

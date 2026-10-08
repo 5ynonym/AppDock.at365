@@ -52,6 +52,9 @@ configureWindowRendering(app);
 protocol.registerSchemesAsPrivileged([
   { scheme: 'appdock', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
+const restoreView = process.argv.includes('--restore-view');
+const hostDocumentUrl = `appdock://host/index.html${restoreView ? '?restoreView=1' : ''}`;
+let startupReady = false;
 const smoke = process.argv.includes('--smoke-test');
 const smokeDirectory = process.argv
   .find((a) => a.startsWith('--smoke-dir='))
@@ -166,9 +169,20 @@ function quitHost(restart = false) {
     if (portableExecutable) {
       // Relaunch the original EXE; its gate protects extraction and final cleanup.
       process.chdir(path.dirname(portableExecutable));
-      app.relaunch({ execPath: portableExecutable, args: process.argv.slice(1) });
+      app.relaunch({
+        execPath: portableExecutable,
+        args: [
+          ...process.argv.slice(1).filter((arg) => arg !== '--restore-view'),
+          '--restore-view',
+        ],
+      });
     } else {
-      app.relaunch();
+      app.relaunch({
+        args: [
+          ...process.argv.slice(1).filter((arg) => arg !== '--restore-view'),
+          '--restore-view',
+        ],
+      });
     }
   }
   quitting = true;
@@ -196,6 +210,7 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    startupReady,
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
@@ -250,7 +265,7 @@ function registerIpc() {
         !window ||
         event.sender !== window.webContents ||
         event.senderFrame !== window.webContents.mainFrame ||
-        event.senderFrame?.url !== 'appdock://host/index.html'
+        event.senderFrame?.url !== hostDocumentUrl
       )
         throw new Error('許可されていない画面からの要求です。');
       return callback(...args);
@@ -428,16 +443,19 @@ async function initialize() {
     hostVersion: app.getVersion(),
     helper: helperPath,
     executable: app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
-    restartArgs: testDirectory
-      ? process.argv
-          .slice(1)
-          .filter(
-            (argument) =>
-              argument.startsWith('--test-profile=') ||
-              argument.startsWith('--remote-debugging-port=') ||
-              argument.startsWith('--inspect='),
-          )
-      : [],
+    restartArgs: [
+      '--restore-view',
+      ...(testDirectory
+        ? process.argv
+            .slice(1)
+            .filter(
+              (argument) =>
+                argument.startsWith('--test-profile=') ||
+                argument.startsWith('--remote-debugging-port=') ||
+                argument.startsWith('--inspect='),
+            )
+        : []),
+    ],
     baseDirectory,
     fetcher: net.fetch,
     changed,
@@ -600,7 +618,10 @@ async function initialize() {
       }
       return fallback;
     },
-    selected: (key) => window?.webContents.send('dock:appletPage', key),
+    selected: (key) => {
+      // Closing Applet surfaces during shutdown must not overwrite the restart destination.
+      if (!quitting) window?.webContents.send('dock:appletPage', key);
+    },
     failed: (message) => log.write('error', 'pages', message),
     shortcut: (input) => {
       if (
@@ -692,7 +713,7 @@ async function initialize() {
   tray.on('click', () => trayClicks?.click());
   tray.on('double-click', () => trayClicks?.doubleClick());
   trayMenu();
-  await window.loadURL('appdock://host/index.html');
+  await window.loadURL(hostDocumentUrl);
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
   if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   manager.discover();
@@ -701,6 +722,8 @@ async function initialize() {
     settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
+  startupReady = true;
+  changed();
   log.write('info', 'host', 'AppDockを起動しました。');
   const updateResultFile = path.join(dataDirectory, 'update-result.json');
   if (fs.existsSync(updateResultFile)) {
@@ -752,7 +775,7 @@ async function initialize() {
     }
   });
   if (smoke) await runSmoke();
-  else if (!settings.value.host.startMinimized) showWindow();
+  else if (restoreView || !settings.value.host.startMinimized) showWindow();
   // Optional startup command only for an explicit isolated test profile.
   const testCommand =
     testDirectory &&

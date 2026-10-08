@@ -12,6 +12,7 @@ fs.copyFileSync(path.join(root, 'publish/AppDock.at365.exe'), executable);
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
+settings.host.startMinimized = true;
 settings.globalShortcutCommands = [];
 settings.updates = {
   ...settings.updates,
@@ -52,10 +53,27 @@ for (const [id, enabled] of [
         version,
         runtime: 'node',
         entry: 'index.js',
-        capabilities: [],
+        capabilities: ['pages'],
+        commands: [{ id: 'test.disabled.open', title: 'Open fixture', activateOnExecute: true }],
+        pages: [
+          {
+            id: 'main',
+            title: 'Restart page fixture',
+            source: 'local',
+            ui: 'index.html',
+            openCommand: 'test.disabled.open',
+          },
+        ],
       }),
     );
-    fs.writeFileSync(path.join(folder, 'index.js'), 'module.exports = {};');
+    fs.writeFileSync(
+      path.join(folder, 'index.js'),
+      "exports.activate = async c => { c.commands.register('test.disabled.open', 'Open fixture', () => c.pages.open('main')); };",
+    );
+    fs.writeFileSync(
+      path.join(folder, 'index.html'),
+      '<!doctype html><html><body>Restart fixture</body></html>',
+    );
   }
   fs.writeFileSync(path.join(installed, 'obsolete.dll'), 'old');
   settings.extensions[id] = { enabled, settings: { preserved: 'user-data' }, updateSource: source };
@@ -202,7 +220,7 @@ async function restarted(inspectPort, predicate) {
       page,
       (snapshot) => !snapshot.updates.busy && snapshot.updates.results.length === 3,
     );
-    assert.equal(initial.version, '0.22.0');
+    assert.equal(initial.version, '0.22.1');
     await waitSnapshot(
       page,
       (snapshot) =>
@@ -212,7 +230,47 @@ async function restarted(inspectPort, predicate) {
     assert.equal(initial.updates.results.filter((r) => r.status === 'available').length, 2);
     assert.equal(fs.existsSync(path.join(profile, '.appdock/update-result.json')), false);
     checks.push('startup checks metadata only, includes disabled Applet, and never installs');
+    assert.equal(
+      await inspect(
+        inspectPort,
+        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
+      ),
+      false,
+    );
+    await inspect(
+      inspectPort,
+      `${electronExpression}.BrowserWindow.getAllWindows()[0].show()`,
+      false,
+    );
     await about(page);
+    assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
+    assert.equal(await page.locator('.about-host .update-primary').count(), 2);
+    assert.equal(await page.locator('.about-host .applet-update-source').count(), 0);
+    assert.equal(await page.locator('.about-applets .applet-update-source').count(), 2);
+    await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
+    // Both source resets use the shared settings draft and preserve unrelated settings.
+    const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
+    await appletCard.locator('summary').click();
+    await appletCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
+    assert.equal(
+      await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
+      '',
+    );
+    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    assert.equal(
+      await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
+      path.join(profile, 'sources/test.disabled'),
+    );
+    await appletCard.locator('summary').click();
+    await page.getByText('更新の設定', { exact: true }).click();
+    await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
+    assert.equal(
+      await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
+      'github:5ynonym/AppDock.at365',
+    );
+    checks.push(
+      'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',
+    );
     await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(root, 'publish'));
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
     assert.equal(
@@ -222,6 +280,25 @@ async function restarted(inspectPort, predicate) {
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);
     await page.screenshot({ path: path.join(profile, 'updates-settings.png') });
+    await page.getByText('更新の設定', { exact: true }).click();
+    await page.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      s.settings.value.host.theme = 'light';
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    await page.screenshot({ path: path.join(profile, 'updates-collapsed-light.png') });
+    await inspect(
+      inspectPort,
+      `${electronExpression}.BrowserWindow.getAllWindows()[0].setSize(900, 720)`,
+      false,
+    );
+    await wait(300);
+    assert.equal(
+      await page.locator('.settings-body').evaluate((el) => el.scrollWidth <= el.clientWidth),
+      true,
+    );
+    await page.screenshot({ path: path.join(profile, 'updates-compact.png') });
     await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).click();
     await waitSnapshot(page, (s) => !s.updates.busy && s.updates.results.length === 3);
     checks.push('settings save, shared check results, and unsaved-draft update guard');
@@ -251,13 +328,22 @@ async function restarted(inspectPort, predicate) {
       updated.settings.value.extensions['appdock.dotnet-demo'].settings.preserved,
       'user-data',
     );
+    assert.equal(
+      await inspect(
+        inspectPort,
+        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
+      ),
+      true,
+    );
+    assert.equal(await renderer(inspectPort, "!!document.querySelector('.about-page')"), true);
+    checks.push('update restart overrides startMinimized and restores settings/about');
     checks.push(
       'real portable helper applies Applet batch, restarts once and preserves settings/login/enabled states',
     );
     await approve(inspectPort);
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);
-    await restarted(inspectPort, (s) => s.version === '0.22.0' && !s.updates.busy);
+    await restarted(inspectPort, (s) => s.version === '0.22.1' && !s.updates.busy);
     const result = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
     assert.equal(result.ok, true);
     assert.equal(result.updated[0].id, 'host');
@@ -289,6 +375,77 @@ async function restarted(inspectPort, predicate) {
     assert.equal(individual.ok, true);
     assert.equal(individual.updated.length, 1);
     checks.push('individual Applet button with same-version reapply');
+    // Ordinary restart restores another category and still shows the window.
+    await renderer(
+      inspectPort,
+      "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === '一般').click()",
+    );
+    await wait(200);
+    const oldPid = await inspect(inspectPort, 'process.pid');
+    await renderer(
+      inspectPort,
+      "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
+    );
+    await wait(2000);
+    await restarted(inspectPort, (s) => s.version === '0.22.1' && s.startupReady);
+    assert.notEqual(await inspect(inspectPort, 'process.pid'), oldPid);
+    assert.equal(
+      await inspect(
+        inspectPort,
+        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
+      ),
+      true,
+    );
+    assert.equal(
+      await renderer(
+        inspectPort,
+        "document.querySelector('.settings-categories button.selected')?.textContent.trim()",
+      ),
+      '一般',
+    );
+    checks.push(
+      'ordinary restart restores selected category and shows window with tray-start enabled',
+    );
+    await renderer(inspectPort, "window.dock.toggleExtension('test.disabled', true)");
+    await restarted(inspectPort, (s) =>
+      s.extensions.some((e) => e.id === 'test.disabled' && e.state === 'running'),
+    );
+    await renderer(inspectPort, "window.dock.openAppletPage('test.disabled', 'main')");
+    await wait(300);
+    assert.equal(
+      await renderer(
+        inspectPort,
+        "document.querySelector('.activity-rail button.active')?.dataset.ribbonId",
+      ),
+      'page:test.disabled:main',
+    );
+    await renderer(
+      inspectPort,
+      "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
+    );
+    await wait(2000);
+    await restarted(inspectPort, (s) => s.startupReady);
+    await wait(500);
+    assert.equal(
+      await renderer(
+        inspectPort,
+        "document.querySelector('.activity-rail button.active')?.dataset.ribbonId",
+      ),
+      'page:test.disabled:main',
+    );
+    assert.equal(
+      await renderer(inspectPort, "document.querySelector('.error-banner')?.textContent ?? ''"),
+      '',
+    );
+    assert.equal(
+      await inspect(
+        inspectPort,
+        `${electronExpression}.webContents.getAllWebContents().some(w => w.getURL().includes('/test.disabled/index.html'))`,
+      ),
+      true,
+    );
+    checks.push('ordinary restart restores the Applet page after activation');
+
     await inspect(inspectPort, `${electronExpression}.app.quit()`, false).catch(() => {});
     const resultFile = path.join(profile, 'result.json');
     fs.writeFileSync(resultFile, JSON.stringify({ ok: true, profile, checks }, null, 2));
