@@ -1,4 +1,4 @@
-# WebアカウントAPI（v0.16.1）
+# WebアカウントAPI（v0.20.0）
 
 0.18.0では[Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の旧版説明の「操作Window」は現在の表示先と読み替えてください。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。
 
@@ -45,6 +45,7 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 | `context.webAccounts.start()` | `host.webAccounts.start` | 全枠を非表示で読込開始、UIを開かない |
 | `context.webAccounts.open()` | `host.webAccounts.open` | 操作用ウィンドウを表示・復帰 |
 | `context.webAccounts.cycle(1|-1)` | `host.webAccounts.cycle` | 次/前の枠へ循環して選択。ウィンドウ表示/復元/フォーカス移動なし（0.16.1） |
+| `context.webAccounts.navigate(action)` | `host.webAccounts.navigate` | 0.20.0。back/forward/reload/inboxだけを受け付け、選択中のViewを操作。停止中は拒否 |
 | `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
 
@@ -84,7 +85,7 @@ soundはaccounts.jsonの各枠へ追加し、旧データは未指定ならOFF�
 
 削除は利用者確認後、対象枠のWebContentsを閉じ、storage/cache/Cookieを消去して一覧から外します。最後の枠は残します。削除処理中の枠は観測から除外します。Webページ内のアカウント切替はGoogle自身の操作で、追加枠とは異なります。
 
-リモートページはpreloadなし、Nodeなし、contextIsolation/sandbox/webSecurityを有効にします。権限要求は拒否し、トップレベル移動先を宣言originへ制限します。子フレームのリダイレクトにトップレベル制限を適用しません。認証URLのquery/fragmentは診断へ記録せず、ローカルUIでは認証originだけ表示します。外部リンクは利用者確認後に開きます。認証偽装・User-Agent変更はしません。
+リモートページはpreloadなし、Nodeなし、contextIsolation/sandbox/webSecurityを有効にします。権限要求は拒否し、トップレベル移動先を宣言originへ制限します。子フレームのリダイレクトにトップレベル制限を適用しません。認証URLのquery/fragmentは診断へ記録せず、ローカルUIでは認証originだけ表示します。外部リンクは既定では利用者確認後に開きます。0.20.0はwebAccounts.externalLinkSettingで自身のboolean設定キーを宣言できます（settings capability必須）。trueなら確認を省略し、falseならダイアログへ「次回から聞かずに開く」を追加します。チェック付きで「開く」を選んだ場合のみホストの検証済み設定保存経路でtrueを保存します。キャンセルでは保存しません。未宣言のAppletは確認を継続します。許可する外部スキームはHTTP(S)/mailtoに限定し、資格情報付きURLは拒否します。内部HTTPS originや認証境界の制限は変わりません。開く処理の失敗はログへ報告し、並行する重複確認を抑制します。認証偽装・User-Agent変更はしません。
 
 Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコードであり、capabilitiesはOSのサンドボックスではありません。observer/itemOpenerにもその信頼境界が適用されます。observerは読取に限定し、項目を開く操作はitemOpenerへ分離して明示的なUI操作でだけ実行してください。
 
@@ -93,3 +94,5 @@ Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコード�
 ホストの`tests/web-accounts.test.cjs`でorigin・資産の境界とcapabilityを検証します。[Gmailの開発ガイド](../../Applet.Gmail.at365/DEVELOPMENT.md)の`test-gui.cjs`で実Electronのセッション分離、DOM変化、背景監視、再起動保持、削除、停止を確認します。実Googleログイン・実メール到着・スリープ復帰は別の検証として扱います。
 
 公式仕様: [WebContentsView](https://www.electronjs.org/docs/latest/api/web-contents-view)、[session.fromPath](https://www.electronjs.org/docs/latest/api/session#sessionfrompathpath-options)、[webContents](https://www.electronjs.org/docs/latest/api/web-contents)。
+
+0.20.0のsnapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。ローカルUIは変更を見て受信トレイ表示へ戻せます。Web履歴の移動可否は従来のcanGoBack/canGoForwardを使用し、履歴の端では移動しません。navigateはWindowを開く操作を含まず、表示はopenで制御します。Gmailの通知は既存のnotifications.show(...,{command:"at365.gmail.open",silent:true})を使い、クリック時はホストが同じ起動世代の実行中Appletか確認してからコマンドを実行します。
