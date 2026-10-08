@@ -7,6 +7,7 @@
 - worktreeの隔離GUI navigation-1791468074781/result.jsonはok:true。mainのsettingActionsを宣言するNode fixtureで、詳細設定パネルの操作成功/失敗と未保存値の保持・自動保存されないことを確認。ボタン/見出しの位置と装飾、大小画面・両テーマ、JSON・下書き・競合・ログの既存動作も成功。
 - ui-1791468081369/result.jsonとpreferences-1791468083979/result.jsonもok:true。Node/.NET起動・停止・設定保存と再読込、プロフィール画像、キー、再起動後の永続化を確認。Prettier/diff check成功。mainから入ったCSSの空白を整形し、再ビルド後のrenderer資産ハッシュはGUI確認時と同一。
 - 検証済みのブランチをmainへfast-forward統合。検証結果・画像・回帰ログをmainのartifactsへ引き継ぎ、ユーザーの追加指定でworktreeを削除する。作業ブランチは履歴として保持。実利用の設定・認証・壁紙・Windows設定は操作せず、今回の単一EXE再発行/deploy/外部pushは実施しない。
+- main統合後のTS/Vite buildも成功し、renderer資産はworktreeで検証したものと同一。mainのtray-ui-1791468482091もok:true。追加smokeはWindowsのwindowsHide:trueで初回表示判定に失敗し、3秒待機でも解消しなかった。試験の起動をwindowsHide:falseへ変えるとsmoke-1791468728937/smoke-result.jsonでトレイ・フォーム保存・アバター・キー・終了が成功。製品の表示処理は変更せず、scripts/smoke.cjsのUI試験起動だけを修正。待機処理の試作と生成JS診断は除去。途中の旧0.21.0単一EXEによる対照試験は設定renameのEPERMで未達となり、今回の成功結果には含めない。
 
 ## 2026-10-08: v0.21.0 Applet詳細の共通設定パネル
 

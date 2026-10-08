@@ -32,7 +32,8 @@ const childEnvironment = { ...process.env };
 delete childEnvironment.ELECTRON_RUN_AS_NODE;
 const child = spawn(executable, args, {
   cwd: root,
-  windowsHide: true,
+  // The UI check must allow the first native window to be shown on Windows.
+  windowsHide: false,
   stdio: 'pipe',
   env: childEnvironment,
 });
