@@ -33,6 +33,7 @@ import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
+import { WebAppletSettings } from './WebAppletSettings';
 declare global {
   interface Window {
     dock: DockApi;
@@ -238,6 +239,7 @@ function App() {
   const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
+  const [webRequest, setWebRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   const [detailSettings, setDetailSettings] = useRestartView<boolean>('detailSettings', false);
   const [detailTab, setDetailTab] = useRestartView<AppletSettingsTab>('detailTab', 'settings', [
@@ -531,12 +533,16 @@ function App() {
           )
         ) : (
           <>
-            <Icon
-              name={
-                (item.id === 'theme' ? (snapshot?.dark ? 'sun' : 'moon') : item.icon) as IconName
-              }
-              size={21}
-            />
+            {item.iconImage ? (
+              <img src={item.iconImage} alt="" width={21} height={21} />
+            ) : (
+              <Icon
+                name={
+                  (item.id === 'theme' ? (snapshot?.dark ? 'sun' : 'moon') : item.icon) as IconName
+                }
+                size={21}
+              />
+            )}
             <span className="rail-label">{item.title}</span>
           </>
         )}
@@ -665,7 +671,47 @@ function App() {
         ) : (
           <div className="page-content">
             {page.startsWith('page:') && (
-              <div className="applet-page-viewport" ref={appletPageRef} aria-label="Appletページ" />
+              <div className="applet-page-body">
+                {snapshot.settings.value.webApplets.items
+                  .filter((a) => `page:${a.id}:main` === page)
+                  .map((a) => (
+                    <div className="web-page-toolbar" key={a.id}>
+                      <strong>{a.name}</strong>
+                      <button
+                        disabled={!snapshot.webPages[a.id]?.canGoBack}
+                        onClick={() => void action(() => window.dock.webNavigate(a.id, 'back'))}
+                      >
+                        戻る
+                      </button>
+                      <button
+                        disabled={!snapshot.webPages[a.id]?.canGoForward}
+                        onClick={() => void action(() => window.dock.webNavigate(a.id, 'forward'))}
+                      >
+                        進む
+                      </button>
+                      <button
+                        onClick={() => void action(() => window.dock.webNavigate(a.id, 'reload'))}
+                      >
+                        再読み込み
+                      </button>
+                      <button
+                        onClick={() => void action(() => window.dock.webNavigate(a.id, 'home'))}
+                      >
+                        開始ページへ
+                      </button>
+                      <span>
+                        {snapshot.webPages[a.id]?.loading
+                          ? '読み込み中…'
+                          : snapshot.webPages[a.id]?.error || snapshot.webPages[a.id]?.origin}
+                      </span>
+                    </div>
+                  ))}
+                <div
+                  className="applet-page-viewport"
+                  ref={appletPageRef}
+                  aria-label="Appletページ"
+                />
+              </div>
             )}
             {page === 'home' && (
               <>
@@ -760,7 +806,11 @@ function App() {
                       <p>{e.description}</p>
                       <div className="card-bottom">
                         <span>
-                          {e.runtime === 'node' ? 'TypeScript' : '.NET 10'}
+                          {e.runtime === 'web'
+                            ? 'WebApplet'
+                            : e.runtime === 'node'
+                              ? 'TypeScript'
+                              : '.NET 10'}
                           <span className="divider">/</span>v{e.version}
                         </span>
                         <Icon name="arrow" size={16} />
@@ -775,13 +825,24 @@ function App() {
                 <PageHeading
                   title="Applet"
                   action={
-                    <button
-                      className="secondary"
-                      onClick={() => void action(() => window.dock.openPath('extensions'))}
-                    >
-                      <Icon name="folder" size={16} />
-                      Appletフォルダを開く
-                    </button>
+                    <div className="actions">
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          setPage('settings');
+                          setWebRequest((n) => n + 1);
+                        }}
+                      >
+                        WebAppletを追加
+                      </button>
+                      <button
+                        className="secondary"
+                        onClick={() => void action(() => window.dock.openPath('extensions'))}
+                      >
+                        <Icon name="folder" size={16} />
+                        Appletフォルダを開く
+                      </button>
+                    </div>
                   }
                 />
                 <div className="extensions-layout">
@@ -840,6 +901,7 @@ function App() {
                 profileRequest={profileRequest}
                 updatesRequest={updatesRequest}
                 ribbonRequest={ribbonRequest}
+                webRequest={webRequest}
                 editor={editor}
                 onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
@@ -1079,7 +1141,11 @@ function ExtensionDetail({
           <h2>{e.displayName}</h2>
           <p>
             v{e.version} <span className="divider">/</span>{' '}
-            {e.runtime === 'node' ? 'TypeScript · Node.js' : 'C# · .NET 10'}
+            {e.runtime === 'web'
+              ? 'WebApplet'
+              : e.runtime === 'node'
+                ? 'TypeScript · Node.js'
+                : 'C# · .NET 10'}
           </p>
         </div>
         <Toggle
@@ -1111,7 +1177,9 @@ function ExtensionDetail({
           {e.minimumHostVersion && (
             <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
           )}
-          <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
+          {e.runtime !== 'web' && (
+            <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
+          )}
           <div className="detail-state">
             <StateBadge extension={e} />
             <button
@@ -1266,6 +1334,7 @@ function SettingsPage({
   profileRequest,
   updatesRequest,
   ribbonRequest,
+  webRequest,
   globalHotKeys,
   editor,
   onApplet,
@@ -1284,6 +1353,7 @@ function SettingsPage({
   profileRequest: number;
   updatesRequest: number;
   ribbonRequest: number;
+  webRequest: number;
   editor: SettingsEditor;
   onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
@@ -1317,6 +1387,7 @@ function SettingsPage({
     | 'profile'
     | 'about'
     | 'ribbon'
+    | 'web-applets'
   >('category', 'appearance', [
     'appearance',
     'general',
@@ -1326,6 +1397,7 @@ function SettingsPage({
     'profile',
     'about',
     'ribbon',
+    'web-applets',
   ]);
   const [appletId, setAppletId] = useRestartView<string>('appletId', '');
   const [appletTab, setAppletTab] = useRestartView<AppletSettingsTab>('appletTab', 'settings', [
@@ -1353,30 +1425,40 @@ function SettingsPage({
             snapshot.value.trayCommands.includes(command.id),
       );
   const appletChanged = (id: string) =>
-    changed(draft.extensions[id], snapshot.value.extensions[id]) || shortcutChanged(id);
+    changed(draft.extensions[id], snapshot.value.extensions[id]) ||
+    changed(
+      draft.webApplets.items.find((a) => a.id === id),
+      snapshot.value.webApplets.items.find((a) => a.id === id),
+    ) ||
+    shortcutChanged(id);
   const categoryChanged = (id: string) =>
-    id === 'ribbon'
-      ? changed(draft.ribbon, snapshot.value.ribbon)
-      : id === 'about'
-        ? changed(draft.updates, snapshot.value.updates) ||
-          extensions.some(
-            (e) =>
-              draft.extensions[e.id]?.updateSource !==
-              snapshot.value.extensions[e.id]?.updateSource,
-          )
-        : id === 'appearance'
-          ? draft.host.theme !== snapshot.value.host.theme
-          : id === 'general'
-            ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
-            : id === 'profile'
-              ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-              : id === 'host-shortcuts'
-                ? shortcutChanged(null)
-                : id === 'shortcuts'
-                  ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
-                    changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
-                    changed(draft.trayCommands, snapshot.value.trayCommands)
-                  : extensions.some((e) => appletChanged(e.id));
+    id === 'web-applets'
+      ? changed(draft.webApplets, snapshot.value.webApplets)
+      : id === 'ribbon'
+        ? changed(draft.ribbon, snapshot.value.ribbon)
+        : id === 'about'
+          ? changed(draft.updates, snapshot.value.updates) ||
+            extensions.some(
+              (e) =>
+                draft.extensions[e.id]?.updateSource !==
+                snapshot.value.extensions[e.id]?.updateSource,
+            )
+          : id === 'appearance'
+            ? draft.host.theme !== snapshot.value.host.theme
+            : id === 'general'
+              ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
+              : id === 'profile'
+                ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+                : id === 'host-shortcuts'
+                  ? shortcutChanged(null)
+                  : id === 'shortcuts'
+                    ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                      changed(
+                        draft.globalShortcutCommands,
+                        snapshot.value.globalShortcutCommands,
+                      ) ||
+                      changed(draft.trayCommands, snapshot.value.trayCommands)
+                    : extensions.some((e) => appletChanged(e.id));
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1392,6 +1474,9 @@ function SettingsPage({
       switchToForm();
     }
   }, [ribbonRequest]);
+  useEffect(() => {
+    if (webRequest && switchToForm()) setCategory('web-applets');
+  }, [webRequest]);
   if (!active) return null;
   return (
     <>
@@ -1405,6 +1490,7 @@ function SettingsPage({
                 [
                   ['appearance', '表示'],
                   ['ribbon', 'リボン'],
+                  ['web-applets', 'WebApplet'],
                   ['general', '一般'],
                   ['shortcuts', 'ショートカット'],
                   ['profile', 'プロフィール'],
@@ -1558,6 +1644,12 @@ function SettingsPage({
         ) : (
           <div className="settings-layout">
             <div className="settings-form">
+              {category === 'web-applets' && (
+                <>
+                  <h2>WebApplet</h2>
+                  <WebAppletSettings editor={editor} />
+                </>
+              )}
               {category === 'ribbon' && (
                 <RibbonSettings draft={draft} extensions={extensions} onChange={edit} />
               )}
@@ -1606,16 +1698,18 @@ function SettingsPage({
                   </p>
                   {extensions.length === 0 && <p>Appletはインストールされていません。</p>}
                   <div className="about-applets">
-                    {extensions.map((e) => (
-                      <article key={e.id}>
-                        <div>
-                          <strong>{e.displayName}</strong>
-                          <span className="muted">v{e.version}</span>
-                        </div>
-                        <VersionCheck id={e.id} details disabled={dirty} />
-                        <AppletUpdateSource extension={e} draft={draft} edit={edit} />
-                      </article>
-                    ))}
+                    {extensions
+                      .filter((e) => e.runtime !== 'web')
+                      .map((e) => (
+                        <article key={e.id}>
+                          <div>
+                            <strong>{e.displayName}</strong>
+                            <span className="muted">v{e.version}</span>
+                          </div>
+                          <VersionCheck id={e.id} details disabled={dirty} />
+                          <AppletUpdateSource extension={e} draft={draft} edit={edit} />
+                        </article>
+                      ))}
                   </div>
                 </section>
               )}

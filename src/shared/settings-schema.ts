@@ -1,4 +1,5 @@
 import type { Settings } from './contracts';
+import { parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
 import {
@@ -10,6 +11,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
+  webApplets: { accounts: [], items: [] },
   schemaVersion: 1,
   host: {
     theme: 'dark',
@@ -179,6 +181,7 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    webApplets: parseWebApplets(value.webApplets),
     updates,
     schemaVersion: value.schemaVersion,
     extensions: value.extensions,

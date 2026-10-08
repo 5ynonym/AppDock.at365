@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-09: WebApplet（0.24.0）の実装と公開前検証
+
+- URLごとに本体管理のWebAppletを追加し、Applet一覧/リボン/コマンド/共有設定へ統合。最大64件、専用アカウント32枠、page/windowの載せ替え、固定/同じorigin/HTTP(S)遷移、認証用の明示originを実装。Gmailの設定・アカウント・session保存先を流用せず、リモートにはNode/preload/ホストIPCを公開しない。詳細は[WebApplet](docs/web-applets.md)。版は0.23.0→0.24.0。
+- project-local Node 24.21.0/pnpm 12.10.1でmain/renderer型検査、TS/Vite build成功。回帰115/115、失敗/skip 0（`artifacts/web-applets-regression-final.log`）。通常sandboxでは既存.NET/TEMP置換試験のEPERMやElectron起動の制約が出たため、隔離profileを使う通常Windows実行で判定した。グローバルツールは追加していない。
+- 最終ソースのWeb GUIは`artifacts/web-applets-1791491534872/result.json`でok:true、9検証群。UI登録とmanifestの自動name/icon/navigation、手動変更の再取得保持、same-origin redirect後の相対パス、別originへ取得要求を送らないこと、JSON容量制限、トップレベルのリンク/redirect/popup/固定モード、追加origin/any/履歴/ローカルキー、同じWebContentsでのpage/window切替と入力保持、専用Cookie分離/共有/保存、消去の取消/確認、無効化/削除時の破棄を確認。消去dialogの回答は試験profileのmain内でだけ置換し、製品の確認手順は維持した。dark/light画像と1000px幅の画面を目視確認。
+- 既存ページ/Gmail GUIは`artifacts/applet-pages-1791491048430/result.json`でok:true、5検証群。ローカルページの所有command bridge、UI/session/input保持、Gmailの選択アカウント/検索/背景監視、リボン非表示/並べ替え、再起動・停止をオフラインfixtureで確認。Web GUIと単一EXE試験ではGmail保存領域のmarkerバイトも不変。実利用の認証情報を読み込まず、実メール送信/実サイトログインはしていない。
+- コミット前の0.24.0単一EXE試験は`artifacts/web-portable-1791491242393/result.json`でok:true。実配布EXEの隔離コピー（SHA256 `9f8ee6a9bcd8067c77dee20965e19b48f83a99e7dbcc15dae4bc6f87667162e6`）を通常起動し、UI登録、well-known JSON、遅延生成、リモートのbridge不存在、page/window入力保持、toolbar履歴、複数ボタン、専用Cookie、再起動、停止、Gmail保存領域の保持を確認。このEXEは以後の終了時保存/取得処理の仕上げ前の検証物であり、最終配布物のハッシュとして扱わない。
+- 正式公開にはclean mainを対象に[Release手順](docs/RELEASING.md)のPrepare→Draft→Publish→Verifyを使用する。今回の最終ソース/配布物/115件回帰/単一EXE更新/進捗/8停止点復旧/全Applet同梱とGitHub匿名取得照合の結果は`artifacts/release-0.24.0-web-20261009/plan.json`と隣のログへ保存する。Prepare後に固定したEXEでWeb GUI、既存ページ/Gmail GUI、Web portableも直列確認する。実利用先へのdeployは依頼範囲外、サイト固有の認証可否と長期背景動作は未確認。
+
 ## 2026-10-09: 更新通知変更をコミットしpublish.batで発行
 
 - ユーザーの承認により、成功通知変更と関連文書/指示をmainの`3c8b4ef`へコミット。続けて`publish.bat`を実行し終了0、通常EXE/update.json/6Applet入りオールインワンZIPを発行。ログは`artifacts/update-notice-publish-2026-10-09.log`。版は0.23.0を維持、GitHub公開/push/実利用先deployは未実施。
