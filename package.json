@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.16.3",
+  "version": "0.16.4",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -14,7 +14,7 @@
     "test": "pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
     "build:test-extensions": "node scripts/build-test-extensions.cjs",
     "build:dotnet": "node scripts/build-dotnet.cjs",
-    "dist": "pnpm run build:dotnet && pnpm run build && electron-builder --win portable --x64",
+    "dist": "pnpm run build:dotnet && pnpm run build && node scripts/build-portable.cjs",
     "smoke": "node scripts/smoke.cjs",
     "test:ui": "pnpm run build:test-extensions && node scripts/ui-test.cjs",
     "test:navigation": "pnpm run build:test-extensions && node scripts/navigation-ui-test.cjs",
@@ -74,7 +74,7 @@
     "portable": {
       "artifactName": "AppDock.at365.exe",
       "requestExecutionLevel": "user",
-      "unpackDirName": false
+      "unpackDirName": "AppDock.at365"
     }
   },
   "dependencies": {

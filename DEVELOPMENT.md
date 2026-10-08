@@ -68,6 +68,16 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 
 `pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
+0.16.4のportable発行は`scripts/build-portable.cjs`を経由します。electron-builder 26.15.3がportableのscript/includeを無視するため、ビルドプロセス内だけでNsisTarget.computeFinalScriptへ`scripts/portable.nsi`を渡し、終了時に復元します。node_modulesは編集しません。ビルダーの固定版と元テンプレートのライフサイクルを検証し、依存更新時は明示的に見直します。直接electron-builder CLIを使うとこのランチャーを含まないため、発行にはpublish.batまたはdev.bat run distを使ってください。APIからビルドする試験もdev.batのローカルNode/pnpm環境を使います。
+
+ランチャーはWindows TEMP・外側EXEの正規化パス・test-profileを小文字化してSHA256を取り、`TEMP/AppDock.at365-<hash>`へ展開します。版番号は含めません。起動/展開/最終削除をGlobalの名前付きmutexで直列化し、別の名前付きカーネルオブジェクトの生存を実行領域のleaseとして使用します。leaseは子のElectron本体へDuplicateHandleで渡すため、ランチャーだけの強制終了後も本体を保護します。二重起動は使用中の資産をそのまま使用し、全leaseがなくなった時だけ生成領域を削除します。設定や認証領域は削除対象外です。
+
+StdUtils.ExecShellWaitExの戻り値は`hProc:<hex>`というタグ形式です。これを検証して`0x<hex>`へ変換してから、Win32の待機/終了コード取得/CloseHandle/DuplicateHandleへ渡します。タグを数値ポインターとして扱うと待機やleaseの解放が壊れるため、実portableの停止/更新試験を省略しないでください。
+
+TrayのGUIDは`src/main/core/tray-identity.ts`で実行EXEパスと保存先からUUID v5を生成します。未署名ではGUIDが実行パスに紐付くため、実行領域と併せて安定化し、移動した配置や隔離profileには別GUIDを割り当てます。[Electronの仕様](https://www.electronjs.org/docs/latest/api/tray/)を参照してください。
+
+`dev.bat exec node scripts/tray-identity-portable-test.cjs`は別版のmetadataを持つ隔離EXEを発行し、同じ配置先で更新します。専用アイコンのWindows登録とIsPromotedだけを確認し、試験設定は終了時に元へ戻します。再起動/同時起動/ランチャー強制終了/生成領域の最終削除も実EXEで検証します。実利用アイコンのWindows設定は変更しません。
+
 ソースの主な配置:
 
 ```text

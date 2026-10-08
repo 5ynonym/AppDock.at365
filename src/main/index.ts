@@ -38,6 +38,7 @@ import { widgetCatalog, parseWidgetPlacement } from '../shared/widgets';
 import { DesktopWidgets, widgetDisplays } from './core/desktop-widgets';
 import { widgetFontPath } from './core/widget-fonts';
 import { configureWindowRendering } from './core/window-rendering';
+import { trayIdentity } from './core/tray-identity';
 
 configureWindowRendering(app);
 
@@ -155,7 +156,7 @@ function quitHost(restart = false) {
   if (restart) {
     const portableExecutable = app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE;
     if (portableExecutable) {
-      // The portable launcher removes the extracted app directory on exit.
+      // Relaunch the original EXE; its gate protects extraction and final cleanup.
       process.chdir(path.dirname(portableExecutable));
       app.relaunch({ execPath: portableExecutable, args: process.argv.slice(1) });
     } else {
@@ -570,7 +571,10 @@ async function initialize() {
   });
   registerIpc();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
-  tray = new Tray(icon.resize({ width: 20, height: 20 }));
+  tray = new Tray(
+    icon.resize({ width: 20, height: 20 }),
+    process.platform === 'win32' ? trayIdentity(app.getPath('exe'), baseDirectory) : undefined,
+  );
   tray.setToolTip('AppDock.at365');
   trayClicks = new TrayClickDispatcher(
     () => settings.value.host,
