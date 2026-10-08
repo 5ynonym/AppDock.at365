@@ -664,3 +664,10 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 同梱ZIPの全ファイル照合・通常EXEとの一致・初期無効/版/エラーなしを検証。`artifacts/release-workflow-validation/bundle-ui.json` はok:true、profileは`artifacts/bundle-verify-37aa59db-7962-41b4-8856-b79fd7bd56b6`。EXE 100598967 bytes/SHA256 4ee27650e20d5a94701d7f241b2961fbaa2e2684b17933b0e98db3b3608bd92b、ZIP 275723780 bytes/SHA256 ff66809c47707ebcd591c3436e36bd04d62b832423c1d06d789d2454e9e0a951。これは今回のローカル検証物であり、既存GitHub v0.23.0の配布物とは別。
 - GitHubの新しいDraft/Publish/Verifyモードを実サービスへ実行して新Releaseを作る試験は行っていない。公開操作の順序/停止/再開はfixture、過去の実公開値は読み取りで確認。今回の版更新・main統合・push・Release変更・実利用deployはなし。
 - この検証記録を追加するコミットでもソースSHAが変わるため、上記planは当時の成功証跡として保持し、将来の公開には再Prepareを必須とする。PS1はUTF-8 BOM/CRLF、BATは未変更。文書リンクと差分を確認。
+
+## 2026-10-09: AppDock固有の運用情報をリポジトリへ移管
+
+- ALICE/TOOLS.mdのAppDock運用注意とWebAppletの未実装相談をAGENTS.mdへ集約。今後の仕様/運用/検証/発行変更時に、この指示と参照文書の更新要否を確認するルールを追加。
+- 旧版ごとの実装・検証経緯はdocs/implementation-history.mdへ本文を保持して移動。当時の未実装/未確認を現状と区別する注記を追加し、現行のAppletページ/共有設定/自己更新と照合。WebAppletのGmail保存領域分離と未決定事項も保持。
+- 共通TOOLSにはサービス環境、汎用GitHub CLI、Computer Useの環境診断を残し、AppDock記述は0件。移動先へ無関係なtailnet/サービス設定が混入していないことを確認。移行時に元のAppDock本文と保存先、WebApplet節と保存先の包含一致を確認してから元を整理。
+- AGENTS/DEVELOPMENT/履歴のローカルリンク36件とgit diff --check成功。文書のみの変更のためビルド/製品試験は実行していない。Release・deploy操作なし。
