@@ -27,12 +27,14 @@ import { ProfileEditor } from './ProfileEditor';
 import { AppletSettings } from './AppletSettings';
 import { VersionCheck } from './VersionCheck';
 import { useAppletSidebar } from './useAppletSidebar';
+import { ribbonItems, orderRibbon } from '../shared/applet-pages';
+import { RibbonSettings } from './RibbonSettings';
 declare global {
   interface Window {
     dock: DockApi;
   }
 }
-type Page = 'home' | 'extensions' | 'settings' | 'logs';
+type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
 type SettingsTarget = { appletId: string; tab: 'settings' | 'shortcuts'; request: number };
 type IconName =
   | 'home'
@@ -164,7 +166,7 @@ function Brand({ small = false }: { small?: boolean }) {
     </span>
   );
 }
-const labels: Record<Page, string> = {
+const labels: Record<string, string> = {
   home: 'ホーム',
   extensions: 'Applet',
   settings: '設定',
@@ -222,6 +224,8 @@ function App() {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [profileRequest, setProfileRequest] = useState(0);
+  const [ribbonRequest, setRibbonRequest] = useState(0);
+  const appletPageRef = useRef<HTMLDivElement>(null);
   const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
   const [appletFilter, setAppletFilter] = useState('');
   const [logSource, setLogSource] = useState('');
@@ -261,6 +265,42 @@ function App() {
       void execute(id);
     });
   }, []);
+  useEffect(
+    () =>
+      window.dock.onAppletPage((key) => {
+        setPalette(false);
+        setPage(key ? (key as Page) : 'home');
+      }),
+    [],
+  );
+  useLayoutEffect(() => {
+    const update = () => {
+      const element = appletPageRef.current;
+      const rect = element?.getBoundingClientRect();
+      const key = page.startsWith('page:') ? page : null;
+      void window.dock
+        .pageViewport(
+          key,
+          key && rect && !palette
+            ? {
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                width: Math.max(1, Math.round(rect.width)),
+                height: Math.max(1, Math.round(rect.height)),
+              }
+            : null,
+        )
+        .catch((error) => setError(String(error)));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (appletPageRef.current) observer.observe(appletPageRef.current);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [page, palette, error, !!snapshot]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
@@ -381,6 +421,10 @@ function App() {
   const selectedApplet =
     snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
+  const ribbon = orderRibbon(
+    ribbonItems(snapshot?.extensions ?? []),
+    snapshot?.settings.value.ribbon.order ?? [],
+  ).filter((item) => !snapshot?.settings.value.ribbon.hidden.includes(item.id));
   return (
     <div
       className={`shell ${page === 'extensions' || page === 'settings' ? 'with-sidebar' : ''}`}
@@ -415,58 +459,73 @@ function App() {
           ))}
         </div>
       </header>
-      <aside className="activity-rail">
+      <aside
+        className="activity-rail"
+        aria-label="リボン"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setPage('settings');
+          setRibbonRequest((value) => value + 1);
+        }}
+      >
         <Brand />
-        {(['home', 'extensions', 'settings', 'logs'] as Page[]).map((p) => (
-          <button
-            key={p}
-            title={labels[p]}
-            aria-label={labels[p]}
-            aria-current={page === p ? 'page' : undefined}
-            className={page === p ? 'active' : ''}
-            onClick={() => setPage(p)}
-          >
-            <Icon name={p} size={21} />
-            <span className="rail-label">{labels[p]}</span>
-          </button>
-        ))}
+        <div className="ribbon-buttons">
+          {ribbon.map((item) => (
+            <button
+              key={item.id}
+              data-ribbon-id={item.id}
+              title={item.id === 'profile' ? snapshot?.settings.value.profile.name : item.title}
+              aria-label={item.title}
+              aria-current={page === item.id ? 'page' : undefined}
+              className={item.id === 'profile' ? 'avatar' : page === item.id ? 'active' : ''}
+              onClick={() => {
+                if (item.extensionId) {
+                  void action(() => window.dock.openAppletPage(item.extensionId!, item.pageId!));
+                } else if (item.id === 'theme') {
+                  if (snapshot)
+                    void action(() =>
+                      window.dock.saveSettings(
+                        {
+                          ...snapshot.settings.value,
+                          host: {
+                            ...snapshot.settings.value.host,
+                            theme: snapshot.dark ? 'light' : 'dark',
+                          },
+                        },
+                        snapshot.settings.revision,
+                      ),
+                    );
+                } else if (item.id === 'profile') {
+                  setPage('settings');
+                  setProfileRequest((value) => value + 1);
+                } else setPage(item.id as Page);
+              }}
+            >
+              {item.id === 'profile' ? (
+                snapshot?.avatarUrl ? (
+                  <img src={snapshot.avatarUrl} alt="ユーザーのアバター" />
+                ) : (
+                  Array.from(snapshot?.settings.value.profile.name ?? 'ユキ')[0]
+                )
+              ) : (
+                <>
+                  <Icon
+                    name={
+                      (item.id === 'theme'
+                        ? snapshot?.dark
+                          ? 'sun'
+                          : 'moon'
+                        : item.icon) as IconName
+                    }
+                    size={21}
+                  />
+                  <span className="rail-label">{item.title}</span>
+                </>
+              )}
+            </button>
+          ))}
+        </div>
         <div className="rail-spacer" />
-        <button
-          title="テーマを切り替え"
-          aria-label="テーマを切り替え"
-          onClick={() =>
-            snapshot &&
-            void action(() =>
-              window.dock.saveSettings(
-                {
-                  ...snapshot.settings.value,
-                  host: {
-                    ...snapshot.settings.value.host,
-                    theme: snapshot.dark ? 'light' : 'dark',
-                  },
-                },
-                snapshot.settings.revision,
-              ),
-            )
-          }
-        >
-          <Icon name={snapshot?.dark ? 'sun' : 'moon'} size={20} />
-        </button>
-        <button
-          className="avatar"
-          aria-label="プロフィール設定を開く"
-          title={snapshot?.settings.value.profile.name}
-          onClick={() => {
-            setPage('settings');
-            setProfileRequest((v) => v + 1);
-          }}
-        >
-          {snapshot?.avatarUrl ? (
-            <img src={snapshot.avatarUrl} alt="ユーザーのアバター" />
-          ) : (
-            Array.from(snapshot?.settings.value.profile.name ?? 'ユキ')[0]
-          )}
-        </button>
       </aside>
       {page === 'extensions' && (
         <aside className="sidebar" aria-label="Applet一覧">
@@ -510,7 +569,15 @@ function App() {
         ref={setSettingsSidebarHost}
         hidden={page !== 'settings'}
       />
-      <main className={page === 'settings' ? 'settings-main' : undefined}>
+      <main
+        className={
+          page === 'settings'
+            ? 'settings-main'
+            : page.startsWith('page:')
+              ? 'applet-page-main'
+              : undefined
+        }
+      >
         {error && (
           <div className="error-banner" role="alert">
             {error}
@@ -523,6 +590,9 @@ function App() {
           <div className="loading">Dockに接続しています…</div>
         ) : (
           <div className="page-content">
+            {page.startsWith('page:') && (
+              <div className="applet-page-viewport" ref={appletPageRef} aria-label="Appletページ" />
+            )}
             {page === 'home' && (
               <>
                 <PageHeading title="ホーム" />
@@ -665,6 +735,7 @@ function App() {
                 commands={shortcutCommands}
                 avatarUrl={snapshot.avatarUrl}
                 profileRequest={profileRequest}
+                ribbonRequest={ribbonRequest}
                 target={settingsTarget}
                 onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
@@ -1072,6 +1143,7 @@ function SettingsPage({
   commands,
   avatarUrl,
   profileRequest,
+  ribbonRequest,
   globalHotKeys,
   target,
   onApplet,
@@ -1088,6 +1160,7 @@ function SettingsPage({
   commands: UiCommand[];
   avatarUrl: string | null;
   profileRequest: number;
+  ribbonRequest: number;
   target?: SettingsTarget;
   onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
@@ -1102,7 +1175,14 @@ function SettingsPage({
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [parseError, setParseError] = useState('');
   const [category, setCategory] = useState<
-    'appearance' | 'general' | 'extensions' | 'shortcuts' | 'host-shortcuts' | 'profile' | 'about'
+    | 'appearance'
+    | 'general'
+    | 'extensions'
+    | 'shortcuts'
+    | 'host-shortcuts'
+    | 'profile'
+    | 'about'
+    | 'ribbon'
   >('appearance');
   const [appletId, setAppletId] = useState('');
   const [appletTab, setAppletTab] = useState<SettingsTarget['tab']>('settings');
@@ -1150,21 +1230,23 @@ function SettingsPage({
   const appletChanged = (id: string) =>
     changed(draft.extensions[id], snapshot.value.extensions[id]) || shortcutChanged(id);
   const categoryChanged = (id: string) =>
-    id === 'about'
-      ? false
-      : id === 'appearance'
-        ? draft.host.theme !== snapshot.value.host.theme
-        : id === 'general'
-          ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
-          : id === 'profile'
-            ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-            : id === 'host-shortcuts'
-              ? shortcutChanged(null)
-              : id === 'shortcuts'
-                ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
-                  changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
-                  changed(draft.trayCommands, snapshot.value.trayCommands)
-                : extensions.some((e) => appletChanged(e.id));
+    id === 'ribbon'
+      ? changed(draft.ribbon, snapshot.value.ribbon)
+      : id === 'about'
+        ? false
+        : id === 'appearance'
+          ? draft.host.theme !== snapshot.value.host.theme
+          : id === 'general'
+            ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
+            : id === 'profile'
+              ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+              : id === 'host-shortcuts'
+                ? shortcutChanged(null)
+                : id === 'shortcuts'
+                  ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                    changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
+                    changed(draft.trayCommands, snapshot.value.trayCommands)
+                  : extensions.some((e) => appletChanged(e.id));
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
   const [avatarLoading, setAvatarLoading] = useState(false);
@@ -1174,6 +1256,12 @@ function SettingsPage({
       switchToForm();
     }
   }, [profileRequest]);
+  useEffect(() => {
+    if (ribbonRequest) {
+      setCategory('ribbon');
+      switchToForm();
+    }
+  }, [ribbonRequest]);
   useEffect(() => {
     if (!dirty) {
       setDraft(snapshot.value);
@@ -1226,6 +1314,7 @@ function SettingsPage({
               {(
                 [
                   ['appearance', '表示'],
+                  ['ribbon', 'リボン'],
                   ['general', '一般'],
                   ['host-shortcuts', 'AppDockのキー'],
                   ['shortcuts', 'ショートカット'],
@@ -1396,6 +1485,9 @@ function SettingsPage({
         ) : (
           <div className="settings-layout">
             <div className="settings-form">
+              {category === 'ribbon' && (
+                <RibbonSettings draft={draft} extensions={extensions} onChange={edit} />
+              )}
               {category === 'about' && (
                 <section className="about-page" aria-label="バージョン情報・更新">
                   <div className="about-host">

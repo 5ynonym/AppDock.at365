@@ -193,6 +193,7 @@ test('Cycle transfers focused Gmail input but preserves local UI and other windo
       isMinimized: () => false,
       contentView: { children: [nextView] },
     },
+    surface: { visible: true },
     attached: { webContents: { isFocused: () => pageFocused } },
     save(next) {
       this.state = next;
@@ -202,11 +203,17 @@ test('Cycle transfers focused Gmail input but preserves local UI and other windo
     },
   };
   const cycle = async () => {
+    fake.contentView = fake.window.contentView;
     fake.attached = { webContents: { isFocused: () => pageFocused } };
     await Controller.prototype.cycle.call(fake, 1);
   };
   await cycle();
   assert.equal(transfers, 1);
+  // Home can be focused while Gmail is parked; that must not transfer input.
+  fake.surface.visible = false;
+  await cycle();
+  assert.equal(transfers, 1);
+  fake.surface.visible = true;
   windowFocused = false;
   await cycle();
   assert.equal(transfers, 1);

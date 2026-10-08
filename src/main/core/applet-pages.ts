@@ -1,0 +1,317 @@
+import { BrowserWindow, WebContentsView, View, screen, type Input, type Rectangle } from 'electron';
+import path from 'node:path';
+import { WindowStateStore, restoreWindowBounds } from './window-state';
+import type { PageDisplay } from '../../shared/applet-pages';
+
+interface PageHost {
+  window(): BrowserWindow | null;
+  display(key: string, fallback: PageDisplay): PageDisplay;
+  selected(key: string | null): void;
+  shortcut(input: Input): boolean;
+  failed(message: string): void;
+}
+let host: PageHost | undefined;
+let selected: string | null = null;
+let bounds: Rectangle | null = null;
+const surfaces = new Map<string, AppletSurface>();
+export function configurePageHost(value: PageHost) {
+  host = value;
+  const window = value.window();
+  const layout = () => {
+    for (const surface of surfaces.values()) surface.layout();
+  };
+  window?.on('resize', layout);
+  window?.on('show', layout);
+  window?.on('hide', layout);
+  window?.on('minimize', layout);
+  window?.on('restore', layout);
+}
+export function pageHostShortcut(input: Input) {
+  return host?.shortcut(input) ?? false;
+}
+export function updatePageViewport(key: string | null, area: Rectangle | null) {
+  if (key !== null && (!surfaces.has(key) || surfaces.get(key)!.display !== 'page'))
+    throw Error('表示中のAppletページがありません。');
+  if (
+    area !== null &&
+    (!area ||
+      ['x', 'y', 'width', 'height'].some((field) => {
+        const value = area[field as keyof Rectangle];
+        return (
+          !Number.isSafeInteger(value) ||
+          value < (field === 'x' || field === 'y' ? 0 : 1) ||
+          value > 100000
+        );
+      }))
+  )
+    throw Error('ページ領域が不正です。');
+  selected = key;
+  bounds = area;
+  for (const surface of surfaces.values()) surface.layout();
+}
+export function refreshPageDisplays() {
+  for (const surface of surfaces.values()) surface.refreshDisplay();
+}
+export function closeAppletPages(extensionId: string) {
+  for (const [key, surface] of surfaces)
+    if (key.startsWith(`page:${extensionId}:`)) surface.close();
+}
+export interface SurfaceOptions {
+  key?: string;
+  title: string;
+  url: string;
+  preload: string;
+  stateFile: string;
+  defaultDisplay?: PageDisplay;
+  partition: string;
+  onLayout(): void;
+  onCreated?(contents: Electron.WebContents): void;
+}
+/** Owns the UI, independently of the window in which it is currently presented. */
+export class AppletSurface {
+  readonly ui: WebContentsView;
+  readonly contentView = new View();
+  private standalone?: BrowserWindow;
+  private parent?: BrowserWindow;
+  private state: WindowStateStore;
+  private ready: Promise<void>;
+  private opened = false;
+  private closed = false;
+  private mode: PageDisplay;
+  constructor(readonly options: SurfaceOptions) {
+    this.mode = this.requestedDisplay();
+    this.state = new WindowStateStore(options.stateFile, () =>
+      host?.failed('Appletウィンドウの位置・サイズを読み込み/保存できませんでした。'),
+    );
+    this.ui = new WebContentsView({
+      webPreferences: {
+        preload: options.preload,
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        backgroundThrottling: false,
+        partition: options.partition,
+      },
+    });
+    this.contentView.addChildView(this.ui);
+    this.ui.webContents.on('will-navigate', (event) => event.preventDefault());
+    this.ui.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    this.ui.webContents.on('render-process-gone', (_, details) =>
+      host?.failed(`Applet画面が終了しました: ${details.reason}`),
+    );
+    options.onCreated?.(this.ui.webContents);
+    this.ready = this.ui.webContents.loadURL(options.url);
+    // The caller of open receives load errors; background creation must not reject unhandled.
+    void this.ready.catch(() => {});
+    if (options.key) surfaces.set(options.key, this);
+  }
+  private requestedDisplay() {
+    return this.options.key
+      ? (host?.display(this.options.key, this.options.defaultDisplay ?? 'page') ?? 'window')
+      : 'window';
+  }
+  get display() {
+    return this.mode;
+  }
+  get window() {
+    return this.mode === 'page' ? (host?.window() ?? undefined) : this.standalone;
+  }
+  get visible() {
+    const window = this.window;
+    return (
+      !this.closed &&
+      this.opened &&
+      !!window &&
+      !window.isDestroyed() &&
+      window.isVisible() &&
+      !window.isMinimized() &&
+      (this.mode === 'window' || (selected === this.options.key && bounds !== null))
+    );
+  }
+  get size() {
+    if (this.mode === 'page') return { width: bounds?.width ?? 1, height: bounds?.height ?? 1 };
+    const [width, height] = this.standalone?.getContentSize() ?? [1, 1];
+    return { width, height };
+  }
+  private detach() {
+    if (
+      this.parent &&
+      !this.parent.isDestroyed() &&
+      this.parent.contentView.children.includes(this.contentView)
+    )
+      this.parent.contentView.removeChildView(this.contentView);
+    this.parent = undefined;
+  }
+  private createWindow() {
+    if (this.standalone && !this.standalone.isDestroyed()) return this.standalone;
+    const primary = screen.getPrimaryDisplay();
+    const saved = this.state.load(
+      [primary, ...screen.getAllDisplays().filter((d) => d.id !== primary.id)].map(
+        (d) => d.workArea,
+      ),
+      { width: 900, height: 640 },
+    );
+    const window = new BrowserWindow({
+      width: 1280,
+      height: 900,
+      ...saved?.bounds,
+      minWidth: 900,
+      minHeight: 640,
+      title: this.options.title,
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        backgroundThrottling: false,
+      },
+    });
+    this.standalone = window;
+    this.state.track(window);
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const layout = () => this.layout();
+    window.on('resize', layout);
+    window.on('show', layout);
+    window.on('hide', layout);
+    window.on('minimize', layout);
+    window.on('restore', layout);
+    window.on('close', (event) => {
+      if (!this.closed) {
+        event.preventDefault();
+        window.hide();
+      }
+    });
+    window.on('closed', () => {
+      this.standalone = undefined;
+      this.options.onLayout();
+    });
+    if (saved) restoreWindowBounds(window, saved.bounds);
+    if (saved?.maximized) window.maximize();
+    return window;
+  }
+  async open() {
+    if (this.closed) throw Error('Appletページは停止しています。');
+    await this.ready;
+    if (this.closed) throw Error('Appletページは停止しています。');
+    this.opened = true;
+    this.refreshDisplay();
+    if (this.mode === 'page') {
+      const alreadySelected = selected === this.options.key;
+      selected = this.options.key!;
+      // Wait for the host renderer to report the page's actual client rectangle.
+      if (!alreadySelected) bounds = null;
+      host?.selected(selected);
+      const window = this.window;
+      if (window?.isMinimized()) window.restore();
+      window?.show();
+      window?.focus();
+    } else {
+      const window = this.createWindow();
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    }
+    this.layout();
+  }
+  refreshDisplay() {
+    if (this.closed) return;
+    const next = this.requestedDisplay();
+    if (next === this.mode) return;
+    const wasVisible = this.visible;
+    const wasSelected = selected === this.options.key;
+    this.detach();
+    this.standalone?.hide();
+    this.mode = next;
+    if (wasSelected) {
+      selected = null;
+      bounds = null;
+      host?.selected(null);
+    }
+    if (this.opened && (wasVisible || wasSelected)) {
+      if (next === 'page') {
+        selected = this.options.key!;
+        host?.selected(selected);
+      } else this.createWindow().show();
+    }
+    this.layout();
+  }
+  layout() {
+    if (this.closed) return;
+    const window = this.window;
+    if (!window || !this.opened || (!this.visible && this.mode === 'page')) {
+      this.detach();
+      this.options.onLayout();
+      return;
+    }
+    if (this.parent !== window) {
+      this.detach();
+      window.contentView.addChildView(this.contentView);
+      this.parent = window;
+    }
+    const [width, height] = window.getContentSize();
+    const rect = this.mode === 'page' ? bounds! : { x: 0, y: 0, width, height };
+    const area = {
+      x: Math.min(rect.x, width),
+      y: Math.min(rect.y, height),
+      width: Math.max(1, Math.min(rect.width, width - rect.x)),
+      height: Math.max(1, Math.min(rect.height, height - rect.y)),
+    };
+    this.contentView.setBounds(area);
+    this.ui.setBounds({ x: 0, y: 0, width: area.width, height: area.height });
+    this.options.onLayout();
+  }
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    this.detach();
+    this.state.flush();
+    if (this.options.key) {
+      surfaces.delete(this.options.key);
+      if (selected === this.options.key) {
+        selected = null;
+        bounds = null;
+        host?.selected(null);
+      }
+    }
+    if (!this.ui.webContents.isDestroyed()) this.ui.webContents.close();
+    this.standalone?.destroy();
+    this.standalone = undefined;
+  }
+}
+
+export interface LocalPageServices {
+  snapshot(): unknown;
+  execute(id: unknown): Promise<unknown>;
+  changed(callback: () => void): () => void;
+}
+const localPages = new Map<
+  Electron.WebContents,
+  { url: string; services: LocalPageServices; surface: AppletSurface; unsubscribe(): void }
+>();
+export function openLocalPage(options: SurfaceOptions, services: LocalPageServices) {
+  const existing = options.key && surfaces.get(options.key);
+  if (existing) return existing.open();
+  const surface = new AppletSurface(options);
+  const contents = surface.ui.webContents;
+  const unsubscribe = services.changed(() => {
+    if (!contents.isDestroyed()) contents.send('applet-page:changed');
+  });
+  localPages.set(contents, { url: options.url, services, surface, unsubscribe });
+  contents.once('destroyed', () => {
+    unsubscribe();
+    localPages.delete(contents);
+  });
+  return surface.open().catch((error) => {
+    surface.close();
+    throw error;
+  });
+}
+export function localPageSource(event: Electron.IpcMainInvokeEvent) {
+  const page = localPages.get(event.sender);
+  if (!page || event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== page.url)
+    throw Error('許可されていないAppletページからの要求です。');
+  return page.services;
+}

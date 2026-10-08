@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
-import { Notification, safeStorage, shell, dialog } from 'electron';
+import { Notification, safeStorage, shell, dialog, nativeTheme } from 'electron';
 import { queueSound } from './sounds';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
@@ -11,6 +11,10 @@ import { parseSettingOptions, validateSettingValue } from '../../shared/setting-
 import { parseExtensionCommands } from '../../shared/extension-commands';
 import { getWebAccounts } from './web-accounts';
 import { shortcutFromEvent } from '../../shared/commands';
+import { pathToFileURL } from 'node:url';
+import { contained } from './extensions';
+import { pageKey } from '../../shared/applet-pages';
+import { openLocalPage, pageHostShortcut } from './applet-pages';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -51,6 +55,57 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.pages.open': {
+        requireCapability('pages');
+        const page = e.manifest.pages?.find((page) => page.id === p.id);
+        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        return openLocalPage(
+          {
+            key: pageKey(id, page.id),
+            title: page.title,
+            url: pathToFileURL(contained(e.manifest.folder, page.ui!)).href,
+            preload: path.resolve(__dirname, '../applet-page-preload.js'),
+            stateFile: path.join(dataRoot, 'pages', id, page.id, 'window-state.json'),
+            defaultDisplay: page.defaultDisplay,
+            partition: `applet-page-${id}-${page.id}`,
+            onLayout: () => {},
+            onCreated: (contents) =>
+              contents.on('before-input-event', (event, input) => {
+                if (pageHostShortcut(input)) event.preventDefault();
+              }),
+          },
+          {
+            snapshot: () => ({
+              dark: nativeTheme.shouldUseDarkColors,
+              settings: e.manifest.capabilities?.includes('settings')
+                ? Object.fromEntries(
+                    (e.manifest.settings ?? []).map((definition) => [
+                      definition.key,
+                      settings.value.extensions[id]?.settings[definition.key] ?? definition.default,
+                    ]),
+                  )
+                : {},
+            }),
+            execute: (command) => {
+              if (
+                e.state !== 'running' ||
+                typeof command !== 'string' ||
+                !e.commands.some((item) => item.id === command)
+              )
+                throw Error('自身の実行中コマンドだけを呼び出せます。');
+              return executeCommand(command);
+            },
+            changed: (callback) => {
+              settings.on('changed', callback);
+              nativeTheme.on('updated', callback);
+              return () => {
+                settings.removeListener('changed', callback);
+                nativeTheme.removeListener('updated', callback);
+              };
+            },
+          },
+        );
+      }
       case 'host.webAccounts.start':
       case 'host.webAccounts.open':
       case 'host.webAccounts.cycle':
@@ -65,6 +120,7 @@ export function createHostApi(
           e.manifest.webAccounts,
           {
             capabilities: e.manifest.capabilities ?? [],
+            page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),
             settings: () =>
               Object.fromEntries(
                 (e.manifest.capabilities?.includes('settings') ? (e.manifest.settings ?? []) : [])

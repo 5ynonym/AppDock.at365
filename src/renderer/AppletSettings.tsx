@@ -21,6 +21,40 @@ export function AppletSettings({
   );
   return (
     <div className="applet-settings">
+      {(applet.pages ?? []).map((page) => (
+        <div className="setting-row" key={`page-${page.id}`}>
+          <div>
+            <strong>{page.title}の表示方法</strong>
+            <p>同じ画面をAppDock本体のページ、または別ウィンドウで表示します。</p>
+          </div>
+          <select
+            aria-label={`${page.title}の表示方法`}
+            value={
+              draft.extensions[applet.id]?.pages?.[page.id]?.display ??
+              page.defaultDisplay ??
+              'page'
+            }
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                extensions: {
+                  ...draft.extensions,
+                  [applet.id]: {
+                    ...(draft.extensions[applet.id] ?? { enabled: false, settings: {} }),
+                    pages: {
+                      ...draft.extensions[applet.id]?.pages,
+                      [page.id]: { display: event.target.value as 'page' | 'window' },
+                    },
+                  },
+                },
+              })
+            }
+          >
+            <option value="page">AppDock本体のページ</option>
+            <option value="window">別ウィンドウ</option>
+          </select>
+        </div>
+      ))}
       <div className="setting-row">
         <div>
           <strong>開始までの秒数</strong>

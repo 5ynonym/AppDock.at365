@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  onAppletPage: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, key: string | null) => callback(key);
+    ipcRenderer.on('dock:appletPage', handler);
+    return () => ipcRenderer.removeListener('dock:appletPage', handler);
+  },
+  openAppletPage: (extensionId, pageId) =>
+    ipcRenderer.invoke('dock:openAppletPage', extensionId, pageId),
+  pageViewport: (key, bounds) => ipcRenderer.invoke('dock:pageViewport', key, bounds),
   chooseDirectory: () => ipcRenderer.invoke('dock:chooseDirectory'),
   checkUpdates: (id) => ipcRenderer.invoke('dock:checkUpdates', id),
   openReleases: (id) => ipcRenderer.invoke('dock:openReleases', id),

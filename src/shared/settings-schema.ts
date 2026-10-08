@@ -1,4 +1,5 @@
 import type { Settings } from './contracts';
+import { validPageId, validRibbonId } from './applet-pages';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -23,6 +24,7 @@ export const createDefaultSettings = (): Settings => ({
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
   trayCommands: [],
   pinnedCommands: [],
+  ribbon: { order: [], hidden: [] },
   profile: { name: 'ユキ', avatar: null },
 });
 export function parseSettings(value: unknown): Settings {
@@ -76,7 +78,32 @@ export function parseSettings(value: unknown): Settings {
         Number(item.startupDelaySeconds) > 86400)
     )
       throw new Error(`拡張設定 ${id} の開始までの秒数は0～86400の整数です。`);
+    if (
+      item.pages !== undefined &&
+      (!object(item.pages) ||
+        Object.entries(item.pages).some(
+          ([pageId, page]) =>
+            !validPageId(pageId) ||
+            !object(page) ||
+            !['page', 'window'].includes(String(page.display)),
+        ))
+    )
+      throw Error(`拡張設定 ${id} のページ表示方法が不正です。`);
   }
+  const ribbon = value.ribbon === undefined ? { order: [], hidden: [] } : value.ribbon;
+  if (
+    !object(ribbon) ||
+    ['order', 'hidden'].some((key) => {
+      const ids = ribbon[key];
+      return (
+        !Array.isArray(ids) ||
+        ids.length > 500 ||
+        ids.some((id) => !validRibbonId(id)) ||
+        new Set(ids).size !== ids.length
+      );
+    })
+  )
+    throw Error('ribbon.order / hidden は重複のないリボンIDの配列です。');
   const shortcuts = parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
   const globalShortcutCommands =
     value.globalShortcutCommands === undefined
@@ -114,6 +141,7 @@ export function parseSettings(value: unknown): Settings {
     shortcuts,
     globalShortcutCommands,
     pinnedCommands,
+    ribbon,
     profile: { ...profile, name: profile.name.trim() },
   };
   if (new TextEncoder().encode(JSON.stringify(next)).length > 1024 * 1024)

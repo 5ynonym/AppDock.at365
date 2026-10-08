@@ -6,7 +6,7 @@ namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
     IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
-    IUiService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
+    IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
@@ -22,6 +22,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public ISettingsService Settings => this;
     public INotificationService Notifications => this;
     public IUiService Ui => this;
+    public IPageService Pages => this;
     public IBrowserService Browser => this;
     public ILogService Log => this;
     public IStorageService Storage => this;
@@ -94,6 +95,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
         }
     }
     public Task ShowAsync(string title, string body, CancellationToken cancellationToken = default) => CallAsync("host.notifications.show", new { title, body }, cancellationToken);
+    Task IPageService.OpenAsync(string id, CancellationToken cancellationToken) => CallAsync("host.pages.open", new { id }, cancellationToken);
     public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);
     public async Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default) =>
         (await connection.RequestAsync("host.ui.imageDirectory", new { }, cancellationToken)).GetString()!;

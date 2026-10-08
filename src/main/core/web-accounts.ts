@@ -21,7 +21,8 @@ import type {
   WebAccountSnapshot,
   WebAccountSound,
 } from '../../shared/web-accounts';
-import { WindowStateStore, restoreWindowBounds } from './window-state';
+import { AppletSurface, pageHostShortcut } from './applet-pages';
+import { pageKey, type AppletPageDefinition } from '../../shared/applet-pages';
 import { queueSound } from './sounds';
 import { importSound, managedSound, pruneSounds } from './sound-assets';
 import { keepWebPageActive } from './web-page-activity';
@@ -41,6 +42,7 @@ type Saved = {
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
   capabilities: string[];
+  page?: AppletPageDefinition;
   settings?(): Record<string, boolean | string>;
   setSetting?(key: unknown, value: unknown): void;
   onSettingsChanged?(callback: () => void): () => void;
@@ -163,7 +165,16 @@ export function allowedWebNavigation(raw: string, origins: string[]): boolean {
 }
 export class WebAccountController {
   private state: Saved;
-  private window?: BrowserWindow;
+  private surface?: AppletSurface;
+  private get window() {
+    return this.surface?.window;
+  }
+  private get uiContents() {
+    return this.surface?.ui.webContents;
+  }
+  private get contentView() {
+    return this.surface?.contentView;
+  }
   private background?: BrowserWindow;
   private backgroundSize = { width: 1044, height: 754 };
   private attached?: WebContentsView;
@@ -186,7 +197,6 @@ export class WebAccountController {
   private source: string;
   private itemOpener?: string;
   private file: string;
-  private windowState: WindowStateStore;
   private initializing?: Promise<void>;
   private soundFailures = new Map<string, string>();
   private avatars = new Map<
@@ -222,9 +232,6 @@ export class WebAccountController {
         .trim()
         .replace(/;$/, '');
     this.file = path.join(root, 'accounts.json');
-    this.windowState = new WindowStateStore(path.join(root, 'window-state.json'), () =>
-      this.services.failed('Webウィンドウの位置・サイズを読み込み/保存できませんでした。'),
-    );
     fs.mkdirSync(root, { recursive: true });
     if (fs.existsSync(this.file)) {
       this.state = JSON.parse(fs.readFileSync(this.file, 'utf8'));
@@ -270,7 +277,7 @@ export class WebAccountController {
     if (!ipcInstalled) {
       ipcInstalled = true;
       ipcMain.handle('web-account:invoke', async (event, method: string, ...args: unknown[]) => {
-        const c = [...controllers.values()].find((c) => c.window?.webContents === event.sender);
+        const c = [...controllers.values()].find((c) => c.uiContents === event.sender);
         if (
           !c ||
           c.disposed ||
@@ -288,8 +295,8 @@ export class WebAccountController {
     this.changed();
   }
   private changed() {
-    if (this.window && !this.window.isDestroyed())
-      this.window.webContents.send('web-account:changed');
+    if (this.uiContents && !this.uiContents.isDestroyed())
+      this.uiContents.send('web-account:changed');
   }
   private account(id: unknown) {
     const a = this.state.accounts.find((a) => a.id === id);
@@ -387,9 +394,10 @@ export class WebAccountController {
     wc.on('before-input-event', (event, input) => {
       if (
         !this.disposed &&
+        this.surface?.visible &&
         this.window?.isVisible() &&
         !this.window.isMinimized() &&
-        this.services.shortcut(input)
+        (pageHostShortcut(input) || this.services.shortcut(input))
       )
         event.preventDefault();
     });
@@ -431,6 +439,7 @@ export class WebAccountController {
     // Transfer input only inside the already-active mail window. Commands from
     // another app must keep that app's focus, including hidden/minimized mail.
     const transferInput =
+      this.surface?.visible &&
       this.window?.isFocused() &&
       this.window.isVisible() &&
       !this.window.isMinimized() &&
@@ -441,7 +450,7 @@ export class WebAccountController {
       transferInput &&
       this.window?.isFocused() &&
       this.attached &&
-      this.window.contentView.children.includes(this.attached)
+      this.contentView?.children.includes(this.attached)
     )
       this.attached.webContents.focus();
   }
@@ -473,7 +482,7 @@ export class WebAccountController {
     return this.background;
   }
   private park(view: WebContentsView) {
-    this.window?.contentView.removeChildView(view);
+    this.contentView?.removeChildView(view);
     const background = this.backgroundWindow();
     if (!background.contentView.children.includes(view)) background.contentView.addChildView(view);
     view.setBounds({ x: 0, y: 0, ...this.backgroundSize });
@@ -669,14 +678,9 @@ export class WebAccountController {
   }
   private layout() {
     if (!this.window || !this.attached) return;
-    const [w, h] = this.window.getContentSize();
+    const { width: w, height: h } = this.surface!.size;
     const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
-    const visible =
-      this.window.isVisible() &&
-      !this.window.isMinimized() &&
-      this.viewport !== null &&
-      area.x < w &&
-      area.y < h;
+    const visible = this.surface!.visible && this.viewport !== null && area.x < w && area.y < h;
     if (!visible) {
       this.park(this.attached);
       return;
@@ -689,8 +693,8 @@ export class WebAccountController {
     for (const child of this.backgroundWindow().contentView.children)
       child.setBounds({ x: 0, y: 0, ...this.backgroundSize });
     this.backgroundWindow().contentView.removeChildView(this.attached);
-    if (!this.window.contentView.children.includes(this.attached))
-      this.window.contentView.addChildView(this.attached);
+    if (!this.contentView!.children.includes(this.attached))
+      this.contentView!.addChildView(this.attached);
     this.attached.setVisible(true);
     this.attached.setBounds({
       x: area.x,
@@ -711,9 +715,8 @@ export class WebAccountController {
   async open() {
     if (this.disposed) throw Error('Web accounts are closed');
     if (this.opening) return this.opening;
-    if (this.window && !this.window.isDestroyed()) {
-      this.window.show();
-      this.window.focus();
+    if (this.surface) {
+      await this.surface.open();
       return;
     }
     this.opening = this.openWindow().finally(() => {
@@ -723,65 +726,25 @@ export class WebAccountController {
   }
   private async openWindow() {
     await this.start();
-    const primary = screen.getPrimaryDisplay();
-    const saved = this.windowState.load(
-      [primary, ...screen.getAllDisplays().filter((d) => d.id !== primary.id)].map(
-        (d) => d.workArea,
-      ),
-      { width: 900, height: 640 },
-    );
-    const w = new BrowserWindow({
-      width: 1280,
-      height: 900,
-      ...saved?.bounds,
-      minWidth: 900,
-      minHeight: 640,
-      title: this.name,
-      show: false,
-      autoHideMenuBar: true,
-      backgroundColor: '#101318',
-      webPreferences: {
-        preload: path.resolve(__dirname, '../web-account-preload.js'),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        spellcheck: false,
-        backgroundThrottling: false,
-        partition: 'web-account-ui-' + this.id,
-      },
-    });
-    this.window = w;
-    this.windowState.track(w);
-    this.bindShortcuts(w.webContents);
-    w.webContents.on('will-navigate', (event) => event.preventDefault());
-    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    w.on('resize', () => this.layout());
-    w.on('show', () => this.layout());
-    w.on('hide', () => this.layout());
-    w.on('minimize', () => this.layout());
-    w.on('restore', () => this.layout());
-    // Closing the mail window hides it; monitoring remains active until Applet stop.
-    w.on('close', (event) => {
-      if (!this.disposed) {
-        event.preventDefault();
-        w.hide();
-      }
-    });
-    w.on('closed', () => {
-      this.window = undefined;
-      if (!this.disposed && this.attached && !this.attached.webContents.isDestroyed())
-        this.park(this.attached);
-      this.attached = undefined;
+    if (this.disposed) return;
+    const page = this.services.page;
+    this.surface = new AppletSurface({
+      key: page ? pageKey(this.id, page.id) : undefined,
+      title: page?.title ?? this.name,
+      url: this.uiURL,
+      preload: path.resolve(__dirname, '../web-account-preload.js'),
+      stateFile: path.join(this.root, 'window-state.json'),
+      defaultDisplay: page?.defaultDisplay,
+      partition: 'web-account-ui-' + this.id,
+      onLayout: () => this.layout(),
+      onCreated: (contents) => this.bindShortcuts(contents),
     });
     try {
-      await w.loadURL(this.uiURL);
-      if (this.disposed || w.isDestroyed()) return;
-      if (saved) restoreWindowBounds(w, saved.bounds);
-      this.show(this.state.selected);
-      if (saved?.maximized) w.maximize();
-      w.show();
+      await this.surface.open();
+      if (!this.disposed) this.show(this.state.selected);
     } catch {
-      if (!w.isDestroyed()) w.destroy();
+      this.surface?.close();
+      this.surface = undefined;
       throw Error('Web画面を開けませんでした。');
     }
   }
@@ -963,7 +926,7 @@ export class WebAccountController {
           if (this.state.accounts.length < 2) throw Error('最後のアカウントは残してください。');
           const view = this.views.get(a.id);
           if (view && this.attached === view) {
-            this.window!.contentView.removeChildView(view);
+            this.contentView!.removeChildView(view);
             this.attached = undefined;
           }
           if (view) this.background?.contentView.removeChildView(view);
@@ -1107,7 +1070,6 @@ export class WebAccountController {
     screen.removeListener('display-added', this.displaysChanged);
     screen.removeListener('display-removed', this.displaysChanged);
     screen.removeListener('display-metrics-changed', this.displaysChanged);
-    this.windowState.flush();
     const ids = [...this.views.keys()];
     for (const avatar of this.avatars.values()) avatar.abort?.abort();
     this.avatars.clear();
@@ -1117,7 +1079,8 @@ export class WebAccountController {
       if (!view.webContents.isDestroyed()) view.webContents.close();
     this.views.clear();
     this.attached = undefined;
-    this.window?.destroy();
+    this.surface?.close();
+    this.surface = undefined;
     this.background?.destroy();
     this.background = undefined;
     await this.initializing?.catch(() => {});

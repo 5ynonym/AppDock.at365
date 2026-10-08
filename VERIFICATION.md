@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-08: v0.18.0 Appletページとリボン
+
+- 専用ブランチ`codex/applet-pages-ribbon`。manifestのpages（local/web-accounts）、Node/.NETのページopen API、限定ローカルUI、共通AppletSurfaceを追加。リボンの標準/導入Appletボタンを表示・非表示/ドラッグ/上下で編集し、設定と並び順を保存。設定ボタンを隠しても右クリックから戻れる。Appletごとの表示方法と独立Window状態を保存する。
+- 同じUI WebContentsViewとアカウントWebContents/sessionをpage/window間で共用。ページのclient領域、command palette中のView取り外し、非選択/最小化のbackground parkを確認。ホームを表示中のcycleは、ホストWindowがアクティブでも入力を奪わないようSurfaceの表示状態を検査する。
+- TypeScript main/renderer型検査・Vite、ホスト回帰88/88、Gmail回帰21/21、SDK/Runtime Release（警告0/エラー0）成功。publish.bat成功、.NET ExtensionHostはframework-dependentでcoreclr等のRuntime混入なし。プロジェクト内の既存Node/pnpmのみ使用。
+- 最終win-unpackedの`scripts/applet-pages-ui-test.cjs`: `artifacts/applet-pages-1791456311809/result.json` ok:true。汎用ローカルページ、実幅、同じページ再open、入力保持、page→window→page、UI/remoteのbridge分離、Gmailの検索/選択/同一WebContents/Cookie保持、ホーム/最小化中の新着、ホーム中のcycleフォーカス保持、リボン設定の再起動保持、非表示ページのcommand起動、停止時全View破棄とホーム復帰を確認。リボン設定画像を目視確認。
+- 同じ変更の発行版Gmail GUI `../Applet.Gmail.at365/artifacts/gui-1791455738683/result.json`、UI/キー/音/位置保存 `../Applet.Gmail.at365/artifacts/ui-features-1791455988932/result.json` はok:true。通常Electron・Playwrightなしのpacked-core試験 `../Applet.Gmail.at365/artifacts/native-background-1791455805763/result.json` はok:trueで、2枠の初回描画/サイト自身の継続更新/非表示reload/認証先で解除/停止時破棄を確認。
+- 最終EXE: 100574904 bytes、SHA256 `E21E8A05CFBE35CC5281F6825CC867739D2325CFA43DDCC0FEE89D2C9E997EF4`。単一EXEの通常起動/CDP試験 `../Applet.Gmail.at365/artifacts/portable-1791456361645/result.json` はok:true/version0.18.0/exitCode0。未改変Gmailのページ表示/新着履歴/クリア/停止・再開/正常終了を確認。
+- Prettier/diff check、更新文書のローカルリンク96件を確認。既に消えていた旧Applet.GmailCheckerへのリンク4件も現行Gmailの案内へ更新。
+- 検証上の修正: ページ領域が既存max-width/margin:autoにより幅1pxへ縮んだためwidth:100%/max-width:noneを指定。GUIの旧Window直下View/仮名セレクターを現在の構成へ更新。再起動fixtureはアカウント起動前に登録し、Cookieは永続期限を指定。sandboxのTEMPではrename権限が不足するためプロジェクト内TEMPを使用。Electron GUI/発行は許可されたWindows実行環境で確認。単一EXEをElectron.launchへ直接渡す詳細試験は起動フックで180秒timeoutしたため除外し、win-unpacked詳細試験と通常EXE起動後のCDP接続を使用。
+- 実Googleのログイン/実受信・実複数アカウント操作・長時間/スリープは今回未実施。実利用先deploy・mainへの統合・外部pushは行っていない。
+
 ## 2026-10-08: v0.17.1 WebアカウントUIから自身の設定を変更
 
 - ユーザーが設定タブの正常動作を確認したと報告し、Gmail側と合わせたコミットを明示指定（2026-10-08）。検証済みコードを変更せず、確認報告と今回の実装・文書をコミット対象にした。
