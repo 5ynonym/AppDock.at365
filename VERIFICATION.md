@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-08: Applet設定パネルへ最新mainを取り込んで統合
+
+- ユーザーの指定により、共通設定パネルと説明/設定ボタン配置の変更をdc49658へ保存し、mainのc9b185a（設定アクション）をcodex/applet-settings-panelへ取り込み。自動マージで競合なし。既存のsettingActionsの型/検証/フォーム実行と文書・試験を保持し、共通設定パネルでも利用できる状態を確認。
+- main/renderer型検査、TS/Vite build、framework-dependent .NETホスト発行成功。ホスト回帰91/91、失敗0（worktreeのartifacts/integration-regression.log）。依存更新なし。
+- worktreeの隔離GUI navigation-1791468074781/result.jsonはok:true。mainのsettingActionsを宣言するNode fixtureで、詳細設定パネルの操作成功/失敗と未保存値の保持・自動保存されないことを確認。ボタン/見出しの位置と装飾、大小画面・両テーマ、JSON・下書き・競合・ログの既存動作も成功。
+- ui-1791468081369/result.jsonとpreferences-1791468083979/result.jsonもok:true。Node/.NET起動・停止・設定保存と再読込、プロフィール画像、キー、再起動後の永続化を確認。Prettier/diff check成功。mainから入ったCSSの空白を整形し、再ビルド後のrenderer資産ハッシュはGUI確認時と同一。
+- 検証済みのブランチをmainへfast-forward統合。検証結果・画像・回帰ログをmainのartifactsへ引き継ぎ、ユーザーの追加指定でworktreeを削除する。作業ブランチは履歴として保持。実利用の設定・認証・壁紙・Windows設定は操作せず、今回の単一EXE再発行/deploy/外部pushは実施しない。
+
 ## 2026-10-08: v0.21.0 Applet詳細の共通設定パネル
 
 - 追加調整: 「設定を開く／説明に戻る」をヘッダー直下の共通操作列へ移動し、同一のsecondaryボタン・アイコン・幅でラベルと動作を切り替えます。ボタンより下だけ説明/設定が変わります。ログは従来の移動先・フィルター・説明側の入口を維持。ユーザーの将来の説明/設定/ログタブ案は今回は実装しません。

@@ -24,6 +24,18 @@ for (let i = 0; i < 24; i++) {
       runtime: 'node',
       entry: 'index.js',
       capabilities: [],
+      ...(i === 1
+        ? {
+            commands: [{ id: `${id}.apply`, title: '検証操作' }],
+            settingActions: [
+              {
+                title: '検証操作',
+                command: `${id}.apply`,
+                successMessage: '共通パネルの操作が成功しました。',
+              },
+            ],
+          }
+        : {}),
       settings:
         i === 0
           ? []
@@ -64,7 +76,13 @@ for (let i = 0; i < 24; i++) {
             ],
     }),
   );
-  fs.writeFileSync(path.join(folder, 'index.js'), 'module.exports = {};');
+  fs.writeFileSync(
+    path.join(folder, 'index.js'),
+    i === 1
+      ? `module.exports = { activate(context) { let calls = 0; context.commands.register('${id}.apply', '検証操作', async () => { await new Promise(resolve => setTimeout(resolve, 150)); if (calls++ > 0) throw new Error('fixture action failure'); }); } };`
+      : 'module.exports = {};',
+  );
+  if (i === 1) settings.extensions[id] = { enabled: true, settings: {} };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [];
@@ -140,6 +158,36 @@ const checks = [];
       .click();
     await button('設定を開く').click();
     await page.getByLabel('検証項目 0', { exact: true }).fill('詳細からの編集');
+    const settingAction = button('検証操作');
+    await page.waitForFunction(
+      () =>
+        !document.querySelector(
+          'button[aria-describedby="setting-action-help-test.applet-1.apply"]',
+        )?.disabled,
+    );
+    await settingAction.click();
+    await page
+      .getByRole('status')
+      .filter({ hasText: '共通パネルの操作が成功しました。' })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      '詳細からの編集',
+    );
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
+        .settings.value0,
+      undefined,
+    );
+    await settingAction.click();
+    await page.getByRole('alert').filter({ hasText: 'fixture action failure' }).waitFor();
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      '詳細からの編集',
+    );
+    checks.push(
+      'main setting actions in the shared inline panel / success and failure / unsaved draft preserved',
+    );
     await page.getByLabel('検証数値', { exact: true }).fill('');
     await button('変更をすべて保存').click();
     await page.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
