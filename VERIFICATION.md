@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-08: v0.19.0 リボンの上下配置・セパレーター
+
+- 指示により前回のcodex/applet-pages-ribbonをmainへfast-forward統合（da2bdc1）。Gmail側もdbe84beをmainへ統合。新しい作業は両repoのcodex/ribbon-layout-gmail-polishで実施。
+- リボン設定へ上寄せ/下寄せ、グループ内順番・表示、セパレーターの追加/削除/配置を実装。登録と参照を検証し、削除時はorder/hidden/bottomからも除去。未導入Appletの設定を保持。古いorder/hiddenを持つ設定は既存配置を保持し、初期化はtheme/profileを下寄せにする。
+- 「AppDockのキー」を「AppDock」へ変更し、「Applet別の設定」の先頭へ移動。下書き・JSON保持・全保存・検索・所属/競合処理は既存経路を使用。
+- main/renderer型検査・Vite build、ホスト回帰89/89、Gmail型検査/Vite/21/21成功。Prettier、git diff --check成功。ローカルツールによるpublish.batも成功。
+- 最終win-unpackedのscripts/ribbon-layout-ui-test.cjs: artifacts/ribbon-layout-1791458897839/result.json（ok:true）。上下の実配置、セパレーター追加/削除/移動、グループ間ドラッグ、上下順番、再起動保持、削除時の参照除去、初期化、本体キーの名称/位置/検索、Gmail UIの不要要素削除と本文/先頭アカウントの上端を検証。通常幅と900×640、本体ページで横はみ出しなし。画像も目視確認。
+- 開発版設定GUI: artifacts/navigation-1791458862311/result.json（ok:true）。24 Applet、複数下書き、JSON/外部更新保持、所属/競合/停止後のキー、検索/フィルター/狭幅/両テーマを確認。Gmail別Window GUIは../Applet.Gmail.at365/artifacts/gui-1791458866882、UI機能はui-features-1791458910659で成功（切替キー・個別session・音・新着/削除・位置/最大化保持）。
+- 最終単一EXE: ../Applet.Gmail.at365/artifacts/portable-1791458903951/result.json（ok:true/host0.19.0/exitCode0）。未改変Gmail0.8.0でページ表示・新着・履歴・クリア・停止/再開・隔離・正常終了を確認。
+- publish/AppDock.at365.exe: 100576430 bytes、SHA256 816DE9044DA45A44B361182FA0044ED08F4B2FC664CA796416743ACD31787842。.NET hostは既存手順のframework-dependent発行。実利用deploy/外部push、実Google操作・実メール送信は未実施。
+- GUI初回のグループ間drag試験は移動元/先が別スクロール領域になり誤った行へ入力したため失敗。試験中のみzoomを下げて両端を可視化し、drag-handleから実マウス操作を再実行して成功。最後のGUIはzoomを通常へ戻して配置/画像を確認。Gmailボタンの同名設定入口はリボン内にscopeを限定。
+
 ## 2026-10-08: v0.18.0 Appletページとリボン
 
 - 専用ブランチ`codex/applet-pages-ribbon`。manifestのpages（local/web-accounts）、Node/.NETのページopen API、限定ローカルUI、共通AppletSurfaceを追加。リボンの標準/導入Appletボタンを表示・非表示/ドラッグ/上下で編集し、設定と並び順を保存。設定ボタンを隠しても右クリックから戻れる。Appletごとの表示方法と独立Window状態を保存する。

@@ -1,4 +1,4 @@
-# Appletページとリボン（AppDock 0.18.0）
+# Appletページとリボン（ページAPI: AppDock 0.18.0、リボン配置: 0.19.0）
 
 Appletは画面のHTML/React・操作・データ処理を実装し、ホストは左のリボン、表示先、UIプロセス、画面領域、ウィンドウ状態、終了処理を管理します。同じローカルUIのWebContentsViewを本体ページと別ウィンドウへ移動し、表示先の変更で再ロードしません。既存のWPF/WinForms/nativeウィンドウを自動変換する契約ではありません。
 
@@ -46,10 +46,12 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 標準6項目（home/extensions/settings/logs/theme/profile）と、導入Appletのpagesを一覧にします。AppletページのリボンIDは`page:<extensionId>:<pageId>`です。配置位置はホストが決め、名前・選択状態・キーボード操作は本体ボタンとして描画します。
 
-「設定 → リボン」で表示チェック、ドラッグ、上下ボタン、初期化を提供します。保存は既存の設定下書き/revision/全保存に従います。`ribbon:{order:string[],hidden:string[]}`は省略時に両方空配列。重複/不正ID/500件超を拒否します。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
+「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の設定下書き/revision/全保存に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。0.18.0の既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
 
 ## 検証
 
 `scripts/applet-pages-ui-test.cjs [win-unpackedのEXE]`は隔離profile・ローカルページfixture・GmailのオフラインHTTPS fixtureを使います。画面の実幅、UI/入力/remote WebContentsの同一性、ページ/Window切替、コマンド検索、背景/最小化監視、Cookie再起動保持、リボンの保存/復帰、停止時破棄を確認します。実GmailのOAuth/実受信とは区別します。単一EXEのラッパーへElectron.launchを直接使用せず、Gmailのscripts/test-portable.cjsによる通常起動後のCDP接続を使います。
 
 既存のWebアカウントGUI試験はUIをBrowserWindowのrootとして想定していたため、UIページの取得はElectron contextの全pagesを使い、親Windowの操作はview所有関係を照合してください。ローカルUIのcapturePageは子WebContentsViewの合成画面を含まないため、各Viewのキャプチャと実領域も照合します。
+
+`scripts/ribbon-layout-ui-test.cjs [win-unpackedのEXE]`は上下配置・セパレーター操作・グループ間ドラッグ・再起動保持・削除/初期化と、Gmailの余白/本文の上端を確認します。ドラッグの試験時だけ画面を縮小し、移動元と移動先を同時に可視領域へ収めます。

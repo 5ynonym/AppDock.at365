@@ -1,0 +1,254 @@
+const { _electron: electron } = require('playwright');
+const fs = require('node:fs'),
+  path = require('node:path'),
+  assert = require('node:assert/strict');
+const root = path.resolve(__dirname, '..');
+const profile = path.join(root, 'artifacts', `ribbon-layout-${Date.now()}`);
+const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.host.hardwareAcceleration = false;
+settings.globalShortcutCommands = [];
+settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
+fs.mkdirSync(profile, { recursive: true });
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.cpSync(
+  path.resolve(root, '../Applet.Gmail.at365/publish/Applet.Gmail.at365'),
+  path.join(profile, 'extensions', 'Applet.Gmail.at365'),
+  { recursive: true },
+);
+let app, dock;
+const checks = [];
+const until = async (fn, label) => {
+  const end = Date.now() + 15000;
+  while (Date.now() < end) {
+    if (await fn()) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw Error(label);
+};
+const button = (label) => dock.getByRole('button', { name: label, exact: true });
+const ribbonIds = (group) =>
+  dock
+    .locator(`.ribbon-${group} [data-ribbon-id]`)
+    .evaluateAll((elements) => elements.map((element) => element.dataset.ribbonId));
+const save = async () => {
+  await button('変更をすべて保存').click();
+  await dock
+    .locator('.settings-toolbar:visible')
+    .getByText('すべて保存されています', { exact: true })
+    .waitFor();
+};
+async function launch() {
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  app = await electron.launch({
+    executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+    args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
+    env,
+  });
+  dock = await app.firstWindow();
+  dock.setDefaultTimeout(15000);
+  await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await app.evaluate(({ app }) =>
+    app.on('session-created', (session) => {
+      if (!session.isPersistent()) return;
+      session.protocol.handle(
+        'https',
+        () =>
+          new Response(
+            '<!doctype html><title>Offline Gmail</title><main role="main"><table><tr class="zA zE"><td class="yW"><span name="Fixture">Fixture</span></td><td><span class="bog" data-legacy-thread-id="first">未読fixture</span></td></tr></table></main>',
+            { headers: { 'content-type': 'text/html; charset=utf-8' } },
+          ),
+      );
+    }),
+  );
+}
+(async () => {
+  try {
+    await launch();
+    assert.deepEqual(await ribbonIds('bottom'), ['theme', 'profile']);
+    assert.ok((await ribbonIds('top')).includes('page:at365.gmail:gmail'));
+    await button('設定').click();
+    assert.equal(await dock.getByRole('button', { name: 'AppDockのキー', exact: true }).count(), 0);
+    assert.equal(
+      await dock
+        .locator('.settings-applet-list .sidebar-extensions button')
+        .first()
+        .locator('span')
+        .textContent(),
+      'AppDock',
+    );
+    await dock
+      .locator('.settings-applet-list')
+      .getByRole('button', { name: 'AppDock', exact: true })
+      .click();
+    assert.ok((await dock.locator('.shortcut-row').count()) > 0);
+    await dock.getByLabel('設定するAppletを検索').fill('AppDock');
+    assert.equal(await dock.locator('.settings-applet-list .empty').count(), 0);
+    await dock.getByLabel('設定するAppletを検索').fill('');
+    await dock
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'リボン', exact: true })
+      .click();
+    await button('上寄せにセパレーターを追加').click();
+    await button('下寄せにセパレーターを追加').click();
+    await dock.getByLabel('Gmailの配置', { exact: true }).selectOption('bottom');
+    await dock.getByLabel('セパレーター 1の配置', { exact: true }).selectOption('bottom');
+    await dock.getByLabel('セパレーター 1の配置', { exact: true }).selectOption('top');
+    await button('セパレーター 1を上へ').click();
+    await button('セパレーター 2を削除').click();
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((window) => window.webContents.getURL() === 'appdock://host/index.html')
+        .webContents.setZoomFactor(0.65),
+    );
+    const gmailRow = dock.locator('[data-ribbon-setting="page:at365.gmail:gmail"]');
+    await gmailRow
+      .locator('.drag-handle')
+      .dragTo(dock.locator('[data-ribbon-setting="home"] .drag-handle'));
+    assert.equal(await dock.getByLabel('Gmailの配置', { exact: true }).inputValue(), 'top');
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((window) => window.webContents.getURL() === 'appdock://host/index.html')
+        .webContents.setZoomFactor(1),
+    );
+    await dock.getByLabel('Gmailの配置', { exact: true }).selectOption('bottom');
+    await save();
+    const persisted = (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon;
+    assert.equal(persisted.separators.length, 1);
+    assert.ok(persisted.bottom.includes('page:at365.gmail:gmail'));
+    assert.ok(!persisted.bottom.includes(persisted.separators[0]));
+    assert.equal(await dock.locator('.ribbon-top [role="separator"]').count(), 1);
+    assert.equal(
+      await dock.locator('.ribbon-bottom [data-ribbon-id="page:at365.gmail:gmail"]').count(),
+      1,
+    );
+    const topBottom = await dock.evaluate(() => ({
+      top: document.querySelector('.ribbon-top').getBoundingClientRect().bottom,
+      bottom: document.querySelector('.ribbon-bottom').getBoundingClientRect().top,
+    }));
+    assert.ok(topBottom.bottom - topBottom.top >= 12);
+    await dock.screenshot({ path: path.join(profile, 'ribbon-layout.png') });
+    checks.push(
+      'Host shortcuts renamed and first in Applet settings; separator add/delete/move; cross-group drag; per-group ordering; real top/bottom placement',
+    );
+
+    await dock
+      .locator('.activity-rail')
+      .getByRole('button', { name: 'Gmail', exact: true })
+      .click();
+    let gmailUi;
+    await until(() => {
+      gmailUi = app
+        .context()
+        .pages()
+        .find((page) => page.url().endsWith('/web/index.html'));
+      return !!gmailUi;
+    }, 'Gmail UI');
+    gmailUi.setDefaultTimeout(15000);
+    await until(
+      async () =>
+        (await gmailUi.evaluate(() => window.webAccounts.snapshot())).accounts[0].data?.pending ===
+        1,
+      'Gmail baseline',
+    );
+    assert.equal(
+      await gmailUi.locator('.header-note,.section,.account-switcher,.status').count(),
+      0,
+    );
+    assert.equal(
+      await gmailUi.getByRole('button', { name: '次のアカウント', exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await gmailUi.getByRole('button', { name: '前のアカウント', exact: true }).count(),
+      0,
+    );
+    const aligned = () =>
+      gmailUi.evaluate(() => ({
+        account: document.querySelector('.accounts .account').getBoundingClientRect().top,
+        main: document.querySelector('main').getBoundingClientRect().top,
+        overflow: document.documentElement.scrollWidth > innerWidth,
+      }));
+    let geometry = await aligned();
+    assert.equal(geometry.account, geometry.main);
+    assert.equal(geometry.main, 130);
+    assert.equal(geometry.overflow, false);
+    await gmailUi.screenshot({ path: path.join(profile, 'gmail-inbox.png') });
+    await gmailUi.getByRole('button', { name: /^新着一覧/ }).click();
+    geometry = await aligned();
+    assert.equal(geometry.account, geometry.main);
+    assert.equal(geometry.main, 146);
+    await gmailUi.getByRole('button', { name: '受信トレイ', exact: true }).click();
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((window) => window.webContents.getURL() === 'appdock://host/index.html')
+        .setContentSize(900, 640),
+    );
+    await until(
+      async () => (await aligned()).account === (await aligned()).main,
+      'Compact alignment',
+    );
+    assert.equal((await aligned()).overflow, false);
+    await gmailUi.screenshot({ path: path.join(profile, 'gmail-compact.png') });
+    checks.push(
+      'Gmail duplicated status/count/switch controls removed; spacer aligns first account with web/content in full and compact sizes; unread monitoring intact',
+    );
+
+    await app.close();
+    app = null;
+    const restartSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    restartSettings.extensions['at365.gmail'].enabled = false;
+    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
+    await launch();
+    assert.deepEqual(
+      (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon,
+      persisted,
+    );
+    assert.equal(await dock.locator('.ribbon-top [role="separator"]').count(), 1);
+    assert.ok((await ribbonIds('bottom')).includes('page:at365.gmail:gmail'));
+    await button('設定').click();
+    await dock
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'リボン', exact: true })
+      .click();
+    await button('セパレーター 1を削除').click();
+    await save();
+    const deleted = (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon;
+    assert.equal(deleted.separators.length, 0);
+    for (const ids of [deleted.order, deleted.hidden, deleted.bottom])
+      assert.ok(!ids.includes(persisted.separators[0]));
+    assert.equal(await dock.locator('.activity-rail [role="separator"]').count(), 0);
+    await button('リボンを初期状態に戻す').click();
+    await save();
+    assert.deepEqual(await ribbonIds('bottom'), ['theme', 'profile']);
+    checks.push(
+      'Restart retains placement and separators; deletion clears every reference; default reset restores bottom utilities',
+    );
+    assert.deepEqual(
+      (await dock.evaluate(() => window.dock.snapshot())).logs.filter(
+        (log) => log.level === 'error',
+      ),
+      [],
+    );
+    await app.close();
+    app = null;
+    fs.writeFileSync(
+      path.join(profile, 'result.json'),
+      JSON.stringify({ ok: true, checks }, null, 2),
+    );
+    console.log(JSON.stringify({ ok: true, profile, checks }));
+  } catch (error) {
+    console.error(error);
+    fs.writeFileSync(
+      path.join(profile, 'result.json'),
+      JSON.stringify({ ok: false, checks, error: String(error) }, null, 2),
+    );
+    if (app) {
+      try {
+        await dock.screenshot({ path: path.join(profile, 'failure.png') });
+      } catch {}
+      await app.close().catch(() => {});
+    }
+    process.exitCode = 1;
+  }
+})();

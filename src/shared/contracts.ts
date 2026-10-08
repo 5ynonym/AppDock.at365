@@ -21,7 +21,7 @@ export interface Settings {
   globalShortcutCommands: string[];
   trayCommands: string[];
   pinnedCommands: string[];
-  ribbon: { order: string[]; hidden: string[] };
+  ribbon: { order: string[]; hidden: string[]; bottom: string[]; separators: string[] };
   profile: { name: string; avatar: 'avatar.png' | null };
 }
 export interface SettingsSnapshot {

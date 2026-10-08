@@ -27,7 +27,7 @@ import { ProfileEditor } from './ProfileEditor';
 import { AppletSettings } from './AppletSettings';
 import { VersionCheck } from './VersionCheck';
 import { useAppletSidebar } from './useAppletSidebar';
-import { ribbonItems, orderRibbon } from '../shared/applet-pages';
+import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
 declare global {
   interface Window {
@@ -422,9 +422,68 @@ function App() {
     snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   const ribbon = orderRibbon(
-    ribbonItems(snapshot?.extensions ?? []),
+    ribbonItems(snapshot?.extensions ?? [], snapshot?.settings.value.ribbon.separators ?? []),
     snapshot?.settings.value.ribbon.order ?? [],
   ).filter((item) => !snapshot?.settings.value.ribbon.hidden.includes(item.id));
+  const renderRibbonItem = (item: RibbonItem) =>
+    item.kind === 'separator' ? (
+      <div
+        key={item.id}
+        className="ribbon-separator"
+        role="separator"
+        aria-label={item.title}
+        data-ribbon-id={item.id}
+      />
+    ) : (
+      <button
+        key={item.id}
+        data-ribbon-id={item.id}
+        title={item.id === 'profile' ? snapshot?.settings.value.profile.name : item.title}
+        aria-label={item.title}
+        aria-current={page === item.id ? 'page' : undefined}
+        className={item.id === 'profile' ? 'avatar' : page === item.id ? 'active' : ''}
+        onClick={() => {
+          if (item.extensionId) {
+            void action(() => window.dock.openAppletPage(item.extensionId!, item.pageId!));
+          } else if (item.id === 'theme') {
+            if (snapshot)
+              void action(() =>
+                window.dock.saveSettings(
+                  {
+                    ...snapshot.settings.value,
+                    host: {
+                      ...snapshot.settings.value.host,
+                      theme: snapshot.dark ? 'light' : 'dark',
+                    },
+                  },
+                  snapshot.settings.revision,
+                ),
+              );
+          } else if (item.id === 'profile') {
+            setPage('settings');
+            setProfileRequest((value) => value + 1);
+          } else setPage(item.id as Page);
+        }}
+      >
+        {item.id === 'profile' ? (
+          snapshot?.avatarUrl ? (
+            <img src={snapshot.avatarUrl} alt="ユーザーのアバター" />
+          ) : (
+            Array.from(snapshot?.settings.value.profile.name ?? 'ユキ')[0]
+          )
+        ) : (
+          <>
+            <Icon
+              name={
+                (item.id === 'theme' ? (snapshot?.dark ? 'sun' : 'moon') : item.icon) as IconName
+              }
+              size={21}
+            />
+            <span className="rail-label">{item.title}</span>
+          </>
+        )}
+      </button>
+    );
   return (
     <div
       className={`shell ${page === 'extensions' || page === 'settings' ? 'with-sidebar' : ''}`}
@@ -469,63 +528,17 @@ function App() {
         }}
       >
         <Brand />
-        <div className="ribbon-buttons">
-          {ribbon.map((item) => (
-            <button
-              key={item.id}
-              data-ribbon-id={item.id}
-              title={item.id === 'profile' ? snapshot?.settings.value.profile.name : item.title}
-              aria-label={item.title}
-              aria-current={page === item.id ? 'page' : undefined}
-              className={item.id === 'profile' ? 'avatar' : page === item.id ? 'active' : ''}
-              onClick={() => {
-                if (item.extensionId) {
-                  void action(() => window.dock.openAppletPage(item.extensionId!, item.pageId!));
-                } else if (item.id === 'theme') {
-                  if (snapshot)
-                    void action(() =>
-                      window.dock.saveSettings(
-                        {
-                          ...snapshot.settings.value,
-                          host: {
-                            ...snapshot.settings.value.host,
-                            theme: snapshot.dark ? 'light' : 'dark',
-                          },
-                        },
-                        snapshot.settings.revision,
-                      ),
-                    );
-                } else if (item.id === 'profile') {
-                  setPage('settings');
-                  setProfileRequest((value) => value + 1);
-                } else setPage(item.id as Page);
-              }}
-            >
-              {item.id === 'profile' ? (
-                snapshot?.avatarUrl ? (
-                  <img src={snapshot.avatarUrl} alt="ユーザーのアバター" />
-                ) : (
-                  Array.from(snapshot?.settings.value.profile.name ?? 'ユキ')[0]
-                )
-              ) : (
-                <>
-                  <Icon
-                    name={
-                      (item.id === 'theme'
-                        ? snapshot?.dark
-                          ? 'sun'
-                          : 'moon'
-                        : item.icon) as IconName
-                    }
-                    size={21}
-                  />
-                  <span className="rail-label">{item.title}</span>
-                </>
-              )}
-            </button>
-          ))}
+        <div className="ribbon-buttons ribbon-top" aria-label="上寄せのリボン">
+          {ribbon
+            .filter((item) => !snapshot?.settings.value.ribbon.bottom.includes(item.id))
+            .map(renderRibbonItem)}
         </div>
         <div className="rail-spacer" />
+        <div className="ribbon-buttons ribbon-bottom" aria-label="下寄せのリボン">
+          {ribbon
+            .filter((item) => snapshot?.settings.value.ribbon.bottom.includes(item.id))
+            .map(renderRibbonItem)}
+        </div>
       </aside>
       {page === 'extensions' && (
         <aside className="sidebar" aria-label="Applet一覧">
@@ -1316,7 +1329,6 @@ function SettingsPage({
                   ['appearance', '表示'],
                   ['ribbon', 'リボン'],
                   ['general', '一般'],
-                  ['host-shortcuts', 'AppDockのキー'],
                   ['shortcuts', 'ショートカット'],
                   ['profile', 'プロフィール'],
                   ['about', 'バージョン情報・更新'],
@@ -1348,6 +1360,23 @@ function SettingsPage({
                 onChange={(event) => setAppletSearch(event.target.value)}
               />
               <div className="sidebar-extensions">
+                {'appdock'.includes(appletSearch.toLowerCase()) && (
+                  <button
+                    data-settings-owner="appdock"
+                    className={category === 'host-shortcuts' ? 'selected' : ''}
+                    aria-current={category === 'host-shortcuts' ? 'true' : undefined}
+                    onClick={() => {
+                      if (switchToForm()) setCategory('host-shortcuts');
+                    }}
+                  >
+                    <span title="AppDock">AppDock</span>
+                    {categoryChanged('host-shortcuts') && (
+                      <small className="unsaved-mark" aria-label="未保存">
+                        ●
+                      </small>
+                    )}
+                  </button>
+                )}
                 {extensions
                   .filter((e) =>
                     (e.displayName + ' ' + e.name + ' ' + e.id)
@@ -1379,11 +1408,12 @@ function SettingsPage({
                       )}
                     </button>
                   ))}
-                {!extensions.some((e) =>
-                  (e.displayName + ' ' + e.name + ' ' + e.id)
-                    .toLowerCase()
-                    .includes(appletSearch.toLowerCase()),
-                ) && <p className="empty">該当するAppletはありません。</p>}
+                {!'appdock'.includes(appletSearch.toLowerCase()) &&
+                  !extensions.some((e) =>
+                    (e.displayName + ' ' + e.name + ' ' + e.id)
+                      .toLowerCase()
+                      .includes(appletSearch.toLowerCase()),
+                  ) && <p className="empty">該当するAppletはありません。</p>}
               </div>
             </div>
             <div

@@ -36,7 +36,12 @@ test('Page declarations require owned activatable commands, capability, bounded 
 test('Legacy preferences gain ribbon defaults and retain explicit presentation across parse/save', () => {
   const settings = createDefaultSettings();
   delete settings.ribbon;
-  assert.deepEqual(parseSettings(settings).ribbon, { order: [], hidden: [] });
+  assert.deepEqual(parseSettings(settings).ribbon, {
+    order: [],
+    hidden: [],
+    bottom: ['theme', 'profile'],
+    separators: [],
+  });
   settings.ribbon = { order: ['page:test.pages:main', 'home'], hidden: ['settings'] };
   settings.extensions['test.pages'] = {
     enabled: true,
@@ -44,6 +49,8 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
     pages: { main: { display: 'window' } },
   };
   const next = parseSettings(settings);
+  assert.deepEqual(next.ribbon.bottom, []);
+  assert.deepEqual(next.ribbon.separators, []);
   assert.equal(pageDisplay(next, 'test.pages', manifest.pages[0]), 'window');
   assert.equal(next.extensions['test.pages'].settings.unrelated, 3);
   for (const ribbon of [
@@ -60,6 +67,30 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
       },
     }),
   );
+});
+test('Ribbon separators and lower placement validate and survive save', () => {
+  const settings = createDefaultSettings();
+  const id = 'separator:fixture-one';
+  settings.ribbon = {
+    order: ['home', id, 'settings'],
+    hidden: [id],
+    bottom: ['profile', id],
+    separators: [id],
+  };
+  assert.deepEqual(parseSettings(settings).ribbon, settings.ribbon);
+  const ordered = orderRibbon(ribbonItems([manifest], [id]), settings.ribbon.order);
+  assert.equal(ordered[1].kind, 'separator');
+  assert.equal(ordered[1].id, id);
+  for (const patch of [
+    { separators: [id, id] },
+    { separators: ['home'] },
+    { separators: [] },
+    { bottom: ['profile', 'profile'] },
+    { bottom: null },
+    { separators: null },
+    { separators: Array.from({ length: 51 }, (_, index) => `separator:s${index}`) },
+  ])
+    assert.throws(() => parseSettings({ ...settings, ribbon: { ...settings.ribbon, ...patch } }));
 });
 test('Ribbon inserts new Applets without dropping, duplicating or mutating saved preferences', () => {
   const source = ribbonItems([manifest]);
