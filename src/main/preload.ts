@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  cancelUpdates: () => ipcRenderer.invoke('dock:cancelUpdates'),
   onAppletPage: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, key: string | null) => callback(key);
     ipcRenderer.on('dock:appletPage', handler);

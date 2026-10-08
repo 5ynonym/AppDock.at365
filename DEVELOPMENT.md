@@ -139,3 +139,5 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 ## 本体・Appletの自己更新
 
 0.22.0の取得元・更新情報JSON・共通ミニプログラム・発行・復元・隔離試験は[更新の開発ガイド](docs/updates.md)を参照してください。`publish.bat`は本体EXEと`publish/update.json`を生成します。
+
+0.23.0は全6Appletの更新ZIP/JSON生成、共通進捗とキャンセル、journalのcommit記録・中断復旧を追加します。`scripts/update-progress-ui-test.cjs`と`scripts/update-recovery-test.cjs`の実行方法・隔離範囲は上記ガイド、実GitHub/HTTP(S)/UNCでの確認は[配布先のチェックリスト](docs/update-checklist.md)を参照してください。

@@ -26,6 +26,7 @@ import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { SettingsActions, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
+import { UpdateProgress } from './UpdateProgress';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
@@ -649,6 +650,7 @@ function App() {
                 : undefined
         }
       >
+        {snapshot && <UpdateProgress state={snapshot.updates} />}
         {error && (
           <div className="error-banner" role="alert">
             {error}

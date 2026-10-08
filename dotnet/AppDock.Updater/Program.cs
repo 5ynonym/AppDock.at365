@@ -81,7 +81,11 @@ internal static class Program
     {
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         var next = file + ".tmp";
-        File.WriteAllText(next, JsonSerializer.Serialize(value, JsonOptions), new UTF8Encoding(false));
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
+        using (var stream = new FileStream(next, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            stream.Write(bytes); stream.Flush(true);
+        }
         File.Move(next, file, true);
     }
     private static void CopyDirectory(string source, string destination)
@@ -187,7 +191,7 @@ internal static class Program
             if (deadline.ElapsedMilliseconds > 30000) throw new IOException("更新の開始が取り消されました。");
             Thread.Sleep(100);
         }
-        bool changed = false; bool restored = true; bool allExited = false;
+        bool changed = false; bool restored = true; bool allExited = false; bool committed = false;
         try
         {
             foreach (var process in processes)
@@ -196,6 +200,7 @@ internal static class Program
                 process.Dispose();
             }
             allExited = true;
+            Write(journal, new { executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps });
             foreach (var swap in swaps)
             {
                 Verify(swap.Item);
@@ -203,18 +208,20 @@ internal static class Program
                 else CopyDirectory(swap.Item.Source, swap.Next);
                 Verify(swap.Item with { Source = swap.Next });
             }
-            Write(journal, new { executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps });
             foreach (var swap in swaps)
             {
                 Move(swap.Item.Destination, swap.Backup, swap.Item.Kind); changed = true;
                 Move(swap.Next, swap.Item.Destination, swap.Item.Kind);
             }
-            // A completed journal must be cleared before restarting, otherwise startup recovery would undo it.
-            File.Delete(journal);
+            // Record the commit before cleanup. Recovery can finish it without undoing a complete update.
+            Write(journal, new { executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps, committed = true });
+            committed = true;
             Write(result, new { ok = true, time = DateTimeOffset.Now, message = "更新を適用しました。", temporaryDirectory = stage, updated = swaps.Select(s => new { s.Item.Id, s.Item.Version }) });
         }
         catch (Exception error)
         {
+            // After commit, leave the journal for recovery instead of rolling back a completed update.
+            if (committed) { restored = false; throw; }
             foreach (var swap in swaps.AsEnumerable().Reverse())
             {
                 try
@@ -233,8 +240,9 @@ internal static class Program
             {
                 foreach (var swap in swaps)
                 {
-                    try { Delete(swap.Next, swap.Item.Kind); Delete(swap.Backup, swap.Item.Kind); } catch { }
+                    try { Delete(swap.Next, swap.Item.Kind); Delete(swap.Backup, swap.Item.Kind); } catch { restored = false; }
                 }
+                if (committed && restored) File.Delete(journal);
             }
         }
         // If a process failed to exit, avoid starting a second instance. Nothing was exchanged in that case.
@@ -244,47 +252,81 @@ internal static class Program
     {
         baseDirectory = Full(baseDirectory); NoLinks(baseDirectory);
         var journal = Path.Combine(baseDirectory, ".appdock", "update-transaction.json"); NoLinks(journal);
+        var result = Path.Combine(baseDirectory, ".appdock", "update-result.json"); NoLinks(result);
         if (!File.Exists(journal)) return;
         using var document = JsonDocument.Parse(File.ReadAllText(journal));
-        foreach (var value in document.RootElement.GetProperty("swaps").EnumerateArray().Reverse())
+        var committed = document.RootElement.TryGetProperty("committed", out var flag) && flag.GetBoolean();
+        var swaps = JsonSerializer.Deserialize<List<Swap>>(document.RootElement.GetProperty("swaps"), JsonOptions)
+            ?? throw new IOException("更新復元の記録がありません。");
+        if (swaps.Count is 0 or > 501) throw new IOException("更新復元の対象数が正しくありません。");
+        var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Validate the entire journal before touching any destination.
+        foreach (var swap in swaps)
         {
-            var item = value.GetProperty("item"); var kind = item.GetProperty("kind").GetString()!;
-            var destination = Full(item.GetProperty("destination").GetString()!);
-            var backup = Full(value.GetProperty("backup").GetString()!); var next = Full(value.GetProperty("next").GetString()!);
-            if (!Within(baseDirectory, destination) || !backup.StartsWith(destination + ".previous-", StringComparison.OrdinalIgnoreCase) ||
-                !next.StartsWith(destination + ".update-", StringComparison.OrdinalIgnoreCase) ||
-                (kind == "host" ? !Same(destination, Path.Combine(baseDirectory, "AppDock.at365.exe")) : kind != "applet" || !Same(Path.GetDirectoryName(destination)!, Path.Combine(baseDirectory, "extensions"))))
+            var kind = swap.Item.Kind; var destination = Full(swap.Item.Destination);
+            var backup = Full(swap.Backup); var next = Full(swap.Next);
+            var suffix = backup.StartsWith(destination + ".previous-", StringComparison.OrdinalIgnoreCase) ? backup[(destination.Length + 10)..] : "";
+            if (!Within(baseDirectory, destination) || !destinations.Add(destination) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(suffix, "^[a-f0-9]{32}$") ||
+                !Same(next, destination + ".update-" + suffix) ||
+                (kind == "host" ? swap.Item.Id != "host" || !Same(destination, Path.Combine(baseDirectory, "AppDock.at365.exe")) : kind != "applet" || !Same(Path.GetDirectoryName(destination)!, Path.Combine(baseDirectory, "extensions"))))
                 throw new IOException("更新復元の範囲が正しくありません。");
-            if (Exists(backup, kind)) { Delete(destination, kind); Move(backup, destination, kind); }
-            Delete(next, kind);
+            NoLinks(destination); NoLinks(backup); NoLinks(next);
+            if (!Exists(destination, kind) && !Exists(backup, kind)) throw new IOException("復元する更新ファイルが見つかりません。");
+            if (committed) Verify(swap.Item with { Source = destination });
         }
+        foreach (var swap in swaps.AsEnumerable().Reverse())
+        {
+            if (committed) Delete(swap.Backup, swap.Item.Kind);
+            else if (Exists(swap.Backup, swap.Item.Kind))
+            {
+                Delete(swap.Item.Destination, swap.Item.Kind);
+                Move(swap.Backup, swap.Item.Destination, swap.Item.Kind);
+            }
+            Delete(swap.Next, swap.Item.Kind);
+        }
+        Write(result, new { ok = committed, restored = !committed,
+            message = committed ? "中断された更新の後片付けを完了しました。" : "中断された更新を元のバージョンへ復元しました。", time = DateTimeOffset.Now });
         File.Delete(journal);
-        Write(Path.Combine(baseDirectory, ".appdock", "update-result.json"), new { ok = false, restored = true, message = "中断されたApplet更新を復元しました。", time = DateTimeOffset.Now });
     }
     private static void Pack(string kind, string source, string version, string output)
     {
-        source = Full(source); output = Full(output); Directory.CreateDirectory(output);
+        source = Full(source); output = Full(output); NoLinks(source); NoLinks(output);
         string id; string? minimumHostVersion = null; string payload;
-        if (kind == "host") { id = "host"; payload = "AppDock.at365.exe"; if (!Same(source, Path.Combine(output, payload))) File.Copy(source, Path.Combine(output, payload), true); }
+        List<string>? files = null;
+        if (kind == "host") { id = "host"; payload = "AppDock.at365.exe"; }
         else if (kind == "applet")
         {
             using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(source, "extension.json")));
-            id = manifest.RootElement.GetProperty("id").GetString()!; version = manifest.RootElement.GetProperty("version").GetString()!;
-            if (manifest.RootElement.TryGetProperty("minimumHostVersion", out var minimum)) minimumHostVersion = minimum.GetString();
-            payload = "update.zip"; var zipPath = Path.Combine(output, payload);
-            if (File.Exists(zipPath)) File.Delete(zipPath);
-            using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
-            foreach (var file in Files(source))
-            {
-                var relative = Path.GetRelativePath(source, file).Replace('\\', '/');
-                if (relative is "update.json" or "update.zip") continue;
-                archive.CreateEntryFromFile(file, relative, CompressionLevel.Optimal);
-            }
+            var m = manifest.RootElement;
+            id = m.GetProperty("id").GetString()!; version = m.GetProperty("version").GetString()!;
+            var entry = m.GetProperty("entry").GetString()!; SafeName(entry);
+            if (m.GetProperty("apiVersion").GetInt32() != 1 || !File.Exists(Path.Combine(source, entry)))
+                throw new IOException("発行するAppletのAPI・エントリーが正しくありません。");
+            if (m.TryGetProperty("minimumHostVersion", out var minimum)) minimumHostVersion = minimum.GetString();
+            // Collect before creating the archive, including when output is the source itself.
+            files = Files(source).Where(file => Path.GetRelativePath(source, file).Replace('\\', '/') is not ("update.json" or "update.zip")).ToList();
+            payload = "update.zip";
         }
         else throw new IOException("発行形式はhost/appletです。");
+        Directory.CreateDirectory(output);
         var filePath = Path.Combine(output, payload);
-        Write(Path.Combine(output, "update.json"), new { schemaVersion = 1, kind, id, version, minimumHostVersion,
-            payload = new { file = payload, sha256 = Hash(filePath), size = new FileInfo(filePath).Length, format = kind == "host" ? "exe" : "zip" } });
+        var temporary = Path.Combine(output, ".update-" + Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            if (kind == "applet")
+            {
+                using (var archive = ZipFile.Open(temporary, ZipArchiveMode.Create))
+                    foreach (var file in files!)
+                        archive.CreateEntryFromFile(file, Path.GetRelativePath(source, file).Replace('\\', '/'), CompressionLevel.Optimal);
+                if (new FileInfo(temporary).Length > Limit) throw new IOException("ZIPの配布サイズが上限を超えました。");
+                File.Move(temporary, filePath, true);
+            }
+            else if (!Same(source, filePath)) { File.Copy(source, temporary); File.Move(temporary, filePath, true); }
+            Write(Path.Combine(output, "update.json"), new { schemaVersion = 1, kind, id, version, minimumHostVersion,
+                payload = new { file = payload, sha256 = Hash(filePath), size = new FileInfo(filePath).Length, format = kind == "host" ? "exe" : "zip" } });
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
     public static int Main(string[] args)
     {

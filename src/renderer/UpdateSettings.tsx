@@ -61,11 +61,6 @@ export function UpdateSettings({
       </div>
       <p className="muted">更新ボタンで最新版を確認・準備し、最後に対象を確認して再起動します。</p>
       {dirty && <p role="status">更新前に未保存の設定を保存または破棄してください。</p>}
-      {state.phase && (
-        <p role="status" className="update-feedback">
-          {state.phase}
-        </p>
-      )}
       {error && (
         <p role="alert" className="error-text">
           {error}

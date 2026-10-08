@@ -220,7 +220,7 @@ async function restarted(inspectPort, predicate) {
       page,
       (snapshot) => !snapshot.updates.busy && snapshot.updates.results.length === 3,
     );
-    assert.equal(initial.version, '0.22.1');
+    assert.equal(initial.version, '0.23.0');
     await waitSnapshot(
       page,
       (snapshot) =>
@@ -343,7 +343,7 @@ async function restarted(inspectPort, predicate) {
     await approve(inspectPort);
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);
-    await restarted(inspectPort, (s) => s.version === '0.22.1' && !s.updates.busy);
+    await restarted(inspectPort, (s) => s.version === '0.23.0' && !s.updates.busy);
     const result = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
     assert.equal(result.ok, true);
     assert.equal(result.updated[0].id, 'host');
@@ -387,7 +387,7 @@ async function restarted(inspectPort, predicate) {
       "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
     );
     await wait(2000);
-    await restarted(inspectPort, (s) => s.version === '0.22.1' && s.startupReady);
+    await restarted(inspectPort, (s) => s.version === '0.23.0' && s.startupReady);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), oldPid);
     assert.equal(
       await inspect(

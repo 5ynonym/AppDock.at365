@@ -161,6 +161,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'host' | 'applets' | string): Promise<UpdateState>;
   onAppletPage(callback: (key: string | null) => void): () => void;
@@ -211,6 +212,15 @@ export interface UpdateSettings {
   allowSameVersion: boolean;
 }
 export interface UpdateState {
+  cancellable?: boolean;
+  progress?: {
+    id: string;
+    name: string;
+    index: number;
+    count: number;
+    receivedBytes: number;
+    totalBytes?: number;
+  };
   busy: boolean;
   phase: string;
   results: UpdateResult[];

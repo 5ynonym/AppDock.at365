@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-09: v0.23.0 更新配布物・進捗・中断復旧
+
+- ユーザーの「順番に」「2は全部が終わったら確認する」指定に従い、1のApplet発行標準化、3の進捗/キャンセル、4の異常中断復旧を実施。2の実GitHub/HTTP(S)/UNC配布先確認はユーザー担当として[チェックリスト](docs/update-checklist.md)へ分離。AppDockは既存`codex/portable-updates`の5460b1e、6Appletは各cleanなmainから同checkoutの`codex/update-packages`で作業。worktreeは作らない。
+- 全6Appletの`publish.bat`に共通.NETパッカーを接続し、各repoの`publish/update.json`と`publish/update.zip`を生成。6件終了0、ID/版/entry・サイズ/SHA256・ZIP内全ファイルと発行元のバイト一致を確認。Gmail8、Wallpaper2、Watch2、WebBrowserTools2、WindowMover3、WindowsTools3ファイル。Watchの旧DLL/埋込済みフォント、DLL型2種の同梱不要SDKを明示名で整理して再発行。`artifacts/applet-update-packages.json`と各`*-update-publish.log`に結果。Applet本体の版変更・deploy対象の追加なし。
+- 共通進捗UI、取得容量/全体/件数とキャンセルを追加。HTTP/ローカルstream・展開子プロセス・ハッシュ読込へ中断を伝播し、インストール先交換前のTEMP準備だけを停止する。確認ダイアログへ進んだ後はその取消ボタンを使う。準備中断後の再試行とチェックのみの取消を追加テストで確認。
+- helperは準備前のjournal、全交換後のcommitted記録、JSONのFlush(true)、全復旧対象の事前検証を追加。commit前は旧版へ戻し、commit後は新版を検証して後片付け。ロック等で復旧できないときはjournalと旧ファイルを保持する。
+- main/renderer型検査、TS/Vite、.NET helperとportable発行成功。プロジェクト内Node24.21.0と既存依存を使用。最終回帰103/103、失敗/skip0（`artifacts/update-completion-regression.log`）。更新専用12件には実HTTP中断とsocket終了、再試行、metadata取消、危険なjournalの全体検証も含む。パッカーや旧交換/ZIP検証も成功。
+- `artifacts/update-progress-1791476360616/result.json`はok:true。配布win-unpackedの隔離profileとループバックHTTPで、実IPC/streamの進捗、dark/lightの容量とprogressbar、キャンセル→再試行→最終確認取消、元ファイル保持を確認。両テーマ画像を目視確認。初回のDOM進捗待ち不足は、mainの進捗に加えてDOMのprogress値も待つよう試験を修正した。
+- `artifacts/update-recovery-1791476324622/result.json`は8停止点すべてok:true。artifactsへコピーしたhelperソースにだけ停止点を挿入し、実プロセスを停止→製品helperで復旧。7点は旧版、commit後1点は新版、再実行の同じ結果、設定/認証fixture保持を確認。7点目では本体ファイルを別プロセスが使用中の失敗→journal/backup保持→解除後復旧も成功。初回の試験用ロック処理の挿入失敗はCRLFを正規化して修正。製品に故障注入スイッチなし。実電源断/ディスク障害の試験ではない。
+- `artifacts/portable-updates-1791476387252/result.json`は9条件ok:true、終了0。実.NET Applet一括交換、実単一EXE交換/再起動、個別同版再適用、設定/認証fixture/無効状態保持、起動時metadata確認だけ、トレイ開始ONからの更新/通常再起動でabout/一般/Appletページ復元を確認。最終native確認ダイアログだけ試験内で差替え。`artifacts/navigation-1791476399630/result.json`も成功。
+- 最終EXEは100596899bytes、SHA256 `71FAA4C6670D2662F195936F45D9FBFFDE13F73D9136BB9869CDC14CE1B8BF02`。feedの版/サイズ/hashと一致、最終asarのmain/portable-updates JSおよび同梱helperが検証した出力とバイト一致。ビルドログは`artifacts/update-completion-build.log`。Prettier、Git差分、ローカル文書リンク、PowerShellのBOM/CRLFを確認。BATは未編集。
+- 実利用先deploy・main統合・push・GitHubへの公開は行っていない。実GitHub/HTTP(S)/UNC配布先の到達性・公開設定・実ログインデータでの確認はユーザーの後日確認として残す。
+
 ## 2026-10-09: v0.22.1 更新UIと再起動先の復元
 
 - ユーザーが0.22.0の実再起動成功を報告。既存codex/portable-updatesのcleanな0369100から継続し、同じcheckoutで実装。更新/一括/個別の主操作をラベンダー色にし、共通設定/実行環境/各Applet更新元を折りたたみ、Applet更新元をインストール済みカードへ移動。本体/各Appletに既定復帰、未保存時は確認も含めて操作を無効化。下端のステータスバーは小さいボタンを維持。
