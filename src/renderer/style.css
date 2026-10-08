@@ -1921,6 +1921,12 @@ main {
 .detail-actions {
   margin-top: 20px;
 }
+.detail-settings-toggle {
+  min-width: 140px;
+}
+.applet-detail-main {
+  scrollbar-gutter: stable;
+}
 .detail-meta {
   font-size: 12px;
 }
@@ -2028,6 +2034,38 @@ summary {
   margin: 0;
   color: var(--text);
   font-size: 18px;
+}
+.applet-settings-panel > .tabs {
+  margin-bottom: 20px;
+}
+.applet-detail-settings-main .extensions-layout,
+.applet-detail-settings-main .detail,
+.detail-settings {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.applet-detail-settings-main .extensions-layout {
+  align-items: stretch;
+}
+.applet-detail-settings-main .detail-heading,
+.applet-detail-settings-main .detail-actions,
+.detail-settings > .error-text {
+  flex-shrink: 0;
+}
+.detail-settings {
+  margin-top: 20px;
+}
+.applet-settings-toolbar > span {
+  margin-left: 0;
+  margin-right: auto;
+}
+.detail-settings > .applet-settings-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 .settings-form {
   min-width: 0;

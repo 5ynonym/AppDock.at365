@@ -26,6 +26,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       'Applet',
       '設定',
       'ログ',
+      'テーマを切り替え',
     ]);
     const initial = await page.evaluate(async () => ({
       api: Object.keys(window.dock),

@@ -18,6 +18,10 @@
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
 - [Gmailの開発ガイド](../Applet.Gmail.at365/DEVELOPMENT.md): Node通知・Webアカウント・ページ表示と、隔離GUI・portable検証。
 
+## Applet設定パネル
+
+0.21.0ではApplet詳細に設定パネルを埋め込み、設定ページのApplet別設定とも共用します。画面・編集状態・保存処理の分担と検証は[AppDock実装ガイド](docs/host-development.md#applet設定パネルの共用)を参照してください。
+
 ## 構成
 
 ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.js、ネイティブ表示を持つ専用EXEのAppletをそれぞれ別プロセスで実行します。設定JSONやAPIの `extensions` は互換性のため名前を維持します。

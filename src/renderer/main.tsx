@@ -11,8 +11,6 @@ import type {
   GlobalHotKeyStatus,
 } from '../shared/contracts';
 import './style.css';
-import { parseSettings } from '../shared/settings-schema';
-import { validateAppletSettings } from '../shared/setting-definitions';
 import {
   hostCommands,
   rankCommands,
@@ -24,7 +22,9 @@ import {
 } from '../shared/commands';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { ProfileEditor } from './ProfileEditor';
-import { AppletSettings } from './AppletSettings';
+import { AppletSettingsPanel } from './AppletSettingsPanel';
+import { SettingsActions, SettingsMessages } from './SettingsActions';
+import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
 import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
@@ -35,7 +35,7 @@ declare global {
   }
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
-type SettingsTarget = { appletId: string; tab: 'settings' | 'shortcuts'; request: number };
+type AppletSettingsTab = 'settings' | 'shortcuts';
 type IconName =
   | 'home'
   | 'extensions'
@@ -226,7 +226,18 @@ function App() {
   const [profileRequest, setProfileRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
-  const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
+  const [detailSettings, setDetailSettings] = useState(false);
+  const [detailTab, setDetailTab] = useState<AppletSettingsTab>('settings');
+  const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
+  useLayoutEffect(() => {
+    // The retained detail view may be revisited after editing the shared JSON draft.
+    if (page === 'extensions' && detailSettings && editor.mode === 'json') {
+      if (!editor.switchToForm()) {
+        setDetailSettings(false);
+        setError('設定ページのJSONの内容を修正してから、Appletの設定を開いてください。');
+      }
+    }
+  }, [page, detailSettings, editor.mode]);
   const [appletFilter, setAppletFilter] = useState('');
   const [logSource, setLogSource] = useState('');
   const [paletteIndex, setPaletteIndex] = useState(0);
@@ -244,10 +255,6 @@ function App() {
   useEffect(() => {
     setPaletteIndex(0);
   }, [query, palette]);
-  const openAppletSettings = (appletId: string, tab: SettingsTarget['tab'] = 'settings') => {
-    setSettingsTarget((previous) => ({ appletId, tab, request: (previous?.request ?? 0) + 1 }));
-    setPage('settings');
-  };
   const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
     try {
@@ -360,6 +367,8 @@ function App() {
   }
   const goExtension = (id: string) => {
     setSelected(id);
+    setDetailSettings(false);
+    setDetailTab('settings');
     setPage('extensions');
   };
   const commands: UiCommand[] = [
@@ -586,9 +595,11 @@ function App() {
         className={
           page === 'settings'
             ? 'settings-main'
-            : page.startsWith('page:')
-              ? 'applet-page-main'
-              : undefined
+            : page === 'extensions'
+              ? `applet-detail-main${detailSettings ? ' settings-main applet-detail-settings-main' : ''}`
+              : page.startsWith('page:')
+                ? 'applet-page-main'
+                : undefined
         }
       >
         {error && (
@@ -726,7 +737,35 @@ function App() {
                 <div className="extensions-layout">
                   <ExtensionDetail
                     extension={selectedApplet}
-                    onSettings={openAppletSettings}
+                    onSettings={() => {
+                      if (editor.switchToForm()) setDetailSettings(true);
+                      else
+                        setError(
+                          '設定ページのJSONの内容を修正してから、Appletの設定を開いてください。',
+                        );
+                    }}
+                    onDescription={() => setDetailSettings(false)}
+                    settingsPanel={
+                      detailSettings && selectedApplet ? (
+                        <>
+                          <div className="settings-toolbar applet-settings-toolbar">
+                            <SettingsActions editor={editor} busy={busy} />
+                          </div>
+                          <SettingsMessages
+                            editor={editor}
+                            currentRevision={snapshot.settings.revision}
+                          />
+                          <AppletSettingsPanel
+                            applet={selectedApplet}
+                            editor={editor}
+                            commands={shortcutCommands}
+                            globalHotKeys={snapshot.globalHotKeys}
+                            tab={detailTab}
+                            onTab={setDetailTab}
+                          />
+                        </>
+                      ) : undefined
+                    }
                     onLogs={(id) => {
                       setLogSource(id);
                       setPage('logs');
@@ -749,7 +788,7 @@ function App() {
                 avatarUrl={snapshot.avatarUrl}
                 profileRequest={profileRequest}
                 ribbonRequest={ribbonRequest}
-                target={settingsTarget}
+                editor={editor}
                 onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
                 sidebarHost={settingsSidebarHost}
@@ -956,9 +995,13 @@ function ExtensionDetail({
   run,
   onSettings,
   onLogs,
+  onDescription,
+  settingsPanel,
 }: {
   extension?: ExtensionSnapshot;
-  onSettings(id: string, tab?: SettingsTarget['tab']): void;
+  onSettings(): void;
+  onDescription(): void;
+  settingsPanel?: React.ReactNode;
   onLogs(id: string): void;
   busy: boolean;
   run: Run;
@@ -989,160 +1032,168 @@ function ExtensionDetail({
           onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
         />
       </div>
-      <p className="detail-description">{e.description}</p>
-      {e.minimumHostVersion && (
-        <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
-      )}
-      <VersionCheck key={e.id} id={e.id} />
       <div className="actions detail-actions">
-        <button className="secondary" onClick={() => onSettings(e.id)}>
-          <Icon name="settings" />
-          設定を開く
-        </button>
-        <button className="secondary" onClick={() => onSettings(e.id, 'shortcuts')}>
-          <Icon name="command" />
-          ショートカットを設定
-        </button>
-        <button className="text-button" onClick={() => onLogs(e.id)}>
-          ログを見る
-        </button>
-      </div>
-      <div className="detail-state">
-        <StateBadge extension={e} />
         <button
-          className="text-button"
-          disabled={busy || !e.enabled}
-          onClick={() =>
-            void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
-          }
+          className="secondary detail-settings-toggle"
+          onClick={settingsPanel ? onDescription : onSettings}
         >
-          <Icon name="refresh" size={14} />
-          再起動
+          <Icon name="settings" />
+          {settingsPanel ? '説明に戻る' : '設定を開く'}
         </button>
-      </div>
-      {e.error && <div className="error-text">{e.error}</div>}
-      {e.state === 'waiting' && (
-        <div className="extension-panel">
-          <p>
-            {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()} に開始します。
-          </p>
-          <button
-            className="secondary"
-            disabled={busy}
-            onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
-          >
-            今すぐ開始
+        {!settingsPanel && (
+          <button className="text-button" onClick={() => onLogs(e.id)}>
+            ログを見る
           </button>
-        </div>
-      )}
-      {e.panel ? (
-        <div className="extension-panel">
-          <h3>{e.panel.title}</h3>
-          <p>{e.panel.description}</p>
-          {!!e.panel.tabs?.length && (
-            <nav className="panel-tabs" aria-label="パネルの切り替え">
-              {e.panel.tabs.map((tab) => (
-                <button
-                  className="secondary"
-                  key={tab.actionId ?? tab.command}
-                  aria-pressed={tab.selected ?? false}
-                  disabled={
-                    busy ||
-                    (!tab.actionId &&
-                      !e.commands.some(
-                        (command) => command.id === tab.command && command.available,
-                      ))
-                  }
-                  onClick={() =>
-                    void run(() =>
-                      tab.actionId
-                        ? window.dock.executePanelAction(e.id, tab.actionId)
-                        : window.dock.executeCommand(tab.command),
-                    )
-                  }
-                >
-                  {tab.title}
-                </button>
-              ))}
-            </nav>
+        )}
+      </div>
+      {settingsPanel ? (
+        <div className="detail-settings">{settingsPanel}</div>
+      ) : (
+        <>
+          <p className="detail-description">{e.description}</p>
+          {e.minimumHostVersion && (
+            <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
           )}
-          {!!e.panel.images?.length && (
-            <div className="panel-images">
-              {e.panel.images.map((item, i) => (
-                <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
-              ))}
-            </div>
-          )}
-          <dl>
-            {e.panel.facts?.map((f, i) => (
-              <div key={i}>
-                <dt>{f.label}</dt>
-                <dd>{f.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="actions">
-            {e.panel.actions?.map((a) => (
+          <VersionCheck key={e.id} id={e.id} />
+          <div className="detail-state">
+            <StateBadge extension={e} />
+            <button
+              className="text-button"
+              disabled={busy || !e.enabled}
+              onClick={() =>
+                void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
+              }
+            >
+              <Icon name="refresh" size={14} />
+              再起動
+            </button>
+          </div>
+          {e.error && <div className="error-text">{e.error}</div>}
+          {e.state === 'waiting' && (
+            <div className="extension-panel">
+              <p>
+                {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()}{' '}
+                に開始します。
+              </p>
               <button
                 className="secondary"
-                key={a.actionId ?? a.command}
-                disabled={
-                  busy ||
-                  (!a.actionId && !e.commands.some((c) => c.id === a.command && c.available))
-                }
-                onClick={() =>
-                  void run(() =>
-                    a.actionId
-                      ? window.dock.executePanelAction(e.id, a.actionId)
-                      : window.dock.executeCommand(a.command),
-                  )
-                }
+                disabled={busy}
+                onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
               >
-                {a.title}
+                今すぐ開始
               </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="inactive-panel">
-          <Icon name="extensions" size={28} />
-          <h3>
-            {!e.enabled
-              ? 'このAppletをDockにつなぐ'
-              : e.state === 'waiting'
-                ? 'Appletの開始を待っています'
-                : e.state === 'starting'
-                  ? 'Appletを起動しています'
-                  : e.state === 'stopping'
-                    ? 'Appletを停止しています'
-                    : e.state === 'error'
-                      ? 'Appletでエラーが発生しました'
-                      : e.state === 'running'
-                        ? '専用の操作画面はありません'
-                        : 'Appletは停止しています'}
-          </h3>
-          <p>
-            {!e.enabled
-              ? '有効にすると、Appletの画面とコマンドを使えます。'
-              : e.state === 'error'
-                ? 'ログを確認して、必要に応じて再起動してください。'
-                : e.state === 'running'
-                  ? '設定やコマンド検索から操作できます。'
-                  : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
-          </p>
-        </div>
+            </div>
+          )}
+          {e.panel ? (
+            <div className="extension-panel">
+              <h3>{e.panel.title}</h3>
+              <p>{e.panel.description}</p>
+              {!!e.panel.tabs?.length && (
+                <nav className="panel-tabs" aria-label="パネルの切り替え">
+                  {e.panel.tabs.map((tab) => (
+                    <button
+                      className="secondary"
+                      key={tab.actionId ?? tab.command}
+                      aria-pressed={tab.selected ?? false}
+                      disabled={
+                        busy ||
+                        (!tab.actionId &&
+                          !e.commands.some(
+                            (command) => command.id === tab.command && command.available,
+                          ))
+                      }
+                      onClick={() =>
+                        void run(() =>
+                          tab.actionId
+                            ? window.dock.executePanelAction(e.id, tab.actionId)
+                            : window.dock.executeCommand(tab.command),
+                        )
+                      }
+                    >
+                      {tab.title}
+                    </button>
+                  ))}
+                </nav>
+              )}
+              {!!e.panel.images?.length && (
+                <div className="panel-images">
+                  {e.panel.images.map((item, i) => (
+                    <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
+                  ))}
+                </div>
+              )}
+              <dl>
+                {e.panel.facts?.map((f, i) => (
+                  <div key={i}>
+                    <dt>{f.label}</dt>
+                    <dd>{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="actions">
+                {e.panel.actions?.map((a) => (
+                  <button
+                    className="secondary"
+                    key={a.actionId ?? a.command}
+                    disabled={
+                      busy ||
+                      (!a.actionId && !e.commands.some((c) => c.id === a.command && c.available))
+                    }
+                    onClick={() =>
+                      void run(() =>
+                        a.actionId
+                          ? window.dock.executePanelAction(e.id, a.actionId)
+                          : window.dock.executeCommand(a.command),
+                      )
+                    }
+                  >
+                    {a.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="inactive-panel">
+              <Icon name="extensions" size={28} />
+              <h3>
+                {!e.enabled
+                  ? 'このAppletをDockにつなぐ'
+                  : e.state === 'waiting'
+                    ? 'Appletの開始を待っています'
+                    : e.state === 'starting'
+                      ? 'Appletを起動しています'
+                      : e.state === 'stopping'
+                        ? 'Appletを停止しています'
+                        : e.state === 'error'
+                          ? 'Appletでエラーが発生しました'
+                          : e.state === 'running'
+                            ? '専用の操作画面はありません'
+                            : 'Appletは停止しています'}
+              </h3>
+              <p>
+                {!e.enabled
+                  ? '有効にすると、Appletの画面とコマンドを使えます。'
+                  : e.state === 'error'
+                    ? 'ログを確認して、必要に応じて再起動してください。'
+                    : e.state === 'running'
+                      ? '設定やコマンド検索から操作できます。'
+                      : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
+              </p>
+            </div>
+          )}
+          <details className="detail-meta">
+            <summary>技術情報</summary>
+            <div>
+              <span>Extension ID</span>
+              <code>{e.id}</code>
+            </div>
+            <div>
+              <span>Host API</span>
+              <p>{e.capabilities?.join(' · ') || 'なし'}</p>
+            </div>
+          </details>
+        </>
       )}
-      <details className="detail-meta">
-        <summary>技術情報</summary>
-        <div>
-          <span>Extension ID</span>
-          <code>{e.id}</code>
-        </div>
-        <div>
-          <span>Host API</span>
-          <p>{e.capabilities?.join(' · ') || 'なし'}</p>
-        </div>
-      </details>
     </section>
   );
 }
@@ -1158,7 +1209,7 @@ function SettingsPage({
   profileRequest,
   ribbonRequest,
   globalHotKeys,
-  target,
+  editor,
   onApplet,
   sidebarHost,
   sidebar,
@@ -1174,19 +1225,30 @@ function SettingsPage({
   avatarUrl: string | null;
   profileRequest: number;
   ribbonRequest: number;
-  target?: SettingsTarget;
+  editor: SettingsEditor;
   onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
   sidebarHost: HTMLDivElement | null;
   sidebar: ReturnType<typeof useAppletSidebar>;
   active: boolean;
 }) {
-  const [draft, setDraft] = useState<Settings>(snapshot.value);
-  const [text, setText] = useState(JSON.stringify(snapshot.value, null, 2));
-  const [revision, setRevision] = useState(snapshot.revision);
-  const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<'form' | 'json'>('form');
-  const [parseError, setParseError] = useState('');
+  const {
+    draft,
+    text,
+    setText,
+    dirty,
+    setDirty,
+    mode,
+    setMode,
+    setParseError,
+    avatarDraft,
+    avatarPreview,
+    setAvatarDraft,
+    setAvatarPreview,
+    setAvatarLoading,
+    edit,
+    switchToForm,
+  } = editor;
   const [category, setCategory] = useState<
     | 'appearance'
     | 'general'
@@ -1198,7 +1260,7 @@ function SettingsPage({
     | 'ribbon'
   >('appearance');
   const [appletId, setAppletId] = useState('');
-  const [appletTab, setAppletTab] = useState<SettingsTarget['tab']>('settings');
+  const [appletTab, setAppletTab] = useState<AppletSettingsTab>('settings');
   const [appletSearch, setAppletSearch] = useState('');
   const selectedApplet = extensions.find((e) => e.id === appletId) ?? extensions[0];
   const settingsBody = useRef<HTMLDivElement>(null);
@@ -1206,27 +1268,6 @@ function SettingsPage({
     // Reset before paint so the next category never appears at the previous offset.
     if (settingsBody.current) settingsBody.current.scrollTop = 0;
   }, [category, selectedApplet?.id, appletTab, mode]);
-  const switchToForm = () => {
-    if (mode === 'json') {
-      try {
-        setDraft(parseSettings(JSON.parse(text)));
-        setParseError('');
-      } catch (error) {
-        setParseError('JSONの内容を修正してからフォームを開いてください。' + String(error));
-        return false;
-      }
-    }
-    setMode('form');
-    return true;
-  };
-  useEffect(() => {
-    if (!target) return;
-    setCategory('extensions');
-    setAppletId(target.appletId);
-    setAppletTab(target.tab);
-    setAppletSearch('');
-    switchToForm();
-  }, [target]);
   const changed = (part: unknown, original: unknown) =>
     JSON.stringify(part) !== JSON.stringify(original);
   const shortcutChanged = (owner: string | null) =>
@@ -1260,9 +1301,6 @@ function SettingsPage({
                     changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands) ||
                     changed(draft.trayCommands, snapshot.value.trayCommands)
                   : extensions.some((e) => appletChanged(e.id));
-  const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
-  const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
-  const [avatarLoading, setAvatarLoading] = useState(false);
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1275,47 +1313,7 @@ function SettingsPage({
       switchToForm();
     }
   }, [ribbonRequest]);
-  useEffect(() => {
-    if (!dirty) {
-      setDraft(snapshot.value);
-      setText(JSON.stringify(snapshot.value, null, 2));
-      setRevision(snapshot.revision);
-    }
-  }, [snapshot.revision, dirty]);
-  const edit = (value: Settings) => {
-    setDraft(value);
-    setText(JSON.stringify(value, null, 2));
-    setDirty(true);
-  };
-  const reset = () => {
-    setDirty(false);
-    setDraft(snapshot.value);
-    setText(JSON.stringify(snapshot.value, null, 2));
-    setRevision(snapshot.revision);
-    setParseError('');
-    setAvatarDraft(undefined);
-    setAvatarPreview(undefined);
-  };
-  const save = async () => {
-    let value: Settings;
-    try {
-      value = parseSettings(mode === 'json' ? JSON.parse(text) : draft);
-      validateAppletSettings(value, extensions);
-      setParseError('');
-    } catch (e) {
-      setParseError(
-        `${mode === 'json' ? 'JSONの形式' : '設定の内容'}を確認してください。${e instanceof Error ? e.message : e}`,
-      );
-      return;
-    }
-    await run(async () => {
-      const result = await window.dock.saveSettings(value, revision, avatarDraft);
-      setRevision(result.revision);
-      setDirty(false);
-      setAvatarDraft(undefined);
-      setAvatarPreview(undefined);
-    }, '設定を保存しました。');
-  };
+  if (!active) return null;
   return (
     <>
       {active &&
@@ -1444,16 +1442,7 @@ function SettingsPage({
           <button
             className={mode === 'form' ? 'selected' : ''}
             onClick={() => {
-              if (mode === 'json') {
-                try {
-                  const v = parseSettings(JSON.parse(text));
-                  setDraft(v);
-                  setParseError('');
-                  setMode('form');
-                } catch (e) {
-                  setParseError(String(e));
-                }
-              }
+              if (mode === 'json') switchToForm();
             }}
           >
             フォーム
@@ -1470,32 +1459,10 @@ function SettingsPage({
             JSON
           </button>
         </div>
-        <span className={dirty ? 'unsaved' : 'muted'}>
-          {dirty ? '未保存の変更があります' : 'すべて保存されています'}
-        </span>
-        <button className="text-button" disabled={!dirty || busy || avatarLoading} onClick={reset}>
-          変更を破棄して再読み込み
-        </button>
-        <button
-          className="primary"
-          disabled={!dirty || busy || avatarLoading}
-          onClick={() => void save()}
-        >
-          <Icon name="check" size={16} />
-          変更をすべて保存
-        </button>
+        <SettingsActions editor={editor} busy={busy} />
       </div>
       <div className="settings-body" ref={settingsBody}>
-        {parseError && (
-          <div className="error-text" role="alert">
-            {parseError}
-          </div>
-        )}
-        {dirty && revision !== snapshot.revision && (
-          <div className="error-text">
-            別の場所で設定が変わりました。編集中の内容は保持しています。再読み込みして変更をやり直してください。
-          </div>
-        )}
+        <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
         {mode === 'json' ? (
           <div className="json-editor">
             <div>
@@ -1575,37 +1542,21 @@ function SettingsPage({
                       Appletに戻る
                     </button>
                   </div>
-                  <div className="tabs" aria-label="Applet設定の表示">
-                    <button
-                      aria-pressed={appletTab === 'settings'}
-                      className={appletTab === 'settings' ? 'selected' : ''}
-                      onClick={() => setAppletTab('settings')}
-                    >
-                      設定項目
-                    </button>
-                    <button
-                      aria-pressed={appletTab === 'shortcuts'}
-                      className={appletTab === 'shortcuts' ? 'selected' : ''}
-                      onClick={() => setAppletTab('shortcuts')}
-                    >
-                      ショートカットキー
-                    </button>
-                  </div>
+                  <AppletSettingsPanel
+                    applet={selectedApplet}
+                    editor={editor}
+                    commands={commands}
+                    globalHotKeys={globalHotKeys}
+                    tab={appletTab}
+                    onTab={setAppletTab}
+                  />
                 </>
               )}
-              {(category === 'shortcuts' ||
-                category === 'host-shortcuts' ||
-                (category === 'extensions' && appletTab === 'shortcuts' && selectedApplet)) && (
+              {(category === 'shortcuts' || category === 'host-shortcuts') && (
                 <ShortcutsEditor
-                  key={category === 'extensions' ? selectedApplet?.id : category}
+                  key={category}
                   commands={commands}
-                  owner={
-                    category === 'extensions'
-                      ? selectedApplet?.id
-                      : category === 'host-shortcuts'
-                        ? null
-                        : undefined
-                  }
+                  owner={category === 'host-shortcuts' ? null : undefined}
                   bindings={draft.shortcuts}
                   onChange={(shortcuts) => edit({ ...draft, shortcuts })}
                   globalCommands={draft.globalShortcutCommands}
@@ -1616,7 +1567,7 @@ function SettingsPage({
                   trayCommands={draft.trayCommands}
                   onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
                   onRestore={(id) =>
-                    edit({
+                    editor.edit({
                       ...draft,
                       shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
                       globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
@@ -1748,14 +1699,6 @@ function SettingsPage({
                     </SettingRow>
                   ))}
                 </>
-              )}
-              {category === 'extensions' && appletTab === 'settings' && selectedApplet && (
-                <AppletSettings
-                  key={selectedApplet.id}
-                  applet={selectedApplet}
-                  draft={draft}
-                  onChange={edit}
-                />
               )}
               {category === 'extensions' && !selectedApplet && (
                 <p className="empty">Appletはまだありません。</p>

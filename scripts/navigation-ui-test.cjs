@@ -81,6 +81,23 @@ const checks = [];
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const button = (name) => page.getByRole('button', { name, exact: true });
+  const switchAppearance = () =>
+    page.locator('.detail-settings-toggle').evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const heading = document.querySelector('.detail-heading').getBoundingClientRect();
+      return {
+        bounds: [bounds.x, bounds.y, bounds.width, bounds.height],
+        heading: [heading.x, heading.y, heading.width, heading.height],
+        style: [
+          style.backgroundColor,
+          style.color,
+          style.border,
+          style.borderRadius,
+          style.padding,
+        ],
+      };
+    });
   const settingsNav = () => page.locator('.settings-categories');
   const save = async () => {
     await button('変更をすべて保存').click();
@@ -109,9 +126,39 @@ const checks = [];
     const selected = page.locator('.sidebar-extensions [aria-current="true"]');
     const selectedName = await selected.locator('span').textContent();
     assert.equal(await page.locator('.detail h2').textContent(), selectedName);
+    const descriptionAppearance = await switchAppearance();
     await button('設定を開く').click();
-    assert.equal(await page.locator('.applet-settings-heading h3').textContent(), selectedName);
-    checks.push('single navigation / selected applet matches detail / direct settings');
+    assert.deepEqual(await switchAppearance(), descriptionAppearance);
+    assert.equal(await page.locator('.detail h2').textContent(), selectedName);
+    assert.equal(await page.getByRole('complementary', { name: 'Applet一覧' }).count(), 1);
+    assert.equal(await button('ショートカットを設定').count(), 0);
+    await button('説明に戻る').click();
+    await page.getByLabel('Appletを検索', { exact: true }).fill('検証Applet 01');
+    await page
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /検証Applet 01/ })
+      .click();
+    await button('設定を開く').click();
+    await page.getByLabel('検証項目 0', { exact: true }).fill('詳細からの編集');
+    await page.getByLabel('検証数値', { exact: true }).fill('');
+    await button('変更をすべて保存').click();
+    await page.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
+    await page.getByLabel('検証数値', { exact: true }).fill('3');
+    await button('説明に戻る').click();
+    await button('設定を開く').click();
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      '詳細からの編集',
+    );
+    await button('設定').click();
+    await chooseApplet('検証Applet 01');
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      '詳細からの編集',
+    );
+    checks.push(
+      'inline settings / description return / unified shortcut entry / shared draft / validation',
+    );
 
     await chooseApplet('検証Applet 01');
     await page.getByLabel('検証項目 0', { exact: true }).fill('編集した値');
@@ -127,6 +174,8 @@ const checks = [];
     await button('Appletに戻る').click();
     assert.equal(await page.locator('.detail h2').textContent(), '検証Applet 02');
     await button('設定を開く').click();
+    assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '別Appletの値');
+    await button('設定').click();
     await chooseApplet('検証Applet 01');
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
@@ -168,10 +217,14 @@ const checks = [];
     await chooseApplet('検証Applet 00');
     await page.getByText('このAppletには設定項目がありません。').waitFor();
     await button('Appletに戻る').click();
-    await button('ショートカットを設定').click();
+    await button('設定を開く').click();
+    await button('ショートカットキー').click();
     await page.getByRole('heading', { name: 'ショートカットキー', exact: true }).waitFor();
     assert.equal(await page.locator('.shortcut-row').count(), 0);
-    checks.push('no settings / no commands / direct shortcuts');
+    checks.push('no settings / no commands / inline shortcuts');
+    await button('設定').click();
+    await chooseApplet('検証Applet 00');
+    await button('ショートカットキー').click();
 
     await chooseApplet('Welcome to your Dock');
     assert.equal(await page.locator('.shortcut-row').count(), 3);
@@ -237,15 +290,71 @@ const checks = [];
     await page.getByLabel('設定JSON').fill('{broken');
     await button('Applet').click();
     await button('設定を開く').click();
+    assert.equal(await page.locator('.detail h2').count(), 1);
+    await page.locator('.error-banner').filter({ hasText: 'JSONの内容を修正' }).waitFor();
+    await button('設定').click();
     assert.equal(await page.getByLabel('設定JSON').inputValue(), '{broken');
-    await page.getByRole('alert').filter({ hasText: 'JSONの内容を修正' }).waitFor();
+    await page.locator('.error-text').filter({ hasText: 'JSONの内容を修正' }).waitFor();
     await button('変更を破棄して再読み込み').click();
     await button('フォーム').click();
+    await button('エラーを閉じる').click();
     checks.push('direct navigation preserves invalid JSON');
+
+    await button('JSON').click();
+    const jsonDraft = JSON.parse(await page.getByLabel('設定JSON').inputValue());
+    jsonDraft.extensions['test.applet-1'].settings.value0 = 'JSONから共通編集';
+    await page.getByLabel('設定JSON').fill(JSON.stringify(jsonDraft));
+    await button('Applet').click();
+    await page.getByLabel('Appletを検索', { exact: true }).fill('検証Applet 01');
+    await page
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /検証Applet 01/ })
+      .click();
+    await button('設定を開く').click();
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      'JSONから共通編集',
+    );
+    await button('設定').click();
+    await chooseApplet('検証Applet 01');
+    await button('設定項目').click();
+    assert.equal(
+      await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      'JSONから共通編集',
+    );
+    await button('変更を破棄して再読み込み').click();
+    await chooseApplet('Welcome to your Dock');
+    await button('Appletに戻る').click();
+    await button('設定を開く').click();
+    await button('ショートカットキー').click();
+    await page
+      .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
+      .press('Control+Alt+w');
+    await button('設定').click();
+    await chooseApplet('Welcome to your Dock');
+    await button('ショートカットキー').click();
+    assert.equal(
+      await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).inputValue(),
+      'Ctrl+Alt+W',
+    );
+    await button('変更を破棄して再読み込み').click();
+    await button('Appletに戻る').click();
+    await button('設定を開く').click();
+    await button('ショートカットキー').click();
+    assert.equal(
+      await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).inputValue(),
+      'Ctrl+Alt+R',
+    );
+    await button('設定').click();
+    checks.push(
+      'valid JSON shared with inline form / shortcut draft shared / discard from either surface',
+    );
 
     await chooseApplet('検証Applet 01');
     await button('設定項目').click();
     await page.getByLabel('検証項目 0', { exact: true }).fill('競合しても残す');
+    await button('Appletに戻る').click();
+    await button('設定を開く').click();
     const external = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     external.profile.name = '外部変更';
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(external));
@@ -262,7 +371,9 @@ const checks = [];
     );
     await button('変更を破棄して再読み込み').click();
     await button('エラーを閉じる').click();
-    checks.push('external update refuses overwrite and retains draft');
+    await button('設定').click();
+    assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
+    checks.push('inline external update refuses overwrite and retains draft / shared discard');
 
     await button('Applet').click();
     await page.getByLabel('Appletを検索', { exact: true }).fill('Welcome');
@@ -317,6 +428,56 @@ const checks = [];
         });
         await page.screenshot({ path: path.join(profile, `${theme}-${size.width}-settings.png`) });
       }
+      await button('Appletに戻る').click();
+      await page.getByLabel('Appletを検索', { exact: true }).fill('');
+      await button('設定を開く').click();
+      await page.getByLabel('検証項目 0', { exact: true }).fill(`詳細で保存 ${theme}`);
+      await page.screenshot({ path: path.join(profile, `${theme}-inline-settings-top.png`) });
+      for (const width of [1280, 900]) {
+        await page.setViewportSize({ width, height: 620 });
+        await button('説明に戻る').click();
+        await page.locator('main').evaluate((el) => {
+          el.scrollTop = 0;
+        });
+        const appearance = await switchAppearance();
+        await page.screenshot({
+          path: path.join(profile, `${theme}-${width}-description-switch.png`),
+        });
+        await button('設定を開く').click();
+        assert.deepEqual(
+          await switchAppearance(),
+          appearance,
+          'switch and heading stay in place with identical button styling',
+        );
+        await page.locator('.detail-settings > .applet-settings-panel').evaluate((el) => {
+          el.scrollTop = el.scrollHeight;
+        });
+        const bounds = await button('変更をすべて保存').boundingBox();
+        assert(
+          bounds && bounds.y >= 40 && bounds.y + bounds.height < 600,
+          'inline save stays visible',
+        );
+        assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+        await page.screenshot({
+          path: path.join(profile, `${theme}-${width}-inline-settings.png`),
+        });
+      }
+      await save();
+      checks.push(`${theme}: stable description/settings switch at 1280 and 900px`);
+      assert.equal(
+        JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
+          .settings.value0,
+        `詳細で保存 ${theme}`,
+      );
+      await button('ショートカットキー').click();
+      await button('説明に戻る').click();
+      await button('設定を開く').click();
+      await button('設定').click();
+      await chooseApplet('検証Applet 01');
+      assert.equal(
+        await page.getByLabel('検証項目 0', { exact: true }).inputValue(),
+        `詳細で保存 ${theme}`,
+      );
       await button('ショートカットキー').click();
       await chooseApplet('Welcome to your Dock');
       for (const width of [1280, 900, 700]) {
