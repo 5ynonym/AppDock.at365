@@ -41,6 +41,8 @@ AppDock.at365-all-in-one-<version>.zip
 
 ## リリース
 
+バージョン更新からGitHub公開までの正本は[RELEASING.md](RELEASING.md)です。`scripts/release.ps1 -Mode Prepare`は通常版と全体ZIPの作成・検証をまとめて行い、リリース時には全repoがcleanであることを要求します。
+
 通常の`AppDock.at365.exe`と`update.json`に加え、オールインワンZIPを同じAppDock Releaseへ添付します。`update.json`のpayloadは通常EXEのままとし、オールインワンZIPへ向けません。Applet個別のリリース・更新処理も従来どおりです。publish.bat自体はGitHubへの公開や実利用先deployを行いません。
 
 ## 検証

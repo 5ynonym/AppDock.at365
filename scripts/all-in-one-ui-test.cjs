@@ -1,0 +1,141 @@
+const fs = require('node:fs'),
+  path = require('node:path'),
+  net = require('node:net'),
+  assert = require('node:assert/strict');
+const { spawn, spawnSync } = require('node:child_process');
+const { chromium } = require('playwright');
+const { createHash, randomUUID } = require('node:crypto');
+const root = path.resolve(__dirname, '..');
+const version = require('../package.json').version;
+const archive = path.join(root, `publish/AppDock.at365-all-in-one-${version}.zip`);
+const archiveSha256 = createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
+const profile = path.join(root, 'artifacts', `bundle-verify-${randomUUID()}`);
+const extracted = spawnSync(
+  'powershell.exe',
+  [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    path.join(__dirname, 'verify-all-in-one.ps1'),
+    '-Archive',
+    archive,
+    '-Destination',
+    profile,
+  ],
+  { encoding: 'utf8', windowsHide: true },
+);
+assert.equal(extracted.status, 0, extracted.stdout + extracted.stderr);
+const bundle = JSON.parse(
+  fs.readFileSync(path.join(profile, 'bundle.json'), 'utf8').replace(/^\uFEFF/, ''),
+);
+assert.equal(bundle.hostVersion, version);
+assert.equal(
+  createHash('sha256')
+    .update(fs.readFileSync(path.join(profile, 'AppDock.at365.exe')))
+    .digest('hex'),
+  createHash('sha256')
+    .update(fs.readFileSync(path.join(root, 'publish/AppDock.at365.exe')))
+    .digest('hex'),
+);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function connect(port) {
+  let last;
+  for (let i = 0; i < 40; i++) {
+    try {
+      const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
+      const pages = browser.contexts().flatMap((context) => context.pages());
+      const page = pages.find((page) => page.url().startsWith('appdock://host/'));
+      if (!page) {
+        await browser.close();
+        throw Error('host renderer not ready');
+      }
+      await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor({ timeout: 3000 });
+      return { browser, page };
+    } catch (error) {
+      last = error;
+      await wait(200);
+    }
+  }
+  throw last;
+}
+async function waitSnapshot(page, predicate) {
+  for (let i = 0; i < 100; i++) {
+    const snapshot = await page.evaluate(() => window.dock.snapshot());
+    if (predicate(snapshot)) return snapshot;
+    await wait(100);
+  }
+  throw Error('snapshot predicate timed out');
+}
+async function about(page) {
+  await page.getByRole('button', { name: '設定', exact: true }).click();
+  await page.getByRole('navigation').count();
+  await page
+    .locator('.settings-categories')
+    .getByRole('button', { name: 'バージョン情報・更新', exact: true })
+    .click();
+}
+(async () => {
+  const server = net.createServer();
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  await new Promise((r) => server.close(r));
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const child = spawn(
+    path.join(profile, 'AppDock.at365.exe'),
+    [`--test-profile=${profile}`, `--remote-debugging-port=${port}`],
+    { cwd: profile, env, windowsHide: true, stdio: 'ignore' },
+  );
+  let connected;
+  try {
+    connected = await connect(port);
+    const page = connected.page;
+    const s = await waitSnapshot(page, (s) => s.startupReady);
+    assert.equal(s.version, bundle.hostVersion);
+    assert.deepEqual(s.extensions.map((e) => e.id).sort(), bundle.applets.map((a) => a.id).sort());
+    for (const a of bundle.applets) {
+      const e = s.extensions.find((e) => e.id === a.id);
+      assert.equal(e.version, a.version);
+      assert.equal(e.enabled, false);
+      assert.ok(!e.error, e.error);
+    }
+    await about(page);
+    await page.screenshot({ path: path.join(profile, 'all-in-one-applets.png') });
+    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    assert.equal(saved.updates.hostSource, 'github:5ynonym/AppDock.at365');
+    const report = {
+      ok: true,
+      profile,
+      archiveSha256,
+      bundle,
+      version: s.version,
+      applets: s.extensions.map((e) => ({ id: e.id, version: e.version, enabled: e.enabled })),
+      settingsCreatedBesideExe: true,
+    };
+    await page.evaluate(() => {
+      void window.dock.executeCommand('appdock.quit');
+    });
+    await new Promise((resolve, reject) => {
+      if (child.exitCode !== null) return resolve();
+      const timer = setTimeout(() => reject(Error('Exit timed out')), 15000);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    fs.writeFileSync(
+      process.argv[2] || path.join(profile, 'result.json'),
+      JSON.stringify(report, null, 2),
+    );
+    console.log(JSON.stringify({ ok: true, profile, version, applets: report.applets }, null, 2));
+  } finally {
+    try {
+      await connected?.browser.close();
+    } catch {}
+    if (child.exitCode === null) child.kill();
+  }
+})().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});
