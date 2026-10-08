@@ -127,3 +127,5 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 リボンの上寄せ/下寄せ・セパレーターと既存設定の移行は[Appletページとリボン](docs/applet-pages.md)を参照してください。隔離GUIは`scripts/ribbon-layout-ui-test.cjs`、設定内の本体ショートカット入口は「Applet別の設定 → AppDock」です。
 
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
+
+0.21.0はmanifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・未保存draft維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
