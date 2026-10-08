@@ -7,6 +7,7 @@ export interface WebAccountDefinition {
   itemOpener?: string;
   keepActive?: boolean;
   avatarOrigins?: string[];
+  externalLinkSetting?: string;
 }
 export interface WebAccount {
   id: string;
@@ -31,6 +32,7 @@ export interface WebAccountSound {
   name?: string;
 }
 export interface WebAccountSnapshot {
+  navigationRevision?: number;
   dark: boolean;
   settings?: Record<string, boolean | string>;
   selected: string;

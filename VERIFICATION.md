@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-08: v0.20.0 Gmailのナビゲーション・リンク設定
+
+- ユーザーの正常動作報告とマージ指示を受け、前回0.19.0をmainへFF統合（327a88a）。Gmailも0.8.0をmainへFF統合（918fb59）。今回は両repoのcodex/gmail-toolbar-commandsで実施。
+- Node APIにcontext.webAccounts.navigate(back/forward/reload/inbox)を追加。自身の実行中Appletだけを対象にし、UIのnavigateと同じ選択中Viewを操作する。invalid actionはView作成前に拒否。snapshot.navigationRevisionで操作画面が受信トレイへ戻れるようにする。
+- webAccounts.externalLinkSettingは自身のboolean設定キーとsettings capabilityを必須にする。既定の確認を保持し、対応Appletのダイアログへ「次回から聞かずに開く」を追加。開く＋チェック時のみ設定を保存。trueならHTTP(S)/mailtoの確認を省略し、資格情報や他スキームは従来どおり拒否。重複した確認を抑制し、外部起動の失敗はログへ報告する。
+- main/renderer型検査・Vite・framework-dependent .NET host/portable発行成功。ホスト回帰90/90、Gmail型検査/Vite/21/21成功。Prettier・diff check、文書ローカルリンク109件でmissing0。
+- 最終win-unpackedとGmail0.9.0の../Applet.Gmail.at365/artifacts/toolbar-1791463003042/result.jsonはok:true。アイコン/tooltip/版、4コマンドと既存clear、選択枠の履歴・reload・受信トレイ・変更キー、全タブのtoolbar/一覧位置、UI↔host設定、外部リンクの取消/一度開く/記憶/再確認/再起動、未読だけ保存・再起動保持を確認。外部アプリはshell呼出しを記録するfixtureへ置換し実起動しない。
+- 通知は既にGmail openコマンドを指定していたため契約を継続。新GUIは実Electron Notificationオブジェクトのshowだけを抑止し、clickイベントから実ホスト・workerコマンドを通して、本体最小化からGmailページを復元、Window設定では隠れたGmailを表示、停止後の古い通知はAppletを起動しないことを確認。Windowsネイティブ通知の実表示/人手クリックは今回未実施。
+- 最終版のaccounts-1791463014150、ui-features-1791463063443もok:true。既存の設定同期/再起動/監視/音/検索/未読・削除/切替キー/位置保持を確認。画像を目視確認。
+- 最終単一EXE+未改変Applet: ../Applet.Gmail.at365/artifacts/portable-1791463095688/result.jsonはok:true/host0.20.0/exitCode0。ページ・新着・履歴・クリア・停止/再開・隔離・正常終了を確認。
+- publish/AppDock.at365.exeは100573045 bytes、SHA256 F777FCCF41408145C5DBD77B61BD8E0577DD303EC82EEC6CDB2E52BB3F4F54C9。実利用deploy/外部push/実Google操作は未実施。
+- 初期GUIの修正: ElectronApplication.evaluateはElectron moduleが第1引数なので、カウンター比較用の引数を第2引数へ直した。ロード完了を待ち、変更キーはWebContents.sendInputEventで確認。停止状態名は既存stoppedを使用。初期の型エラーと未読フィルター解除箇所を修正し、最終版の全試験で成功。
+
 ## 2026-10-08: v0.19.0 リボンの上下配置・セパレーター
 
 - 指示により前回のcodex/applet-pages-ribbonをmainへfast-forward統合（da2bdc1）。Gmail側もdbe84beをmainへ統合。新しい作業は両repoのcodex/ribbon-layout-gmail-polishで実施。

@@ -109,6 +109,7 @@ export function createHostApi(
       case 'host.webAccounts.start':
       case 'host.webAccounts.open':
       case 'host.webAccounts.cycle':
+      case 'host.webAccounts.navigate':
       case 'host.webAccounts.read':
       case 'host.webAccounts.report': {
         requireCapability('web-accounts');
@@ -196,6 +197,10 @@ export function createHostApi(
         }
         if (method.endsWith('.cycle')) {
           await web.cycle(p.direction);
+          return null;
+        }
+        if (method.endsWith('.navigate')) {
+          await web.navigate(p.action);
           return null;
         }
         if (method.endsWith('.report')) {

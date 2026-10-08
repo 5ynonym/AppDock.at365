@@ -297,6 +297,37 @@ test('Web assets cannot escape Applet; observer origin and capability must be de
     observer: 'observer.js',
   };
   assert.deepEqual(validateWebAccounts(folder, web), web);
+  for (const externalLinkSetting of [true, '', '../other', 'x'.repeat(81)])
+    assert.throws(
+      () => validateWebAccounts(folder, { ...web, externalLinkSetting }),
+      /setting key/,
+    );
+  const declared = {
+    apiVersion: 1,
+    id: 'test.web',
+    name: 'Test',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'index.js',
+    capabilities: ['web-accounts', 'settings'],
+    webAccounts: { ...web, externalLinkSetting: 'skipConfirmation' },
+    settings: [{ key: 'skipConfirmation', title: 'Skip', type: 'boolean', default: false }],
+  };
+  const check = (value) => {
+    fs.writeFileSync(path.join(folder, 'extension.json'), JSON.stringify(value));
+    return readManifest(folder);
+  };
+  assert.equal(check(declared).webAccounts.externalLinkSetting, 'skipConfirmation');
+  assert.throws(() => check({ ...declared, settings: [] }), /boolean/);
+  assert.throws(
+    () =>
+      check({ ...declared, settings: [{ ...declared.settings[0], type: 'string', default: '' }] }),
+    /boolean/,
+  );
+  assert.throws(
+    () => check({ ...declared, capabilities: ['web-accounts'] }),
+    /settings capability/,
+  );
   assert.throws(() => validateWebAccounts(folder, { ...web, observer: '../outside.js' }), /inside/);
   assert.throws(
     () => validateWebAccounts(folder, { ...web, itemOpener: '../outside.js' }),
@@ -335,4 +366,50 @@ test('Web account API is unavailable without capability and when extension is st
   e.state = 'stopped';
   e.manifest.capabilities = ['web-accounts'];
   await assert.rejects(api(e, 'host.webAccounts.start', {}), /停止/);
+  await assert.rejects(api(e, 'host.webAccounts.navigate', { action: 'reload' }), /停止/);
+});
+
+test('Web navigation commands reject invalid actions without creating a view; use the selected account and update UI revision', async () => {
+  const { WebAccountController } = require('../out/main/main/core/web-accounts');
+  const calls = [];
+  const fake = {
+    state: { selected: 'second' },
+    definition: { url: 'https://mail.google.com/#inbox' },
+    navigationRevision: 0,
+    async start() {},
+    view(id) {
+      assert.equal(id, 'second');
+      return {
+        webContents: {
+          navigationHistory: {
+            canGoBack: () => true,
+            canGoForward: () => false,
+            goBack: () => calls.push('back'),
+            goForward: () => calls.push('forward'),
+          },
+          reload: () => calls.push('reload'),
+          async loadURL(url) {
+            calls.push(url);
+          },
+        },
+      };
+    },
+    changed() {
+      calls.push('changed');
+    },
+  };
+  await assert.rejects(WebAccountController.prototype.navigate.call(fake, 'arbitrary'), /Invalid/);
+  assert.deepEqual(calls, []);
+  for (const action of ['back', 'forward', 'reload', 'inbox'])
+    await WebAccountController.prototype.navigate.call(fake, action);
+  assert.equal(fake.navigationRevision, 4);
+  assert.deepEqual(calls, [
+    'back',
+    'changed',
+    'changed',
+    'reload',
+    'changed',
+    'https://mail.google.com/#inbox',
+    'changed',
+  ]);
 });

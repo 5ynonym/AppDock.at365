@@ -176,3 +176,5 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、renderer/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
 0.19.0はリボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。AppDock本体のキー設定は「Applet別の設定」の先頭へ移動し、既存の下書きとコマンド所属処理を使います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
+
+0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。

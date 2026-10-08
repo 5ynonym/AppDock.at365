@@ -176,7 +176,7 @@ async function launch() {
     await gmailUi.screenshot({ path: path.join(profile, 'gmail-inbox.png') });
     await gmailUi.getByRole('button', { name: /^新着一覧/ }).click();
     geometry = await aligned();
-    assert.equal(geometry.account, geometry.main);
+    assert.equal(geometry.account, 130);
     assert.equal(geometry.main, 146);
     await gmailUi.getByRole('button', { name: '受信トレイ', exact: true }).click();
     await app.evaluate(({ BrowserWindow }) =>

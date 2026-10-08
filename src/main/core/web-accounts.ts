@@ -122,6 +122,12 @@ export function validateWebAccounts(
   if (value.keepActive !== undefined && typeof value.keepActive !== 'boolean')
     throw Error('webAccounts.keepActive must be boolean');
   if (
+    value.externalLinkSetting !== undefined &&
+    (typeof value.externalLinkSetting !== 'string' ||
+      !/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(value.externalLinkSetting))
+  )
+    throw Error('webAccounts.externalLinkSetting must be a setting key');
+  if (
     value.avatarOrigins !== undefined &&
     (!Array.isArray(value.avatarOrigins) || value.avatarOrigins.length > 10)
   )
@@ -181,6 +187,8 @@ export class WebAccountController {
   private viewport: Viewport | null | undefined;
   private disposed = false;
   private opening?: Promise<void>;
+  private navigationRevision = 0;
+  private openingExternal = false;
   private reads = new Map<string, Promise<unknown>>();
   private generation = new Map<string, number>();
   private views = new Map<string, WebContentsView>();
@@ -490,6 +498,7 @@ export class WebAccountController {
   }
   snapshot(includeData = true): WebAccountSnapshot {
     return {
+      navigationRevision: this.navigationRevision ?? 0,
       dark: nativeTheme?.shouldUseDarkColors ?? true,
       ...(includeData && this.services?.settings ? { settings: this.services.settings() } : {}),
       selected: this.state.selected,
@@ -529,7 +538,7 @@ export class WebAccountController {
     };
   }
   private async outside(raw: string) {
-    if (!this.window || this.disposed) return;
+    if (!this.window || this.disposed || this.openingExternal) return;
     let url: URL;
     try {
       url = new URL(raw);
@@ -538,16 +547,51 @@ export class WebAccountController {
     }
     if (!['https:', 'http:', 'mailto:'].includes(url.protocol) || url.username || url.password)
       return;
-    const result = await dialog.showMessageBox(this.window, {
-      type: 'question',
-      title: 'リンクを外部で開く',
-      message: 'このリンクを既定のアプリで開きますか？',
-      detail: url.protocol === 'mailto:' ? 'メール作成リンク' : url.origin,
-      buttons: ['キャンセル', '開く'],
-      defaultId: 0,
-      cancelId: 0,
-    });
-    if (!this.disposed && result.response === 1) await shell.openExternal(url.href);
+    this.openingExternal = true;
+    try {
+      const key = this.definition.externalLinkSetting;
+      const canRemember =
+        !!key &&
+        this.services.capabilities.includes('settings') &&
+        !!this.services.setSetting &&
+        typeof this.services.settings?.()[key] === 'boolean';
+      if (canRemember && this.services.settings?.()[key!] === true) {
+        await shell.openExternal(url.href);
+        return;
+      }
+      const result = await dialog.showMessageBox(this.window, {
+        type: 'question',
+        title: 'リンクを外部で開く',
+        message: 'このリンクを既定のアプリで開きますか？',
+        detail: url.protocol === 'mailto:' ? 'メール作成リンク' : url.origin,
+        buttons: ['キャンセル', '開く'],
+        defaultId: 0,
+        cancelId: 0,
+        ...(canRemember ? { checkboxLabel: '次回から聞かずに開く', checkboxChecked: false } : {}),
+      });
+      if (!this.disposed && result.response === 1) {
+        if (canRemember && result.checkboxChecked) this.services.setSetting!(key, true);
+        await shell.openExternal(url.href);
+      }
+    } catch {
+      if (!this.disposed) this.services.failed('外部リンクを開けませんでした。');
+    } finally {
+      this.openingExternal = false;
+    }
+  }
+  async navigate(action: unknown) {
+    if (!['back', 'forward', 'reload', 'inbox'].includes(action as string))
+      throw Error('Invalid navigation action');
+    await this.start();
+    if (this.disposed) throw Error('Webアカウントは停止しています。');
+    const wc = this.view(this.state.selected).webContents;
+    if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+    else if (action === 'forward' && wc.navigationHistory.canGoForward())
+      wc.navigationHistory.goForward();
+    else if (action === 'reload') wc.reload();
+    else if (action === 'inbox') await wc.loadURL(this.definition.url);
+    this.navigationRevision++;
+    this.changed();
   }
   private view(id: string): WebContentsView {
     this.account(id);
@@ -888,24 +932,7 @@ export class WebAccountController {
         return !this.disposed && !this.deleting.has(a.id) && opened === true;
       }
       case 'navigate': {
-        const wc = this.view(this.state.selected).webContents;
-        switch (args[0]) {
-          case 'back':
-            if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
-            break;
-          case 'forward':
-            if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
-            break;
-          case 'reload':
-            wc.reload();
-            break;
-          case 'inbox':
-            await wc.loadURL(this.definition.url);
-            break;
-          default:
-            throw Error('Invalid navigation action');
-        }
-        return;
+        return this.navigate(args[0]);
       }
       case 'remove': {
         const a = this.account(args[0]);

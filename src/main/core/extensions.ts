@@ -67,6 +67,15 @@ function readManifest(folder: string): LoadedManifest {
     if (!m.capabilities?.includes('web-accounts'))
       throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
     validateWebAccounts(folder, m.webAccounts);
+    if (
+      m.webAccounts.externalLinkSetting !== undefined &&
+      (!m.capabilities?.includes('settings') ||
+        !(parseSettingDefinitions(m.settings) ?? []).some(
+          (setting) =>
+            setting.key === m.webAccounts.externalLinkSetting && setting.type === 'boolean',
+        ))
+    )
+      throw Error('externalLinkSettingには自身のboolean設定とsettings capabilityが必要です。');
   }
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);

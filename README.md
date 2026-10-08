@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.19.0はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.8.0は本体ページと別ウィンドウの両方に対応します。
+0.20.0はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.0は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 
@@ -63,7 +63,7 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 | Applet | 主な機能 |
 | --- | --- |
 | [Watch](../Applet.Watch.at365/README.md) | 独立した半透明のデスクトップ時計 |
-| [Gmail](../Applet.Gmail.at365/README.md) | 本体ページ／別ウィンドウのGmail画面、新着一覧・検索、アバター、並べ替え・個別監視・通知音（Gmail 0.8.0はAppDock 0.18.0以降） |
+| [Gmail](../Applet.Gmail.at365/README.md) | 本体ページ／別ウィンドウのGmail画面、新着一覧・検索、アバター、並べ替え・個別監視・通知音（Gmail 0.9.0はAppDock 0.20.0以降） |
 | [WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md) | モニターごとの壁紙スライドショーと履歴 |
 | [WindowMover](../Applet.WindowMover.at365/README.md) | 最前面ウィンドウの移動・サイズ変更・終了 |
 | [WindowsTools](../Applet.WindowsTools.at365/README.md) | 消灯予約・キー送信・無操作時のPCロック |
