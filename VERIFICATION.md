@@ -652,3 +652,11 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 試験の途中失敗は保存ボタンの旧名、inspector内のrequire参照、終了するrendererのIPC完了待ち/CDP再接続が原因。保存名を現UIへ変更し、createRequireと再起動後Node inspectorで実snapshot/個別ボタンを確認する方式へ修正。製品の確認ダイアログを省略するコードは追加していない。最終試験は終了0。
 - 未確認: 実UNC共有からの取得、GitHub上での公開/実Release asset取得、実Webサーバーからの全パッケージ取得、更新通知の実toast表示/人手クリック、電源断中の本体復元、各製品Appletの独自保存データ。対応経路は実装済みだが、公開や実利用操作で検証したとは扱わない。非公開GitHub認証とprereleaseは非対応。
 - 最終確認: 起動時確認を待ち時間中にOFFにした場合の取得抑止、破損ダウンロード時に確認/終了へ進まない回帰を追加して100/100成功。未保存時のガードは更新操作だけに限定し、従来の有効化/通常操作を保持。最終版で再度実portable更新試験が終了0。整形・diff check、更新文書27リンク、packed JS/helperと現在のbuildのバイト一致を確認。
+
+## 2026-10-09: Release手順のリポジトリ内保存
+
+- AGENTS.mdからdocs/RELEASING.mdをリリースの正本として参照。成功済み7repoのplan/public-verificationとオールインワン追加結果、GitHub v0.23.0の3assetのsize/digest/targetを照合し、コマンド・成果物・例外を記録した。
+- scripts/release.ps1はSetVersion/Prepare/Draft/Publish/Verifyを分離。Prepareは既存の型検査/回帰/publish/実EXE更新/進捗/中断復旧/全体ZIP起動を直列実行し、全ソースclean・commit・ノート・3asset・証跡を固定。Draft/Publishはremote mainとtag、下書きとasset digestを再照合。公開済み上書きや自動clobberはしない。
+- tests/release.test.cjs 6件成功: 全添付後だけ公開、未完了準備拒否、ソース/asset/remote main変更拒否、アップロード中断と不足分再開、remote digest不一致/asset欠落で公開停止、版の増加と正式版制約。GitHub操作はfixtureであり、この作業で実Releaseは変更していない。
+- tests/all-in-one.test.cjs成功: 従来の異常時ZIP保持に加え、新しい兄弟repoを追加するとスクリプトの一覧編集なしで同梱されることを確認。WindowsのZIP区切りを正規化するverify-all-in-one.ps1で全収録hash/sizeと展開を検査。
+- sandbox内のTEMPファイルrenameはEPERM。許可された通常Windows環境で同じfixtureテストを実行して成功。製品コードや権限制約を回避する変更は行っていない。

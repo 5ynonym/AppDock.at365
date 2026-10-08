@@ -98,6 +98,42 @@ test(
     result = build();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.notEqual(hash(), first, 'republish must replace the previous complete archive');
+    // A newly added sibling repository must be included without changing host scripts.
+    const added = path.join(applets, 'Applet.AddedLater');
+    init(added);
+    fs.mkdirSync(path.join(added, 'payload'));
+    const addedManifest = { ...manifest, id: 'fixture.added-later' };
+    for (const name of ['extension.json', 'payload/extension.json']) {
+      fs.writeFileSync(path.join(added, name), JSON.stringify(addedManifest));
+    }
+    fs.writeFileSync(path.join(added, 'payload/index.js'), 'exports.activate = () => {};');
+    fs.writeFileSync(path.join(added, 'publish.bat'), publisher, 'ascii');
+    result = build();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const extracted = path.join(directory, 'verified-bundle');
+    const inspection = run('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(root, 'scripts/verify-all-in-one.ps1'),
+      '-Archive',
+      zip,
+      '-Destination',
+      extracted,
+    ]);
+    assert.equal(inspection.status, 0, inspection.stdout + inspection.stderr);
+    const bundle = JSON.parse(fs.readFileSync(path.join(extracted, 'bundle.json')));
+    assert.deepEqual(bundle.applets.map((item) => item.id).sort(), [
+      'fixture.added-later',
+      'fixture.applet',
+    ]);
+    assert.equal(
+      JSON.parse(
+        fs.readFileSync(path.join(extracted, 'extensions/Applet.AddedLater/extension.json')),
+      ).id,
+      'fixture.added-later',
+    );
     const complete = hash();
     function fails(pattern) {
       const r = build();

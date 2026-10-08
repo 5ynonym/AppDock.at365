@@ -4,6 +4,8 @@
 
 ## 文書の入口
 
+- [GitHub Release手順](docs/RELEASING.md): バージョン更新、検証、通常版/オールインワン作成、下書き添付、公開・取得確認。
+
 0.18.0のAppletページ宣言・Node/.NET API・限定UIブリッジ・表示先・リボン設定と検証は[Appletページとリボン](docs/applet-pages.md)を参照してください。
 
 0.17.1ではWebアカウントのローカルUIへ、自身のAppletの宣言済みboolean/静的select設定の読み書きと変更通知を追加しました。保存は既存SettingsStore、詳細は[WebアカウントAPI](docs/web-accounts.md)を参照してください。

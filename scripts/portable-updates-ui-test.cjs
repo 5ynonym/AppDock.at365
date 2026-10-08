@@ -4,6 +4,7 @@ const net = require('node:net');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
+const hostVersion = require('../package.json').version;
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, 'artifacts', `portable-updates-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
@@ -220,7 +221,7 @@ async function restarted(inspectPort, predicate) {
       page,
       (snapshot) => !snapshot.updates.busy && snapshot.updates.results.length === 3,
     );
-    assert.equal(initial.version, '0.23.0');
+    assert.equal(initial.version, hostVersion);
     await waitSnapshot(
       page,
       (snapshot) =>
@@ -343,7 +344,7 @@ async function restarted(inspectPort, predicate) {
     await approve(inspectPort);
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);
-    await restarted(inspectPort, (s) => s.version === '0.23.0' && !s.updates.busy);
+    await restarted(inspectPort, (s) => s.version === hostVersion && !s.updates.busy);
     const result = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
     assert.equal(result.ok, true);
     assert.equal(result.updated[0].id, 'host');
@@ -387,7 +388,7 @@ async function restarted(inspectPort, predicate) {
       "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
     );
     await wait(2000);
-    await restarted(inspectPort, (s) => s.version === '0.23.0' && s.startupReady);
+    await restarted(inspectPort, (s) => s.version === hostVersion && s.startupReady);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), oldPid);
     assert.equal(
       await inspect(
