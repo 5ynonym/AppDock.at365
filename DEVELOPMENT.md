@@ -10,7 +10,6 @@
 - [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
 - [Applet API](docs/extensions.md): APIと通信の契約。
 - [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）、テーマ同期・音声コピー（0.15.0）、通常起動の描画（0.15.1）、準備完了後の背景同期再開・操作中の自然なフォーカス（0.15.2）。
-- [ウィジェット開発ガイド](docs/widgets.md): ウィジェットSDK、描画方式、Watch DLLへの移行。
 - [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
 - [GmailCheckerの開発ガイド](../Applet.GmailChecker.at365/DEVELOPMENT.md): 0.11.0のNode通知APIを使うAppletと、隔離GUI・portable検証。
@@ -19,9 +18,9 @@
 
 ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.js、ネイティブ表示を持つ専用EXEのAppletをそれぞれ別プロセスで実行します。設定JSONやAPIの `extensions` は互換性のため名前を維持します。
 
-## 開発環境・ビルド・テスト
+0.17.0ではウィジェット機能・配置設定・Node/.NET APIを削除しました。独自の画面を持つAppletは`native`、Webサービスの画面はWebアカウントAPI、宣言的な表示はPanelを使用します。Watchは独自WPF画面のnative EXEです。
 
-ウィジェットのSDK、描画方式、配置設定とWatch DLLへの移行は[ウィジェット開発ガイド](docs/widgets.md)を参照してください。AppDock 0.10.0以降では日時を表示側で更新し、同じモニター・階層の透過画面を共有します。
+## 開発環境・ビルド・テスト
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
@@ -46,7 +45,6 @@ Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジ�
 .\dev.bat run test:preferences
 .\dev.bat run test:hotkeys
 .\dev.bat run test:window-state
-.\dev.bat run test:widget-desktop
 .\dev.bat run smoke
 .\dev.bat run dist
 .\dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe
@@ -67,6 +65,8 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
 `pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+
+`build`は`scripts/build-main.cjs`で生成済みの`out/main`を整理してからTypeScriptをコンパイルします。削除したモジュールが次の配布物に残ることを防ぎます。React/Viteも`out/renderer`を再生成します。設定の読み込み・保存は定義済みのトップレベル項目のみを返し、Applet固有の`extensions.<id>.settings`は保持します。
 
 0.16.4のportable発行は`scripts/build-portable.cjs`を経由します。electron-builder 26.15.3がportableのscript/includeを無視するため、ビルドプロセス内だけでNsisTarget.computeFinalScriptへ`scripts/portable.nsi`を渡し、終了時に復元します。node_modulesは編集しません。ビルダーの固定版と元テンプレートのライフサイクルを検証し、依存更新時は明示的に見直します。直接electron-builder CLIを使うとこのランチャーを含まないため、発行にはpublish.batまたはdev.bat run distを使ってください。APIからビルドする試験もdev.batのローカルNode/pnpm環境を使います。
 

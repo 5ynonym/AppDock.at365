@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.16.4",
+  "version": "0.17.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -9,7 +9,7 @@
   "scripts": {
     "postinstall": "install-electron",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
-    "build": "tsc -p tsconfig.main.json && vite build",
+    "build": "node scripts/build-main.cjs && vite build",
     "start": "pnpm run build && electron .",
     "test": "pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
     "build:test-extensions": "node scripts/build-test-extensions.cjs",
@@ -25,9 +25,7 @@
     "test:tray": "node scripts/tray-commands-ui-test.cjs",
     "test:hardware-acceleration": "node scripts/hardware-acceleration-ui-test.cjs",
     "test:applet-sidebar": "node scripts/applet-sidebar-ui-test.cjs",
-    "format": "prettier --write --ignore-path .gitignore src scripts tests",
-    "test:widgets": "node scripts/widgets-ui-test.cjs",
-    "test:widget-desktop": "node scripts/widget-desktop-visibility-test.cjs"
+    "format": "prettier --write --ignore-path .gitignore src scripts tests"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

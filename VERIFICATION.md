@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-08: v0.17.0 ウィジェット機能を削除
+
+- ユーザーが変更内容の確認完了を報告し、コミットを明示指定（2026-10-08）。今回の削除・回帰確認・文書をmainへコミット。コードは上記依頼で検証したままで、コミット時の追加変更はこの確認記録のみ。
+- ユーザー指定により、ウィジェット画面・ホームの表示・配置設定・専用IPC/preload・フォント配信・デスクトップ固定/移動・日時描画・Node API・.NET SDK/Runtime・専用試験/ガイドを削除。互換APIは残さない。Watchの現行native EXEに合わせて利用者/開発文書を修正。過去の検証記録は当時の実測として保持。
+- `dev.bat run typecheck`成功、`dev.bat test`は85/85成功。設定保存の回帰では旧トップレベル配置を除去し、テーマ・キー・ピン・トレイ・プロフィール・Applet固有データ（同名のwidgetsキーを含む）が保持されることを確認。定義済みのトップレベル項目だけを保存し、Applet設定内部は変えない。
+- `dotnet build AppDock.at365.slnx -c Release`成功（警告0・エラー0）。復元済みWatchも新SDK/Runtimeに対するRelease build成功（警告0・エラー0）、回帰8/8成功。Watchリポジトリのソース・manifest・発行物は変更しない。
+- `publish.bat`成功。生成済み`out/main`を整理してからコンパイルするbuild-main.cjsを追加し、古いモジュールの同梱を防止。最終app.asarはversion=0.17.0、名前にwidgetを含むモジュール0件。framework-dependent .NETホストにcoreclr/hostfxr等のランタイム混入なし。
+- 発行版win-unpackedを使う`ui-1791443748554`成功。ホーム/同梱専用fixtureによるNode/.NETの起動・コマンド・停止、フォーム/JSON保存、不正JSON保護、手動再読込を確認。ナビゲーションはホーム・Applet・設定・ログの4ページ、widget操作API/HostSnapshot/設定の配置項目なし、BrowserWindowは本体1つ。home.pngでホームとサイドバーを目視確認。
+- 発行版`navigation-1791443751234/result.json`はok:true。設定編集中の画面移動・変更保持・キー・パレット・ログ・24Appletの一覧・大小画面・両テーマのレイアウト成功。`tray-ui-1791443823904`もok:true、既存の表示選択・単クリック/ダブル・Windows判定時間・再起動保持成功。
+- 最終単一EXEの`smoke-1791443817043/smoke-result.json`はok:true。設定/アバター/ピン/キー/トレイ/正常終了成功。試験コピーと発行EXEのSHA256一致を確認。`smoke-1791443919058`では復元済みWatch 0.1.1 native EXEを隔離配置し、起動・3コマンド・表示/非表示・visible保存・パネル・終了を確認。実利用の設定/認証/プロセスは操作しない。
+- 最終EXEは100566507bytes、SHA256 `16AD48FA3175AA33CE844E550F0A878E1B1DFEF00E6E05D06A681B9DDBCE186C`、FileVersion/ProductVersion 0.17.0。Prettierとgit diff --check成功。実装内のwidget参照0件、残る言及は削除説明と回帰確認だけ。実利用先へのdeploy・pushなし。
+- 検証途中の失敗は成功扱いしない。publish完了前の最初のportable smokeは旧0.16.4のコピーだったため除外し、最終EXEで再実行してハッシュ一致を確認。Watch buildの最初のcsproj名誤指定は正しいApplet.Watch.csprojで修正。asarの直接requireはpnpmの依存境界で失敗し、electron-builder→app-builder-libのcreateRequire経由で検査。復元されたWatchの旧test-ui.cjsはProcess failed to launchで実行できず、現UIと古いセレクターも異なるため、そのGUI試験の成功は主張しない。新ホストとのnative接続/コマンドは既存のportable smokeで確認。全モニター/DPI・実デスクトップ描画の詳細・長期常駐/スリープは今回未検証。
+- 通常execのhelper_unknown_errorは許可されたWindows実行環境で作業・検証。開始時mainはclean、既存Applet/別作業の変更破棄なし。
+
 ## 2026-10-08: v0.16.4 通知領域のアイコン識別を更新間で維持
 
 - ユーザーが修正版の正常動作を確認したと報告（2026-10-08）。その確認を受け、今回の修正と検証記録をコミット。利用者の確認は自動試験の結果と区別し、全OS版の表示位置や将来の実利用更新まで検証済みとは扱わない。

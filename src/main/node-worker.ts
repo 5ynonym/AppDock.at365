@@ -1,6 +1,5 @@
 import { JsonLinePeer } from './core/rpc';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
-import type { WidgetDefinition, WidgetPlacement } from '../shared/widgets';
 type Handler = () => unknown | Promise<unknown>;
 export interface NodeExtensionContext {
   webAccounts: {
@@ -11,11 +10,6 @@ export interface NodeExtensionContext {
       import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
     >;
     report(id: string, status: string, attention: boolean, data?: unknown): Promise<unknown>;
-  };
-  widgets: {
-    replace(widgets: WidgetDefinition[]): Promise<unknown>;
-    placements(): Promise<Record<string, WidgetPlacement>>;
-    setDesktop(ids: string[], enabled: boolean): Promise<unknown>;
   };
   commands: { register(id: string, title: string, handler: Handler): void };
   tray: { add(title: string, command: string): void; attention(active: boolean): Promise<unknown> };
@@ -78,11 +72,6 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             >,
           report: (id, status, attention, data) =>
             peer.request('host.webAccounts.report', { id, status, attention, data }),
-        },
-        widgets: {
-          replace: (widgets) => peer.request('host.widgets.replace', { widgets }),
-          placements: () => peer.request('host.widgets.placements', {}),
-          setDesktop: (ids, enabled) => peer.request('host.widgets.desktop', { ids, enabled }),
         },
         commands: {
           register: (id, title, handler) => {

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
+const executable = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const profile = path.join(root, 'artifacts', `ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
@@ -13,13 +14,33 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
   delete env.ELECTRON_RUN_AS_NODE;
   const application = await electron.launch({
     env,
-    executablePath: require('electron'),
-    args: [root, `--test-profile=${profile}`],
+    executablePath: executable || require('electron'),
+    args: [...(executable ? [] : [root]), `--test-profile=${profile}`],
     timeout: 30000,
   });
   try {
     const page = await application.firstWindow();
     await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    assert.deepEqual(await page.locator('.activity-rail .rail-label').allTextContents(), [
+      'ホーム',
+      'Applet',
+      '設定',
+      'ログ',
+    ]);
+    const initial = await page.evaluate(async () => ({
+      api: Object.keys(window.dock),
+      snapshot: await window.dock.snapshot(),
+    }));
+    assert.equal(
+      initial.api.some((name) => /widget/i.test(name)),
+      false,
+    );
+    assert.equal('widgets' in initial.snapshot, false);
+    assert.equal('widgets' in initial.snapshot.settings.value, false);
+    assert.equal(
+      await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length),
+      1,
+    );
     await page.getByRole('button', { name: 'Applet', exact: true }).click();
     await page
       .getByRole('complementary', { name: 'Applet一覧' })
@@ -101,6 +122,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
           ok: true,
           profile,
           checks: [
+            'four navigation pages / widget API and layout removed / only main window',
             'React navigation',
             '.NET activation / command / deactivation',
             'settings form persistence',

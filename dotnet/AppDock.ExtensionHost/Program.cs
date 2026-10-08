@@ -20,11 +20,6 @@ if (args is ["--hotkeys"])
     await WindowsHotKeySession.RunAsync(Console.In, wireOutput);
     return 0;
 }
-if (args is ["--widget-shell", var hostProcess] && uint.TryParse(hostProcess, out var hostPid))
-{
-    await WindowsWidgetSession.RunAsync(Console.In, wireOutput, hostPid);
-    return 0;
-}
 if (args.Length != 2) { Console.Error.WriteLine("Usage: AppDock.ExtensionHost <assembly.dll> <type>"); return 2; }
 try
 {
