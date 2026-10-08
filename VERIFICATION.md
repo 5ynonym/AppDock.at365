@@ -1,5 +1,12 @@
 # 検証記録
 
+## 2026-10-09: 更新通知変更をコミットしpublish.batで発行
+
+- ユーザーの承認により、成功通知変更と関連文書/指示をmainの`3c8b4ef`へコミット。続けて`publish.bat`を実行し終了0、通常EXE/update.json/6Applet入りオールインワンZIPを発行。ログは`artifacts/update-notice-publish-2026-10-09.log`。版は0.23.0を維持、GitHub公開/push/実利用先deployは未実施。
+- 通常EXEは100599103bytes、SHA256 `7b4486595d71bdf3d86cf6eb7bf860c02821aadc97c0d8cb897836248d31c9ce`。update.jsonのsize/hashと一致。ZIPは275723984bytes、SHA256 `cc2aaf9b7eedfd4fcdf699a731dc7082828dcac7650f51d0b006645b591f2594`。`artifacts/update-notice-publish-hashes-2026-10-09.json`へ保存。
+- 固定した発行物でGUI試験を直列実行。配布win-unpackedの通知チェックは`artifacts/update-notice-1791486954229/result.json`でok:true。dark/light、自動/手動消去、main領域不変、フォーカス非奪取、失敗結果の継続表示、トレイ開始から開いたときの通知を確認。
+- 単一EXEの隔離smokeは`artifacts/smoke-1791486973286/smoke-result.json`でok:true。オールインワンは全収録ファイルのsize/hash・本体単体EXEとの一致・各Applet更新ZIPとの一致を照合し、新規隔離フォルダーへ展開して通常起動。`artifacts/update-notice-bundle-result-2026-10-09.json`はok:true、6AppletすべてのID/版一致・初期無効・EXE隣に設定生成を確認。各Applet固有機能/実ログイン操作は今回再試験していない。
+
 ## 2026-10-09: 更新適用後のお知らせをステータスバーへ移動
 
 - mainの既存cleanなcheckoutで、起動時結果の成功だけを左下のミント色のピル型通知へ変更。本文/リボン/ネイティブWebページの領域に重ねず、約5秒でフェードアウトし、×で即時に閉じる。失敗結果と更新中の進捗は従来の上部表示を維持。配布形式・更新用helper・設定保存形式は変更していない。
