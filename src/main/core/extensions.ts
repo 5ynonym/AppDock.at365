@@ -5,6 +5,7 @@ import { EventEmitter } from 'node:events';
 import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
+import { parseSettingActions } from '../../shared/setting-actions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
@@ -79,10 +80,12 @@ function readManifest(folder: string): LoadedManifest {
   }
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
+  const commands = parseDeclaredCommands(m.id, m.commands);
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
-    commands: parseDeclaredCommands(m.id, m.commands),
+    commands,
+    settingActions: parseSettingActions(m.settingActions, commands ?? []),
     folder,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
