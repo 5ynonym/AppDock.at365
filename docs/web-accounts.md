@@ -72,6 +72,10 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 ## 保存とライフサイクル
 
+0.17.1ではローカルUIのsnapshotに`settings?: Record<string, boolean | string>`、preloadに`setSetting(key, value): Promise<void>`を追加しました。settings capabilityを持つ自身のAppletのmanifestで宣言したboolean/静的select項目だけを公開し、未保存時はmanifestのdefault（未指定はbooleanならfalse、selectなら空文字）を使います。未宣言キー・定義の型・選択肢に合わない値は拒否します。ホスト全体や他Applet、未宣言の保存項目は読み書きできません。NodeのreadにはこのUI用設定を追加しません。
+
+保存は既存SettingsStoreのupdateExtensionで行い、ほかの項目・有効化状態を保持します。既存の競合検出とatomicWriteを使い、失敗は呼び出し元へ返します。AppDockからの変更もonChangedでローカルUIへ通知し、停止時に購読を解除します。Gmail 0.6.0の設定タブがこのAPIを使います。
+
 `.appdock/web-accounts/<extension-id>/accounts.json`に安定したUUIDと表示名、`sessions/<account-id>/`にChromiumの永続セッションを保存します。`session.fromPath`を使うので複数のApplet・アカウント間でCookieを共有しません。アカウント保存はatomicWrite、不正な既存JSONは上書きせず起動エラーとして報告します。停止・異常終了でWebContents/UIを明示破棄し、Cookieをflushします。ウィンドウの×は非表示にし、Appletを止めるまで背景のページ更新を維持します。
 
 soundはaccounts.jsonの各枠へ追加し、旧データは未指定ならOFFで扱います。0.14.0は同じ保存先のwindow-state.jsonへ通常の位置・サイズ/最大化を記録します。共通WindowStateStoreで300ms遅延保存、終了時flush、DIP丸め補正とモニター作業領域への復帰を再利用します。最小化/非表示では通常枠を上書きしません。保存失敗はホストログへ内容を含まない診断を残し、ページを閉じません。

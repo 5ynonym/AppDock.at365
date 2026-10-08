@@ -32,11 +32,13 @@ export interface WebAccountSound {
 }
 export interface WebAccountSnapshot {
   dark: boolean;
+  settings?: Record<string, boolean | string>;
   selected: string;
   accounts: WebAccount[];
 }
 export interface WebAccountUi {
   snapshot(): Promise<WebAccountSnapshot>;
+  setSetting(key: string, value: boolean | string): Promise<void>;
   add(): Promise<void>;
   select(id: string): Promise<void>;
   rename(id: string, name: string): Promise<void>;

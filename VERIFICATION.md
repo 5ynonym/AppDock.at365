@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-08: v0.17.1 WebアカウントUIから自身の設定を変更
+
+- ユーザーが設定タブの正常動作を確認したと報告し、Gmail側と合わせたコミットを明示指定（2026-10-08）。検証済みコードを変更せず、確認報告と今回の実装・文書をコミット対象にした。
+
+- ローカルUIへsnapshot.settings/setSettingを追加。自身のmanifestの宣言済みboolean/静的selectとsettings capabilityに限定し、既存SettingsStoreの保存/競合検出/変更通知を使用。停止時は購読解除。リモートページ・他Applet・ホスト全体の設定は非公開。
+- dev.bat run typecheck、dev.bat run test（85/85）、dev.bat run dist成功。変更したコードのPrettierとgit diff --check成功。.NETホストは既存スクリプトでクリーンなframework-dependent発行、DLLはAppDock.ExtensionHost/Runtime/SDKのみ。
+- Gmail0.6.0の発行版GUI ../Applet.Gmail.at365/artifacts/accounts-1791452824168/result.json成功。設定共有・双方向同期・監視停止/再開・保存後再起動・未宣言キー/型拒否・既存アカウント管理を確認。
+- 実単一EXEの../Applet.Gmail.at365/artifacts/portable-1791452888173/result.jsonはok:true/version0.17.1/exitCode0。EXE100567486 bytes、SHA256 19C334ECEBFC849AA821DC361F77D3B275939A84AD757BF60FE6D2674E2BFD6D。実利用先への配置・実Google操作・commit/pushなし。
+
 ## 2026-10-08: v0.17.0 ウィジェット機能を削除
 
 - ユーザーが変更内容の確認完了を報告し、コミットを明示指定（2026-10-08）。今回の削除・回帰確認・文書をmainへコミット。コードは上記依頼で検証したままで、コミット時の追加変更はこの確認記録のみ。

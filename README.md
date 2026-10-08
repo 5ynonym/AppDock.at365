@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.17.0はElectron 44.6.0を使用します。追加の導入手順は従来と同じで、EXEを更新して再起動すると利用できます。
+0.17.1はElectron 44.6.0を使用します。追加の導入手順は従来と同じで、EXEを更新して再起動すると利用できます。Gmail 0.6.0ではGmailウィンドウ内の「設定」タブから、AppDockと共通の新着監視・通知設定を変更できます。
 
 この配布版は未署名です。
 

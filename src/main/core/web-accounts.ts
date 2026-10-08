@@ -41,6 +41,9 @@ type Saved = {
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
   capabilities: string[];
+  settings?(): Record<string, boolean | string>;
+  setSetting?(key: unknown, value: unknown): void;
+  onSettingsChanged?(callback: () => void): () => void;
   shortcut(input: Input): boolean;
   failed(message: string): void;
 }
@@ -191,6 +194,7 @@ export class WebAccountController {
     { url: string; image: string; retryAt: number; abort?: AbortController }
   >();
   private themeChanged = () => this.changed();
+  private unsubscribeSettings?: () => void;
   private displaysChanged = () => {
     if (this.background && !this.background.isDestroyed()) {
       const right = Math.max(...screen.getAllDisplays().map((d) => d.bounds.x + d.bounds.width));
@@ -259,6 +263,7 @@ export class WebAccountController {
       this.save(this.state);
     }
     nativeTheme.on('updated', this.themeChanged);
+    this.unsubscribeSettings = this.services.onSettingsChanged?.(() => this.changed());
     screen.on('display-added', this.displaysChanged);
     screen.on('display-removed', this.displaysChanged);
     screen.on('display-metrics-changed', this.displaysChanged);
@@ -477,6 +482,7 @@ export class WebAccountController {
   snapshot(includeData = true): WebAccountSnapshot {
     return {
       dark: nativeTheme?.shouldUseDarkColors ?? true,
+      ...(includeData && this.services?.settings ? { settings: this.services.settings() } : {}),
       selected: this.state.selected,
       accounts: this.state.accounts.map((a) => {
         const wc = this.views.get(a.id)?.webContents;
@@ -787,6 +793,11 @@ export class WebAccountController {
         return;
       case 'snapshot':
         return this.snapshot();
+      case 'setSetting':
+        if (!this.services.capabilities.includes('settings') || !this.services.setSetting)
+          throw Error('このAppletの設定は変更できません。');
+        this.services.setSetting(args[0], args[1]);
+        return;
       case 'add': {
         if (this.state.accounts.length >= 10) throw Error('10アカウントまで追加できます。');
         const id = randomUUID();
@@ -1091,6 +1102,7 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
+    this.unsubscribeSettings?.();
     nativeTheme.removeListener('updated', this.themeChanged);
     screen.removeListener('display-added', this.displaysChanged);
     screen.removeListener('display-removed', this.displaysChanged);

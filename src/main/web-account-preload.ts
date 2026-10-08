@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 // One fixed channel; the host maps the sender to its own Applet. No arbitrary RPC.
 contextBridge.exposeInMainWorld('webAccounts', {
   snapshot: () => ipcRenderer.invoke('web-account:invoke', 'snapshot'),
+  setSetting: (key: string, value: boolean | string) =>
+    ipcRenderer.invoke('web-account:invoke', 'setSetting', key, value),
   add: () => ipcRenderer.invoke('web-account:invoke', 'add'),
   select: (id: string) => ipcRenderer.invoke('web-account:invoke', 'select', id),
   rename: (id: string, name: string) =>
