@@ -2,6 +2,7 @@
 
 ## 2026-10-08: v0.20.0 Gmailのナビゲーション・リンク設定
 
+- ユーザーが今回の動作を確認したと報告し、マージを指定（2026-10-08 JST）。両repoのcodex/gmail-toolbar-commandsをmainへfast-forward統合（AppDock a737ae5 / Gmail d3fc1c4）。統合直後のGit treeは検証済みブランチと一致。報告は今回全体の動作確認として記録し、個別のWindows通知などの検証範囲は推測しない。追加の製品コード変更・再発行・deploy・pushなし。
 - ユーザーの正常動作報告とマージ指示を受け、前回0.19.0をmainへFF統合（327a88a）。Gmailも0.8.0をmainへFF統合（918fb59）。今回は両repoのcodex/gmail-toolbar-commandsで実施。
 - Node APIにcontext.webAccounts.navigate(back/forward/reload/inbox)を追加。自身の実行中Appletだけを対象にし、UIのnavigateと同じ選択中Viewを操作する。invalid actionはView作成前に拒否。snapshot.navigationRevisionで操作画面が受信トレイへ戻れるようにする。
 - webAccounts.externalLinkSettingは自身のboolean設定キーとsettings capabilityを必須にする。既定の確認を保持し、対応Appletのダイアログへ「次回から聞かずに開く」を追加。開く＋チェック時のみ設定を保存。trueならHTTP(S)/mailtoの確認を省略し、資格情報や他スキームは従来どおり拒否。重複した確認を抑制し、外部起動の失敗はログへ報告する。
