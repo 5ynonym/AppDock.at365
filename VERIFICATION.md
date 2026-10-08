@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-09: publish.batでオールインワンZIPを生成
+
+- ユーザー指定の「Appletは拡張として同梱」に対応。cleanなmain 8a4d96eから`codex/all-in-one-package`を作成。`publish.bat`が呼ぶ`dist`を本体発行`dist:host`と`pack:all-in-one`へ分割し、単一EXEと更新JSONに加えて`extensions/<repo名>`入りZIPを生成する。BAT自体・文字コードは未変更。本体の版/API/UIコードは0.23.0のまま。
+- 新しいPowerShell処理は兄弟直下の`.git`/manifestを持つ全repoを対象とし、各publish.batを直列実行。ID/正式版/最低本体版の事前検査、feed/ZIPのsize/SHA256、展開後manifest/entry照合、commit/dirty/全ファイルhashのbundle.json、完成後のZIP置換を実装。失敗時に以前の完成ZIPを保持する。本体側の設定/認証/ログは収録しない。
+- `publish.bat`の実実行は終了0（`artifacts/all-in-one-publish-final.log`）。本体/.NET helper/TS/Vite/portableと全6Appletの再発行、オールインワン生成まで通した。初回はWindows PowerShellの環境でGet-FileHashが解決できず失敗したため、.NET stream/SHA256へ変更して最初から再実行した。pnpm/依存/グローバル設定の変更なし。
+- `tests/all-in-one.test.cjs`成功、終了0（`artifacts/all-in-one-tests.log`）。実helperを使った隔離fixtureで正常発行、変更したAppletの再発行/既存ZIP置換、発行exit19・改変ZIP・最低host不足・ID重複による失敗と以前のZIPのhash保持を確認。
+- ZIPは275724048bytes、SHA256 `92a17694df699133353dc43160b68dc76eded545b4766b8b9621f13ac45f345c`。`artifacts/all-in-one-package-result.json`はok:true。本体EXE/bundle.json/6Appletの計22ファイル、収録一覧/全size/hash、本体単体EXEとの一致、各Appletの更新ZIP全ファイルとのバイト一致を確認。発行時のローカルソースを記録しており、GitHub既存assetとの一致を要求するものではない。
+- ZIPから新しい隔離profileへ展開して通常起動。`artifacts/all-in-one-ui-1791481347816/result.json`はok:true、終了0。Gmail0.9.0、Wallpaper0.4.0、Watch0.1.1、WebBrowserTools0.2.4、WindowMover0.2.1、WindowsTools0.1.1をすべて認識、初期無効/エラーなし/EXE隣に設定生成/既定GitHub更新元を確認。about画面の画像を目視確認。各Appletの固有機能・実ログイン操作は今回再試験しない。
+- README/DEVELOPMENT/[発行ガイド](docs/all-in-one.md)を更新。通常更新feedは単体EXEのまま、オールインワンZIPは初回導入用の追加assetとする。既存GitHub Releaseの上書き・新規公開・実利用先deploy・main統合は未実施。
+
 ## 2026-10-09: v0.23.0 更新配布物・進捗・中断復旧
 
 - ユーザーの「順番に」「2は全部が終わったら確認する」指定に従い、1のApplet発行標準化、3の進捗/キャンセル、4の異常中断復旧を実施。2の実GitHub/HTTP(S)/UNC配布先確認はユーザー担当として[チェックリスト](docs/update-checklist.md)へ分離。AppDockは既存`codex/portable-updates`の5460b1e、6Appletは各cleanなmainから同checkoutの`codex/update-packages`で作業。worktreeは作らない。

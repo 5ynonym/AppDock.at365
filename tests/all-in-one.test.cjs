@@ -1,0 +1,123 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
+const root = path.resolve(__dirname, '..');
+const helper = path.join(root, 'artifacts/updater/AppDock.Updater.exe');
+
+test(
+  'all-in-one uses fresh packages and preserves the last archive on invalid inputs',
+  { skip: process.platform !== 'win32', timeout: 120000 },
+  (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-bundle-test-'));
+    t.after(() => {
+      assert.equal(path.dirname(directory), os.tmpdir());
+      fs.rmSync(directory, { recursive: true, force: true });
+    });
+    const host = path.join(directory, 'host');
+    const applets = path.join(directory, 'applets');
+    const applet = path.join(applets, 'Applet.Fixture');
+    function run(exe, args, cwd = host) {
+      return spawnSync(exe, args, { cwd, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+    }
+    function init(repo) {
+      fs.mkdirSync(repo, { recursive: true });
+      const args = ['-c', `safe.directory=${repo.replaceAll('\\', '/')}`, '-C', repo];
+      for (const command of [
+        ['init'],
+        [
+          '-c',
+          'user.name=Fixture',
+          '-c',
+          'user.email=fixture@example.test',
+          'commit',
+          '--allow-empty',
+          '-m',
+          'Fixture',
+        ],
+      ]) {
+        const r = run('git', [...args, ...command], repo);
+        assert.equal(r.status, 0, r.stderr);
+      }
+    }
+    init(host);
+    init(applet);
+    fs.mkdirSync(path.join(host, 'scripts'));
+    fs.mkdirSync(path.join(host, 'publish'));
+    fs.mkdirSync(path.join(host, 'artifacts/updater'), { recursive: true });
+    fs.copyFileSync(helper, path.join(host, 'artifacts/updater/AppDock.Updater.exe'));
+    fs.copyFileSync(
+      path.join(root, 'scripts/build-all-in-one.ps1'),
+      path.join(host, 'scripts/build-all-in-one.ps1'),
+    );
+    fs.writeFileSync(path.join(host, 'package.json'), JSON.stringify({ version: '1.0.0' }));
+    const exe = path.join(host, 'publish/AppDock.at365.exe');
+    fs.writeFileSync(exe, 'MZ-host-fixture');
+    assert.equal(
+      run(helper, ['--pack', 'host', exe, '1.0.0', path.join(host, 'publish')]).status,
+      0,
+    );
+    const manifest = {
+      apiVersion: 1,
+      id: 'fixture.applet',
+      version: '1.0.0',
+      runtime: 'node',
+      entry: 'index.js',
+      minimumHostVersion: '1.0.0',
+    };
+    fs.mkdirSync(path.join(applet, 'payload'));
+    const writeManifest = (value) =>
+      fs.writeFileSync(path.join(applet, 'extension.json'), JSON.stringify(value));
+    writeManifest(manifest);
+    fs.writeFileSync(path.join(applet, 'payload/extension.json'), JSON.stringify(manifest));
+    fs.writeFileSync(path.join(applet, 'payload/index.js'), 'exports.activate = () => {};');
+    const publisher = `@echo off\r\n"${helper}" --pack applet "%~dp0payload" unused "%~dp0publish"\r\nexit /b %errorlevel%\r\n`;
+    fs.writeFileSync(path.join(applet, 'publish.bat'), publisher, 'ascii');
+    const build = () =>
+      run('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(host, 'scripts/build-all-in-one.ps1'),
+        '-AppletRoot',
+        applets,
+      ]);
+    let result = build();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const zip = path.join(host, 'publish/AppDock.at365-all-in-one-1.0.0.zip');
+    const hash = () => createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
+    fs.writeFileSync(
+      path.join(applet, 'payload/index.js'),
+      'exports.activate = () => { return 2; };',
+    );
+    const first = hash();
+    result = build();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.notEqual(hash(), first, 'republish must replace the previous complete archive');
+    const complete = hash();
+    function fails(pattern) {
+      const r = build();
+      assert.notEqual(r.status, 0);
+      assert.match(r.stdout + r.stderr, pattern);
+      assert.equal(hash(), complete, 'failed builds must not replace the last successful package');
+    }
+    fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 19\r\n', 'ascii');
+    fails(/Applet publish failed/);
+    fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 0\r\n', 'ascii');
+    fs.appendFileSync(path.join(applet, 'publish/update.zip'), 'tampered');
+    fails(/Payload hash\/size mismatch/);
+    fs.writeFileSync(path.join(applet, 'publish.bat'), publisher, 'ascii');
+    writeManifest({ ...manifest, minimumHostVersion: '2.0.0' });
+    fails(/Applet requires a newer host/);
+    writeManifest(manifest);
+    const duplicate = path.join(applets, 'Applet.Duplicate');
+    init(duplicate);
+    fs.copyFileSync(path.join(applet, 'extension.json'), path.join(duplicate, 'extension.json'));
+    fs.copyFileSync(path.join(applet, 'publish.bat'), path.join(duplicate, 'publish.bat'));
+    fails(/Duplicate Applet ID/);
+  },
+);
