@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -11,10 +11,12 @@
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
     "build": "node scripts/build-main.cjs && vite build",
     "start": "pnpm run build && electron .",
-    "test": "pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
+    "test": "pnpm run build:updater && pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
     "build:test-extensions": "node scripts/build-test-extensions.cjs",
     "build:dotnet": "node scripts/build-dotnet.cjs",
-    "dist": "pnpm run build:dotnet && pnpm run build && node scripts/build-portable.cjs",
+    "build:updater": "node scripts/build-updater.cjs",
+    "pack:update": "node scripts/pack-update.cjs",
+    "dist": "pnpm run build:dotnet && pnpm run build:updater && pnpm run build && node scripts/build-portable.cjs && node scripts/pack-update.cjs host publish/AppDock.at365.exe publish",
     "smoke": "node scripts/smoke.cjs",
     "test:ui": "pnpm run build:test-extensions && node scripts/ui-test.cjs",
     "test:navigation": "pnpm run build:test-extensions && node scripts/navigation-ui-test.cjs",
@@ -53,6 +55,10 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "artifacts/updater/AppDock.Updater.exe",
+        "to": "updater/AppDock.Updater.exe"
+      },
       {
         "from": "artifacts/dotnet-host",
         "to": "dotnet-host"

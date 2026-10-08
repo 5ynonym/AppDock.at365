@@ -606,3 +606,15 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 実利用先deploy、commit、pushなし。実Windows背景を変更する検証ではない。
 - 通常sandboxのpnpm呼出しはポリシー確認で進まず中断。プロジェクト内の既存Nodeで検査し、許可された通常Windows環境のdev.bat/publish.batでは成功。グローバルツールの導入なし。
 - 最終EXE: 100574539 bytes、SHA256 DDCCF49D9702CB8A2E879AD44552DF2AE36114EFA6E1A43BB841A0BDB7A05A7D。
+
+## 2026-10-09: v0.22.0 単一EXEとAppletの共通自己更新
+
+- mainのクリーンな状態から、同じcheckoutにcodex/portable-updatesブランチを作成。worktreeは作成せず、本体単一EXEを維持。更新元は本体/各Appletごとのローカル絶対パス・UNC・HTTP(S) feed・GitHub Releases。起動時の本体/各Applet確認、待ち時間、通知、同版再適用を保存できる。起動時確認はmetadataだけで、download/installは呼ばない。
+- framework-dependent .NET 10単一ファイルhelper（197666 bytes）を本体内に同梱。交換前の準備・SHA256/サイズ・ID/版/最低host/manifest・ZIP範囲検証、実PID/外側ランチャー終了待ち、全候補交換・逆順復元、journalと結果記録を実装。設定/.appdock/ほかのAppletは交換対象外。
+- main/renderer型検査、TS/Vite build、.NET host/updater Release発行、dev.bat run dist終了0。回帰100/100、失敗0（artifacts/portable-updates-regression.log）。新規9回帰は旧設定移行/更新元/ID/版/互換性/起動時確認のみ/HTTP-GitHub metadata/実helper2Applet交換と途中失敗時復元/ZIP traversal拒否。sandboxのTEMP制約はプロジェクトartifacts/test-tempで確認し、Electron GUIは許可された通常Windows環境で実行。
+- 既存ui/navigation/preferences GUI成功。navigationでは新しい更新設定の保存バー表示を確認し、未保存のApplet設定を保持する既存試験を継続。
+- 実portableのartifacts/portable-updates-1791472687891/result.jsonはok:true。起動時metadata確認のみ、無効Appletも対象、下書き時更新禁止、設定保存、実.NET DLL Appletの稼働/停止/一括交換/再起動、無効状態保持、obsolete.dll除去、設定/ログインfixture保持、同じhelperで本体EXE交換・再起動、個別ボタンから同版再適用が成功。最終確認native dialogだけ隔離試験内で応答を差替え、交換/終了/起動は実処理。updates-settings.pngを目視確認。
+- 最終EXEは100595163 bytes、SHA256 DB67DBC642612535381D90CF37801027E7686D9454B5889ECF9CC93C06D86584。publish/update.jsonのsize/hashと一致。自己更新helperとframework-dependent .NET hostを同梱し、.NET runtimeは既存の利用要件のまま。本体/各Appletが実利用されている配置先にはdeployしていない。
+- 試験の途中失敗は保存ボタンの旧名、inspector内のrequire参照、終了するrendererのIPC完了待ち/CDP再接続が原因。保存名を現UIへ変更し、createRequireと再起動後Node inspectorで実snapshot/個別ボタンを確認する方式へ修正。製品の確認ダイアログを省略するコードは追加していない。最終試験は終了0。
+- 未確認: 実UNC共有からの取得、GitHub上での公開/実Release asset取得、実Webサーバーからの全パッケージ取得、更新通知の実toast表示/人手クリック、電源断中の本体復元、各製品Appletの独自保存データ。対応経路は実装済みだが、公開や実利用操作で検証したとは扱わない。非公開GitHub認証とprereleaseは非対応。
+- 最終確認: 起動時確認を待ち時間中にOFFにした場合の取得抑止、破損ダウンロード時に確認/終了へ進まない回帰を追加して100/100成功。未保存時のガードは更新操作だけに限定し、従来の有効化/通常操作を保持。最終版で再度実portable更新試験が終了0。整形・diff check、更新文書27リンク、packed JS/helperと現在のbuildのバイト一致を確認。
