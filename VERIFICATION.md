@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-08: v0.21.0 Applet詳細の共通設定パネル
+
+- 追加調整: 「設定を開く／説明に戻る」をヘッダー直下の共通操作列へ移動し、同一のsecondaryボタン・アイコン・幅でラベルと動作を切り替えます。ボタンより下だけ説明/設定が変わります。ログは従来の移動先・フィルター・説明側の入口を維持。ユーザーの将来の説明/設定/ログタブ案は今回は実装しません。
+- 追加調整のmain/renderer型検査とVite build成功。隔離Electronの`artifacts/navigation-1791467373616/result.json`はok:true。dark/light・1280/900pxで切替前後のボタン座標/サイズ/背景/文字色/枠/余白と見出しの座標/サイズが一致し、長いフォームの保存ボタン表示、下書き・JSON・外部競合・ログ移動の既存確認も成功。切替前後の画像を目視確認、Prettier/diff check成功。初回GUIで設定側の見出し幅が縮むことを検知し、旧grid由来のalign-items:startをflexのstretchに変更して解消。今回の変更は既存worktree内だけで、main/他の未完了作業には触れず、追加発行/deploy/commit/統合/pushなし。
+- AppDock mainのe4b32e7から専用worktree `AppDock.at365.worktrees/applet-settings-panel`、ブランチ`codex/applet-settings-panel`を作成。元の作業ツリーで進行中の別作業には触れていません。
+- 「設定を開く」はAppletページ内の説明→設定切替へ変更。「説明に戻る」で復帰し、詳細のショートカット入口は削除。設定ページのApplet別設定は保持し、同じAppletSettingsPanelと共通編集セッション/保存操作を使用します。全下書き・JSON・プロフィール画像・revision競合を保持します。
+- main/renderer型検査、Vite build、既存.NETホストのframework-dependent発行に成功。ホスト回帰90/90、失敗0（artifacts/regression.log）。追加API/設定形式/依存更新はありません。
+- 隔離Electron画面 `artifacts/navigation-1791464805381/result.json` はok:true。説明/設定切替、ショートカット入口統一、双方での下書き共有・保存・破棄、複数Appletの編集、数値検証、停止中のキー保持、正しいJSONの引継ぎと不正JSONの保持、外部変更競合時の上書き拒否、24Applet、長いフォーム、dark/light、1280/900px、保存ボタンの常時表示、横はみ出しなしを確認。画像も目視確認。
+- 既存UI回帰 `artifacts/ui-1791464724997/result.json` とプロフィール/キー/保存/再起動回帰 `artifacts/preferences-1791464764546/result.json` はok:true。後者は名前・画像選択/上書き・不正画像拒否と再起動後の永続化を含みます。
+- Prettier、git diff --checkに成功。変更したREADME/DEVELOPMENT/host-developmentのローカルリンク64件で欠落0（worktree外の兄弟Applet参照は元repo配置で照合）。
+- 検証時の修正: JSON編集後に保持済み詳細設定へ復帰した際も表示前に変換する処理を追加。不正JSONは説明へ戻して修正を案内。既存ui-testのリボン期待値に、既に存在する「テーマを切り替え」を追加。新しいJSON試験の2つのalertは表示先を指定して照合。
+- 実行環境の制限: dev.batのpnpm検証が進まなかったため中断し、取得済みプロジェクト内Node/TypeScript/Viteで同じビルド・検査を実行（依存取得/ポリシー変更なし）。sandboxの.NET発行は失敗し、許可されたWindows環境で成功。回帰の初回sandbox TEMPでのrename等の失敗は、worktree内TEMPを指定して90件すべて成功。
+- 今回はworktree内のソースと隔離fixtureによる確認です。単一EXEの発行・実利用先deploy・実Applet/実アカウント操作・main統合・commit・pushは行っていません。
+
 ## 2026-10-08: v0.20.0 Gmailのナビゲーション・リンク設定
 
 - ユーザーが今回の動作を確認したと報告し、マージを指定（2026-10-08 JST）。両repoのcodex/gmail-toolbar-commandsをmainへfast-forward統合（AppDock a737ae5 / Gmail d3fc1c4）。統合直後のGit treeは検証済みブランチと一致。報告は今回全体の動作確認として記録し、個別のWindows通知などの検証範囲は推測しない。追加の製品コード変更・再発行・deploy・pushなし。

@@ -178,3 +178,12 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 0.19.0はリボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。AppDock本体のキー設定は「Applet別の設定」の先頭へ移動し、既存の下書きとコマンド所属処理を使います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。
+
+
+## Applet設定パネルの共用
+
+- `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
+- `AppletSettingsPanel.tsx`は「設定項目／ショートカットキー」の切替と既存`AppletSettings`/`ShortcutsEditor`をまとめます。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifest/設定JSONの追加はありません。
+- `ExtensionDetail`はヘッダーと共通の操作列を保ち、「設定を開く／説明に戻る」を同じ位置・同じsecondaryボタンで切り替えます。その下だけ説明と設定を描画します。スクロールバーの領域を両表示で確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログを見る操作は既存ログページへ移動します。別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
+- JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
+- 詳細設定はパネル内をスクロールし、保存操作と説明へ戻る操作は長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
