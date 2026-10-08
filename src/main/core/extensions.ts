@@ -34,6 +34,7 @@ function readManifest(folder: string): LoadedManifest {
     !isObject(m) ||
     m.apiVersion !== 1 ||
     !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(m.id) ||
+    String(m.id).startsWith('web.') ||
     typeof m.name !== 'string' ||
     !m.name ||
     m.name.length > 100 ||

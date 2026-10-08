@@ -46,45 +46,11 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - AppDockのpublish.batはこれらのrepoを自動検出するため、名前一覧の追記は不要。追加後は[オールインワン発行](docs/all-in-one.md)の検査と展開起動で、新Appletも含まれることを確認する。探索範囲外のrepoは勝手に無視せず、配置または明示のAppletRootを整える。
 - READMEは利用者向け、開発/発行手順はDEVELOPMENT/docs、実測結果と未確認事項はVERIFICATIONへ記録する。BATはCP932/CRLFを保つ。
 
-## AppDock WebApplet：次回実装用の記録（2026-10-09）
+## WebAppletの維持事項（0.24.0）
 
-状態：設計相談のみ。ユキちゃんは「あとでお願いする」と指定しており、今回は記録まで。実装・配置・コミットはまだ依頼されていない。
-
-### ユキちゃんの希望と決まった方針
-
-- 好きなWebページをURLから動的に「WebApplet」として追加できる。Appletの一覧・詳細設定・リボンから扱える体験にする。
-- 名前とURLを設定し、リボンを押すとAppDockの埋め込みページまたは別ウィンドウで表示する。表示方法は設定可能にする。
-- WebAppletごとにページ遷移を許可するか設定できる。
-- WebAppletが使用するWebアカウント枠を一覧から選べる。Gmailで使っている管理方式を参考にする。
-- **WebAppletのアカウント一覧とログイン保存領域はGmailとは別管理。Gmailの枠との共有案は採用しない。** Gmailのログイン・ログアウト・枠削除・新着監視へ影響を出さない。
-- WebApplet側で初回ログインする。Gmailの認証データのコピーや移行は不要。管理用コードを再利用する場合も保存先は独立させる。
-
-### 次回の設計で決める事項
-
-- 1ページを1WebAppletとして追加するか、最初の相談にあった1Applet内の複数URL/リボンボタンにも対応するか。具体的な構成と件数上限は未確定。
-- ページ遷移設定の選択肢・初期値、認証先への転送、新しいウィンドウを要求するリンクの扱い。
-- WebApplet専用のアカウント枠を複数WebAppletで共有できる範囲と、枠を削除するときの扱い。Gmailとの分離は確定。
-- 名前/URLの変更でもリボン配置・表示先等を保持する安定ID、保存形式、必要時のページ読込と画面再利用。
-
-### 追加アイデア：Webアプリが提供する設定JSON（2026-10-09、検討案）
-
-Web用機能はこれから作る設計相談。下記の標準仕様は比較・再利用候補として調査したもので、AppDockのWebAppletや独自JSON連携が既に実装されているという意味ではない。
-
-- ユキちゃんの案：表示するWebアプリがJSONを提供し、名前/アイコン/ページ遷移なし・同じサブドメイン内等を自動設定できる。AppDockでの手動設定も維持する。まだ採用/具体仕様は確定していない。
-- アリスの提案：Web側の推奨初期設定として読む。URL登録時に自動検出して追加フォームを埋め、ユーザーの編集を優先する。初版は追加時読取と明示的な再取得を候補にし、ページ再読込のたびに保存設定を強制更新しない。更新で許可範囲を勝手に広げない。
-- Web App Manifestのname/icons/start_url/scopeを活用し、遷移禁止やsame-origin等のAppDock専用指定は名前の衝突を避けた独自appdock項目を候補にする。通常manifestはlink rel=manifestで発見できる。独自項目は未定義の設計案であり、既存APIとして扱わない。
-- scopeはWebアプリの適用範囲で、ブラウザーの遷移遮断機能ではない。AppDockの遷移制限は別途ホストで実施する。同じサブドメイン限定はscheme/host/portの完全一致（same-origin）を基本候補とし、兄弟サブドメインを自動許可しない。
-- 許可した宣言データ項目だけ検証して取り込む。既存extension manifest/settings.jsonへ丸ごとmergeしたり、実行コード/任意コマンド/使用アカウント枠をWeb側から指定したりしない。Gmailとの保存領域分離を維持する。
-- JSON取得元は登録先の同一origin・HTTPSを初期候補にし、アイコン/JSONのサイズ・時間・転送先も検証する。不在/不正/取得失敗なら手動設定に戻れる形とし、別サイトへの認証転送や範囲拡張は別設計とする。
-- 参照確認済み： https://www.w3.org/TR/appmanifest/ （2026-10-08 Working Draft。標準項目、link、proprietary拡張、同origin scope）、https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/scope （scopeは範囲外への遷移を遮断しない）。後日の実装時は現仕様を再確認する。
-
-### 調査済みの実装上の入口
-
-- `30.PROJECT/AppDock.at365/src/shared/applet-pages.ts`：相談時はmanifest固定の最大10ページ。各pageが個別リボンボタンになり、page/windowを選べる。動的ページ登録は未提供。dynamic-commandsはリボンページ登録とは別。
-- `src/main/core/applet-pages.ts`：既存AppletSurfaceはWebContentsViewを本体ページ/別Windowへ載せ替える。画面領域・Window位置・終了処理を再利用する候補。
-- `src/main/core/web-accounts.ts`：相談時はApplet IDごとのaccounts.jsonとsessions/<accountId>。Webアカウントsourceは1Applet1ページ、初期URL/HTTPS originはmanifest固定、任意URLのnavigate APIはない。Gmailのremoveはログインデータ/cacheを消去するので、共有データを不用意に使わない。
-- `docs/applet-pages.md`、`docs/web-accounts.md`、`src/shared/contracts.ts`も確認する。Gmailの観測/通知など固有処理はGmail側に残す。
-- 2026-10-09のコード非変更検証で同Applet3ボタン・10ページ受理/11拒否・web-accounts2ページ拒否・remote source拒否を確認。実サイトとの互換性は未検証。
-- 相談時のAppDockはpackage0.22.0/codex/portable-updatesで既存未コミット変更あり。後日は現ブランチ・差分・APIを再確認し、別作業を上書きしない。Gmail分離と既存表示の回帰確認を含めて実装する。
-
-この節は未実装の相談内容として保持する。実装を依頼された時に現ソース・要望を再確認し、着手と完了に合わせて状態を更新する。
+- URLから動的に追加する本体管理Applet。設定・アカウント・遷移・Web提供JSON・検証の正本は[WebApplet](docs/web-applets.md)。従来の未実装相談は実装履歴として扱う。
+- Gmailとはaccounts/session/Cookieの保存領域とライフサイクルを分離する。認証データのコピー・移行を追加しない。WebApplet専用の同じ枠はWebApplet間で共有する。
+- リモートページにpreload/Node/ホストIPCを公開しない。外部JSONは検証した推奨初期値だけを取り込み、アカウント/コマンド/許可範囲拡張を受け入れず、手動変更を再取得で上書きしない。
+- WebAppletはページを開いた時に生成する。既存AppletSurfaceを使い、表示先の切替でWebContents/session/入力を作り直さない。無効化/削除/アカウント・URL変更時の破棄、Cookie保存、共有枠消去時の対象画面終了を確認する。
+- WebAppletのID接頭辞web.は本体管理用。ファイルmanifestからこの名前空間やweb runtimeを読み込まない。本体と一緒に更新されるため、個別Appletの配布更新対象へ混ぜない。
+- 今後の同機能変更ではtests/web-applets.test.cjs、scripts/web-applets-ui-test.cjs、scripts/web-applets-portable-test.cjsに加え、既存ページ/Gmail表示の回帰を確認する。実サイト認証・長期背景動作とオフラインfixtureの成功を区別する。

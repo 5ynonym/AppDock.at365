@@ -5,6 +5,7 @@ import {
   type UiCommand,
 } from '../shared/commands';
 import { AppletSettings } from './AppletSettings';
+import { WebAppletSettings } from './WebAppletSettings';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import type { SettingsEditor } from './useSettingsEditor';
 import { useLayoutEffect, useRef } from 'react';
@@ -49,7 +50,11 @@ export function AppletSettingsPanel({
         </button>
       </div>
       {tab === 'settings' ? (
-        <AppletSettings key={applet.id} applet={applet} draft={draft} onChange={edit} />
+        applet.runtime === 'web' ? (
+          <WebAppletSettings key={applet.id} editor={editor} itemId={applet.id} />
+        ) : (
+          <AppletSettings key={applet.id} applet={applet} draft={draft} onChange={edit} />
+        )
       ) : (
         <ShortcutsEditor
           key={applet.id}

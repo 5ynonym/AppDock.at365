@@ -60,7 +60,9 @@ export interface SurfaceOptions {
   key?: string;
   title: string;
   url: string;
-  preload: string;
+  preload?: string;
+  remote?: boolean;
+  session?: Electron.Session;
   stateFile: string;
   defaultDisplay?: PageDisplay;
   partition: string;
@@ -92,10 +94,12 @@ export class AppletSurface {
         spellcheck: false,
         backgroundThrottling: false,
         partition: options.partition,
+        session: options.session,
+        webSecurity: true,
       },
     });
     this.contentView.addChildView(this.ui);
-    this.ui.webContents.on('will-navigate', (event) => event.preventDefault());
+    if (!options.remote) this.ui.webContents.on('will-navigate', (event) => event.preventDefault());
     this.ui.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     this.ui.webContents.on('render-process-gone', (_, details) =>
       host?.failed(`Applet画面が終了しました: ${details.reason}`),

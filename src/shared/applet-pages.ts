@@ -2,6 +2,7 @@ import type { ExtensionManifest, Settings } from './contracts';
 
 export type PageDisplay = 'page' | 'window';
 export interface AppletPageDefinition {
+  iconImage?: string;
   id: string;
   title: string;
   icon?: 'mail' | 'clock' | 'image' | 'folder' | 'extensions';
@@ -11,6 +12,7 @@ export interface AppletPageDefinition {
   defaultDisplay?: PageDisplay;
 }
 export interface RibbonItem {
+  iconImage?: string;
   kind?: 'separator';
   id: string;
   title: string;
@@ -98,6 +100,7 @@ export function ribbonItems(
       id: pageKey(extension.id, page.id),
       title: page.title,
       icon: page.icon ?? 'extensions',
+      iconImage: page.iconImage,
       extensionId: extension.id,
       pageId: page.id,
     })),

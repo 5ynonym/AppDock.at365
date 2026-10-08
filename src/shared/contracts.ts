@@ -15,6 +15,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  webApplets: import('./web-applets').WebAppletSettings;
   schemaVersion: 1;
   host: HostSettings;
   updates: UpdateSettings;
@@ -113,7 +114,7 @@ export interface ExtensionManifest {
   updateRepository?: string;
   startupDelaySeconds?: number;
   description?: string;
-  runtime: 'node' | 'dotnet' | 'native';
+  runtime: 'node' | 'dotnet' | 'native' | 'web';
   entry: string;
   type?: string;
   capabilities?: string[];
@@ -142,6 +143,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  webPages: Record<string, import('./web-applets').WebPageState>;
   startupReady: boolean;
   windowVisible: boolean;
   updates: UpdateState;
@@ -162,6 +164,9 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
+  webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
+  clearWebAccount(id: string): Promise<void>;
   cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'host' | 'applets' | string): Promise<UpdateState>;

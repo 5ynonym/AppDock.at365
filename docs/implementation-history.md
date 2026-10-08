@@ -10,7 +10,7 @@
 - 自己更新は0.22.0以降に実装済みで、現在の手順は更新/Release文書を参照します。「Releaseページを開くだけ」の記録は旧仕様です。
 - GitHubの実取得/隔離インストールは後段の2026-10-09記録で確認済みです。UNC、任意Webサーバー、実利用環境へのdeployとは区別します。
 - バージョン・依存・ブランチ・権限・配布物ハッシュは当時の値です。現在の値はpackage.json/toolchain.json/Git/対象Release等で確認します。
-- WebAppletの設計相談とGmailとの保存領域分離は[AGENTS.md](../AGENTS.md)へ移しました。既存のAppletページAPIと動的WebAppletの構想を混同しません。
+- WebAppletの当時の設計相談は0.24.0で実装しました。現在の仕様とGmailとの保存領域分離は[WebApplet](web-applets.md)、維持事項は[AGENTS.md](../AGENTS.md)を参照します。
 
 以下のパスは相談当時のワークスペースを基準とする履歴で、削除・改名されたrepoやGit管理外artifactsを含みます。
 

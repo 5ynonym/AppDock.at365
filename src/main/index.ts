@@ -46,6 +46,8 @@ import {
   localPageSource,
 } from './core/applet-pages';
 import { pageDisplay, pageKey } from '../shared/applet-pages';
+import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
+import { webId } from '../shared/web-applets';
 
 configureWindowRendering(app);
 
@@ -89,6 +91,8 @@ let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
+let webApplets: WebAppletManager;
+const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
 let shortcutRecording = false;
@@ -137,7 +141,7 @@ function trayMenu() {
     tray.setImage(nativeImage.createFromBitmap(pixels, { width: 20, height: 20 }));
   } else tray.setImage(icon);
   tray.setToolTip(attention ? 'AppDock.at365 — 新しい通知があります' : 'AppDock.at365');
-  const groups = trayCommandGroups(settings.value, manager.snapshot());
+  const groups = trayCommandGroups(settings.value, allApplets());
   const appletGroups = groups.filter((group) => group.extensionId !== null);
   const builtins = groups.find((group) => group.extensionId === null)?.commands ?? [];
   const menu = Menu.buildFromTemplate([
@@ -199,6 +203,12 @@ async function executeCommand(id: string) {
     if (id !== 'appdock.open') window?.webContents.send('dock:hostCommand', id);
     return;
   }
+  const split = id.lastIndexOf('.');
+  const web = id.slice(0, split);
+  if (webId(web))
+    return id.endsWith('.open')
+      ? webApplets.open(web)
+      : webApplets.navigate(web, id.slice(split + 1));
   return manager.execute(id);
 }
 function runTrayCommand(id: string) {
@@ -215,7 +225,8 @@ function snapshot(): HostSnapshot {
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
-    extensions: manager.snapshot(),
+    extensions: allApplets(),
+    webPages: webApplets.states(),
     logs: log.entries,
     version: app.getVersion(),
     runtime: {
@@ -234,6 +245,7 @@ function snapshot(): HostSnapshot {
   };
 }
 function applySettings() {
+  webApplets?.reconcile();
   trayClicks?.cancel();
   nativeTheme.themeSource = settings.value.host.theme;
   refreshPageDisplays();
@@ -244,11 +256,9 @@ function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
   const available = [
     ...hostCommands.map((command) => command.id),
-    ...manager
-      .snapshot()
-      .flatMap((extension) =>
-        extension.commands.filter((command) => command.available).map((command) => command.id),
-      ),
+    ...allApplets().flatMap((extension) =>
+      extension.commands.filter((command) => command.available).map((command) => command.id),
+    ),
   ];
   return hotKeys.sync(settings.value, available, shortcutRecording, retry);
 }
@@ -273,12 +283,16 @@ function registerIpc() {
     });
   handle('dock:snapshot', snapshot);
   handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
+    if (webId(extensionId) && pageId === 'main') return webApplets.open(extensionId);
     const extension = manager.items.get(extensionId);
     const page = extension?.manifest.pages?.find((page) => page.id === pageId);
     if (!page) throw Error('Appletページがありません。');
     await executeCommand(page.openCommand);
   });
   handle('dock:pageViewport', updatePageViewport);
+  handle('dock:webDefaults', discoverWebDefaults);
+  handle('dock:webNavigate', (id: string, action: string) => webApplets.navigate(id, action));
+  handle('dock:clearWebAccount', (id: string) => webApplets.clearAccount(id));
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   handle('dock:chooseDirectory', async () => {
@@ -333,12 +347,22 @@ function registerIpc() {
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
   handle('dock:toggleExtension', async (id: string, enabled: boolean) => {
+    if (webId(id) && typeof enabled === 'boolean') {
+      const next = structuredClone(settings.value);
+      const item = next.webApplets.items.find((item) => item.id === id);
+      if (!item) throw Error('WebAppletがありません。');
+      item.enabled = enabled;
+      settings.save(next, settings.revision);
+      return;
+    }
     if (!manager.items.has(id) || typeof enabled !== 'boolean')
       throw new Error('拡張が見つかりません。');
     settings.updateExtension(id, { enabled });
     await manager.reconcile();
   });
-  handle('dock:restartExtension', (id: string) => manager.restart(id));
+  handle('dock:restartExtension', (id: string) =>
+    webId(id) ? webApplets.restart(id) : manager.restart(id),
+  );
   handle('dock:executeCommand', (id: string) => executeCommand(id));
   handle('dock:executePanelAction', (id: string, actionId: string) =>
     manager.executePanelAction(id, actionId),
@@ -500,6 +524,7 @@ async function initialize() {
     changed,
     (message) => log.write('error', 'hotkeys', message),
   );
+  webApplets = new WebAppletManager(settings, dataDirectory, changed, executeCommand);
   manager.on('changed', () => {
     trayMenu();
     void syncHotKeys();
@@ -612,6 +637,8 @@ async function initialize() {
   configurePageHost({
     window: () => window,
     display: (key, fallback) => {
+      const web = settings.value.webApplets.items.find((item) => pageKey(item.id, 'main') === key);
+      if (web) return web.display;
       for (const extension of manager.items.values()) {
         const page = extension.manifest.pages?.find(
           (page) => pageKey(extension.manifest.id, page.id) === key,
@@ -952,8 +979,17 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   void (async () => {
-    await hotKeys?.close();
-    await manager.shutdown();
+    for (const stop of [
+      () => hotKeys?.close(),
+      () => webApplets.close(),
+      () => manager.shutdown(),
+    ]) {
+      try {
+        await stop();
+      } catch {
+        log.write('error', 'host', '終了処理の一部に失敗しました。');
+      }
+    }
   })().finally(() => {
     settings.close();
     tray?.destroy();
