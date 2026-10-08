@@ -2,6 +2,7 @@ import { JsonLinePeer } from './core/rpc';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
 type Handler = () => unknown | Promise<unknown>;
 export interface NodeExtensionContext {
+  pages: { open(id: string): Promise<unknown> };
   webAccounts: {
     start(): Promise<unknown>;
     open(): Promise<unknown>;
@@ -62,6 +63,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
+        pages: { open: (id) => peer.request('host.pages.open', { id }) },
         webAccounts: {
           start: () => peer.request('host.webAccounts.start', {}),
           open: () => peer.request('host.webAccounts.open', {}),

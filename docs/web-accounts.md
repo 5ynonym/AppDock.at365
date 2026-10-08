@@ -1,5 +1,7 @@
 # WebアカウントAPI（v0.16.1）
 
+0.18.0では[Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の旧版説明の「操作Window」は現在の表示先と読み替えてください。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。
+
 Node Appletへ、Webサービスのアカウント別画面と永続セッションを提供します。WebContentsViewの生成・ログイン領域・アカウント切替・UI IPC・破棄はホスト、サービス固有のDOM観測と通知はAppletの責務です。.NET SDKには今回専用ラッパーを追加していません。既存API v1/Node/.NET/nativeの契約は維持します。
 
 ## manifest

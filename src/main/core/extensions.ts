@@ -9,6 +9,8 @@ import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/exte
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
+import { closeAppletPages } from './applet-pages';
+import { parseAppletPages } from '../../shared/applet-pages';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -66,6 +68,8 @@ function readManifest(folder: string): LoadedManifest {
       throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
     validateWebAccounts(folder, m.webAccounts);
   }
+  m.pages = parseAppletPages(m as unknown as ExtensionManifest);
+  for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
@@ -396,6 +400,7 @@ class ExtensionManager extends EventEmitter {
   crashed(e: ExtensionInstance, message: string) {
     if (e.state === 'stopping') return;
     void closeWebAccounts(e.manifest.id);
+    closeAppletPages(e.manifest.id);
     e.state = 'error';
     e.attention = false;
     e.error = message;
@@ -409,6 +414,7 @@ class ExtensionManager extends EventEmitter {
     this.cancelStart(e);
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
+    closeAppletPages(e.manifest.id);
     e.attention = false;
     this.emit('changed');
     const child = e.child;

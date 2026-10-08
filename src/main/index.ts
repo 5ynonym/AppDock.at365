@@ -36,6 +36,13 @@ import {
 import type { HostSnapshot, Settings } from '../shared/contracts';
 import { configureWindowRendering } from './core/window-rendering';
 import { trayIdentity } from './core/tray-identity';
+import {
+  configurePageHost,
+  updatePageViewport,
+  refreshPageDisplays,
+  localPageSource,
+} from './core/applet-pages';
+import { pageDisplay, pageKey } from '../shared/applet-pages';
 
 configureWindowRendering(app);
 
@@ -207,6 +214,7 @@ function snapshot(): HostSnapshot {
 function applySettings() {
   trayClicks?.cancel();
   nativeTheme.themeSource = settings.value.host.theme;
+  refreshPageDisplays();
   trayMenu();
   changed();
 }
@@ -242,6 +250,15 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
+    const extension = manager.items.get(extensionId);
+    const page = extension?.manifest.pages?.find((page) => page.id === pageId);
+    if (!page) throw Error('Appletページがありません。');
+    await executeCommand(page.openCommand);
+  });
+  handle('dock:pageViewport', updatePageViewport);
+  ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
+  ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   handle('dock:chooseDirectory', async () => {
     const result = await dialog.showOpenDialog(window!, {
       title: '画像ソースフォルダーを選ぶ',
@@ -477,6 +494,50 @@ async function initialize() {
     });
   }
   windowState.track(window);
+  configurePageHost({
+    window: () => window,
+    display: (key, fallback) => {
+      for (const extension of manager.items.values()) {
+        const page = extension.manifest.pages?.find(
+          (page) => pageKey(extension.manifest.id, page.id) === key,
+        );
+        if (page) return pageDisplay(settings.value, extension.manifest.id, page);
+      }
+      return fallback;
+    },
+    selected: (key) => window?.webContents.send('dock:appletPage', key),
+    failed: (message) => log.write('error', 'pages', message),
+    shortcut: (input) => {
+      if (
+        input.type !== 'keyDown' ||
+        input.isAutoRepeat ||
+        input.isComposing ||
+        shortcutRecording ||
+        quitting
+      )
+        return false;
+      const shortcut = shortcutFromEvent({
+        key: input.key,
+        code: input.code,
+        ctrlKey: input.control,
+        altKey: input.alt,
+        shiftKey: input.shift,
+        metaKey: input.meta,
+        isComposing: input.isComposing,
+      });
+      const commands = hostCommands.filter(
+        (command) =>
+          !!shortcut &&
+          !settings.value.globalShortcutCommands.includes(command.id) &&
+          settings.value.shortcuts[command.id]?.includes(shortcut),
+      );
+      if (commands.length !== 1) return false;
+      void executeCommand(commands[0].id).catch((error) =>
+        log.write('error', 'pages', String(error)),
+      );
+      return true;
+    },
+  });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.on('close', (event) => {
@@ -498,6 +559,7 @@ async function initialize() {
   window.on('blur', resumeHotKeys);
   window.webContents.on('render-process-gone', resumeHotKeys);
   window.webContents.on('did-start-loading', resumeHotKeys);
+  window.webContents.on('did-start-loading', () => updatePageViewport(null, null));
   window.webContents.on('before-input-event', (event, input) => {
     if (shortcutRecording) return;
     const shortcut = shortcutFromEvent({

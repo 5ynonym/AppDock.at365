@@ -10,6 +10,7 @@ export interface HostSettings {
 export interface ExtensionSettings {
   enabled: boolean;
   startupDelaySeconds?: number;
+  pages?: Record<string, { display: import('./applet-pages').PageDisplay }>;
   settings: Record<string, unknown>;
 }
 export interface Settings {
@@ -20,6 +21,7 @@ export interface Settings {
   globalShortcutCommands: string[];
   trayCommands: string[];
   pinnedCommands: string[];
+  ribbon: { order: string[]; hidden: string[] };
   profile: { name: string; avatar: 'avatar.png' | null };
 }
 export interface SettingsSnapshot {
@@ -110,6 +112,7 @@ export interface ExtensionManifest {
   settings?: SettingDefinition[];
   commands?: DeclaredCommand[];
   webAccounts?: import('./web-accounts').WebAccountDefinition;
+  pages?: import('./applet-pages').AppletPageDefinition[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
   displayName: string;
@@ -147,6 +150,12 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  onAppletPage(callback: (key: string | null) => void): () => void;
+  openAppletPage(extensionId: string, pageId: string): Promise<void>;
+  pageViewport(
+    key: string | null,
+    bounds: { x: number; y: number; width: number; height: number } | null,
+  ): Promise<void>;
   chooseDirectory(): Promise<string | null>;
   checkUpdates(id?: string): Promise<UpdateResult>;
   openReleases(id?: string): Promise<void>;

@@ -169,4 +169,8 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 - `core/extensions.ts` / `index.ts`: 各Appletのattentionを集約し、共通トレイの印とツールチップへ反映。停止・異常終了時は解除。
 - `renderer/main.tsx`: タブのアクセシビリティ名をモニター専用から一般パネル向けに変更。
 
-既存API v1/.NET Appletとの互換を維持します。ホスト回帰は`tests/notification-services.test.cjs`、実Electron/Nodeの統合検証は[GmailCheckerの検証スクリプト](../../Applet.GmailChecker.at365/scripts/test-ui.cjs)を参照してください。
+既存API v1/.NET Appletとの互換を維持します。ホスト回帰は`tests/notification-services.test.cjs`、現在の実Electron/Nodeの統合検証は[Gmailの検証スクリプト](../../Applet.Gmail.at365/scripts/test-gui.cjs)を参照してください。
+
+## Appletページとリボン（0.18.0）
+
+契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、renderer/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。

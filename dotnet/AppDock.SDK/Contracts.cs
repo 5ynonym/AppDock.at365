@@ -17,6 +17,7 @@ public interface IExtensionContext
     ISettingsService Settings { get; }
     INotificationService Notifications { get; }
     IUiService Ui { get; }
+    IPageService Pages => throw new NotSupportedException("Applet pages require AppDock 0.18.0 or later.");
     IBrowserService Browser { get; }
     ILogService Log { get; }
     IStorageService Storage { get; }
@@ -42,6 +43,7 @@ public interface IUiService {
     Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default);
     Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default);
 }
+public interface IPageService { Task OpenAsync(string id, CancellationToken cancellationToken = default); }
 public interface IBrowserService { Task OpenAsync(string url, CancellationToken cancellationToken = default); }
 public interface ILogService
 {

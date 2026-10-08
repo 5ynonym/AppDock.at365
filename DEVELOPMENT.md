@@ -4,6 +4,8 @@
 
 ## 文書の入口
 
+0.18.0のAppletページ宣言・Node/.NET API・限定UIブリッジ・表示先・リボン設定と検証は[Appletページとリボン](docs/applet-pages.md)を参照してください。
+
 0.17.1ではWebアカウントのローカルUIへ、自身のAppletの宣言済みboolean/静的select設定の読み書きと変更通知を追加しました。保存は既存SettingsStore、詳細は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
 0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
@@ -14,13 +16,13 @@
 - [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）、テーマ同期・音声コピー（0.15.0）、通常起動の描画（0.15.1）、準備完了後の背景同期再開・操作中の自然なフォーカス（0.15.2）。
 - [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
 - [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
-- [GmailCheckerの開発ガイド](../Applet.GmailChecker.at365/DEVELOPMENT.md): 0.11.0のNode通知APIを使うAppletと、隔離GUI・portable検証。
+- [Gmailの開発ガイド](../Applet.Gmail.at365/DEVELOPMENT.md): Node通知・Webアカウント・ページ表示と、隔離GUI・portable検証。
 
 ## 構成
 
 ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.js、ネイティブ表示を持つ専用EXEのAppletをそれぞれ別プロセスで実行します。設定JSONやAPIの `extensions` は互換性のため名前を維持します。
 
-0.17.0ではウィジェット機能・配置設定・Node/.NET APIを削除しました。独自の画面を持つAppletは`native`、Webサービスの画面はWebアカウントAPI、宣言的な表示はPanelを使用します。Watchは独自WPF画面のnative EXEです。
+0.17.0ではウィジェット機能・配置設定・Node/.NET APIを削除しました。WPF等の独自ウィンドウは`native`、WebサービスはWebアカウントAPI、宣言的な表示はPanelを使用します。0.18.0からHTML/Reactの独自操作画面にはAppletページAPIも利用できます。Watchは独自WPF画面のnative EXEです。
 
 ## 開発環境・ビルド・テスト
 
