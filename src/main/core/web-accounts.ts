@@ -30,8 +30,15 @@ import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-a
 type Saved = {
   version: 1;
   selected: string;
-  accounts: { id: string; name: string; sound?: WebAccountSound; monitoring?: boolean }[];
+  accounts: {
+    id: string;
+    name: string;
+    temporaryName?: boolean;
+    sound?: WebAccountSound;
+    monitoring?: boolean;
+  }[];
 };
+const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
   capabilities: string[];
   shortcut(input: Input): boolean;
@@ -236,13 +243,19 @@ export class WebAccountController {
       )
         throw Error('アカウント設定を読み込めません。元のファイルを保持しています。');
       for (const a of s.accounts) {
+        if (a.temporaryName !== undefined && typeof a.temporaryName !== 'boolean')
+          throw Error('アカウントの仮名設定を読み込めません。元のファイルを保持しています。');
         if (a.sound !== undefined) parseWebAccountSound(a.sound);
         if (a.monitoring !== undefined && typeof a.monitoring !== 'boolean')
           throw Error('アカウントの監視設定を読み込めません。元のファイルを保持しています。');
       }
     } else {
       const id = randomUUID();
-      this.state = { version: 1, accounts: [{ id, name: 'アカウント 1' }], selected: id };
+      this.state = {
+        version: 1,
+        accounts: [{ id, name: temporaryAccountName, temporaryName: true }],
+        selected: id,
+      };
       this.save(this.state);
     }
     nativeTheme.on('updated', this.themeChanged);
@@ -280,6 +293,25 @@ export class WebAccountController {
   }
   private accountSession(id: string) {
     return session.fromPath(path.join(this.root, 'sessions', id));
+  }
+  private updateAccountName(id: string, raw: unknown) {
+    const a = this.account(id);
+    const temporary =
+      a.temporaryName ?? (a.name === temporaryAccountName || /^アカウント [1-9]\d?$/.test(a.name));
+    if (
+      !temporary ||
+      typeof raw !== 'string' ||
+      !raw.trim() ||
+      raw.length > 60 ||
+      /[\u0000-\u001f\u007f]/.test(raw)
+    )
+      return;
+    this.save({
+      ...this.state,
+      accounts: this.state.accounts.map((item) =>
+        item.id === id ? { ...item, name: raw.trim(), temporaryName: false } : item,
+      ),
+    });
   }
   private updateAvatar(id: string, raw: unknown) {
     const url = webAvatarURL(raw, this.definition.avatarOrigins ?? []);
@@ -391,8 +423,22 @@ export class WebAccountController {
     if (!accounts.length) return;
     const index = accounts.findIndex((a) => a.id === this.state.selected);
     const next = accounts[(Math.max(0, index) + direction + accounts.length) % accounts.length];
+    // Transfer input only inside the already-active mail window. Commands from
+    // another app must keep that app's focus, including hidden/minimized mail.
+    const transferInput =
+      this.window?.isFocused() &&
+      this.window.isVisible() &&
+      !this.window.isMinimized() &&
+      this.attached?.webContents.isFocused();
     this.save({ ...this.state, selected: next.id });
     this.show(next.id);
+    if (
+      transferInput &&
+      this.window?.isFocused() &&
+      this.attached &&
+      this.window.contentView.children.includes(this.attached)
+    )
+      this.attached.webContents.focus();
   }
   private backgroundWindow() {
     if (!this.background) {
@@ -748,7 +794,7 @@ export class WebAccountController {
           ...this.state,
           accounts: [
             ...this.state.accounts,
-            { id, name: `アカウント ${this.state.accounts.length + 1}` },
+            { id, name: temporaryAccountName, temporaryName: true },
           ],
           selected: id,
         });
@@ -806,7 +852,7 @@ export class WebAccountController {
         this.save({
           ...this.state,
           accounts: this.state.accounts.map((item) =>
-            item.id === a.id ? { ...a, name: name.trim() } : item,
+            item.id === a.id ? { ...a, name: name.trim(), temporaryName: false } : item,
           ),
         });
         return;
@@ -999,6 +1045,12 @@ export class WebAccountController {
         if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
           throw Error('Observation too large');
         status.observation = result;
+        this.updateAccountName(
+          a.id,
+          result && typeof result === 'object' && 'accountName' in result
+            ? result.accountName
+            : null,
+        );
         this.updateAvatar(
           a.id,
           result && typeof result === 'object' && 'avatar' in result ? result.avatar : null,

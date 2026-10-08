@@ -172,6 +172,84 @@ test('Account ordering preserves selected IDs, sessions and settings; monitoring
   assert.ok(fake.monitoringResets.has('a'));
 });
 
+test('Cycle transfers focused Gmail input but preserves local UI and other windows', async () => {
+  const { WebAccountController: Controller } = require('../out/main/main/core/web-accounts');
+  let windowFocused = true,
+    pageFocused = true,
+    transfers = 0;
+  const nextView = {
+    webContents: {
+      focus() {
+        transfers++;
+      },
+    },
+  };
+  const fake = {
+    state: { accounts: [{ id: 'a' }, { id: 'b' }], selected: 'a' },
+    deleting: new Set(),
+    window: {
+      isFocused: () => windowFocused,
+      isVisible: () => true,
+      isMinimized: () => false,
+      contentView: { children: [nextView] },
+    },
+    attached: { webContents: { isFocused: () => pageFocused } },
+    save(next) {
+      this.state = next;
+    },
+    show() {
+      this.attached = nextView;
+    },
+  };
+  const cycle = async () => {
+    fake.attached = { webContents: { isFocused: () => pageFocused } };
+    await Controller.prototype.cycle.call(fake, 1);
+  };
+  await cycle();
+  assert.equal(transfers, 1);
+  windowFocused = false;
+  await cycle();
+  assert.equal(transfers, 1);
+  windowFocused = true;
+  pageFocused = false;
+  await cycle();
+  assert.equal(transfers, 1);
+});
+
+test('Only temporary account names are replaced and explicit renames win', async () => {
+  const { WebAccountController: Controller } = require('../out/main/main/core/web-accounts');
+  const fake = {
+    state: {
+      accounts: [
+        { id: 'new', name: '新しいアカウント', temporaryName: true, monitoring: false },
+        { id: 'legacy', name: 'アカウント 2' },
+        { id: 'custom', name: '仕事用' },
+      ],
+      selected: 'new',
+    },
+    deleting: new Set(),
+    account: Controller.prototype.account,
+    save(next) {
+      this.state = next;
+    },
+  };
+  const update = (id, value) => Controller.prototype.updateAccountName.call(fake, id, value);
+  for (const raw of [null, {}, '', 'x'.repeat(61), 'bad\nname']) update('new', raw);
+  assert.equal(fake.state.accounts[0].name, '新しいアカウント');
+  update('new', 'Gmail Name');
+  assert.equal(fake.state.accounts[0].name, 'Gmail Name');
+  assert.equal(fake.state.accounts[0].monitoring, false);
+  update('new', 'Later Name');
+  assert.equal(fake.state.accounts[0].name, 'Gmail Name');
+  update('legacy', 'account@example.test');
+  assert.equal(fake.state.accounts[1].name, 'account@example.test');
+  update('custom', 'Ignored');
+  assert.equal(fake.state.accounts[2].name, '仕事用');
+  await Controller.prototype.invoke.call(fake, 'rename', ['new', '新しいアカウント']);
+  update('new', 'Ignored after explicit rename');
+  assert.equal(fake.state.accounts[0].name, '新しいアカウント');
+});
+
 test('Web account viewport and transient UI report are bounded', () => {
   assert.equal(parseWebViewport(null), null);
   assert.deepEqual(parseWebViewport({ x: 20, y: 100, width: 800, height: 600, extra: 1 }), {

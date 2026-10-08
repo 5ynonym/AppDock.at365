@@ -50,6 +50,8 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
 
+0.16.3では、観測の任意の`accountName`（制御文字なしの1〜60文字）を仮名の置換に使います。新規枠は`name:"新しいアカウント"/temporaryName:true`で保存します。取得成功または明示的なrenameで`temporaryName:false`とし、以後は自動変更しません。旧保存形式でフラグがない場合は「新しいアカウント」または「アカウント N」の完全一致だけを仮名と扱い、利用者の名前・UUID・ログイン・順番・音・監視設定を保持します。Gmail固有の名前/メール抽出はAppletのobserverへ置きます。受信トレイのreadyとは独立して処理し、監視OFFでも本人情報を取得できます。
+
 ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`を公開します。0.14.0は`cycle/openItem/setSound/pickSound/testSound`を追加します。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
 
 `openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
@@ -61,6 +63,8 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 0.15.0のsnapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 
 操作UIと各WebContentsのbefore-input-eventで、自分のAppletの登録済みコマンドに一致するローカルshortcutだけを実行します。利用者設定を毎回参照し、global指定済みのコマンドはここから実行しません。キー長押し・IME入力中は実行せず、同じキーに複数の自身のコマンドが一致した場合も実行しません。Gmailの初期Ctrl+Tab/Ctrl+Shift+Tabはホストの既定shortcutsで、明示の空配列/変更を保持します。
+
+0.16.3のcycleは、切替前に操作Windowがアクティブかつ表示中で、選択中WebContents自身が入力フォーカスを持つ場合だけ、接続後の切替先WebContentsへ入力を渡します。Windowのshow/focus/restoreは呼びません。ローカルUIの入力欄、別Windowの前面、未表示/非表示/最小化は保持します。切替後に毎回wc.focusを呼んでからキーを送る試験は不具合を隠すため、最初の1回だけフォーカスを設定し、以後はgetFocusedWebContentsに連続してキーを送る試験を使います。
 
 `viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は操作WindowからViewを外して背景Windowへ戻し、アカウント切替後も操作画面へ表示せず、ページと監視を続けます。UIではResizeObserver等で実領域を再送してください。未呼出しの旧UIは既定レイアウトを維持します。
 
