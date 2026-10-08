@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-08: v0.16.4 通知領域のアイコン識別を更新間で維持
+
+- ユーザーが修正版の正常動作を確認したと報告（2026-10-08）。その確認を受け、今回の修正と検証記録をコミット。利用者の確認は自動試験の結果と区別し、全OS版の表示位置や将来の実利用更新まで検証済みとは扱わない。
+- 旧版はTrayのGUIDがなく、electron-builder26.15.3のportable展開先がbuildごとに変わっていた。Windows NotifyIconSettingsでも複数の旧TEMPパスに個別のIsPromoted=1があり、ユーザーの毎回ピン留めの報告と整合。タスクバーの固定AppUserModelId/元EXE参照は維持。
+- 新ランチャーはTEMP/外側EXE/test-profileから版番号を含まないSHA256の展開先を生成し、Trayは実行パス/保存先からUUID v5を生成。異なる配置/隔離profileには別ID。gateとkernel leaseで使用中の再展開を避け、子へleaseをDuplicateHandleする。再起動/二重起動/ランチャーだけの強制終了後も保護し、最後の終了で生成領域を整理。
+- 型検査・Vite・ホスト93/93成功。最終通常圧縮EXEを使う`tray-identity-1791441890232/日本語 profile/result.json`はok:true。0.16.4から別metadata版0.16.4-tray-updateへの置換前後で、実行パス・GUID・Windowsの登録キー・IsPromoted=1が一致。通常再起動、2つの同時起動で本体PID/資産保持、コマンド再起動、ランチャーだけの終了後の本体保護/再接続、次回の回復と最後の生成領域削除を確認。専用アイコンのテスト表示設定は元へ復元し、実利用の設定は変更していない。Windows設定画面での利用者のピン操作/全OS版の表示位置は未確認。
+- 既存トレイGUIのtray-ui-1791441841077はok:true。クリック/ダブルクリック/メニュー/保存/再起動後の設定が成功。最終配布EXEのhost-commands-1791441961159もok:true/portable:true。パレット再起動、新PID、重複再起動防止、設定保持、終了キー、Applet deactivateと全host/worker終了を確認。
+- 初期の検証エラー: StdUtilsのプロセスハンドルはhProc:<hex>というタグ形式だった。数値HANDLEへ検証/変換してからWin32の待機・終了コード取得・解放/DuplicateHandleを使うよう修正。レジストリ確認用JSのパスエスケープも修正。直接NodeでのAPI発行はpnpm環境不足で失敗したため、既存dev.batのローカルツール環境で実施。最終試験の実成功を採用し、途中の終了コード0でもエラー出力があった試験は成功扱いしない。最終CLIの失敗は明示のprocess.exit(1)で返す。
+- 最終EXE100581824bytes、SHA256 E4785E4B6F0E77773B9A4E7662C9B22252E6A22CB5C98FAB2EA7FC7B755207BE。.NETホストはframework-dependent、SDK/Runtime/APIは変更なし。今回の更新後は初回のみ必要に応じてWindows側のピン設定を行う。同じ配置/EXE名/TEMPの更新間で維持し、移動/改名/Windows自身の設定リセットは対象外。実利用先deploy/commit/pushなし。
+- 途中の失敗試験が残した6つのTEMP実行領域は、各専用profileのハッシュ・親TEMP・reparse pointなし・稼働プロセスなしを検証して削除し、全対象の消失を確認。最終試験の自動整理は正常。一時診断コードは配布版から除去済み。
+
 ## 2026-10-08: v0.16.3 Gmail連続切替と仮名の自動設定
 
 - ユーザー補足の「1回目は効くが、クリックせず2回目が効かない」を旧0.16.2配布版で再現。以前のGUI試験は切替ごとに対象wc.focusを呼んでおり、入力先の消失を隠していた。新試験は初回だけfocusし、その後はgetFocusedWebContentsへキーを送る。修正は既にアクティブなGmail WebContentsの入力先だけを接続済みの切替先へ引き継ぐ。

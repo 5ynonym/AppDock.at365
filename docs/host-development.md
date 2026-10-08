@@ -161,6 +161,8 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 デスクトップ固定の初回と非表示からの復帰では、Shellへの接続後にElectronの`showInactive()`も呼び、Chromiumの描画を開始してから親と座標を再確認します。Win32の`SWP_SHOWWINDOW`と`IsWindowVisible`だけでは描画の開始を確認できません。定期確認では表示済み画面を繰り返しshowしません。`test:widget-desktop`は隔離Node fixtureを使い、実デスクトップの露出した180×120pxだけで表示・更新・通常ウィンドウによる遮蔽・非表示からの復帰・透過を検証します。
 0.16.3はWebアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。詳細と旧保存形式の互換性は[WebアカウントAPI](web-accounts.md)を参照してください。
 
+0.16.4のportableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
+
 ## GmailChecker対応（0.11.0）
 
 - `node-worker.ts`: `ui.pickFile`、`audio.play`、`tray.attention`、通知オプションを追加。ファイル選択だけRPC期限を5分に拡張。
