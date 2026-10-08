@@ -211,6 +211,7 @@ function runTrayCommand(id: string) {
 function snapshot(): HostSnapshot {
   return {
     startupReady,
+    windowVisible: !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
@@ -674,6 +675,10 @@ async function initialize() {
     void syncHotKeys();
   };
   window.on('blur', resumeHotKeys);
+  window.on('show', changed);
+  window.on('hide', changed);
+  window.on('minimize', changed);
+  window.on('restore', changed);
   window.webContents.on('render-process-gone', resumeHotKeys);
   window.webContents.on('did-start-loading', resumeHotKeys);
   window.webContents.on('did-start-loading', () => updatePageViewport(null, null));
@@ -731,6 +736,7 @@ async function initialize() {
     try {
       const result = JSON.parse(fs.readFileSync(updateResultFile, 'utf8'));
       updater.state.phase = result.message;
+      updater.state.completion = { ok: result.ok === true, message: String(result.message) };
       log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
       const temporary =
         typeof result.temporaryDirectory === 'string'

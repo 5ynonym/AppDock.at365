@@ -143,6 +143,7 @@ export interface LogEntry {
 }
 export interface HostSnapshot {
   startupReady: boolean;
+  windowVisible: boolean;
   updates: UpdateState;
   globalHotKeys: GlobalHotKeyStatus[];
   settings: SettingsSnapshot;
@@ -212,6 +213,7 @@ export interface UpdateSettings {
   allowSameVersion: boolean;
 }
 export interface UpdateState {
+  completion?: { ok: boolean; message: string };
   cancellable?: boolean;
   progress?: {
     id: string;

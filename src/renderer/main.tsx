@@ -27,6 +27,7 @@ import { SettingsActions, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
+import { UpdateCompletionNotice } from './UpdateCompletionNotice';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
@@ -859,10 +860,13 @@ function App() {
         )}
       </main>
       <footer className="statusbar">
-        <span>
+        <UpdateCompletionNotice
+          completion={snapshot?.updates.completion}
+          visible={snapshot?.windowVisible ?? false}
+        >
           <i />
           実行中 {active} Applet
-        </span>
+        </UpdateCompletionNotice>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
           <VersionCheck compact disabled={editor.dirty} />

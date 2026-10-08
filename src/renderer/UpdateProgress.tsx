@@ -11,7 +11,8 @@ export function UpdateProgress({ state }: { state: UpdateState }) {
       setError('');
     }
   }, [state.busy]);
-  if (!state.busy && (!state.phase || dismissed === state.phase)) return null;
+  if (!state.busy && (state.completion?.ok || !state.phase || dismissed === state.phase))
+    return null;
   const progress = state.progress;
   return (
     <section className="update-operation" aria-label="更新の進行状況">

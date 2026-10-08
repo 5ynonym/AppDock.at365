@@ -325,6 +325,7 @@ export class PortableUpdates {
     this.state.busy = true;
     this.state.cancellable = true;
     this.state.progress = undefined;
+    this.state.completion = undefined;
     this.state.phase = phase;
     this.options.changed();
   }
