@@ -1,5 +1,5 @@
 import type { Settings } from './contracts';
-import { validPageId, validRibbonId } from './applet-pages';
+import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -24,7 +24,7 @@ export const createDefaultSettings = (): Settings => ({
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
   trayCommands: [],
   pinnedCommands: [],
-  ribbon: { order: [], hidden: [] },
+  ribbon: defaultRibbon(),
   profile: { name: 'ユキ', avatar: null },
 });
 export function parseSettings(value: unknown): Settings {
@@ -90,20 +90,35 @@ export function parseSettings(value: unknown): Settings {
     )
       throw Error(`拡張設定 ${id} のページ表示方法が不正です。`);
   }
-  const ribbon = value.ribbon === undefined ? { order: [], hidden: [] } : value.ribbon;
+  const rawRibbon = value.ribbon === undefined ? defaultRibbon() : value.ribbon;
+  const ribbon = object(rawRibbon)
+    ? {
+        ...rawRibbon,
+        bottom: rawRibbon.bottom === undefined ? [] : rawRibbon.bottom,
+        separators: rawRibbon.separators === undefined ? [] : rawRibbon.separators,
+      }
+    : rawRibbon;
   if (
     !object(ribbon) ||
-    ['order', 'hidden'].some((key) => {
+    ['order', 'hidden', 'bottom', 'separators'].some((key) => {
       const ids = ribbon[key];
       return (
         !Array.isArray(ids) ||
-        ids.length > 500 ||
+        ids.length > (key === 'separators' ? 50 : 500) ||
         ids.some((id) => !validRibbonId(id)) ||
+        (key === 'separators' && ids.some((id) => !validSeparatorId(id))) ||
         new Set(ids).size !== ids.length
       );
     })
   )
-    throw Error('ribbon.order / hidden は重複のないリボンIDの配列です。');
+    throw Error('ribbon.order / hidden / bottom / separators は重複のないリボンIDの配列です。');
+  for (const key of ['order', 'hidden', 'bottom'])
+    if (
+      (ribbon[key] as string[]).some(
+        (id) => validSeparatorId(id) && !(ribbon.separators as string[]).includes(id),
+      )
+    )
+      throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
   const shortcuts = parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
   const globalShortcutCommands =
     value.globalShortcutCommands === undefined

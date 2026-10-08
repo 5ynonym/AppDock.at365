@@ -11,6 +11,7 @@ export interface AppletPageDefinition {
   defaultDisplay?: PageDisplay;
 }
 export interface RibbonItem {
+  kind?: 'separator';
   id: string;
   title: string;
   icon: string;
@@ -33,7 +34,16 @@ export const validPageId = (id: unknown): id is string =>
 export const validRibbonId = (id: unknown): id is string =>
   typeof id === 'string' &&
   (builtinRibbon.some((item) => item.id === id) ||
-    /^page:[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id));
+    /^page:[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id) ||
+    validSeparatorId(id));
+export const validSeparatorId = (id: unknown): id is string =>
+  typeof id === 'string' && /^separator:[a-z0-9][a-z0-9-]{0,79}$/.test(id);
+export const defaultRibbon = () => ({
+  order: [] as string[],
+  hidden: [] as string[],
+  bottom: ['theme', 'profile'],
+  separators: [] as string[],
+});
 
 export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinition[] {
   const pages = manifest.pages;
@@ -79,7 +89,10 @@ export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinit
     return { ...page, title: page.title.trim() };
   });
 }
-export function ribbonItems(extensions: ExtensionManifest[]): RibbonItem[] {
+export function ribbonItems(
+  extensions: ExtensionManifest[],
+  separators: string[] = [],
+): RibbonItem[] {
   const applets = extensions.flatMap((extension) =>
     (extension.pages ?? []).map((page) => ({
       id: pageKey(extension.id, page.id),
@@ -89,7 +102,17 @@ export function ribbonItems(extensions: ExtensionManifest[]): RibbonItem[] {
       pageId: page.id,
     })),
   );
-  return [...builtinRibbon.slice(0, 4), ...applets, ...builtinRibbon.slice(4)];
+  return [
+    ...builtinRibbon.slice(0, 4),
+    ...applets,
+    ...builtinRibbon.slice(4),
+    ...separators.map((id, index): RibbonItem => ({
+      id,
+      title: `セパレーター ${index + 1}`,
+      icon: '',
+      kind: 'separator',
+    })),
+  ];
 }
 export function orderRibbon(items: RibbonItem[], order: string[]): RibbonItem[] {
   const byId = new Map(items.map((item) => [item.id, item]));

@@ -2387,3 +2387,36 @@ summary {
   cursor: grab;
   opacity: 0.6;
 }
+
+.activity-rail {
+  min-height: 0;
+  overflow: hidden;
+}
+.rail-spacer {
+  min-height: 12px;
+}
+.ribbon-separator {
+  height: 1px;
+  min-height: 1px;
+  width: 38px;
+  margin: 7px auto;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.ribbon-placement {
+  margin: 22px 0;
+}
+.ribbon-group-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ribbon-group-heading h4 {
+  margin: 0;
+}
+.ribbon-setting-row select {
+  width: 100px;
+  flex-shrink: 0;
+}

@@ -201,7 +201,19 @@ const checks = [];
     await save();
     await button('ショートカット').click();
     await page.getByRole('heading', { name: '未確認のコマンド', exact: true }).waitFor();
-    await button('AppDockのキー').click();
+    await page.getByLabel('設定するAppletを検索').fill('');
+    assert.equal(
+      await page
+        .locator('.settings-applet-list .sidebar-extensions button')
+        .first()
+        .locator('span')
+        .textContent(),
+      'AppDock',
+    );
+    await page
+      .locator('.settings-applet-list')
+      .getByRole('button', { name: 'AppDock', exact: true })
+      .click();
     assert.equal(await page.locator('.shortcut-row').count(), 5);
     checks.push(
       'owner scope / cross-applet conflicts / status filters / unknown commands / host keys',

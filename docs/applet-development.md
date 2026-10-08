@@ -199,3 +199,5 @@ Webサービスの対話ログインとアカウント別ページが必要なNo
 ## Appletページの追加（0.18.0）
 
 HTML/Reactで独自画面を作り、リボンから本体ページまたは独立Windowとして開く場合は[Appletページとリボン](applet-pages.md)を参照してください。manifestのpages、安定したページIDとopenCommand、pages capabilityを宣言します。Nodeはcontext.pages.open、.NET/nativeはcontext.Pages.OpenAsyncを利用します。WebアカウントUIはsource:web-accountsと既存openを再利用します。
+
+AppDock 0.19.0ではページボタンを上寄せ/下寄せへ利用者が配置し、間にセパレーターを置けます。Appletのページ宣言やopen APIは0.18.0から変わらず、配置はホストが管理します。
