@@ -1,5 +1,28 @@
 # 検証記録
 
+## 2026-10-08: 実利用先へのdeploy
+
+- 配置後の実利用について、ユーザーが正常動作を確認したと報告（2026-10-08）。
+
+- ユーザーの明示指示により、AppDockと全6Appletの`deploy.bat`を引数なしで実行し、7件すべて終了コード0。配置先は`A:\00.ESSENTIAL\00.MainTools\AppDock.at365`。5つの.NET Appletは現ソース/SDKで`publish.bat`を先に実行し、Gmailはdeploy内で再発行した。
+- AppDock0.16.2、Gmail0.5.1、WallpaperSlideshow0.3.0、Watch0.1.1（native）、WebBrowserTools0.2.4、WindowMover0.2.1、WindowsTools0.1.1を配置。Watchの古いDLL版manifestを配置せず、現ソースのnative版へ更新。
+- 配置対象21ファイルのSHA256はすべて発行元と一致。現ソースと配置manifestの版/runtime/entry、minimumHostVersionも照合。settings.json・avatar.png・Gmail accounts.jsonの3ファイルは配置前後のハッシュ不変。
+- 配置前後とも関連プロセスなし。実利用アプリは起動していないため、次回起動で反映する。旧ファイル退避は行わず、設定・認証領域を配置スクリプトで変更していない。結果は`../AppDock.at365/artifacts/deploy-2026-10-08-result.json`（本体では`artifacts/deploy-2026-10-08-result.json`）。
+
+## 2026-10-08: v0.16.2 依存パッケージ更新
+
+- npm公式レジストリのlatestタグを照会し、Electron 44.5.1→44.6.0、Vite 8.3.2→8.3.3、@vitejs/plugin-react 6.1.1→6.1.2へ更新。間接依存はpostcss 8.5.28→8.5.29、nanoid 3.3.19→3.3.20へ更新し、pnpm-lock.yamlを再生成。React/React DOM・型定義・TypeScript・Playwright・electron-builder・Prettierは既に最新。最終`dev.bat outdated --format json`は`{}`、終了コード0。
+- ローカルpnpmは11.25.0→12.10.1。Node 24.21.0は公式indexで最新24 LTSと確認して維持（Currentの26.11.1へは変更なし）。グローバルインストール/PATH変更なし。
+- pnpm 12のnative EXE化により、従来のnpm --ignore-scripts取得ではWindows shimが起動できなかった。取得後にpnpm自身の公式install.jsだけを実行し、npm rebuild --ignore-scriptsでWindows shimを再生成するようsetup-tools.ps1を修正。初回クリーン取得・連続再実行・dev.bat --version=12.10.1成功。旧版ローカルツールは保持。参考: [pnpmの公式導入手順](https://pnpm.io/installation/)。
+- 新Electronはインストール時の依存postinstallを持たず、通常CLIの初回起動時に取得する。Playwright等は直接EXEを使うため、プロジェクトのpostinstallにinstall-electronを追加。`dev.bat install --frozen-lockfile --config.optimisticRepeatInstall=false`でroot postinstallとlockfileの再現インストールを確認。`dev.bat run postinstall`でも44.6.0実体を確認。参考: [Electronの公式バイナリ取得仕様](https://www.electronjs.org/docs/latest/tutorial/installation)。
+- 型検査・Vite build・ホスト90/90・Gmail20/20成功。5つの.NET AppletのRelease buildは最終警告0/エラー0、既存回帰成功。WallpaperSlideshowは4グループ、Watch8/8、WebBrowserTools13/13、WindowMover23/23、WindowsTools11/11。各slnxのNuGet更新照会では更新なし、ソースにも外部PackageReferenceなし。Gmailはホストの依存を共有する。
+- WindowsToolsのテスト用FakeContextが現SDKのIUiService.GetImageDirectoryAsyncに未追従でCS0535。未使用メソッドをNotSupportedExceptionとして追加し、新しいbuildから11/11を再実行。最初の失敗後に--no-buildで旧出力が成功した結果は最終検証として扱わない。
+- トレイGUIの設定見出しlocatorがh1/h2の2件に一致して失敗。ページh1（level:1）を指定して再実行成功。製品の設定画面やトレイ動作は変更なし。
+- AppDock隔離GUI: `artifacts/ui-1791435600421`（React移動、.NET起動/操作/停止、設定保存・無効JSON、暗号化secrets）、トレイ`artifacts/tray-ui-1791435643517`（実メニュー、single/double、OS間隔、再起動保存）、Widget `artifacts/widgets-ui-1791435647510`（時計tick・全9文字揃え・透過画面・Shell接続・配置保存・再起動）が成功。Widget検証はfixture DLLを使用し、native Watch実画面とは区別する。
+- Gmailの最新依存でのオフラインUI: `../Applet.Gmail.at365/artifacts/accounts-1791435471926/result.json`と`ui-features-1791435496597/result.json`成功。画像/枠分離・切替の前面保持・個別監視・入力/順序保存・検索/未読・削除反映・キー・音コピー・テーマ・位置/サイズ保存を確認。通常Electron/Playwrightなしの最終app.asar背景試験`native-background-1791435598245/result.json`も成功（初回未表示の2枠更新・非選択枠・reload・認証解除・終了）。実Gmailのアカウントやメールは操作していない。
+- 最終単一EXEの`../Applet.Gmail.at365/artifacts/portable-1791435656782/result.json`はhost0.16.2、ok:true/exitCode0。実EXE展開・隔離WebContentsView・到着判定・停止/再開・正常終了成功。最終EXE100,579,516 bytes、SHA256 `48E647F7C7631C13D8176A554829035CE2E3916210E01C5223E20EB0D19D4EB1`。.NETホストはframework-dependentクリーン発行、coreclr/hostfxr/hostpolicy等Runtime混入なし。
+- README/DEVELOPMENT/本記録と各Appletの検証記録を更新。package.jsonのPrettier、setup-tools.ps1のPowerShell構文解析成功（PrettierはPS1非対応なので対象外）。通常隔離シェルはhelper_unknown_errorで起動できず、許可された通常Windows実行環境で検証した。実利用先deploy・外部pushなし。実メール到着、実ブラウザー操作、壁紙変更、ディスプレイOFF/ロック、長期常駐・スリープ復帰は今回の検証対象外。
+
 ## 2026-10-08: v0.16.1 認証済みアバター・非アクティブなアカウント切替
 
 - 画像要求を当該アカウントのsession/credentials:includeへ変更。0.16.0の未認証取得ではGoogleの設定済みアバターURLが標準画像へ置き換わることを実Gmailで再現した。Cookieの適用はChromiumの各sessionへ閉じ、他枠へコピーせず、UI/Node/ログへ値を出さない。origin/転送数/時間/サイズ制限は維持する。

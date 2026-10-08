@@ -218,7 +218,7 @@ const trayStructure = () =>
     await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
     assert.equal(await count(page), '3');
     await application.evaluate(() => globalThis.testTray.emit('click'));
-    await page.getByRole('heading', { name: '設定', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '設定', exact: true, level: 1 }).waitFor();
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page
       .getByLabel('トレイクリックのコマンド', { exact: true })

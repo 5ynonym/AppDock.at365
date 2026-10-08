@@ -1,12 +1,13 @@
 {
   "name": "appdock-at365",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
   "license": "UNLICENSED",
   "main": "out/main/main/index.js",
   "scripts": {
+    "postinstall": "install-electron",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.main.json && vite build",
     "start": "pnpm run build && electron .",
@@ -32,13 +33,13 @@
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "electron": "44.5.1",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "44.6.0",
     "electron-builder": "26.15.3",
     "playwright": "^1.63.0",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
+    "vite": "^8.3.3"
   },
   "build": {
     "appId": "at365.appdock",
