@@ -27,7 +27,12 @@ import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
-import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
+import {
+  getKeybindings,
+  initializeExtensionDefaults,
+  initializeWebAppletDefaults,
+  resolveKeybindings,
+} from '../shared/keybindings';
 import { ShortcutDispatcher } from './core/shortcut-dispatcher';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
@@ -400,9 +405,10 @@ function registerIpc() {
     await syncHotKeys();
   });
   handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) => {
-    const next = parseSettings(value);
+    let next = parseSettings(value);
     webApplets.validateAccounts(next.webApplets.items);
     validateAppletSettings(next, manager.snapshot());
+    next = initializeWebAppletDefaults(next, settings.value);
     return saveUserSettings(settings, baseDirectory, next, revision, avatar);
   });
   handle('dock:setPinnedCommands', (ids: string[]) =>
@@ -815,7 +821,10 @@ async function initialize() {
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
   if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   manager.discover();
-  const migrated = withoutMissingSamples(settings.value, manager.items.keys());
+  const migrated = initializeExtensionDefaults(
+    withoutMissingSamples(settings.value, manager.items.keys()),
+    [...manager.items.values()].map((item) => item.manifest),
+  );
   if (JSON.stringify(migrated) !== JSON.stringify(settings.value))
     settings.save(migrated, settings.revision);
   await manager.reconcile();

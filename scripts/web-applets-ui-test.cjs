@@ -157,6 +157,8 @@ async function remote(id) {
   );
   await dock.locator('[data-ribbon-id="extensions"]').click();
   await dock.getByRole('button', { name: 'WebAppletを追加', exact: true }).click();
+  await dock.getByLabel('既定のショートカット1', { exact: true }).press('Control+F6');
+  await dock.getByLabel('既定の割り当て2を有効にする', { exact: true }).uncheck();
   await dock.getByRole('button', { name: '＋ WebAppletを追加', exact: true }).click();
   await dock.getByLabel('WebAppletのURL', { exact: true }).fill(`http://127.0.0.1:${port}/start`);
   await dock.getByLabel('WebAppletの表示方法', { exact: true }).focus();
@@ -177,10 +179,20 @@ async function remote(id) {
   }, 'save new applet');
   const id = s.settings.value.webApplets.items[0].id,
     accountId = s.webAccounts[0].id;
+  assert.deepEqual(
+    s.settings.value.keybindings
+      .filter((binding) => binding.command.startsWith(`${id}.`))
+      .map((binding) => [binding.command, binding.key, binding.enabled, binding.when.scope]),
+    [
+      [`${id}.reload`, 'Ctrl+F6', true, 'owner'],
+      [`${id}.back`, 'Alt+Left', false, 'owner'],
+      [`${id}.forward`, 'Alt+Right', true, 'owner'],
+    ],
+  );
   assert.ok(s.settings.value.webApplets.items[0].icon.startsWith('data:image/png;base64,'));
   assert.equal(s.extensions.find((a) => a.id === id).runtime, 'web');
   checks.push(
-    'UI add, automatic standard manifest name/icon/navigation, saved virtual Applet and ribbon',
+    'UI template edits copy into new WebApplet bindings; automatic manifest name/icon/navigation, saved virtual Applet and ribbon',
   );
   assert.equal(await dock.locator('.web-account-row').count(), 0);
   assert.equal(
@@ -489,7 +501,13 @@ async function remote(id) {
     const item = v.webApplets.items.find((a) => a.id === id);
     item.allowedOrigins = [];
     item.navigation = 'any';
-    v.shortcuts[`${id}.home`] = ['Alt+H'];
+    v.keybindings.push({
+      id: 'web-test.home',
+      command: `${id}.home`,
+      key: 'Alt+H',
+      enabled: true,
+      when: { scope: 'owner', appletIds: [] },
+    });
   }, id);
   await web.evaluate(() => document.querySelector('#outside').click());
   await until(() => web.url().includes(String(otherPort)), 'explicit any navigation');

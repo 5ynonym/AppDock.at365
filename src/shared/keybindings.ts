@@ -21,6 +21,7 @@ export interface Keybinding {
   enabled: boolean;
   when: { scope: ShortcutScope; appletIds: string[] };
 }
+export type KeybindingDefault = Omit<Keybinding, 'id'>;
 export interface ShortcutContext {
   appFocused: boolean;
   appletId?: string;
@@ -63,6 +64,104 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       when: { scope: when.scope as ShortcutScope, appletIds: [...when.appletIds] as string[] },
     };
   });
+}
+/** Manifest defaults may only name commands declared by the same Applet. */
+export function parseKeybindingDefaults(
+  value: unknown,
+  commands: string[],
+  limit = 100,
+): KeybindingDefault[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > limit)
+    throw Error(`既定のキーバインドは${limit}件以内の配列です。`);
+  const allowed = new Set(commands);
+  return parseKeybindings(
+    value.map((row, index) => {
+      if (
+        !object(row) ||
+        !allowed.has(String(row.command)) ||
+        Object.keys(row).some((key) => !['command', 'key', 'enabled', 'when'].includes(key))
+      )
+        throw Error('既定のキーバインドには自身の登録コマンドだけを指定してください。');
+      return { ...row, id: `default.${index}` };
+    }),
+  ).map(({ id: _id, ...row }) => row);
+}
+
+export function addDefaultBindings(
+  rows: Keybinding[],
+  owner: string,
+  defaults: KeybindingDefault[],
+): Keybinding[] {
+  const assigned = new Set(rows.map((row) => row.command));
+  return [
+    ...rows,
+    ...defaults.flatMap((row, index) =>
+      assigned.has(row.command)
+        ? []
+        : [
+            {
+              ...row,
+              id: `applet-default.${owner}.${index}`,
+              when: { ...row.when, appletIds: [...row.when.appletIds] },
+            },
+          ],
+    ),
+  ];
+}
+
+export function initializeExtensionDefaults(
+  settings: Settings,
+  applets: { id: string; defaultKeybindings?: KeybindingDefault[] }[],
+): Settings {
+  const initialized = new Set(settings.keybindingDefaultsInitialized ?? []);
+  let rows = getKeybindings(settings);
+  for (const applet of applets) {
+    if (initialized.has(applet.id)) continue;
+    // An Applet already present in older settings has user-owned shortcut state.
+    if (!settings.extensions[applet.id])
+      rows = addDefaultBindings(rows, applet.id, applet.defaultKeybindings ?? []);
+    initialized.add(applet.id);
+  }
+  return withKeybindings({ ...settings, keybindingDefaultsInitialized: [...initialized] }, rows);
+}
+
+export function initializeWebAppletDefaults(settings: Settings, previous: Settings): Settings {
+  const existing = new Set(previous.webApplets.items.map((item) => item.id));
+  let rows = getKeybindings(settings);
+  for (const item of settings.webApplets.items) {
+    if (existing.has(item.id)) continue;
+    rows = addDefaultBindings(
+      rows,
+      item.id,
+      settings.webApplets.shortcutDefaults.map((binding) => ({
+        ...binding,
+        command: `${item.id}.${binding.command}`,
+      })),
+    );
+  }
+  return withKeybindings(settings, rows);
+}
+
+export function resetAppletKeybindings(
+  settings: Settings,
+  applet: {
+    id: string;
+    runtime: string;
+    commands: { id: string }[];
+    defaultKeybindings?: KeybindingDefault[];
+  },
+): Settings {
+  const owned = new Set(applet.commands.map((command) => command.id));
+  const remaining = getKeybindings(settings).filter((row) => !owned.has(row.command));
+  const defaults =
+    applet.runtime === 'web'
+      ? settings.webApplets.shortcutDefaults.map((binding) => ({
+          ...binding,
+          command: `${applet.id}.${binding.command}`,
+        }))
+      : (applet.defaultKeybindings ?? []);
+  return withKeybindings(settings, addDefaultBindings(remaining, applet.id, defaults));
 }
 export function migrateKeybindings(
   shortcuts: Record<string, string[]>,

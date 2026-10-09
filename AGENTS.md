@@ -72,4 +72,5 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - Applet条件は実Windowフォーカスと表示中のSurfaceから判定する。非選択/背景/トレイのページ選択をアクティブと扱わず、リモートページへホストIPCを公開しない。
 - owner条件は現在のコマンド登録元extensionIdと表示中ページを照合し、ID接頭辞から推測しない。選択肢は「すべてのApplet → 提供元名だけ → 指定したApplet」の順。本体コマンドには提供元項目を出さない。
 - 未割り当てのAppletコマンドへキーを追加する時はowner、本体/提供元不明はappを既定にする。既存条件の編集/複製を上書きしない。コマンド一覧の補助表示は完全なIDを見せ、提供元表示名とIDの双方で検索できることを保つ。
+- Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細の一括初期化は対象Appletの行だけを置き換える。正本の形式と検証境界はdocs/keybindings.mdを参照する。
 - UIはuseSettingsEditorのdraft/JSON/revision/saveを共用。条件のない旧設定への完全互換のために新設計を複雑化しない（2026-10-09ユーザー指定）。

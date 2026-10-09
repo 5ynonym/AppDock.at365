@@ -16,6 +16,7 @@ export interface ExtensionSettings {
 }
 export interface Settings {
   keybindings?: import('./keybindings').Keybinding[];
+  keybindingDefaultsInitialized?: string[];
   webApplets: import('./web-applets').WebAppletSettings;
   schemaVersion: 1;
   host: HostSettings;
@@ -122,6 +123,7 @@ export interface ExtensionManifest {
   settings?: SettingDefinition[];
   settingActions?: SettingAction[];
   commands?: DeclaredCommand[];
+  defaultKeybindings?: import('./keybindings').KeybindingDefault[];
   webAccounts?: import('./web-accounts').WebAccountDefinition;
   pages?: import('./applet-pages').AppletPageDefinition[];
 }

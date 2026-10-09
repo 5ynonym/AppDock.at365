@@ -3,6 +3,8 @@
 ## 設定
 
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
+Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。旧設定の`extensions[id]`に登録済みのAppletは利用者の編集を優先して初期値を差し込まない。行を消した後の再起動やApplet更新でも再追加しない。
+新しいWebAppletは`webApplets.shortcutDefaults`から追加時の保存トランザクションでコピーする。このテンプレートのコマンドは`open`/`reload`/`back`/`forward`/`home`に限定し、コマンドIDの`web.<UUID>.`を追加時に補う。既存WebAppletの行は変更しない。Applet詳細の一括初期化は、そのAppletのコマンドの行だけ置き換え、WebAppletでは現在のテンプレートを使う。
 未割り当てコマンドへの初回キー入力では、登録元extensionIdがあればowner、なければappを既定にする。既存行のキー変更と割り当ての複製は条件を保持する。コマンドIDはショートカット表・パレット・ホームのピン留め・トレイ動作選択で完全な文字列を表示し、表示名による検索も維持する。
 
 ```json

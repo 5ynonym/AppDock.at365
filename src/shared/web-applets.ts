@@ -1,3 +1,5 @@
+import { parseKeybindingDefaults, type KeybindingDefault } from './keybindings';
+
 export type WebNavigation = 'none' | 'same-origin' | 'any';
 export interface WebProfile {
   id: string;
@@ -17,6 +19,7 @@ export interface WebApplet {
 }
 export interface WebAppletSettings {
   items: WebApplet[];
+  shortcutDefaults: WebShortcutDefault[];
 }
 export interface WebPageState {
   loading: boolean;
@@ -65,7 +68,7 @@ export function parseWebProfiles(raw: unknown): WebProfile[] {
   });
 }
 export function parseWebApplets(raw: unknown): WebAppletSettings {
-  if (raw === undefined) return { items: [] };
+  if (raw === undefined) return { items: [], shortcutDefaults: defaultWebShortcutDefaults() };
   if (!object(raw) || !Array.isArray(raw.items) || raw.items.length > 64)
     throw Error('WebAppletは64件、Webアカウントは32枠までです。');
   // Validate the old roster for migration, but do not retain it in settings.
@@ -132,7 +135,12 @@ export function parseWebApplets(raw: unknown): WebAppletSettings {
       ...(imported ? { imported } : {}),
     };
   });
-  return { items };
+  const shortcutDefaults = parseKeybindingDefaults(
+    raw.shortcutDefaults === undefined ? defaultWebShortcutDefaults() : raw.shortcutDefaults,
+    ['open', 'back', 'forward', 'reload', 'home'],
+    20,
+  ) as WebShortcutDefault[];
+  return { items, shortcutDefaults };
 }
 export function allowedWebAppletNavigation(item: WebApplet, target: string): boolean {
   try {
@@ -193,3 +201,12 @@ export function manifestDefaults(
   }
   return result;
 }
+export type WebShortcutCommand = 'open' | 'back' | 'forward' | 'reload' | 'home';
+export interface WebShortcutDefault extends Omit<KeybindingDefault, 'command'> {
+  command: WebShortcutCommand;
+}
+export const defaultWebShortcutDefaults = (): WebShortcutDefault[] => [
+  { command: 'reload', key: 'F5', enabled: true, when: { scope: 'owner', appletIds: [] } },
+  { command: 'back', key: 'Alt+Left', enabled: true, when: { scope: 'owner', appletIds: [] } },
+  { command: 'forward', key: 'Alt+Right', enabled: true, when: { scope: 'owner', appletIds: [] } },
+];

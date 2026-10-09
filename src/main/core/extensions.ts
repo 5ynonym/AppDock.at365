@@ -7,6 +7,7 @@ import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseSettingActions } from '../../shared/setting-actions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
+import { parseKeybindingDefaults } from '../../shared/keybindings';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
@@ -82,10 +83,15 @@ function readManifest(folder: string): LoadedManifest {
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
+  const defaultKeybindings = parseKeybindingDefaults(
+    m.defaultKeybindings,
+    (commands ?? []).map((command) => command.id),
+  );
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
     commands,
+    defaultKeybindings,
     settingActions: parseSettingActions(m.settingActions, commands ?? []),
     folder,
     entryPath: contained(folder, m.entry),

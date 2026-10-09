@@ -716,7 +716,7 @@ function App() {
                       <button
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'reload'))}
                       >
-                        再読み込み
+                        リロード
                       </button>
                       <button
                         onClick={() => void action(() => window.dock.webNavigate(a.id, 'home'))}
@@ -896,6 +896,7 @@ function App() {
                             currentRevision={snapshot.settings.revision}
                           />
                           <AppletSettingsPanel
+                            extensions={snapshot.extensions}
                             applets={(snapshot?.extensions ?? []).map((e) => ({
                               id: e.id,
                               title: e.displayName,
@@ -1773,6 +1774,10 @@ function SettingsPage({
                   <WebAppletSettings
                     editor={editor}
                     accounts={webAccounts}
+                    applets={extensions.map((extension) => ({
+                      id: extension.id,
+                      title: extension.displayName,
+                    }))}
                     onAccounts={() => setCategory('web-accounts')}
                   />
                 </>
@@ -1849,6 +1854,7 @@ function SettingsPage({
                     </button>
                   </div>
                   <AppletSettingsPanel
+                    extensions={extensions}
                     applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
                     applet={selectedApplet}
                     editor={editor}
@@ -1863,6 +1869,7 @@ function SettingsPage({
               )}
               {(category === 'shortcuts' || category === 'host-shortcuts') && (
                 <ShortcutsEditor
+                  extensions={extensions}
                   key={category}
                   commands={commands}
                   owner={category === 'host-shortcuts' ? null : undefined}

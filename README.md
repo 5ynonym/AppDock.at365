@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.25.1はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.0は本体ページと別ウィンドウの両方に対応します。
+0.25.2はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.1は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 
@@ -65,6 +65,8 @@ Applet画面と設定画面の左側の一覧は、同じ背景・余白・選�
 提供元の項目にはApplet名だけを表示します。AppDock本体のコマンドにはこの項目はありません。
 新しくキーを割り当てると、Appletのコマンドは提供元のApplet、本体のコマンドはAppDock全体が選ばれます。既存の割り当ての変更や複製では、選んでいた条件を保持します。
 ショートカット一覧・コマンド検索・ホームのピン留めには完全なコマンドID（例: `at365.gmail.nextAccount`）を表示します。コマンド名・提供元名・コマンドIDで検索できます。
+Appletを新しく導入してAppDockを起動すると、そのAppletが指定した既定のキー・条件・有効状態を初回だけ追加します。Applet詳細の「ショートカットキー」には、そのAppletの割り当てをまとめて初期値へ戻すボタンがあります。変更は「保存」で確定します。
+「設定 → WebApplet」では、これから追加するWebAppletの既定の割り当てを編集できます。初期状態はリロード=F5、戻る=Alt+左、進む=Alt+右で、いずれも追加したWebAppletのページで有効です。変更は既存のWebAppletには遡って反映されません。
 
 Gmail、各WebAppletを個別に選択できます。対象は名前を変更しても保持されます。独立したWPF/WinForms等のnative Applet独自ウィンドウはページ条件の対象外です。
 
@@ -108,7 +110,7 @@ Appletは利用者と同じ権限でファイルやネットワークへアク�
 | Applet | 主な機能 |
 | --- | --- |
 | [Watch](../Applet.Watch.at365/README.md) | 独立した半透明のデスクトップ時計 |
-| [Gmail](../Applet.Gmail.at365/README.md) | 本体ページ／別ウィンドウのGmail画面、新着一覧・検索、アバター、並べ替え・個別監視・通知音（Gmail 0.9.0はAppDock 0.20.0以降） |
+| [Gmail](../Applet.Gmail.at365/README.md) | 本体ページ／別ウィンドウのGmail画面、新着一覧・検索、アバター、並べ替え・個別監視・通知音（Gmail 0.9.1はAppDock 0.20.0以降） |
 | [WallpaperSlideshow](../Applet.WallpaperSlideshow.at365/README.md) | モニターごとの壁紙スライドショーと履歴 |
 | [WindowMover](../Applet.WindowMover.at365/README.md) | 最前面ウィンドウの移動・サイズ変更・終了 |
 | [WindowsTools](../Applet.WindowsTools.at365/README.md) | 消灯予約・キー送信・無操作時のPCロック |

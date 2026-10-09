@@ -1,6 +1,6 @@
 import { parseKeybindings, withKeybindings } from './keybindings';
 import type { Settings } from './contracts';
-import { parseWebApplets } from './web-applets';
+import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
 import {
@@ -12,7 +12,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
-  webApplets: { items: [] },
+  webApplets: { items: [], shortcutDefaults: defaultWebShortcutDefaults() },
   schemaVersion: 1,
   host: {
     theme: 'dark',
@@ -134,6 +134,17 @@ export function parseSettings(value: unknown): Settings {
       throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
   const keybindings =
     value.keybindings === undefined ? undefined : parseKeybindings(value.keybindings);
+  const keybindingDefaultsInitialized =
+    value.keybindingDefaultsInitialized === undefined ? [] : value.keybindingDefaultsInitialized;
+  if (
+    !Array.isArray(keybindingDefaultsInitialized) ||
+    keybindingDefaultsInitialized.length > 500 ||
+    keybindingDefaultsInitialized.some(
+      (id) => typeof id !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(id),
+    ) ||
+    new Set(keybindingDefaultsInitialized).size !== keybindingDefaultsInitialized.length
+  )
+    throw Error('既定ショートカット適用済みAppletの一覧が不正です。');
   const shortcuts = keybindings
     ? {}
     : parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
@@ -188,6 +199,7 @@ export function parseSettings(value: unknown): Settings {
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
     ...(keybindings ? { keybindings } : {}),
+    ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),
     webApplets: parseWebApplets(value.webApplets),
     updates,
     schemaVersion: value.schemaVersion,

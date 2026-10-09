@@ -6,7 +6,7 @@ WebAppletはURLから追加する本体管理のAppletです。配布用のexten
 
 「Applet → WebAppletを追加」または「設定 → WebApplet」から追加し、名前・HTTP(S)の開始URL・本体ページ/別ウィンドウ・ページ遷移・アカウントを指定して「変更をすべて保存」を押します。既存の共有draft/JSON/revision/競合検出を使い、Applet詳細の設定にも同じ編集内容を表示します。追加・削除は再起動なしで反映します。
 
-`settings.json`の`webApplets`は`items:[{id,name,url,accountId,enabled,display,navigation,allowedOrigins,icon,imported?}]`です。アカウント枠の一覧は含めません。旧設定では空の一覧を補います。名前/URLを変えてもIDを維持し、リボン配置・ショートカット・表示先を保持します。WebAppletは本体に含まれるため、個別のバージョン確認/更新対象にはしません。
+`settings.json`の`webApplets`は`items:[{id,name,url,accountId,enabled,display,navigation,allowedOrigins,icon,imported?}]`と`shortcutDefaults:[{command,key,enabled,when}]`です。アカウント枠の一覧は含めません。旧設定では空の一覧とリロード=F5・戻る=Alt+左・進む=Alt+右の初期テンプレートを補います。名前/URLを変えてもIDを維持し、リボン配置・ショートカット・表示先を保持します。WebAppletは本体に含まれるため、個別のバージョン確認/更新対象にはしません。
 
 アイコンは32pxのPNGとして設定へ保存します。Web側のmanifestから取り込むか、4MB以下のPNG/JPEG/WebPを選択できます。設定全体の既存1MB上限を維持するため、大量の画像では64件未満でも上限に達する場合があります。
 
@@ -44,7 +44,7 @@ Webページにはpreload/Node/ホストIPCを公開せず、sandbox/contextIsol
 
 画面は明示的に開いたときに作成し、同じWebContentsViewをpage/window間で再利用します。独立Windowの位置は`.appdock/web-applets/windows/<webId>.json`へ保存します。Windowの×は非表示です。非選択時の常時描画/新着監視は汎用WebAppletでは保証しません。Gmailの既存背景描画契約は継続します。
 
-本体ページの上部には戻る/進む/再読み込み/開始ページと状態を表示します。別Windowでも同じ操作をコマンド検索や割り当てたキーから実行できます。Webページにフォーカス中のローカルキーはCtrl/Alt付き、F1～F24、Pauseを扱い、通常の文字入力キーを取りません。URLのquery/fragmentをエラーログへ記録しません。
+本体ページの上部には戻る/進む/リロード/開始ページと状態を表示します。別Windowでも同じ操作をコマンド検索や割り当てたキーから実行できます。Webページにフォーカス中のローカルキーはCtrl/Alt付き、F1～F24、Pauseを扱い、通常の文字入力キーを取りません。URLのquery/fragmentをエラーログへ記録しません。
 
 ## Web側の推奨設定JSON
 

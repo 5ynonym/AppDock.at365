@@ -102,6 +102,7 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 ## 3. ID・コマンド・設定を設計する
 
 - `id`は小文字英数字・`.`・`-`による安定した識別子です。コマンドIDは必ず `<id>.` で始め、機能名や表示名を変えても既存IDを維持します。ショートカットとピンはIDで保存されます。
+- 新しく導入したAppletのショートカット初期値は、`extension.json`の`commands`と`defaultKeybindings`で宣言します。例: `"defaultKeybindings": [{"command":"at365.sample.refresh","key":"Ctrl+R","enabled":true,"when":{"scope":"owner","appletIds":[]}}]`。コマンドは同じmanifestの`commands`内に必須です。初回導入時だけ保存設定へコピーし、あとからユーザーが変更・解除した内容を更新で上書きしません。実行時にも同じコマンドIDを登録します。
 - コマンドはActivate時に登録します。有効なAppletが登録したコマンドは、パレットとショートカット設定に自動表示されます。通常のショートカットはAppDockの画面操作中に有効です。v0.3.1以降では、ユーザーが「グローバル」を有効にするとWindowsのホットキーとして登録します。登録・解除はホストが担当し、Appletの停止時に解除します。`at365.watch.toggle` は既定でグローバルPauseです。
 - 設定値は `context.Settings` 経由で扱います。保存先はAppDockの `settings.json` の `extensions.<id>.settings` です。Appletから設定ファイル全体を直接書き換えません。
 - manifestの既定値はフォーム表示用です。SDKの読み取りにも同じfallbackを指定します。空の設定で起動できるようにしてください。manifestの既定値が自動的に全項目保存されるわけではありません。
