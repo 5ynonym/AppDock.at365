@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $taskHostRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskSource = [IO.Path]::GetFullPath($SourceDirectory)
 $taskOutput = [IO.Path]::GetFullPath($OutputDirectory)
-$taskHelper = Join-Path $taskHostRoot 'artifacts\updater\AppDock.Updater.exe'
+$taskHelper = Join-Path $taskHostRoot '.artifacts\updater\AppDock.Updater.exe'
 $taskProject = Join-Path $taskHostRoot 'dotnet\AppDock.Updater\AppDock.Updater.csproj'
 # Incremental publishing keeps the shared packer current, including on a fresh checkout.
 & dotnet publish $taskProject -c Release -o (Split-Path $taskHelper -Parent)

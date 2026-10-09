@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const executable = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const profile = path.join(root, 'artifacts', `ui-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 require('../tests/fixtures/install.cjs')(profile, settings);

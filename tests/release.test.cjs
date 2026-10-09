@@ -17,7 +17,7 @@ function fixture(t) {
   fs.writeFileSync(path.join(applet, 'publish/update.zip'), 'applet fixture');
   const notes = path.join(root, 'notes.md');
   fs.writeFileSync(notes, 'Reviewed release notes\n');
-  const planPath = path.join(root, 'artifacts/plan.json');
+  const planPath = path.join(root, '.artifacts/plan.json');
   const commit = 'a'.repeat(40);
   const state = {
     calls: [],
@@ -103,9 +103,9 @@ function fixture(t) {
     version: '1.2.3',
     payload: { file: host.name, size: host.size, sha256: host.sha256, format: 'exe' },
   });
-  save(path.join(root, 'artifacts/checks.json'), CHECKS);
-  for (const name of CHECKS) fs.writeFileSync(path.join(root, `artifacts/${name}.log`), 'passed');
-  save(path.join(root, 'artifacts/bundle-ui.json'), {
+  save(path.join(root, '.artifacts/checks.json'), CHECKS);
+  for (const name of CHECKS) fs.writeFileSync(path.join(root, `.artifacts/${name}.log`), 'passed');
+  save(path.join(root, '.artifacts/bundle-ui.json'), {
     ok: true,
     version: '1.2.3',
     archiveSha256: asset(archive).sha256,
@@ -151,7 +151,7 @@ test('release stages every verified asset before the single publication operatio
 
 test('failed or incomplete preparation cannot make any GitHub mutation', async (t) => {
   const { root, state, release, planPath } = fixture(t);
-  save(path.join(root, 'artifacts/checks.json'), CHECKS.slice(0, 2));
+  save(path.join(root, '.artifacts/checks.json'), CHECKS.slice(0, 2));
   assert.throws(() => release.seal(planPath), /All checks/);
   await assert.rejects(release.remote('draft', planPath, 'gh'), /Prepare must complete/);
   assert.equal(mutations(state).length, 0);
@@ -228,7 +228,7 @@ test('successful release preparation removes only older stable bundles in publis
   fs.writeFileSync(nested, 'nested');
   const directory = path.join(publish, 'AppDock.at365-all-in-one-0.0.1.zip');
   fs.mkdirSync(directory);
-  const backup = path.join(root, 'artifacts/previous-all-in-one.zip');
+  const backup = path.join(root, '.artifacts/previous-all-in-one.zip');
   fs.writeFileSync(backup, 'backup');
   const current = asset(archive);
   release.seal(planPath);
@@ -245,7 +245,7 @@ test('failed preparation or changed bundle preserves older packages', (t) => {
   const { root, release, planPath, archive } = fixture(t);
   const old = path.join(root, 'publish/AppDock.at365-all-in-one-1.2.2.zip');
   fs.writeFileSync(old, 'last complete package');
-  const checks = path.join(root, 'artifacts/checks.json');
+  const checks = path.join(root, '.artifacts/checks.json');
   save(
     checks,
     CHECKS.filter((name) => name !== 'pack-all-in-one'),

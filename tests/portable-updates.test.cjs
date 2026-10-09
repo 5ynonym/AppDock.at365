@@ -9,7 +9,7 @@ const { PortableUpdates, safeRelative } = require('../out/main/main/core/portabl
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema.js');
 const { validateUpdateSource } = require('../out/main/shared/update-sources.js');
 const root = path.resolve(__dirname, '..');
-const helper = path.join(root, 'artifacts/updater/AppDock.Updater.exe');
+const helper = path.join(root, '.artifacts/updater/AppDock.Updater.exe');
 const hash = (data) => createHash('sha256').update(data).digest('hex');
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-update-test-'));

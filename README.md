@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.26.10はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.1は本体ページと別ウィンドウの両方に対応します。
+0.26.12はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.1は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 

@@ -38,13 +38,13 @@ AppDock.at365-all-in-one-<version>.zip
 - 本体EXEだけをコピーし、各Appletは検証した更新ZIPの内容だけを収録します。AppDockの設定・認証領域・ログ・実利用先の拡張は取り込みません。Appletのpublishフォルダーは生成物専用とし、個人データを置かないでください。
 - `bundle.json`に本体/各Appletの版・commit・dirty状態・Applet ZIPハッシュと収録ファイルのサイズ/SHA256を記録します。初期設定は同梱せず、初回起動時の通常動作ですべてのAppletが無効になります。
 
-出力は`publish/AppDock.at365-all-in-one-<version>.zip`。専用stageは`artifacts/all-in-one-<ID>/package`に残します。完成後だけ同じ版の出力ZIPを置換します。途中で失敗した場合、以前の完成済みZIPは残るため、終了コードが失敗の発行物を新しいものとして公開しないでください。Appletが0件でも失敗します。
+出力は`publish/AppDock.at365-all-in-one-<version>.zip`。専用stageは`.artifacts/all-in-one-<ID>/package`に残します。完成後だけ同じ版の出力ZIPを置換します。途中で失敗した場合、以前の完成済みZIPは残るため、終了コードが失敗の発行物を新しいものとして公開しないでください。Appletが0件でも失敗します。
 
 ## publishの旧版ZIP整理
 
 AppDockのリリース準備で新しいオールインワンZIPを`publish`へ配置した後、版・全収録ファイルのサイズ/SHA256・同梱本体と`publish/AppDock.at365.exe`の一致・隔離起動を検証します。Prepareの全チェックとsealの整合検証が成功した時点で、sealが旧版ZIPを削除します。2026-10-09のユーザーの追加指定により、通常publishではZIPの生成も整理も行いません。
 
-削除対象は`publish`直下の`AppDock.at365-all-in-one-<version>.zip`という通常ファイルだけです。正式版x.y.zを数値で比較し、検証済みの新版より古い版だけを削除します。新版、同じ版、より新しい版、別名のZIP、ディレクトリ/リンク、`artifacts`のstage/backup、GitHub Releaseは対象外です。生成・配置・検証の途中で失敗した場合は旧版を残します。削除した名前はplan.jsonの`removedOldBundles`へ保存します。削除時のエラーはPrepareの失敗として報告されるため、ログと残存ZIPを確認してください。
+削除対象は`publish`直下の`AppDock.at365-all-in-one-<version>.zip`という通常ファイルだけです。正式版x.y.zを数値で比較し、検証済みの新版より古い版だけを削除します。新版、同じ版、より新しい版、別名のZIP、ディレクトリ/リンク、`.artifacts`のstage/backup、GitHub Releaseは対象外です。生成・配置・検証の途中で失敗した場合は旧版を残します。削除した名前はplan.jsonの`removedOldBundles`へ保存します。削除時のエラーはPrepareの失敗として報告されるため、ログと残存ZIPを確認してください。
 
 ## リリース
 

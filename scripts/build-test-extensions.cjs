@@ -21,7 +21,7 @@ run('dotnet', [
   'Release',
 ]);
 for (const name of ['welcome', 'dotnet-demo']) {
-  const folder = path.join(root, 'artifacts/test-extensions', name);
+  const folder = path.join(root, '.artifacts/test-extensions', name);
   fs.mkdirSync(folder, { recursive: true });
   fs.copyFileSync(
     path.join(root, 'tests/fixtures/extensions', name, 'extension.json'),
@@ -29,13 +29,13 @@ for (const name of ['welcome', 'dotnet-demo']) {
   );
 }
 fs.copyFileSync(
-  path.join(root, 'artifacts/node-extensions/tests/fixtures/extensions/welcome/index.js'),
-  path.join(root, 'artifacts/test-extensions/welcome/index.js'),
+  path.join(root, '.artifacts/node-extensions/tests/fixtures/extensions/welcome/index.js'),
+  path.join(root, '.artifacts/test-extensions/welcome/index.js'),
 );
 fs.copyFileSync(
   path.join(
     root,
     'tests/fixtures/dotnet/AppDock.Extensions.Demo/bin/Release/net10.0/AppDock.Extensions.Demo.dll',
   ),
-  path.join(root, 'artifacts/test-extensions/dotnet-demo/AppDock.Extensions.Demo.dll'),
+  path.join(root, '.artifacts/test-extensions/dotnet-demo/AppDock.Extensions.Demo.dll'),
 );

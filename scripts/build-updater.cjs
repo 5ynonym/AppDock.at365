@@ -9,7 +9,7 @@ const result = spawnSync(
     '-c',
     'Release',
     '-o',
-    'artifacts/updater',
+    '.artifacts/updater',
   ],
   { cwd: root, stdio: 'inherit', windowsHide: true },
 );

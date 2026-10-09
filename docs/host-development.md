@@ -127,7 +127,7 @@ node scripts/test-ui.cjs ../AppDock.at365/publish/win-unpacked/AppDock.at365.exe
 
 Windows SDKへのアクセス制限がある環境はビルド未確認として扱い、許可された実行環境で再確認します。実行中EXEの書き込みロックがあれば、その配置先を通常終了するか別出力先を使います。無関係な既存アプリを止めません。
 
-完成後は[ドキュメント方針](documentation.md)に従い、必要なホストバージョンと利用者が配置するファイルをREADMEへ、開発・検証の手順をDEVELOPMENTまたはこのガイドへ、実機条件と限界・結果・成果物のVersion／SHA256をVERIFICATIONへ記録します。Gitではsourceとdocsを管理し、publish・artifacts・設定・秘密情報は除外します。
+完成後は[ドキュメント方針](documentation.md)に従い、必要なホストバージョンと利用者が配置するファイルをREADMEへ、開発・検証の手順をDEVELOPMENTまたはこのガイドへ、実機条件と限界・結果・成果物のVersion／SHA256をVERIFICATIONへ記録します。Gitではsourceとdocsを管理し、publish・.artifacts・設定・秘密情報は除外します。
 
 ## v0.6.0の追加契約と検証
 

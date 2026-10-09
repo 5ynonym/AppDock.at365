@@ -3,7 +3,7 @@ const path = require('node:path');
 // Install only into the isolated profile selected by an integration/UI test.
 module.exports = function installTestExtensions(profile, settings) {
   fs.cpSync(
-    path.resolve(__dirname, '../../artifacts/test-extensions'),
+    path.resolve(__dirname, '../../.artifacts/test-extensions'),
     path.join(profile, 'extensions'),
     {
       recursive: true,

@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.main.json",
-  "compilerOptions": { "rootDir": ".", "outDir": "artifacts/node-extensions", "declaration": true },
+  "compilerOptions": { "rootDir": ".", "outDir": ".artifacts/node-extensions", "declaration": true },
   "include": [
     "tests/fixtures/extensions/welcome/index.ts",
     "src/main/node-worker.ts",

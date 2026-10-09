@@ -5,7 +5,7 @@ const [kind, source, output] = process.argv.slice(2);
 if (!['host', 'applet'].includes(kind) || !source || !output)
   throw Error('Usage: pack-update.cjs host|applet source output');
 const result = spawnSync(
-  path.join(root, 'artifacts/updater/AppDock.Updater.exe'),
+  path.join(root, '.artifacts/updater/AppDock.Updater.exe'),
   ['--pack', kind, path.resolve(source), require('../package.json').version, path.resolve(output)],
   { cwd: root, stdio: 'inherit', windowsHide: true },
 );

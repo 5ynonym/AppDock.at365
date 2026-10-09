@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-10: 開発生成物を`.artifacts`へ改名（0.26.12）
+
+- ユーザー指定でrepo直下の`artifacts`を`.artifacts`へ改名。最初の通常/sandbox外の改名はアクセス拒否、ユーザーの中断・再開後の再試行は成功。原因は断定せず、ACL変更・実利用プロセス停止・旧データ削除は行っていない。Applet.WindowsTools.at365が元の場所に存在し、Git作業ツリーがcleanであることも再開時に確認した。
+- 改名前後の74,986項目（ファイル51,473、通常ファイル合計42,783,730,897 bytes）の相対パス/サイズ/更新日時/ディレクトリ・リンク属性が一致。主要EXEと直近2件のRelease planのSHA256も移動直後に一致。棚卸しは`A:/XX.TEMP/appdock-artifacts-rename-20261010-before.json`と同`after.json`。保存済みJSON/ログの内部絶対パス・当時のhashは書き換えていない。旧記録のAppDock内の`artifacts/`は`.artifacts/`へ読み替える（各Applet自身の同名フォルダーは対象外）。
+- 本体のビルド/開発起動/テスト/Release既定出力先/共有Appletパッカー/package.json/TypeScript fixture出力/Git除外と開発手順を更新。WindowMoverのDEVELOPMENT.mdも本体ホストを参照するコマンド1行だけ更新。以前からの未コミット文書変更を保持。製品のpackaged起動時のresources配置は変更なし。同期/バックアップ/スナップショットの除外設定は未変更。
+- 型検査成功、`dev.bat test`は171 pass/0 fail。sandboxのpnpm依存検査待機を中断して通常環境で再実行し、依存検査も成功。変更CJS37件の構文、PS1の3件の構文/UTF-8 BOM、git diff --check成功。実行用ソース/スクリプト/テスト/設定に旧保存先参照なし、実行後も旧`artifacts`が再生成されないことと`.artifacts`のGit除外を確認。ログは`.artifacts/rename-20261010-{typecheck,test,publish,ui,portable,applet-pack}.log`。
+- source GUIは`.artifacts/ui-1791568489764`で8群成功（.NET起動/コマンド/停止、設定保存、暗号化秘密、JSON保護など）。単一EXE smokeは`.artifacts/smoke-1791568492288`で終了0/ok:true、設定/avatarを隔離profileへ保存。共有`pack-applet-update.ps1`もdotnet-demo fixtureだけで終了0、update.zip/feedのsize/hash一致。未変更の製品Appletは再発行していない。
+- 版更新後publish.bat終了0。本体EXEは142,514,767 bytes、SHA256 `ef4c8d0d412c6d1353371cbb11aa587b5ea74d9423efd518dc7096287e17bf5f`、0.26.12のfeedと隔離EXEコピーが一致。通常publishのみで全体ZIP作成/整理、GitHub操作、commit/push、実利用deployは行っていない。移動した直近2件のRelease planのhashは検証終了時も不変。
+- 完了時整理: 今回のsource GUI/portable smokeは各方式1回なので直近3回保持の範囲内。改名した既存profileについては過去の使用終了・旧版資料の再利用要否を今回一括で確定していないため保持し、削除0件。フォルダーの改名で既存証跡を失わないことを確認した。
+
 ## 2026-10-09: キー割り当てのクリアをその他メニューへ明記（0.26.9）
 
 - ユーザーの判断委任により、Deleteを解除キーにせずその他メニューを採用。従来の「削除…」をショートカットでは「キーのクリア…」へ明確化し、確認後に選んだIDの行だけを共有draftから除く。無効行/停止中でも操作でき、最後の割り当てを外した登録済みコマンドは未設定行へ戻る。他の割り当て/トレイ設定を維持し、空キーを保存するために検証を緩めない。

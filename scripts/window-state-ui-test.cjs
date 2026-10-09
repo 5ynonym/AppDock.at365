@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `window-state-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `window-state-${Date.now()}`);
 const file = path.join(profile, '.appdock', 'window-state.json');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;

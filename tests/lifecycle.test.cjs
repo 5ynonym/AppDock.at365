@@ -12,12 +12,12 @@ test('commands are catalogued before loading; explicit start and legacy alias ac
   const settings = new SettingsStore(path.join(dir, 'settings.json'));
   settings.load();
   const manager = new ExtensionManager({
-    roots: [path.join(root, 'artifacts/test-extensions')],
+    roots: [path.join(root, '.artifacts/test-extensions')],
     settings,
     hostVersion: '0.6.0',
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
-    dotnetHost: path.join(root, 'artifacts/dotnet-host'),
+    dotnetHost: path.join(root, '.artifacts/dotnet-host'),
     log: () => {},
     api: async (e, method, p) => {
       if (method === 'host.ui.panel') e.panel = p;
@@ -75,11 +75,11 @@ test('real Node and .NET extensions: activation, commands, crash isolation, rest
   settings.updateExtension('appdock.welcome', { enabled: true });
   settings.updateExtension('appdock.dotnet-demo', { enabled: true });
   const manager = new ExtensionManager({
-    roots: [path.join(root, 'artifacts/test-extensions')],
+    roots: [path.join(root, '.artifacts/test-extensions')],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
-    dotnetHost: path.join(root, 'artifacts/dotnet-host'),
+    dotnetHost: path.join(root, '.artifacts/dotnet-host'),
     api: async (e, method, p) => {
       if (method === 'host.ui.panel') {
         e.panel = p;

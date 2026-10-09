@@ -7,9 +7,9 @@ const { spawn, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'artifacts', `update-recovery-${Date.now()}`);
+const output = path.join(root, '.artifacts', `update-recovery-${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
-const helper = path.join(root, 'artifacts/updater/AppDock.Updater.exe');
+const helper = path.join(root, '.artifacts/updater/AppDock.Updater.exe');
 const hash = (data) => createHash('sha256').update(data).digest('hex');
 const treeHash = (dir) =>
   hash(

@@ -6,7 +6,7 @@ const http = require('node:http');
 const { randomBytes } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `update-progress-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `update-progress-${Date.now()}`);
 const source = path.join(profile, 'source');
 const installed = path.join(profile, 'extensions/fixture');
 fs.mkdirSync(source, { recursive: true });
@@ -30,7 +30,7 @@ for (const [dir, version] of [
 }
 fs.writeFileSync(path.join(source, 'asset.bin'), randomBytes(3 * 1024 * 1024));
 const feedDir = path.join(profile, 'feed');
-const helper = path.join(root, 'artifacts/updater/AppDock.Updater.exe');
+const helper = path.join(root, '.artifacts/updater/AppDock.Updater.exe');
 assert.equal(
   spawnSync(helper, ['--pack', 'applet', source, 'unused', feedDir], { windowsHide: true }).status,
   0,

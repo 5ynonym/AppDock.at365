@@ -9,7 +9,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const source = path.resolve(process.argv[2] || path.join(root, 'publish/AppDock.at365.exe'));
-const profile = path.join(root, 'artifacts', `web-portable-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `web-portable-${Date.now()}`);
 const executable = path.join(profile, 'AppDock.at365.exe');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(profile, { recursive: true });

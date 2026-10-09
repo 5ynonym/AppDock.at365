@@ -20,7 +20,7 @@ ZIPは一時ファイルへ完成させてから置換し、feedを最後に保�
 
 ```powershell
 .\dev.bat run build:updater
-.\dev.bat run pack:update applet ..\Applet.Watch.at365\publish\Applet.Watch.at365 artifacts\watch-update
+.\dev.bat run pack:update applet ..\Applet.Watch.at365\publish\Applet.Watch.at365 .artifacts\watch-update
 ```
 
 生成したupdate.jsonとupdate.zipを同じWeb配布場所/GitHub Releaseに置く。本体はupdate.jsonとAppDock.at365.exe。JSONはschemaVersion=1、kind=host/applet、id=host/実Applet ID、version、任意minimumHostVersion、payload={file,sha256,size,format=exe/zip}。ZIP直下にextension.jsonと実行ファイル一式を置く。情報JSONを配布物の最後に公開する。
@@ -43,7 +43,7 @@ UpdateSettingsの先頭は「本体と全Appletを更新」。本体のみ・App
 
 tests/portable-updates.test.cjsは隔離ディレクトリーで設定移行、ローカル/URL/GitHub metadata、起動時確認だけ、同版再適用、互換性、helper交換/復元/ZIP拒否を検証する。helperは事前にbuild:updaterする。
 
-scripts/portable-updates-ui-test.cjsは配布EXEをartifactsの専用profileへコピーし、実helper/ランチャーで本体/一括/個別交換と再起動を確認する。DevTools/Node inspectorは隔離試験に明示指定し、最終のnative確認ダイアログだけ試験内で差し替える。通常起動にdebug/inspector引数を追加しない。結果/画像は専用profileへ保存。
+scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへコピーし、実helper/ランチャーで本体/一括/個別交換と再起動を確認する。DevTools/Node inspectorは隔離試験に明示指定し、最終のnative確認ダイアログだけ試験内で差し替える。通常起動にdebug/inspector引数を追加しない。結果/画像は専用profileへ保存。
 
 ## 0.22.1 の操作画面と再起動
 
@@ -63,7 +63,7 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 
 `scripts/update-progress-ui-test.cjs`は専用profileとループバックHTTPを使い、dark/lightの実progress/容量表示、キャンセル、再試行、最終確認での取消と元ファイル保持を確認する。
 
-`scripts/update-recovery-test.cjs`はhelperソースをartifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。7箇所は旧版、commit後は新版を保持し、journal再実行、使用中ファイルによる復旧失敗→解除後再試行、設定/認証fixture保持を確認する。交換対象は隔離した検査用ファイルで、実portable EXE交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
+`scripts/update-recovery-test.cjs`はhelperソースを.artifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。7箇所は旧版、commit後は新版を保持し、journal再実行、使用中ファイルによる復旧失敗→解除後再試行、設定/認証fixture保持を確認する。交換対象は隔離した検査用ファイルで、実portable EXE交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
 
 ```powershell
 .\dev.bat exec node scripts/update-progress-ui-test.cjs

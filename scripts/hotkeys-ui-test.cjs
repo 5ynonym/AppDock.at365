@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `hotkeys-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `hotkeys-${Date.now()}`);
 const clockFolder = path.join(profile, 'extensions', 'Applet.Watch.at365');
 fs.mkdirSync(clockFolder, { recursive: true });
 for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
@@ -67,7 +67,7 @@ async function until(check, message) {
       (await snapshot()).settings.value.extensions['at365.watch'].settings.visible;
     checks.push('global Pause registered by default');
     contender = new WindowsHotKeyBackend(
-      path.join(root, 'artifacts/dotnet-host/AppDock.ExtensionHost.exe'),
+      path.join(root, '.artifacts/dotnet-host/AppDock.ExtensionHost.exe'),
       assert.fail,
       () => {},
     );

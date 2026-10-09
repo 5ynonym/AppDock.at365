@@ -47,12 +47,12 @@ package.jsonは本体バージョンの正本です。pnpm-lock.yamlには本体
 
 ```powershell
 $taskNotes = Join-Path $taskRepo 'docs\releases\v<版>.md'
-$taskPlan = Join-Path $taskRepo 'artifacts\release-<版>-<試行ID>\plan.json'
+$taskPlan = Join-Path $taskRepo '.artifacts\release-<版>-<試行ID>\plan.json'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
   -Mode Prepare -NotesFile $taskNotes -PlanPath $taskPlan
 ```
 
-プレースホルダーは実際の版と新しい試行IDへ置き換えます。PlanPathを省略すると固有のartifactsフォルダーを作ります。既存planの上書きは拒否します。
+プレースホルダーは実際の版と新しい試行IDへ置き換えます。PlanPathを省略すると固有の.artifactsフォルダーを作ります。既存planの上書きは拒否します。
 
 Prepareはソース/ノートの事前記録後、次を順番に実行します。
 
@@ -119,7 +119,7 @@ planの`retentionReport`が指すJSONに、削除前一覧・保持対象・削�
 
 保持3件内の不具合Releaseなど、通常の件数整理に加えてユーザーが対象を指定した場合に実施します。まず修正版のPrepare→Draft→Publish→Verifyを完了させ、latestと匿名取得、本体更新チェックを確認します。その後、指定された旧タグのRelease ID・公開状態を再確認して、`gh release delete <旧タグ> --repo 5ynonym/AppDock.at365 --yes`でReleaseと添付アセットを削除します。`--cleanup-tag`は使わず、Gitタグとコミット履歴は残します。
 
-削除後は旧タグのRelease APIが404、修正版がlatestで全アセットを持つこと、旧Gitタグが保持されていることを確認し、削除対象のmetadataと結果をartifactsへ記録します。削除結果が不明な場合は読み取りで状態を確認し、別のReleaseを推測で削除しません。公開後Verifyの失敗を理由に自動で削除する処理とは区別します。
+削除後は旧タグのRelease APIが404、修正版がlatestで全アセットを持つこと、旧Gitタグが保持されていることを確認し、削除対象のmetadataと結果を.artifactsへ記録します。削除結果が不明な場合は読み取りで状態を確認し、別のReleaseを推測で削除しません。公開後Verifyの失敗を理由に自動で削除する処理とは区別します。
 
 ## Appletを追加したとき
 
@@ -160,12 +160,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Release整理が失敗しました。公開結
 
 ## 2026-10-09に成功した公開の記録
 
-次のローカル証跡とGitHubの実アセットを確認して、この手順へ移しました。artifactsはGit管理対象外なので、将来これらのファイルがなくても上の手順を実行できます。
+次のローカル証跡とGitHubの実アセットを確認して、この手順へ移しました。.artifactsはGit管理対象外なので、将来これらのファイルがなくても上の手順を実行できます。
 
-- `artifacts/github-releases-0.23.0/plan.json`: 7repoのtag/commit/ノート/アセットsize/hash。
+- `.artifacts/github-releases-0.23.0/plan.json`: 7repoのtag/commit/ノート/アセットsize/hash。
 - 同`public-verification.json`: 全7repoの認証なし取得と実PortableUpdates.check成功。
-- `artifacts/github-install-1791480155823/result.json`: 隔離EXEで全6Applet一括、本体同版、WindowMover個別のGitHub更新成功。
-- `artifacts/all-in-one-release-result.json`: 全体ZIP取得検証と元のEXE/feedが不変である記録。
+- `.artifacts/github-install-1791480155823/result.json`: 隔離EXEで全6Applet一括、本体同版、WindowMover個別のGitHub更新成功。
+- `.artifacts/all-in-one-release-result.json`: 全体ZIP取得検証と元のEXE/feedが不変である記録。
 
 実行したCLI操作は`gh release create <tag> <payload> <feed> --repo <repo> --target <commit> --title <title> --notes-file <file> --draft`、下書きassetのAPI照合、`gh release edit <tag> --repo <repo> --draft=false --latest`です。全体ZIPの追加時は`gh release upload v0.23.0 <zip> --repo 5ynonym/AppDock.at365`（clobberなし）、`gh release edit v0.23.0 --repo 5ynonym/AppDock.at365 --notes-file <既存本文に説明を追記したファイル>`を使いました。今回のスクリプトは初回から3assetを下書きへ揃える手順です。
 
