@@ -31,7 +31,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 背景Webの動作はvisibilityState、rAF、observer.readyだけで成功としない。Playwrightのfocus emulationが結果を変えるため、未表示の通常起動も別途検証する。ページ自身の描画/取得開始と、必要に応じて許可された実受信を確認する。実メール送信は明示許可の範囲に限定する。
 - keepActiveの認証遷移/別文書/破棄時の解除、native focus時の入力を保つ。破棄後にWebContents.debugger getterを呼ばず、生存中の参照と冪等disposeで解放する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
 - 設定はuseSettingsEditorの共有draft/JSON/revision/saveを維持し、詳細/設定画面で二重draftや二重入力を作らない。settingActionsは自身の宣言済みcommandに限定し、実行中ガード・結果表示・未保存入力を保つ。
-- Applet詳細の説明・設定・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletを選ぶと説明へ戻す。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
+- Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletを選ぶと説明へ戻す。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
 - 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
 - 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/.appdockの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
@@ -87,3 +87,5 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - ジェスチャー一覧は入力ごとにグループ化し、ドラッグ/上下キーで同じグループ内だけ順序を変える。コマンド選択はCommandPaletteを実行モード/選択モードで共用し、選択用から実行しない。スイッチは共通Toggle、削除/複製はメニューと削除確認を使う。グループ移動でキー記録欄が消える場合も記録停止を保証する。
 
 - 行の操作メニューはスクロール表の外へ浮かべ、行の高さを変えない。画面端の位置補正、外側クリック/Escapeで閉じる操作、キーボード移動、削除確認を維持する。
+
+- Applet設定は詳細ページへ集約し、設定ページにApplet別一覧/本体専用キー入口を戻さない。全体キー一覧はAppDock→appletOrderによるApplet順→未確認コマンドのグループ表示。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、保存/破棄は全編集内容を対象にする。起動順・keybindingsの実行順・独立したribbon.orderを表示順で変更しない。仕様はdocs/host-development.mdとdocs/keybindings.md、回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。

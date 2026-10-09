@@ -47,6 +47,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       .getByRole('complementary', { name: 'Applet一覧' })
       .getByRole('button', { name: /.NET Connection Demo/ })
       .click();
+    await page.getByRole('tab', { name: '説明', exact: true }).click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.getByRole('button', { name: '状態を更新', exact: true }).click();
@@ -75,10 +76,12 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('switch', { name: '閉じるとトレイに常駐' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'settings-general.png') });
+    await page.getByRole('button', { name: 'Applet', exact: true }).click();
     await page
-      .locator('.settings-applet-list')
-      .getByRole('button', { name: '.NET Connection Demo', exact: true })
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /.NET Connection Demo/ })
       .click();
+    await page.getByRole('tab', { name: '設定', exact: true }).click();
     await page.getByLabel('更新間隔（秒）').fill('10');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     assert.equal(
@@ -107,6 +110,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), '{broken');
     fs.writeFileSync(settingsFile, JSON.stringify(config, null, 2));
     await page.getByRole('button', { name: 'Applet', exact: true }).first().click();
+    await page.getByRole('tab', { name: '説明', exact: true }).click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'このAppletをDockにつなぐ' }).waitFor();
     assert.equal(

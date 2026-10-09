@@ -181,7 +181,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、renderer/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
-0.19.0はリボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。AppDock本体のキー設定は「Applet別の設定」の先頭へ移動し、既存の下書きとコマンド所属処理を使います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
+0.19.0はリボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。当時はAppDock本体のキー設定を「Applet別の設定」の先頭へ移しました。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。
 
@@ -189,10 +189,17 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 ## Applet設定パネルの共用
 
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
-- `AppletSettingsPanel.tsx`は「設定項目／ショートカットキー」の切替と既存`AppletSettings`/`ShortcutsEditor`をまとめます。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifest/設定JSONの追加はありません。
-- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定へ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
+- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて既存`AppletSettings`/`ShortcutsEditor`を描画します。設定ページのApplet別一覧と本体専用ショートカット入口は削除し、全体一覧にグループを表示します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
+- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
 - JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
 - 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
+
+## Appletの表示順
+
+- `shared/applet-order.ts`は保存ID順に既存Appletを並べ、未登録の新規Appletは発見順で末尾へ置きます。不在IDを表示せず、新しい並べ替えでもそのIDは保存配列に保持します。WebAppletも同じ一覧に含みます。既存JSONのappletOrder未指定は空配列で補い、重複・不正ID・500件超を拒否します。
+- `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。共有draftを更新し、保存/破棄は他の未保存設定も含みます。不正JSON・revision競合・保存失敗時に下書きを上書きしません。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
+- rendererのApplet一覧・ホームカード・設定ページのショートカットグループと対象Applet候補に同じ順を使います。グループはAppDock→Applet順→未確認コマンド。検索/割り当て状態で絞り込みます。実行順の番号と上下操作は元keybindings配列を使い、表示順で実行順・起動順・ribbon.orderを変更しません。
+- 検証は`tests/applet-order.test.cjs`、`scripts/applet-order-ui-test.cjs`と既存navigation/default-shortcuts/WebApplet UI試験で行います。
 
 ## コマンドパレットの共用
 

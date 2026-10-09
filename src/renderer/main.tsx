@@ -20,6 +20,8 @@ import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { ProfileEditor } from './ProfileEditor';
 import { AppletSettingsPanel } from './AppletSettingsPanel';
+import { AppletIndex } from './AppletIndex';
+import { orderApplets } from '../shared/applet-order';
 import { SettingsActions, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
@@ -38,8 +40,7 @@ declare global {
   }
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
-type AppletSettingsTab = 'settings' | 'shortcuts';
-type AppletDetailView = 'description' | 'settings' | 'logs';
+type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
 function Brand({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand-mark ${small ? 'small' : ''}`}>
@@ -98,13 +99,9 @@ function App() {
   const [detailView, setDetailView] = useRestartView<AppletDetailView>(
     'detailView',
     'description',
-    ['description', 'settings', 'logs'],
+    ['description', 'settings', 'shortcuts', 'logs'],
   );
-  const detailSettings = detailView === 'settings';
-  const [detailTab, setDetailTab] = useRestartView<AppletSettingsTab>('detailTab', 'settings', [
-    'settings',
-    'shortcuts',
-  ]);
+  const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
   const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
   useLayoutEffect(() => {
     // The retained detail view may be revisited after editing the shared JSON draft.
@@ -115,7 +112,7 @@ function App() {
       }
     }
   }, [page, detailSettings, editor.mode]);
-  const [appletFilter, setAppletFilter] = useState('');
+  const orderedApplets = orderApplets(snapshot?.extensions ?? [], editor.draft.appletOrder);
   const [logSource, setLogSource] = useRestartView<string>('logSource', '');
   const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
@@ -272,7 +269,6 @@ function App() {
   const goExtension = (id: string) => {
     setSelected(id);
     setDetailView('description');
-    setDetailTab('settings');
     setPage('extensions');
   };
   const commands: UiCommand[] = [
@@ -323,8 +319,7 @@ function App() {
     await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
   }
   const updatePins = (ids: string[]) => void action(() => window.dock.setPinnedCommands(ids));
-  const selectedApplet =
-    snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
+  const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   const ribbon = orderRibbon(
     visibleRibbonItems(
@@ -453,38 +448,15 @@ function App() {
       </aside>
       {page === 'extensions' && (
         <aside className="sidebar" aria-label="Applet一覧">
-          <h2>Applet</h2>
-          <input
-            aria-label="Appletを検索"
-            placeholder="Appletを検索…"
-            value={appletFilter}
-            onChange={(event) => setAppletFilter(event.target.value)}
+          <AppletIndex
+            applets={orderedApplets}
+            selected={selectedApplet?.id}
+            onSelect={goExtension}
+            editor={editor}
+            busy={busy}
+            revision={snapshot?.settings.revision ?? -1}
+            showMessages={!detailSettings}
           />
-          <div className="sidebar-extensions">
-            {snapshot?.extensions
-              .filter((e) =>
-                (e.displayName + ' ' + e.name + ' ' + e.id)
-                  .toLowerCase()
-                  .includes(appletFilter.toLowerCase()),
-              )
-              .map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => goExtension(e.id)}
-                  aria-current={selectedApplet?.id === e.id ? 'true' : undefined}
-                  className={selectedApplet?.id === e.id ? 'selected' : ''}
-                >
-                  <span title={e.displayName}>{e.displayName}</span>
-                  <small>{states[e.state]}</small>
-                </button>
-              ))}
-            {snapshot &&
-              !snapshot.extensions.some((e) =>
-                (e.displayName + ' ' + e.name + ' ' + e.id)
-                  .toLowerCase()
-                  .includes(appletFilter.toLowerCase()),
-              ) && <p className="empty">該当するAppletはありません。</p>}
-          </div>
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
       )}
@@ -643,7 +615,7 @@ function App() {
                   </button>
                 </div>
                 <div className="extension-grid">
-                  {snapshot.extensions.map((e) => (
+                  {orderedApplets.map((e) => (
                     <button className="extension-card" key={e.id} onClick={() => goExtension(e.id)}>
                       <div className="card-top">
                         <span className={`extension-icon ${e.runtime}`}>
@@ -699,7 +671,7 @@ function App() {
                     extension={selectedApplet}
                     view={detailView}
                     onView={(view) => {
-                      if (view === 'settings' && !editor.switchToForm()) {
+                      if ((view === 'settings' || view === 'shortcuts') && !editor.switchToForm()) {
                         setError(
                           '設定ページのJSONの内容を修正してから、Appletの設定を開いてください。',
                         );
@@ -719,8 +691,8 @@ function App() {
                             currentRevision={snapshot.settings.revision}
                           />
                           <AppletSettingsPanel
-                            extensions={snapshot.extensions}
-                            applets={(snapshot?.extensions ?? []).map((e) => ({
+                            extensions={orderedApplets}
+                            applets={orderedApplets.map((e) => ({
                               id: e.id,
                               title: e.displayName,
                             }))}
@@ -728,8 +700,7 @@ function App() {
                             editor={editor}
                             commands={shortcutCommands}
                             globalHotKeys={snapshot.globalHotKeys}
-                            tab={detailTab}
-                            onTab={setDetailTab}
+                            tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
                             webAccounts={snapshot.webAccounts}
                             onWebAccounts={() => {
                               setPage('settings');
@@ -761,7 +732,7 @@ function App() {
                 snapshot={snapshot.settings}
                 version={snapshot.version}
                 runtime={snapshot.runtime}
-                extensions={snapshot.extensions}
+                extensions={orderedApplets}
                 run={action}
                 busy={busy}
                 commands={shortcutCommands}
@@ -773,7 +744,6 @@ function App() {
                 webAccountsRequest={webAccountsRequest}
                 webAccounts={snapshot.webAccounts}
                 editor={editor}
-                onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
                 sidebarHost={settingsSidebarHost}
                 sidebar={appletSidebar}
@@ -893,6 +863,7 @@ function ExtensionDetail({
           [
             { id: 'description', title: '説明', icon: 'extensions' },
             { id: 'settings', title: '設定', icon: 'settings' },
+            { id: 'shortcuts', title: 'ショートカット', icon: 'command' },
             { id: 'logs', title: 'ログ', icon: 'logs' },
           ] as const
         ).map((tab, index, tabs) => (
@@ -931,7 +902,7 @@ function ExtensionDetail({
           className="detail-settings"
           id="applet-detail-panel"
           role="tabpanel"
-          aria-labelledby="applet-detail-tab-settings"
+          aria-labelledby={`applet-detail-tab-${view}`}
         >
           {settingsPanel}
         </div>
@@ -1117,7 +1088,6 @@ function SettingsPage({
   webAccounts,
   globalHotKeys,
   editor,
-  onApplet,
   sidebarHost,
   sidebar,
   active,
@@ -1137,7 +1107,6 @@ function SettingsPage({
   webAccountsRequest: number;
   webAccounts: HostSnapshot['webAccounts'];
   editor: SettingsEditor;
-  onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
   sidebarHost: HTMLDivElement | null;
   sidebar: ReturnType<typeof useAppletSidebar>;
@@ -1163,9 +1132,7 @@ function SettingsPage({
   const [category, setCategory] = useRestartView<
     | 'appearance'
     | 'general'
-    | 'extensions'
     | 'shortcuts'
-    | 'host-shortcuts'
     | 'gestures'
     | 'profile'
     | 'about'
@@ -1175,9 +1142,7 @@ function SettingsPage({
   >('category', 'appearance', [
     'appearance',
     'general',
-    'extensions',
     'shortcuts',
-    'host-shortcuts',
     'gestures',
     'profile',
     'about',
@@ -1185,41 +1150,13 @@ function SettingsPage({
     'web-applets',
     'web-accounts',
   ]);
-  const [appletId, setAppletId] = useRestartView<string>('appletId', '');
-  const [appletTab, setAppletTab] = useRestartView<AppletSettingsTab>('appletTab', 'settings', [
-    'settings',
-    'shortcuts',
-  ]);
-  const [appletSearch, setAppletSearch] = useState('');
-  const selectedApplet = extensions.find((e) => e.id === appletId) ?? extensions[0];
   const settingsBody = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     // Reset before paint so the next category never appears at the previous offset.
     if (settingsBody.current) settingsBody.current.scrollTop = 0;
-  }, [category, selectedApplet?.id, appletTab, mode]);
+  }, [category, mode]);
   const changed = (part: unknown, original: unknown) =>
     JSON.stringify(part) !== JSON.stringify(original);
-  const shortcutChanged = (owner: string | null) =>
-    commands
-      .filter((command) => command.extensionId === owner)
-      .some(
-        (command) =>
-          changed(
-            getKeybindings(draft).filter((r) => r.command === command.id),
-            getKeybindings(snapshot.value).filter((r) => r.command === command.id),
-          ) ||
-          draft.globalShortcutCommands.includes(command.id) !==
-            snapshot.value.globalShortcutCommands.includes(command.id) ||
-          draft.trayCommands.includes(command.id) !==
-            snapshot.value.trayCommands.includes(command.id),
-      );
-  const appletChanged = (id: string) =>
-    changed(draft.extensions[id], snapshot.value.extensions[id]) ||
-    changed(
-      draft.webApplets.items.find((a) => a.id === id),
-      snapshot.value.webApplets.items.find((a) => a.id === id),
-    ) ||
-    shortcutChanged(id);
   const categoryChanged = (id: string) =>
     id === 'gestures'
       ? changed(draft.gestures, snapshot.value.gestures)
@@ -1242,16 +1179,14 @@ function SettingsPage({
                   ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
                   : id === 'profile'
                     ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-                    : id === 'host-shortcuts'
-                      ? shortcutChanged(null)
-                      : id === 'shortcuts'
-                        ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
-                          changed(
-                            draft.globalShortcutCommands,
-                            snapshot.value.globalShortcutCommands,
-                          ) ||
-                          changed(draft.trayCommands, snapshot.value.trayCommands)
-                        : extensions.some((e) => appletChanged(e.id));
+                    : id === 'shortcuts'
+                      ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
+                        changed(
+                          draft.globalShortcutCommands,
+                          snapshot.value.globalShortcutCommands,
+                        ) ||
+                        changed(draft.trayCommands, snapshot.value.trayCommands)
+                      : false;
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1312,71 +1247,6 @@ function SettingsPage({
                   )}
                 </button>
               ))}
-            </div>
-            <div className="settings-applet-list">
-              <h3>Applet別の設定</h3>
-              <input
-                aria-label="設定するAppletを検索"
-                placeholder="Appletを検索…"
-                value={appletSearch}
-                onChange={(event) => setAppletSearch(event.target.value)}
-              />
-              <div className="sidebar-extensions">
-                {'appdock'.includes(appletSearch.toLowerCase()) && (
-                  <button
-                    data-settings-owner="appdock"
-                    className={category === 'host-shortcuts' ? 'selected' : ''}
-                    aria-current={category === 'host-shortcuts' ? 'true' : undefined}
-                    onClick={() => {
-                      if (navigateSettings()) setCategory('host-shortcuts');
-                    }}
-                  >
-                    <span title="AppDock">AppDock</span>
-                    {categoryChanged('host-shortcuts') && (
-                      <small className="unsaved-mark" aria-label="未保存">
-                        ●
-                      </small>
-                    )}
-                  </button>
-                )}
-                {extensions
-                  .filter((e) =>
-                    (e.displayName + ' ' + e.name + ' ' + e.id)
-                      .toLowerCase()
-                      .includes(appletSearch.toLowerCase()),
-                  )
-                  .map((e) => (
-                    <button
-                      key={e.id}
-                      className={
-                        category === 'extensions' && selectedApplet?.id === e.id ? 'selected' : ''
-                      }
-                      aria-current={
-                        category === 'extensions' && selectedApplet?.id === e.id
-                          ? 'true'
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (!navigateSettings()) return;
-                        setCategory('extensions');
-                        setAppletId(e.id);
-                      }}
-                    >
-                      <span title={e.displayName}>{e.displayName}</span>
-                      {appletChanged(e.id) && (
-                        <small className="unsaved-mark" aria-label="未保存">
-                          ●
-                        </small>
-                      )}
-                    </button>
-                  ))}
-                {!'appdock'.includes(appletSearch.toLowerCase()) &&
-                  !extensions.some((e) =>
-                    (e.displayName + ' ' + e.name + ' ' + e.id)
-                      .toLowerCase()
-                      .includes(appletSearch.toLowerCase()),
-                  ) && <p className="empty">該当するAppletはありません。</p>}
-              </div>
             </div>
             <div
               className="sidebar-resizer"
@@ -1544,34 +1414,11 @@ function SettingsPage({
                   </div>
                 </section>
               )}
-              {category === 'extensions' && selectedApplet && (
-                <>
-                  <div className="applet-settings-heading">
-                    <h3>{selectedApplet.displayName}</h3>
-                    <button className="text-button" onClick={() => onApplet(selectedApplet.id)}>
-                      Appletに戻る
-                    </button>
-                  </div>
-                  <AppletSettingsPanel
-                    extensions={extensions}
-                    applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
-                    applet={selectedApplet}
-                    editor={editor}
-                    commands={commands}
-                    globalHotKeys={globalHotKeys}
-                    tab={appletTab}
-                    onTab={setAppletTab}
-                    webAccounts={webAccounts}
-                    onWebAccounts={() => setCategory('web-accounts')}
-                  />
-                </>
-              )}
-              {(category === 'shortcuts' || category === 'host-shortcuts') && (
+              {category === 'shortcuts' && (
                 <ShortcutsEditor
                   extensions={extensions}
                   key={category}
                   commands={commands}
-                  owner={category === 'host-shortcuts' ? null : undefined}
                   settings={draft}
                   onChange={edit}
                   applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
@@ -1699,9 +1546,6 @@ function SettingsPage({
                     </SettingRow>
                   ))}
                 </>
-              )}
-              {category === 'extensions' && !selectedApplet && (
-                <p className="empty">Appletはまだありません。</p>
               )}
             </div>
           </div>

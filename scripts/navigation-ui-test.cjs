@@ -98,7 +98,15 @@ const checks = [];
   page.setDefaultTimeout(12000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const button = (name) => page.getByRole('button', { name, exact: true });
+  const button = (name) =>
+    name === 'ショートカットキー'
+      ? detailTab('ショートカット')
+      : name === '設定項目'
+        ? detailTab('設定')
+        : page.getByRole('button', {
+            name: name === 'Appletに戻る' ? 'Applet' : name,
+            exact: true,
+          });
   const detailTab = (name) =>
     page
       .getByRole('tablist', { name: 'Applet詳細の切り替え' })
@@ -130,10 +138,16 @@ const checks = [];
       .waitFor();
   };
   const chooseApplet = async (name) => {
-    await page.getByLabel('設定するAppletを検索').fill(name);
-    await settingsNav()
+    const view = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('appdock.restart-view.detailView') ?? '"settings"'),
+    );
+    await button('Applet').click();
+    await page.getByLabel('Appletを検索', { exact: true }).fill(name);
+    await page
+      .getByRole('complementary', { name: 'Applet一覧' })
       .getByRole('button', { name: new RegExp(name) })
       .click();
+    await detailTab(view === 'shortcuts' ? 'ショートカット' : '設定').click();
   };
   try {
     await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
@@ -154,7 +168,7 @@ const checks = [];
         .getByRole('tablist', { name: 'Applet詳細の切り替え' })
         .getByRole('tab')
         .allTextContents(),
-      ['説明', '設定', 'ログ'],
+      ['説明', '設定', 'ショートカット', 'ログ'],
     );
     const assertDetailTab = async (name) => {
       assert.equal(await page.locator('.detail-tabs [aria-selected="true"]').count(), 1);
@@ -164,7 +178,9 @@ const checks = [];
     await assertDetailTab('説明');
     await detailTab('説明').press('ArrowRight');
     await assertDetailTab('設定');
-    await detailTab('設定').press('End');
+    await detailTab('設定').press('ArrowRight');
+    await assertDetailTab('ショートカット');
+    await detailTab('ショートカット').press('End');
     await assertDetailTab('ログ');
     await detailTab('ログ').press('ArrowRight');
     await assertDetailTab('説明');
@@ -173,7 +189,7 @@ const checks = [];
     await detailTab('ログ').press('Home');
     await assertDetailTab('説明');
     checks.push(
-      'horizontal description/settings/log tabs / exclusive selection and panel / keyboard arrows, Home, End',
+      'horizontal description/settings/shortcuts/log tabs / exclusive selection and panel / keyboard arrows, Home, End',
     );
     const descriptionAppearance = await switchAppearance();
     await detailTab('設定').click();
@@ -257,6 +273,7 @@ const checks = [];
     await button('設定').click();
     await chooseApplet('検証Applet 01');
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
+    await button('設定').click();
     await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
     await page.getByRole('region', { name: 'バージョン情報・更新', exact: true }).waitFor();
     assert.equal(await page.locator('.settings-toolbar:visible').count(), 1);
@@ -339,22 +356,15 @@ const checks = [];
     await statusButtons.getByRole('button', { name: 'すべて', exact: true }).click();
     assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
     await save();
+    await button('設定').click();
     await button('ショートカット').click();
     await page.locator('.command-id[title="未確認のコマンド"]').first().waitFor();
-    await page.getByLabel('設定するAppletを検索').fill('');
+    assert.equal(await page.locator('.settings-applet-list').count(), 0);
+    assert.equal(await page.locator('.shortcut-group-heading').first().textContent(), 'AppDock6件');
     assert.equal(
-      await page
-        .locator('.settings-applet-list .sidebar-extensions button')
-        .first()
-        .locator('span')
-        .textContent(),
-      'AppDock',
+      await page.locator('[data-shortcut-owner="appdock"] .keybindings-table tbody tr').count(),
+      6,
     );
-    await page
-      .locator('.settings-applet-list')
-      .getByRole('button', { name: 'AppDock', exact: true })
-      .click();
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 6);
     checks.push(
       'owner scope / cross-applet shared keys / status filters / unknown commands / host keys',
     );
@@ -373,6 +383,7 @@ const checks = [];
     );
     checks.push('stopped applet retains known ownership and key bindings');
 
+    await button('設定').click();
     await button('JSON').click();
     await setJsonDraft('{broken');
     await button('Applet').click();
@@ -387,6 +398,7 @@ const checks = [];
     await button('エラーを閉じる').click();
     checks.push('direct navigation preserves invalid JSON');
 
+    await button('設定').click();
     await button('JSON').click();
     const jsonDraft = JSON.parse(await page.getByLabel('設定JSON').inputValue());
     jsonDraft.extensions['test.applet-1'].settings.value0 = 'JSONから共通編集';
@@ -458,7 +470,8 @@ const checks = [];
     );
     await button('変更を破棄して再読み込み').click();
     await button('エラーを閉じる').click();
-    await button('設定').click();
+    await chooseApplet('検証Applet 01');
+    await detailTab('設定').click();
     assert.equal(await page.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     checks.push('inline external update refuses overwrite and retains draft / shared discard');
 
@@ -618,7 +631,7 @@ const checks = [];
       }
       await save();
       checks.push(
-        `${theme}: stable description/settings/log tabs at 1280, 900 and 700px; single-line labels`,
+        `${theme}: stable description/settings/shortcuts/log tabs at 1280, 900 and 700px; single-line labels`,
       );
       assert.equal(
         JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
