@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-10: 古い成功テストフォルダーの整理
+
+- ユーザーの削除依頼により、本体と全6Appletの`.artifacts`を確認。成功結果と実行方式を判定できるものを種類/方式ごとに直近3回まで保持し、それより古い94フォルダー（本体70、Gmail24）を削除。合計9,102,018,616 bytes（約9.1GB / 8.48GiB）。他5Appletは安全に削除できる条件を満たす古い成功分がなかった。
+- 削除候補はrepoの`.artifacts`直下の検証済み絶対パスだけ。各repo/親/配下の再解析ポイントを除外し、結果JSONのhash・ファイル数/サイズを再照合、使用中プロセス/旧パス参照・ディレクトリの削除可否・配下ファイルの排他読み取りを確認してからPowerShellのLiteralPathで削除した。コマンドラインを取得できないAppDock群は実行パス/親PIDから実利用配置の子プロセスと確認、停止やACL変更はしていない。削除失敗/使用中による保留0件。
+- 直近の成功結果69件のSHA256が不変、全削除候補が消え、その他の保持予定項目がすべて存在することを再確認。失敗/状態不明/実行方式不明のテスト536件、固定ビルド出力、Release/all-in-one資料、旧版移行資料、Gmailのgmail-dev/avatar-match-live、単独の調査ファイルは保持した。成功専用schemaはkeybindings/gesturesの末尾assert後のchecks形式も確認し、ただの名前/経過日数で削除していない。
+- 本体0.26.12のEXE/feed SHA256と各Appletのpublish全33ファイルのhashが不変。Gmailの開発用データ3,166項目は改名時の棚卸しからsize/mtime/属性が不変。製品コード・版・設定変更/再発行/Release/deployなし。
+- 候補/保持理由/全削除名/再照合結果は`.artifacts/cleanup-20261010-plan.json`、`cleanup-20261010-result.json`、`cleanup-20261010-verification.json`。調査のschema一覧と削除スクリプトは`A:/XX.TEMP/artifacts-cleanup-survey-20261010.json`、`remove-old-artifact-tests-20261010.ps1`。同期設定はユキちゃんが担当する。
+
 ## 2026-10-10: 開発生成物を`.artifacts`へ改名（0.26.12）
 
 - ユーザー指定でrepo直下の`artifacts`を`.artifacts`へ改名。最初の通常/sandbox外の改名はアクセス拒否、ユーザーの中断・再開後の再試行は成功。原因は断定せず、ACL変更・実利用プロセス停止・旧データ削除は行っていない。Applet.WindowsTools.at365が元の場所に存在し、Git作業ツリーがcleanであることも再開時に確認した。
