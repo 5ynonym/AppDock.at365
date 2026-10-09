@@ -180,7 +180,7 @@ export interface DockApi {
   deleteWebAccount(id: string): Promise<false | 'deleted' | 'deferred'>;
   cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
-  installUpdates(target: 'host' | 'applets' | string): Promise<UpdateState>;
+  installUpdates(target: 'all' | 'host' | 'applets' | string): Promise<UpdateState>;
   onAppletPage(callback: (key: string | null) => void): () => void;
   openAppletPage(extensionId: string, pageId: string): Promise<void>;
   pageViewport(

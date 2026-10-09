@@ -211,6 +211,117 @@ test('a corrupt downloaded payload never reaches approval or shutdown', async (t
   assert.equal(shutdowns, 0);
   assert.equal(updater.state.busy, false);
 });
+function combinedFixture(t, minimumHostVersion, packaged = false) {
+  const f = fixture(t);
+  f.manifest.minimumHostVersion = minimumHostVersion;
+  fs.writeFileSync(path.join(f.source, 'extension.json'), JSON.stringify(f.manifest));
+  if (packaged) {
+    const packed = path.join(f.directory, 'package');
+    assert.equal(
+      spawnSync(helper, ['--pack', 'applet', f.source, 'unused', packed], { windowsHide: true })
+        .status,
+      0,
+    );
+    f.target.source = packed;
+  }
+  const hostSource = path.join(f.directory, 'host-publish');
+  fs.mkdirSync(hostSource);
+  const payload = Buffer.from('MZhost-fixture');
+  fs.writeFileSync(path.join(hostSource, 'AppDock.exe'), payload);
+  const feed = {
+    schemaVersion: 1,
+    kind: 'host',
+    id: 'host',
+    version: '0.23.0',
+    payload: { file: 'AppDock.exe', format: 'exe', sha256: hash(payload), size: payload.length },
+  };
+  const saveFeed = () =>
+    fs.writeFileSync(path.join(hostSource, 'update.json'), JSON.stringify(feed));
+  saveFeed();
+  const host = {
+    id: 'host',
+    name: 'AppDock',
+    kind: 'host',
+    version: '0.22.0',
+    source: hostSource,
+    destination: path.join(f.directory, 'AppDock.exe'),
+  };
+  fs.writeFileSync(host.destination, 'installed-host');
+  fs.mkdirSync(f.target.destination, { recursive: true });
+  fs.writeFileSync(path.join(f.target.destination, 'preserved.txt'), 'installed-applet');
+  let approvals = [],
+    shutdowns = 0;
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    // Deliberately put the Applet first: compatibility must use the host in this job.
+    targets: () => [f.target, host],
+    executable: host.destination,
+    confirm: async (names) => {
+      approvals.push(names);
+      return false;
+    },
+    shutdown: () => {
+      shutdowns++;
+    },
+  });
+  const preserved = () => {
+    assert.equal(fs.readFileSync(host.destination, 'utf8'), 'installed-host');
+    assert.equal(
+      fs.readFileSync(path.join(f.target.destination, 'preserved.txt'), 'utf8'),
+      'installed-applet',
+    );
+    assert.equal(shutdowns, 0);
+    assert.equal(updater.state.busy, false);
+  };
+  return { ...f, updater, host, feed, hostSource, saveFeed, approvals, preserved };
+}
+test('combined update prepares host and Applet against the new host version in one approval', async (t) => {
+  for (const packaged of [false, true]) {
+    await t.test(packaged ? 'feed and extracted manifest' : 'local manifest', async (t) => {
+      const f = combinedFixture(t, '0.23.0', packaged);
+      await f.updater.check();
+      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').status, 'incompatible');
+      await f.updater.install('all');
+      assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0', 'Fixture 1.0.0 → 2.0.0']]);
+      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').installable, true);
+      f.preserved();
+    });
+  }
+});
+test('combined updates never assume an unavailable or insufficient host upgrade', async (t) => {
+  for (const scenario of ['disabled', 'error', 'same', 'older', 'insufficient']) {
+    await t.test(scenario, async (t) => {
+      const f = combinedFixture(t, scenario === 'insufficient' ? '0.24.0' : '0.23.0');
+      if (scenario === 'disabled') f.host.source = '';
+      if (scenario === 'error') f.feed.id = 'wrong';
+      if (scenario === 'same') f.feed.version = '0.22.0';
+      if (scenario === 'older') f.feed.version = '0.21.0';
+      f.saveFeed();
+      await f.updater.install('all');
+      assert.equal(f.updater.state.results.find((r) => r.id === 'fixture').status, 'incompatible');
+      assert.equal(f.approvals.length, scenario === 'insufficient' ? 1 : 0);
+      if (f.approvals.length) assert.deepEqual(f.approvals[0], ['AppDock 0.22.0 → 0.23.0']);
+      f.preserved();
+    });
+  }
+});
+test('combined preparation failure leaves both host and Applet installed files intact', async (t) => {
+  for (const corrupt of ['host', 'applet']) {
+    await t.test(corrupt, async (t) => {
+      const f = combinedFixture(t, '0.23.0', true);
+      fs.appendFileSync(
+        path.join(
+          corrupt === 'host' ? f.hostSource : f.target.source,
+          corrupt === 'host' ? 'AppDock.exe' : 'update.zip',
+        ),
+        'corrupt',
+      );
+      await assert.rejects(f.updater.install('all'), /ハッシュ/);
+      assert.deepEqual(f.approvals, []);
+      f.preserved();
+    });
+  }
+});
 function digestTree(directory) {
   const names = [];
   function walk(current) {

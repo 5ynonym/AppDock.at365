@@ -2756,8 +2756,16 @@ summary {
 .update-actions {
   flex-wrap: wrap;
 }
-.about-page .version-check > [role='status'],
-.about-page .version-check > time {
+.update-check-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.update-check-control time {
+  white-space: nowrap;
+}
+.about-page .version-check > [role='status'] {
   flex-basis: 100%;
 }
 

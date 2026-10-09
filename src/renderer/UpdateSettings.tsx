@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot, UpdateState } from '../shared/contracts';
 import { createDefaultSettings } from '../shared/settings-schema';
+import { UpdateCheckTime } from './VersionCheck';
 
 export function UpdateSettings({
   draft,
@@ -20,6 +21,10 @@ export function UpdateSettings({
   };
   const [state, setState] = useState<UpdateState>({ busy: false, phase: '', results: [] });
   const [error, setError] = useState('');
+  const checkedAt = state.results
+    .map((result) => result.checkedAt)
+    .sort()
+    .at(-1);
   useEffect(() => {
     let alive = true;
     const refresh = () => {
@@ -45,21 +50,34 @@ export function UpdateSettings({
       <div className="actions update-actions">
         <button
           className="update-primary"
+          disabled={state.busy || dirty}
+          title={dirty ? '未保存の設定を保存または破棄してください。' : undefined}
+          onClick={() => action(() => window.dock.installUpdates('all'))}
+        >
+          本体と全Appletを更新
+        </button>
+        <button
+          className="text-button"
           disabled={state.busy || dirty || appletCount === 0}
           title={dirty ? '未保存の設定を保存または破棄してください。' : undefined}
           onClick={() => action(() => window.dock.installUpdates('applets'))}
         >
           Appletを一括更新
         </button>
-        <button
-          className="text-button"
-          disabled={state.busy || dirty}
-          onClick={() => action(() => window.dock.checkAllUpdates())}
-        >
-          すべての更新を確認
-        </button>
+        <span className="update-check-control">
+          <button
+            className="text-button"
+            disabled={state.busy || dirty}
+            onClick={() => action(() => window.dock.checkAllUpdates())}
+          >
+            すべての更新を確認
+          </button>
+          {checkedAt && <UpdateCheckTime checkedAt={checkedAt} />}
+        </span>
       </div>
-      <p className="muted">更新ボタンで最新版を確認・準備し、最後に対象を確認して再起動します。</p>
+      <p className="muted">
+        本体と全Appletの更新は、更新のある対象をまとめて準備し、最後に確認して1回の再起動で適用します。
+      </p>
       {dirty && <p role="status">更新前に未保存の設定を保存または破棄してください。</p>}
       {error && (
         <p role="alert" className="error-text">
