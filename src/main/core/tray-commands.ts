@@ -48,6 +48,8 @@ export function withoutMissingSamples(
   const retired = ['appdock.welcome', 'appdock.dotnet-demo'].filter((id) => !installed.has(id));
   const isRetired = (id: string) => retired.some((owner) => id.startsWith(owner + '.'));
   const next = structuredClone(settings);
+  if (next.keybindings)
+    next.keybindings = next.keybindings.filter((row) => !isRetired(row.command));
   for (const owner of retired) delete next.extensions[owner];
   for (const id of Object.keys(next.shortcuts)) if (isRetired(id)) delete next.shortcuts[id];
   next.globalShortcutCommands = next.globalShortcutCommands.filter((id) => !isRetired(id));

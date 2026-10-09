@@ -1,3 +1,4 @@
+import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -16,8 +17,6 @@ import {
   rankCommands,
   movePinnedCommand,
   shortcutFromEvent,
-  defaultShortcuts,
-  defaultGlobalShortcutCommands,
   type UiCommand,
 } from '../shared/commands';
 import { ShortcutsEditor } from './ShortcutsEditor';
@@ -377,20 +376,34 @@ function App() {
         e.target.closest('input, textarea, select, [contenteditable="true"]')
       )
         return;
-      const commandId =
+      const matches =
         shortcut &&
-        Object.entries(snapshot?.settings.value.shortcuts ?? {}).find(([, values]) =>
-          values.includes(shortcut),
-        )?.[0];
-      if (commandId && commands.some((c) => c.id === commandId && c.available)) {
+        snapshot &&
+        resolveKeybindings(
+          getKeybindings(snapshot.settings.value),
+          shortcut,
+          {
+            appFocused: true,
+            appletId: !palette && page.startsWith('page:') ? page.split(':')[1] : undefined,
+          },
+          commands.filter((c) => c.available),
+        );
+      if (shortcut && matches && matches.length) {
         e.preventDefault();
-        if (!busy || hostCommands.some((c) => c.id === commandId)) void execute(commandId);
+        void window.dock
+          .dispatchShortcut(shortcut)
+          .then((result) => {
+            if (result?.failed)
+              setError('ショートカットの一部を実行できませんでした。ログを確認してください。');
+            else if (result?.executed) setToast('コマンドを実行しました。');
+          })
+          .catch((error) => setError(String(error)));
       }
       if (e.key === 'Escape') setPalette(false);
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [snapshot, busy]);
+  }, [snapshot, busy, page, palette]);
   useEffect(() => {
     document.documentElement.dataset.theme = snapshot?.dark ? 'dark' : 'light';
   }, [snapshot?.dark]);
@@ -781,7 +794,9 @@ function App() {
                         onClick={() => void execute(c.id)}
                       >
                         {c.title}
-                        <small>{c.extension}</small>
+                        <small className="command-id" title={c.extension}>
+                          {c.id}
+                        </small>
                       </button>
                     ))}
                   </div>
@@ -872,6 +887,10 @@ function App() {
                             currentRevision={snapshot.settings.revision}
                           />
                           <AppletSettingsPanel
+                            applets={(snapshot?.extensions ?? []).map((e) => ({
+                              id: e.id,
+                              title: e.displayName,
+                            }))}
                             applet={selectedApplet}
                             editor={editor}
                             commands={shortcutCommands}
@@ -1048,8 +1067,8 @@ function App() {
                       <Icon name="play" size={16} />
                       <div>
                         {c.title}
-                        <small>
-                          {c.extension}
+                        <small title={c.extension}>
+                          <span className="command-id">{c.id}</span>
                           {!c.available && <span> · Applet起動後に利用できます</span>}
                           {pinned && <span className="pin-badge">PINNED</span>}
                         </small>
@@ -1436,7 +1455,10 @@ function SettingsPage({
       .filter((command) => command.extensionId === owner)
       .some(
         (command) =>
-          changed(draft.shortcuts[command.id], snapshot.value.shortcuts[command.id]) ||
+          changed(
+            getKeybindings(draft).filter((r) => r.command === command.id),
+            getKeybindings(snapshot.value).filter((r) => r.command === command.id),
+          ) ||
           draft.globalShortcutCommands.includes(command.id) !==
             snapshot.value.globalShortcutCommands.includes(command.id) ||
           draft.trayCommands.includes(command.id) !==
@@ -1472,7 +1494,7 @@ function SettingsPage({
                   : id === 'host-shortcuts'
                     ? shortcutChanged(null)
                     : id === 'shortcuts'
-                      ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                      ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
                         changed(
                           draft.globalShortcutCommands,
                           snapshot.value.globalShortcutCommands,
@@ -1767,6 +1789,7 @@ function SettingsPage({
                     </button>
                   </div>
                   <AppletSettingsPanel
+                    applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
                     applet={selectedApplet}
                     editor={editor}
                     commands={commands}
@@ -1783,25 +1806,10 @@ function SettingsPage({
                   key={category}
                   commands={commands}
                   owner={category === 'host-shortcuts' ? null : undefined}
-                  bindings={draft.shortcuts}
-                  onChange={(shortcuts) => edit({ ...draft, shortcuts })}
-                  globalCommands={draft.globalShortcutCommands}
-                  onGlobalChange={(globalShortcutCommands) =>
-                    edit({ ...draft, globalShortcutCommands })
-                  }
+                  settings={draft}
+                  onChange={edit}
+                  applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
                   statuses={globalHotKeys}
-                  trayCommands={draft.trayCommands}
-                  onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
-                  onRestore={(id) =>
-                    editor.edit({
-                      ...draft,
-                      shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
-                      globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
-                        ? [...new Set([...draft.globalShortcutCommands, id])]
-                        : draft.globalShortcutCommands.filter((command) => command !== id),
-                      trayCommands: draft.trayCommands.filter((command) => command !== id),
-                    })
-                  }
                 />
               )}
               {category === 'profile' && (
@@ -1883,7 +1891,7 @@ function SettingsPage({
                           .filter((command) => !command.hidden || command.id === draft.host[key])
                           .map((command) => (
                             <option key={command.id} value={command.id}>
-                              {command.extension} / {command.title}
+                              {command.title} ({command.id})
                               {command.available ? '' : '（現在利用できません）'}
                             </option>
                           ))}

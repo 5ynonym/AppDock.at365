@@ -272,21 +272,25 @@ const checks = [];
     await button('設定を開く').click();
     await button('ショートカットキー').click();
     await page.getByRole('heading', { name: 'ショートカットキー', exact: true }).waitFor();
-    assert.equal(await page.locator('.shortcut-row').count(), 0);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 0);
     checks.push('no settings / no commands / inline shortcuts');
     await button('設定').click();
     await chooseApplet('検証Applet 00');
     await button('ショートカットキー').click();
 
     await chooseApplet('Welcome to your Dock');
-    assert.equal(await page.locator('.shortcut-row').count(), 3);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
     await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).press('Control+p');
-    await page.getByRole('alert').filter({ hasText: 'AppDock / コマンドを検索' }).waitFor();
+    await page.getByText('同じキーの割り当てあり（条件一致時に実行）', { exact: true }).waitFor();
     await page
       .getByRole('group', { name: 'ショートカットの絞り込み' })
-      .getByRole('button', { name: '競合・エラー', exact: true })
+      .getByRole('button', { name: '登録エラー', exact: true })
       .click();
-    assert.equal(await page.locator('.shortcut-row').count(), 1);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 0);
+    await page
+      .getByRole('group', { name: 'ショートカットの絞り込み' })
+      .getByRole('button', { name: 'すべて', exact: true })
+      .click();
     await page
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
       .press('Control+Alt+r');
@@ -294,18 +298,18 @@ const checks = [];
       .getByRole('group', { name: 'ショートカットの絞り込み' })
       .getByRole('button', { name: '割り当て済み', exact: true })
       .click();
-    assert.equal(await page.locator('.shortcut-row').count(), 1);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 1);
     const statusButtons = page.getByRole('group', { name: 'ショートカットの絞り込み' });
     const unassigned = statusButtons.getByRole('button', { name: '未設定', exact: true });
     await unassigned.focus();
     await unassigned.press('Space');
     assert.equal(await unassigned.getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('.shortcut-row').count(), 2);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 2);
     await statusButtons.getByRole('button', { name: 'すべて', exact: true }).click();
-    assert.equal(await page.locator('.shortcut-row').count(), 3);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
     await save();
     await button('ショートカット').click();
-    await page.getByRole('heading', { name: '未確認のコマンド', exact: true }).waitFor();
+    await page.locator('.command-id[title="未確認のコマンド"]').first().waitFor();
     await page.getByLabel('設定するAppletを検索').fill('');
     assert.equal(
       await page
@@ -319,9 +323,9 @@ const checks = [];
       .locator('.settings-applet-list')
       .getByRole('button', { name: 'AppDock', exact: true })
       .click();
-    assert.equal(await page.locator('.shortcut-row').count(), 5);
+    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 6);
     checks.push(
-      'owner scope / cross-applet conflicts / status filters / unknown commands / host keys',
+      'owner scope / cross-applet shared keys / status filters / unknown commands / host keys',
     );
     await page.evaluate(() => window.dock.toggleExtension('appdock.welcome', false));
     await chooseApplet('Welcome to your Dock');

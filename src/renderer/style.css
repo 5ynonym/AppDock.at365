@@ -2736,3 +2736,84 @@ summary {
 .update-operation > button {
   flex-shrink: 0;
 }
+/* Conditional shortcut assignments: one row per binding. */
+.command-id {
+  overflow-wrap: anywhere;
+}
+.keybindings-scroll {
+  overflow-x: auto;
+}
+.keybindings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.keybindings-table th {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.keybindings-table td {
+  vertical-align: top;
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.keybindings-table td:nth-child(2) {
+  min-width: 155px;
+}
+.keybindings-table td:nth-child(3) {
+  min-width: 175px;
+}
+.keybindings-table td:nth-child(4) {
+  min-width: 190px;
+}
+.keybindings-table td:nth-child(5) {
+  min-width: 140px;
+}
+.keybindings-table small {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.keybindings-table input[data-shortcut-recorder],
+.keybindings-table select {
+  width: 100%;
+}
+.keybinding-tray {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+.keybinding-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.keybinding-targets {
+  margin-top: 8px;
+  text-align: left;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.keybinding-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.keybinding-picker label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

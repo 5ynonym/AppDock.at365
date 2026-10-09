@@ -1,3 +1,4 @@
+import { parseKeybindings, withKeybindings } from './keybindings';
 import type { Settings } from './contracts';
 import { parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
@@ -131,9 +132,14 @@ export function parseSettings(value: unknown): Settings {
       )
     )
       throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
-  const shortcuts = parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
-  const globalShortcutCommands =
-    value.globalShortcutCommands === undefined
+  const keybindings =
+    value.keybindings === undefined ? undefined : parseKeybindings(value.keybindings);
+  const shortcuts = keybindings
+    ? {}
+    : parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
+  const globalShortcutCommands = keybindings
+    ? []
+    : value.globalShortcutCommands === undefined
       ? [...defaultGlobalShortcutCommands]
       : value.globalShortcutCommands;
   if (
@@ -181,6 +187,7 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    ...(keybindings ? { keybindings } : {}),
     webApplets: parseWebApplets(value.webApplets),
     updates,
     schemaVersion: value.schemaVersion,
@@ -193,7 +200,9 @@ export function parseSettings(value: unknown): Settings {
     ribbon,
     profile: { ...profile, name: profile.name.trim() },
   };
-  if (new TextEncoder().encode(JSON.stringify(next)).length > 1024 * 1024)
+  const parsed = structuredClone(next) as unknown as Settings;
+  const result = keybindings ? withKeybindings(parsed, keybindings) : parsed;
+  if (new TextEncoder().encode(JSON.stringify(result)).length > 1024 * 1024)
     throw new Error('設定は1MB以下にしてください。');
-  return structuredClone(next) as unknown as Settings;
+  return result;
 }

@@ -161,3 +161,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 0.22.0の取得元・更新情報JSON・共通ミニプログラム・発行・復元・隔離試験は[更新の開発ガイド](docs/updates.md)を参照してください。`publish.bat`は本体EXEと`publish/update.json`を生成します。
 
 0.23.0は全6Appletの更新ZIP/JSON生成、共通進捗とキャンセル、journalのcommit記録・中断復旧を追加します。`scripts/update-progress-ui-test.cjs`と`scripts/update-recovery-test.cjs`の実行方法・隔離範囲は上記ガイド、実GitHub/HTTP(S)/UNCでの確認は[配布先のチェックリスト](docs/update-checklist.md)を参照してください。
+
+## 条件付きショートカット
+
+0.25.0の[保存形式・判定・検証](docs/keybindings.md)を参照してください。全画面の入力とWindowsホットキーをホスト共通の条件判定/逐次実行へ集約します。新規割り当ては提供元条件を既定にし、本体コマンドはapp条件にします。

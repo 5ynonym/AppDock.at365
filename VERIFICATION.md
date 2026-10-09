@@ -1,5 +1,36 @@
 # 検証記録
 
+## 2026-10-09: 条件付きショートカットを0.25.0としてリリース準備
+
+- 新規キー割り当てはApplet提供元を既定にし、本体/提供元不明はAppDock全体。既存行のキー変更・複製は条件を保持。ショートカット表/コマンドパレット/ホームのピン留め/トレイ動作選択へ完全なコマンドIDを表示し、ID・コマンド名・提供元名の検索を維持した。
+- 0.25.0へ版更新。型検査/build成功。専用GUI10群（`artifacts/keybindings-1791523433971`）、設定保持7群（`artifacts/preferences-1791523444534`）、画面遷移16群（`artifacts/navigation-1791523485549`）成功。dark/lightと700/900/1280pxを含む。ナビ試験の旧補助表示「未確認のコマンド」への依存を完全ID表示に合わせて更新した。
+- 版変更後のpnpm依存確認はsandboxで停止し、対象プロセスだけを終了して通常環境で再実行した。lockfileは変更なし。OSキー試験の仮想キー送信は複数回未到達。非同期送信/試験順分離だけでは改善せず、試験ヘルパーに任意のScanCode方式を追加して実OS入力を確認した（比較試験`artifacts/keybindings-1791523386732`と最終GUIの双方で成功）。製品のキー受付へ待機/送信方式変更は加えていない。外部フック等の低レベル原因は断定しない。
+- ユーザーがこの会話のショートカット基盤全体と上記2点をまとめた版更新/公開を依頼。最新Releaseはv0.24.2、origin/mainは`1e2a2a50d4fd86b76689d7015df57e0762bc23f9`、v0.25.0未使用、全6Applet checkout cleanと読取確認。正式Prepare→Draft→Publish→Verifyの実行証跡は`artifacts/release-0.25.0-shortcuts-20261009/plan.json`へ記録し、固定配布物の追加ショートカット/ページGUIも確認する。最終結果/公開URL/ハッシュはPlanとALICE日記を参照。実利用先deployは行わない。
+
+## 2026-10-09: コマンド提供元のAppletページ条件を追加
+
+- `owner`条件を追加し、現在のコマンド登録元extensionIdとアクティブページを照合。提供元名だけ（例: Gmail）を表示し、「すべてのApplet → 提供元名 → 指定したApplet」の順に配置。本体コマンドでは提供元項目を出さない。既存のpages/applets設定は意味を保つ。
+- 型検査/build、条件・登録元・不明/本体・フォーカス・保存形式を含む専用unit 8/8成功。ソースGUI9群成功（`artifacts/keybindings-1791522519621`）。発行win-unpackedでも提供元内で実行/別Appletでは非実行、Gmail名だけの表示、本体項目除外、順序/保存を確認。
+- 発行版GUIの実Windows入力試験は2回`Expected d,a`で停止。発行ヘルパー単独では同じSendInputを受信。診断用にOS通知/Web入力の観測だけを加えたGUIは9群成功（`artifacts/keybindings-1791522762511`）、ローカル重複防止/全Window非表示の2回ともOS通知を確認。製品コード/入力待機は変更していない。最初の未到達の低レベル原因は未特定。診断スクリプトは`artifacts/keybindings-owner-probe.cjs`に保存。
+- `publish.bat`終了0。0.24.2のローカル確認版を再発行。EXE100612225 bytes/SHA256 `88c5afdb1d3978f748a4a200983822aeaf28babac0d81e8360fd8567086c41b3`とupdate.jsonが一致。全6Applet入りZIPの全ファイルsize/hashと本体一致、隔離展開した単一EXE起動/全Appletの版・初期無効を確認（`artifacts/owner-keybindings-bundle-result.json`）。実利用設定変更、deploy、commit、push、公開なし。
+
+## 2026-10-09: 条件付きショートカット版をローカルpublishへ発行
+
+- 追加依頼により`publish.bat`を実行し終了0。本体単一EXE、update.json、全6Applet入りZIPを更新。版は0.24.2のままのローカル確認用で、公開済みReleaseとは内容が異なる。deploy、commit、push、GitHub公開は行っていない。
+- EXEは100610698 bytes、SHA256 `d9aa0f054789a38de1a0d7ae41022dbfab12d9e2cb149294052cc49f34f9b879`。update.jsonのsize/hashと実単一EXE試験コピーが一致。
+- 発行したwin-unpackedで専用ショートカットGUI7群成功（`artifacts/keybindings-1791521847798`）。実単一EXEのWebApplet GUI3群も成功（`artifacts/web-portable-1791521873121`）、起動、設定/Cookieの再起動保持、リボン停止/復帰を確認。
+- 同梱ZIPは275734355 bytes、SHA256 `81dd08a3c8aaf3e5da3feadd4f4bda37c2da4ffa00bd409d3a5738d7358c5aec`。全21ファイルのsize/hash、本体EXE一致、隔離展開後の実EXE起動、全6Appletの版と初期無効状態を確認（`artifacts/keybindings-publish-bundle-result.json`）。実利用設定/認証データは変更していない。
+
+## 2026-10-09: 条件付きショートカット基盤（未公開）
+
+- 割り当て単位のkeybindings、4種類のscope、複数Applet選択、全一致/保存順実行、同一コマンド重複除去、実行中再入抑制、失敗後の継続/終了時打切りを実装。旧設定は新形式がない時だけ利用し、新形式の空配列も維持。実利用settings.jsonの編集/破棄は行っていない。
+- `dev.bat run typecheck`、`dev.bat run build`成功。通常権限の`dev.bat exec node --test tests/*.test.cjs`は132/132成功（新規7件含む）。初回sandboxではTempのrename/子プロセスが拒否され失敗したため、通常権限で再検証した。
+- 専用GUI `scripts/keybindings-ui-test.cjs`は7群成功。最終証跡`artifacts/keybindings-1791521496874/result.json`、dark/light PNG。本体、localページ、WebApplet埋め込み/別Window、ページ切替後の捕捉済み実行対象、GmailローカルUI/オフライン本文、Ctrl+Alt+F10の実RegisterHotKey/SendInput、ローカルとの重複防止、全Window非表示、複数対象、記録中解除、順序/無効化/保存を確認。
+- 既存GUI: `applet-pages-ui-test.cjs` 6群（`artifacts/applet-pages-1791520900394`）、`preferences-ui-test.cjs` 7群（`artifacts/preferences-1791521158229`）、`navigation-ui-test.cjs` 16群（`artifacts/navigation-1791521170308`）成功。.NET/Node実コマンド、再起動設定保持、両テーマ、狭幅、フォーム/JSON/各設定入口の下書き共有、Gmail session/入力/背景監視を含む。
+- 途中の試験失敗: 素のF18/F23はOS登録競合。検証用ファイルの同時読取でatomic renameがEPERMになり、fixtureを追記型の別キー保存へ変更。GUI再起動ではPlaywrightのfocus emulationと実Windowフォーカスを区別して待機。Ctrl+Altキー一括SendInputはOS通知/対象WebContentsの双方へ届かない回があり、UIなしの最小ホストでは到着を確認。試験ヘルパーで押下中の修飾キーを待ち、各押下/解放を20ms間隔で送って最終GUI成功。製品の受付頻度に待機は追加していない。外部フック等を含む低レベル原因の断定はしない。
+- 利用境界: Applet Web画面は文字入力保護のためCtrl/Alt付き・F1〜F24・Pause。本体の通常入力欄は既存保護、IME/リピート/キー記録を除外。native Appletの独自Windowはページ条件に含めない。実Gmail認証環境、物理キーボードの全配列/IME組合せ、配布単一EXEでの今回の変更は未検証。今回は版更新、publish、deploy、commit、push、Releaseを行っていない。
+
+
 ## 2026-10-09: 停止中Appletのリボン修正を0.24.2としてリリース
 
 - ユーザーがローカル修正版の正常動作を確認し、版更新/公開と、不具合があった直前のRelease削除を指定。0.24.2へ更新し、下記のWeb/Gmail共通リボン修正と関連回帰をコミットする。Gmail Appletの版・API・保存形式は変更しない。

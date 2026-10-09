@@ -18,13 +18,67 @@
     "allowSameVersion": false
   },
   "shortcuts": {
-    "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
-    "appdock.settings.open": ["Ctrl+,"],
-    "at365.watch.toggle": ["Pause"]
+    "appdock.commands.search": [
+      "Ctrl+P",
+      "Ctrl+Shift+P"
+    ],
+    "appdock.settings.open": [
+      "Ctrl+,"
+    ],
+    "at365.watch.toggle": [
+      "Pause"
+    ]
   },
-  "globalShortcutCommands": ["at365.watch.toggle"],
+  "globalShortcutCommands": [
+    "at365.watch.toggle"
+  ],
   "trayCommands": [],
   "pinnedCommands": [],
-  "profile": { "name": "User", "avatar": null },
-  "extensions": {}
+  "profile": {
+    "name": "User",
+    "avatar": null
+  },
+  "extensions": {},
+  "keybindings": [
+    {
+      "id": "default.0.0",
+      "command": "appdock.commands.search",
+      "key": "Ctrl+P",
+      "enabled": true,
+      "when": {
+        "scope": "app",
+        "appletIds": []
+      }
+    },
+    {
+      "id": "default.0.1",
+      "command": "appdock.commands.search",
+      "key": "Ctrl+Shift+P",
+      "enabled": true,
+      "when": {
+        "scope": "app",
+        "appletIds": []
+      }
+    },
+    {
+      "id": "default.1.0",
+      "command": "appdock.settings.open",
+      "key": "Ctrl+,",
+      "enabled": true,
+      "when": {
+        "scope": "app",
+        "appletIds": []
+      }
+    },
+    {
+      "id": "default.2.0",
+      "command": "at365.watch.toggle",
+      "key": "Pause",
+      "enabled": true,
+      "when": {
+        "scope": "global",
+        "appletIds": []
+      }
+    }
+  ]
 }

@@ -1,3 +1,4 @@
+import { safePageShortcut } from '../../shared/keybindings';
 import {
   BrowserWindow,
   WebContentsView,
@@ -21,7 +22,7 @@ import type {
   WebAccountSnapshot,
   WebAccountSound,
 } from '../../shared/web-accounts';
-import { AppletSurface, pageHostShortcut } from './applet-pages';
+import { AppletSurface } from './applet-pages';
 import { pageKey, type AppletPageDefinition } from '../../shared/applet-pages';
 import { queueSound } from './sounds';
 import { importSound, managedSound, pruneSounds } from './sound-assets';
@@ -405,7 +406,9 @@ export class WebAccountController {
         this.surface?.visible &&
         this.window?.isVisible() &&
         !this.window.isMinimized() &&
-        (pageHostShortcut(input) || this.services.shortcut(input))
+        this.window.isFocused() &&
+        safePageShortcut(input) &&
+        this.services.shortcut(input)
       )
         event.preventDefault();
     });
@@ -773,6 +776,7 @@ export class WebAccountController {
     if (this.disposed) return;
     const page = this.services.page;
     this.surface = new AppletSurface({
+      appletId: this.id,
       key: page ? pageKey(this.id, page.id) : undefined,
       title: page?.title ?? this.name,
       url: this.uiURL,

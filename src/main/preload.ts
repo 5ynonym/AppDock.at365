@@ -22,6 +22,7 @@ const api: DockApi = {
   installUpdates: (target) => ipcRenderer.invoke('dock:installUpdates', target),
   openReleases: (id) => ipcRenderer.invoke('dock:openReleases', id),
   startExtensionNow: (id) => ipcRenderer.invoke('dock:startExtensionNow', id),
+  dispatchShortcut: (key) => ipcRenderer.invoke('dock:dispatchShortcut', key),
   retryGlobalHotKeys: () => ipcRenderer.invoke('dock:retryGlobalHotKeys'),
   setShortcutRecording: (recording) => ipcRenderer.invoke('dock:setShortcutRecording', recording),
   onHostCommand: (callback) => {

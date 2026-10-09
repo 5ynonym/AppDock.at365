@@ -15,6 +15,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  keybindings?: import('./keybindings').Keybinding[];
   webApplets: import('./web-applets').WebAppletSettings;
   schemaVersion: 1;
   host: HostSettings;
@@ -165,6 +166,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
   webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
   clearWebAccount(id: string): Promise<boolean>;
