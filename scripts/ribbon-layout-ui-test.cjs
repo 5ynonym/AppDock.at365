@@ -65,6 +65,12 @@ async function launch() {
 (async () => {
   try {
     await launch();
+    assert.ok(!(await ribbonIds('top')).includes('page:at365.gmail:gmail'));
+    await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));
+    await until(
+      async () => (await ribbonIds('top')).includes('page:at365.gmail:gmail'),
+      'Enabled Gmail ribbon',
+    );
     assert.deepEqual(await ribbonIds('bottom'), ['theme', 'profile']);
     assert.ok((await ribbonIds('top')).includes('page:at365.gmail:gmail'));
     await button('設定').click();
@@ -200,6 +206,12 @@ async function launch() {
     restartSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
     await launch();
+    assert.equal(await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
+    await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));
+    await until(
+      async () => (await ribbonIds('bottom')).includes('page:at365.gmail:gmail'),
+      'Restored enabled Gmail placement',
+    );
     assert.deepEqual(
       (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon,
       persisted,

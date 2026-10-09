@@ -138,6 +138,9 @@ async function launch() {
 (async () => {
   try {
     await launch();
+    assert.equal(await dock.locator('[data-ribbon-id="page:test.pages:main"]').count(), 0);
+    assert.equal(await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
+    await dock.evaluate(() => window.dock.toggleExtension('test.pages', true));
     await button('ページ検証').click();
     let ui = await localUi('/test.pages/index.html');
     await ui.getByLabel('保持する入力').fill('表示先を変えても保持');
@@ -189,6 +192,7 @@ async function launch() {
     assert.equal(await ui.getByLabel('保持する入力').inputValue(), '表示先を変えても保持');
     checks.push('Same UI/input survives page-window-page; command palette overlays page');
 
+    await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));
     await button('Gmail').click();
     const gmailUi = await localUi('/web/index.html');
     const snapshot = () => gmailUi.evaluate(() => window.webAccounts.snapshot());
@@ -326,6 +330,40 @@ async function launch() {
         .restore(),
     );
 
+    const ribbonBeforeStop = (await dock.evaluate(() => window.dock.snapshot())).settings.value
+      .ribbon;
+    await dock.locator('[data-ribbon-id="extensions"]').click();
+    await dock
+      .locator('.sidebar-extensions')
+      .getByRole('button', { name: /^Gmail/ })
+      .click();
+    const gmailToggle = dock.getByRole('switch', { name: 'Gmailを有効にする', exact: true });
+    await gmailToggle.click();
+    await until(
+      async () => (await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
+      'Stopped Gmail ribbon disappears',
+    );
+    await until(() => gmailUi.isClosed(), 'Stopped Gmail UI disposed');
+    assert.equal(await dock.locator('[data-ribbon-id="page:test.pages:main"]').count(), 1);
+    assert.deepEqual(
+      (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon,
+      ribbonBeforeStop,
+    );
+    await gmailToggle.click();
+    await until(
+      async () => (await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 1,
+      'Resumed Gmail ribbon returns',
+    );
+    await button('Gmail').click();
+    const resumedUi = await localUi('/web/index.html');
+    assert.equal((await resumedUi.evaluate(() => window.webAccounts.snapshot())).selected, account);
+    await until(
+      async () => (await remote(account, 'document.cookie')).includes('fixture=persisted'),
+      'Resume retains Gmail Cookie',
+    );
+    checks.push(
+      'Applet page stop hides Gmail ribbon without activating it; resume restores a usable ribbon, account/Cookie and saved preferences',
+    );
     await button('設定').click();
     await dock
       .locator('.settings-categories')

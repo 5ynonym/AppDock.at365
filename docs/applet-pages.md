@@ -4,7 +4,7 @@ Appletは画面のHTML/React・操作・データ処理を実装し、ホスト�
 
 ## manifestと起動
 
-`minimumHostVersion: "0.18.0"`、`capabilities: ["pages"]`と`pages`を宣言します。最大10ページ、安定したApplet内ページID、80文字までのtitleです。iconは`mail / clock / image / folder / extensions`、省略時はextensions。HTML/画像をリボンへ直接挿入しません。openCommandは自身の宣言済みコマンドで`activateOnExecute:true`を必須にし、停止中のリボン操作も通常の明示起動経路を通ります。
+`minimumHostVersion: "0.18.0"`、`capabilities: ["pages"]`と`pages`を宣言します。最大10ページ、安定したApplet内ページID、80文字までのtitleです。iconは`mail / clock / image / folder / extensions`、省略時はextensions。HTML/画像をリボンへ直接挿入しません。openCommandは自身の宣言済みコマンドで`activateOnExecute:true`を必須にします。無効化中はリボンから隠しますが、コマンドの明示実行による起動は引き続き可能です。
 
 ```json
 {
@@ -45,6 +45,8 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 ## リボン
 
 標準6項目（home/extensions/settings/logs/theme/profile）と、導入Appletのpagesを一覧にします。AppletページのリボンIDは`page:<extensionId>:<pageId>`です。配置位置はホストが決め、名前・選択状態・キーボード操作は本体ボタンとして描画します。
+
+すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 
 「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の設定下書き/revision/全保存に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。0.18.0の既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
 

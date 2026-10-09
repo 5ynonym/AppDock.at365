@@ -103,6 +103,12 @@ Publishは検証済み下書きと全アセットを再照合してから、最�
 
 「失敗時に公開しない」は**公開前の検査に失敗したものを公開しない**意味です。公開リクエストと世界中への反映をネットワーク越しに原子的に取り消せる保証ではありません。複数repoのReleaseも一括トランザクションではなく、repoごとの公開/下書き状態を報告します。
 
+## 不具合のある旧Releaseの削除
+
+ユーザーが旧Releaseの削除を指定した場合だけ実施します。まず修正版のPrepare→Draft→Publish→Verifyを完了させ、latestと匿名取得、本体更新チェックを確認します。その後、指定された旧タグのRelease ID・公開状態を再確認して、`gh release delete <旧タグ> --repo 5ynonym/AppDock.at365 --yes`でReleaseと添付アセットを削除します。`--cleanup-tag`は使わず、Gitタグとコミット履歴は残します。
+
+削除後は旧タグのRelease APIが404、修正版がlatestで全アセットを持つこと、旧Gitタグが保持されていることを確認し、削除対象のmetadataと結果をartifactsへ記録します。削除結果が不明な場合は読み取りで状態を確認し、別のReleaseを推測で削除しません。公開後Verifyの失敗を理由に自動で削除する処理とは区別します。
+
 ## Appletを追加したとき
 
 [オールインワン発行](all-in-one.md)の自動探索が正本です。AppDockの親フォルダー直下に独立repoを置き、`.git`、`extension.json`、失敗時非0終了の`publish.bat`を用意します。共通`pack-applet-update.ps1`で`publish/update.json`と`update.zip`を作ります。IDを重複させず、version/runtime/apiVersion/minimumHostVersion/entryを正しく記載します。

@@ -4,6 +4,7 @@ const { parseSettings, createDefaultSettings } = require('../out/main/shared/set
 const {
   parseAppletPages,
   ribbonItems,
+  visibleRibbonItems,
   orderRibbon,
   pageDisplay,
 } = require('../out/main/shared/applet-pages');
@@ -100,4 +101,32 @@ test('Ribbon inserts new Applets without dropping, duplicating or mutating saved
   assert.equal(ordered.length, 7);
   assert.equal(new Set(ordered.map((item) => item.id)).size, 7);
   assert.equal(source[0].id, 'home');
+});
+test('Disabled Applets disappear from the ribbon while the settings catalogue and placement remain', () => {
+  const web = { ...manifest, id: 'web.fixture', runtime: 'web', enabled: true, state: 'running' };
+  const stoppedLocal = { ...manifest, runtime: 'node', enabled: false, state: 'stopped' };
+  const id = 'page:web.fixture:main';
+  const preferences = { order: [id, 'home'], hidden: [], bottom: [id], separators: [] };
+  const before = structuredClone(preferences);
+  const visible = (extensions) => orderRibbon(visibleRibbonItems(extensions), preferences.order);
+  assert.equal(visible([web, stoppedLocal])[0].id, id);
+  web.enabled = false;
+  web.state = 'stopped';
+  assert.ok(!visible([web, stoppedLocal]).some((item) => item.id === id));
+  assert.ok(!visible([web, stoppedLocal]).some((item) => item.id === 'page:test.pages:main'));
+  assert.ok(ribbonItems([web, stoppedLocal]).some((item) => item.id === id));
+  assert.ok(ribbonItems([web, stoppedLocal]).some((item) => item.id === 'page:test.pages:main'));
+  for (const runtime of ['node', 'dotnet', 'native', 'web']) {
+    for (const state of ['waiting', 'starting', 'running', 'stopped', 'error']) {
+      assert.ok(
+        visible([{ ...stoppedLocal, runtime, state, enabled: true }]).some(
+          (item) => item.id === 'page:test.pages:main',
+        ),
+      );
+    }
+  }
+  web.enabled = true;
+  web.state = 'error';
+  assert.equal(visible([web, stoppedLocal])[0].id, id);
+  assert.deepEqual(preferences, before);
 });

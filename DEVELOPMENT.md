@@ -10,6 +10,8 @@
 
 0.18.0のAppletページ宣言・Node/.NET API・限定UIブリッジ・表示先・リボン設定と検証は[Appletページとリボン](docs/applet-pages.md)を参照してください。
 
+実リボンは有効なAppletのページだけを表示します。停止中もリボン設定の一覧と保存済み配置は保持します。停止/再開の回帰はWebApplet・既存ページ/Gmail・リボン配置のGUI試験で確認します。
+
 0.17.1ではWebアカウントのローカルUIへ、自身のAppletの宣言済みboolean/静的select設定の読み書きと変更通知を追加しました。保存は既存SettingsStore、詳細は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
 0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
