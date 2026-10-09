@@ -6,11 +6,13 @@ import { ShortcutsEditor } from './ShortcutsEditor';
 import type { SettingsEditor } from './useSettingsEditor';
 import type { WebProfile } from '../shared/web-applets';
 import { useLayoutEffect, useRef } from 'react';
+import { resetAppletKeybindings } from '../shared/keybindings';
 
 /** Both pages render this panel against the same host editing session. */
 export function AppletSettingsPanel({
   applet,
   applets,
+  extensions,
   editor,
   commands,
   globalHotKeys,
@@ -21,6 +23,7 @@ export function AppletSettingsPanel({
 }: {
   applet: ExtensionSnapshot;
   applets: { id: string; title: string }[];
+  extensions: ExtensionSnapshot[];
   editor: SettingsEditor;
   commands: UiCommand[];
   globalHotKeys: GlobalHotKeyStatus[];
@@ -60,20 +63,32 @@ export function AppletSettingsPanel({
             itemId={applet.id}
             onAccounts={onWebAccounts}
             accounts={webAccounts}
+            applets={applets}
           />
         ) : (
           <AppletSettings key={applet.id} applet={applet} draft={draft} onChange={edit} />
         )
       ) : (
-        <ShortcutsEditor
-          key={applet.id}
-          commands={commands}
-          owner={applet.id}
-          settings={draft}
-          onChange={edit}
-          applets={applets}
-          statuses={globalHotKeys}
-        />
+        <>
+          <div className="actions">
+            <button
+              className="secondary"
+              onClick={() => edit(resetAppletKeybindings(draft, applet))}
+            >
+              このAppletのショートカットを初期値に戻す
+            </button>
+          </div>
+          <ShortcutsEditor
+            key={applet.id}
+            commands={commands}
+            owner={applet.id}
+            settings={draft}
+            onChange={edit}
+            applets={applets}
+            extensions={extensions}
+            statuses={globalHotKeys}
+          />
+        </>
       )}
     </div>
   );

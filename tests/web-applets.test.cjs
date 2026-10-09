@@ -6,6 +6,7 @@ const {
   webUrl,
   allowedWebAppletNavigation,
   manifestDefaults,
+  defaultWebShortcutDefaults,
 } = require('../out/main/shared/web-applets');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ribbonItems } = require('../out/main/shared/applet-pages');
@@ -26,12 +27,15 @@ test('Legacy settings migrate without altering Gmail configuration', () => {
   delete s.webApplets;
   s.extensions['at365.gmail'] = { enabled: true, settings: { monitoring: true } };
   const next = parseSettings(s);
-  assert.deepEqual(next.webApplets, { items: [] });
+  assert.deepEqual(next.webApplets, { items: [], shortcutDefaults: defaultWebShortcutDefaults() });
   assert.deepEqual(next.extensions, s.extensions);
 });
 test('Web account references, identity, limits, protocols and icon formats are validated', () => {
   const good = { accounts: [account], items: [item] };
-  assert.deepEqual(parseWebApplets(good), { items: good.items });
+  assert.deepEqual(parseWebApplets(good), {
+    items: good.items,
+    shortcutDefaults: defaultWebShortcutDefaults(),
+  });
   for (const patch of [
     { accountId: 'at365.gmail' },
     { url: 'file:///A:/private' },

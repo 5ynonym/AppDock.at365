@@ -148,6 +148,10 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 
 拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
 
+## v0.25.2: ショートカット初期値
+
+AppDock 0.25.2以降、`extension.json`に`defaultKeybindings`を指定できます。各行は`command`/`key`/`enabled`/`when`を持ち、`command`は同じmanifestの`commands`に宣言したIDに限ります。`when`は[条件付きショートカット](keybindings.md)の形式です。初回導入時にだけ利用者の設定へコピーされます。
+
 ## v0.9.1: Appletの表示名
 
 `extension.json`の任意項目`displayName`（空白だけではない1～100文字の文字列）で表示名を指定できます。前後の空白を除いた名前をホストの一覧・詳細・設定・コマンド候補・トレイのサブメニュー・起動ログに使用します。明示した表示名はそのまま尊重します。

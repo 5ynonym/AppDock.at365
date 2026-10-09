@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { shortcutFromEvent, type UiCommand } from '../shared/commands';
-import type { Settings, GlobalHotKeyStatus } from '../shared/contracts';
+import type { Settings, GlobalHotKeyStatus, ExtensionSnapshot } from '../shared/contracts';
 import {
   defaultKeybindings,
+  addDefaultBindings,
   getKeybindings,
   withKeybindings,
   shortcutScopes,
@@ -16,6 +17,7 @@ export function ShortcutsEditor({
   onChange,
   statuses,
   applets,
+  extensions,
   owner,
 }: {
   commands: UiCommand[];
@@ -23,6 +25,7 @@ export function ShortcutsEditor({
   onChange(value: Settings): void;
   statuses: GlobalHotKeyStatus[];
   applets: { id: string; title: string }[];
+  extensions: ExtensionSnapshot[];
   owner?: string | null;
 }) {
   const [filter, setFilter] = useState('');
@@ -32,6 +35,21 @@ export function ShortcutsEditor({
   const [choosing, setChoosing] = useState<string | null>(null);
   const [appletFilter, setAppletFilter] = useState('');
   const rows = getKeybindings(settings);
+  const defaults = [
+    ...defaultKeybindings(),
+    ...extensions.flatMap((extension) =>
+      addDefaultBindings(
+        [],
+        extension.id,
+        extension.runtime === 'web'
+          ? settings.webApplets.shortcutDefaults.map((binding) => ({
+              ...binding,
+              command: `${extension.id}.${binding.command}`,
+            }))
+          : (extension.defaultKeybindings ?? []),
+      ),
+    ),
+  ];
   const change = (next: Keybinding[]) => onChange(withKeybindings(settings, next));
   const update = (id: string, patch: Partial<Keybinding>) =>
     change(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -393,7 +411,7 @@ export function ShortcutsEditor({
                         onClick={() =>
                           change([
                             ...rows.filter((r) => r.command !== command.id),
-                            ...defaultKeybindings()
+                            ...defaults
                               .filter((r) => r.command === command.id)
                               .map((r) => ({ ...r, id: crypto.randomUUID() })),
                           ])

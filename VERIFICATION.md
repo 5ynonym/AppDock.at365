@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-09: Applet別ショートカット初期値と一括初期化（0.25.2）
+
+- `extension.json`の宣言コマンドだけを初期割り当てに指定できるようにし、初回発見時だけ設定へ追加。Gmail 0.9.1はCtrl+Tab/Ctrl+Shift+Tabをowner条件、Watch 0.1.2はPauseをglobal条件で宣言。本体のApplet固有既定値は除去。既存設定・ユーザーが解除した行を再追加せず、Applet詳細の一括初期化は対象Appletの行だけを下書きで置換する。
+- WebAppletは将来の新規追加用テンプレートを設定画面で編集可能にし、作成時の保存で個別行へコピー。既定はリロードF5、戻るAlt+Left、進むAlt+Right、すべてowner/有効。既存WebAppletを遡及変更しない。WebAppletのコマンドと本体ツールバーは「リロード」へ改称。
+- 型検査/build、全回帰136/136成功。sandbox内の最初の全体試験は一時フォルダーのEPERMとローカルHTTP接続待ちで完走せず、プロジェクト内一時領域と通常Windows環境で再実行して全件成功。新しい初期値・既存編集保持・Webテンプレート・Applet一括初期化のunitに加え、隔離GUIのApplet初期化3群（`artifacts/applet-default-shortcuts-1791532245168`）、WebApplet12群（`artifacts/web-applets-1791532251940`）、条件付きキー10群（`artifacts/keybindings-1791532292669`）成功。
+- `publish.bat`終了0。AppDock単一EXEは100611885 bytes、SHA256 `6478fca6083f7f34ec1490ea8b85b66a1cecd5581a767f70afa3919419ec78a4`で`publish/update.json`の版0.25.2・size・hashと一致。全6Applet入りZIPは275734979 bytes、SHA256 `f922051edee927569815e2a29668d79bb0ad3a955d77adf03d4f62110e0c07fb`。`scripts/all-in-one-ui-test.cjs`でZIP全ファイルhash/size、安全な隔離展開、6Applet版/初期無効/起動を確認（`artifacts/bundle-verify-6110b7e8-bfb3-464a-aaed-573f162ad5ff`）。展開直後の設定にGmail2行とWatch1行が期待条件で存在した。
+- 実単一EXEの隔離WebApplet3群も成功（`artifacts/web-portable-1791532267933`、版0.25.2/hash一致）。実Gmail認証と実利用先deployは試験していない。GitHub公開はこのローカル発行の対象外。
+
 ## 2026-10-09: Applet詳細タブを0.25.1へ版更新・コミット準備
 
 - ユーザーがタブ表示を確認し、バージョンインクリメントとコミットを依頼。SetVersionで0.25.0→0.25.1、READMEの現行版とv0.25.1の変更ノートを整合。追加指定により、今後の完成時は版更新とpublish発行をセットにする方針を共通/本体AGENTSへ反映。通常修正はパッチ番号、再試行/未変更Applet同梱だけでは追加インクリメントしない。

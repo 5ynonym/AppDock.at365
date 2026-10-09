@@ -24,14 +24,9 @@
     ],
     "appdock.settings.open": [
       "Ctrl+,"
-    ],
-    "at365.watch.toggle": [
-      "Pause"
     ]
   },
-  "globalShortcutCommands": [
-    "at365.watch.toggle"
-  ],
+  "globalShortcutCommands": [],
   "trayCommands": [],
   "pinnedCommands": [],
   "profile": {
@@ -39,6 +34,14 @@
     "avatar": null
   },
   "extensions": {},
+  "webApplets": {
+    "items": [],
+    "shortcutDefaults": [
+      { "command": "reload", "key": "F5", "enabled": true, "when": { "scope": "owner", "appletIds": [] } },
+      { "command": "back", "key": "Alt+Left", "enabled": true, "when": { "scope": "owner", "appletIds": [] } },
+      { "command": "forward", "key": "Alt+Right", "enabled": true, "when": { "scope": "owner", "appletIds": [] } }
+    ]
+  },
   "keybindings": [
     {
       "id": "default.0.0",
@@ -67,16 +70,6 @@
       "enabled": true,
       "when": {
         "scope": "app",
-        "appletIds": []
-      }
-    },
-    {
-      "id": "default.2.0",
-      "command": "at365.watch.toggle",
-      "key": "Pause",
-      "enabled": true,
-      "when": {
-        "scope": "global",
         "appletIds": []
       }
     }

@@ -134,7 +134,7 @@ export class WebAppletManager {
             open: '開く',
             back: '戻る',
             forward: '進む',
-            reload: '再読み込み',
+            reload: 'リロード',
             home: '開始ページへ',
           } as Record<string, string>
         )[key],

@@ -7,6 +7,10 @@ const {
   resolveKeybindings,
   withKeybindings,
   safePageShortcut,
+  parseKeybindingDefaults,
+  initializeExtensionDefaults,
+  initializeWebAppletDefaults,
+  resetAppletKeybindings,
 } = require('../out/main/shared/keybindings');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
 const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys');
@@ -38,8 +42,8 @@ test('new settings round-trip beyond legacy limits and include bindings in the s
 test('legacy settings remain readable; new bindings are authoritative and allow shared keys', () => {
   const legacy = createDefaultSettings();
   assert.equal(
-    getKeybindings(legacy).find((r) => r.command === 'at365.watch.toggle').when.scope,
-    'global',
+    getKeybindings(legacy).some((r) => r.command.startsWith('at365.')),
+    false,
   );
   const rows = [
     row('one', 'test.one', 'applets', ['gmail', 'web.1']),
@@ -51,6 +55,125 @@ test('legacy settings remain readable; new bindings are authoritative and allow 
   assert.deepEqual(parseSettings(settings), settings);
   assert.deepEqual(parseSettings({ ...settings, keybindings: [] }).shortcuts, {});
   assert.deepEqual(parseSettings(withKeybindings(legacy, rows)).keybindings, rows);
+});
+test('Applet manifest defaults are scoped to declared commands and applied only on first discovery', () => {
+  const defaults = parseKeybindingDefaults(
+    [
+      {
+        command: 'at365.gmail.nextAccount',
+        key: 'Ctrl+Tab',
+        enabled: true,
+        when: { scope: 'owner', appletIds: [] },
+      },
+      {
+        command: 'at365.gmail.nextAccount',
+        key: 'Ctrl+Shift+Tab',
+        enabled: false,
+        when: { scope: 'owner', appletIds: [] },
+      },
+    ],
+    ['at365.gmail.nextAccount'],
+  );
+  assert.throws(
+    () =>
+      parseKeybindingDefaults(
+        [{ ...defaults[0], command: 'appdock.quit' }],
+        ['at365.gmail.nextAccount'],
+      ),
+    /自身の登録コマンド/,
+  );
+  const applets = [{ id: 'at365.gmail', defaultKeybindings: defaults }];
+  const first = initializeExtensionDefaults(createDefaultSettings(), applets);
+  assert.deepEqual(
+    getKeybindings(first)
+      .filter((r) => r.command === 'at365.gmail.nextAccount')
+      .map((r) => [r.key, r.enabled, r.when.scope]),
+    [
+      ['Ctrl+Tab', true, 'owner'],
+      ['Ctrl+Shift+Tab', false, 'owner'],
+    ],
+  );
+  const cleared = withKeybindings(
+    first,
+    getKeybindings(first).filter((r) => r.command !== 'at365.gmail.nextAccount'),
+  );
+  assert.deepEqual(initializeExtensionDefaults(cleared, applets), cleared);
+  const previouslyInstalled = createDefaultSettings();
+  previouslyInstalled.extensions['at365.gmail'] = { enabled: true, settings: {} };
+  assert.equal(
+    getKeybindings(initializeExtensionDefaults(previouslyInstalled, applets)).some(
+      (r) => r.command === 'at365.gmail.nextAccount',
+    ),
+    false,
+  );
+});
+test('new WebApplets copy current template without changing existing bindings', () => {
+  const previous = createDefaultSettings();
+  const oldId = 'web.00000000-0000-0000-0000-000000000001';
+  const newId = 'web.00000000-0000-0000-0000-000000000002';
+  const makeItem = (id) => ({
+    id,
+    name: 'Test',
+    url: 'https://example.com/',
+    accountId: 'account.00000000-0000-0000-0000-000000000001',
+    enabled: true,
+    display: 'page',
+    navigation: 'same-origin',
+    allowedOrigins: [],
+    icon: '',
+  });
+  previous.webApplets.items = [makeItem(oldId)];
+  const changed = structuredClone(previous);
+  changed.webApplets.items.push(makeItem(newId));
+  changed.webApplets.shortcutDefaults[0].key = 'Ctrl+F5';
+  changed.webApplets.shortcutDefaults[1].enabled = false;
+  changed.webApplets.shortcutDefaults[2].when = { scope: 'applets', appletIds: ['test.defaults'] };
+  const result = initializeWebAppletDefaults(changed, previous);
+  assert.equal(
+    getKeybindings(result).some((r) => r.command.startsWith(oldId + '.')),
+    false,
+  );
+  assert.deepEqual(
+    getKeybindings(result)
+      .filter((r) => r.command.startsWith(newId + '.'))
+      .map((r) => [r.command, r.key, r.enabled, r.when.scope]),
+    [
+      [`${newId}.reload`, 'Ctrl+F5', true, 'owner'],
+      [`${newId}.back`, 'Alt+Left', false, 'owner'],
+      [`${newId}.forward`, 'Alt+Right', true, 'applets'],
+    ],
+  );
+  assert.deepEqual(
+    getKeybindings(result).find((row) => row.command === `${newId}.forward`).when.appletIds,
+    ['test.defaults'],
+  );
+  assert.deepEqual(initializeWebAppletDefaults(result, result), result);
+});
+test('resetting one Applet restores its declared defaults and preserves other Applets', () => {
+  const settings = withKeybindings(createDefaultSettings(), [
+    row('gmail-custom', 'at365.gmail.nextAccount', 'global'),
+    row('other', 'at365.watch.toggle', 'global'),
+  ]);
+  const next = resetAppletKeybindings(settings, {
+    id: 'at365.gmail',
+    runtime: 'node',
+    commands: [{ id: 'at365.gmail.nextAccount' }],
+    defaultKeybindings: [
+      {
+        command: 'at365.gmail.nextAccount',
+        key: 'Ctrl+Tab',
+        enabled: true,
+        when: { scope: 'owner', appletIds: [] },
+      },
+    ],
+  });
+  assert.deepEqual(
+    getKeybindings(next).map((r) => [r.command, r.key, r.when.scope]),
+    [
+      ['at365.watch.toggle', 'Ctrl+F12', 'global'],
+      ['at365.gmail.nextAccount', 'Ctrl+Tab', 'owner'],
+    ],
+  );
 });
 test('invalid and unknown conditions fail closed; unknown applet and command IDs are retained', () => {
   for (const when of [

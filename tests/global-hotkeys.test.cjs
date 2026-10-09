@@ -4,8 +4,10 @@ const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys.js
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema.js');
 const { shortcutFromEvent } = require('../out/main/shared/commands.js');
 
-test('Watch defaults to global Pause; explicit user bindings and opt-out survive migration', () => {
+test('legacy Watch global Pause and explicit opt-out survive migration', () => {
   const settings = createDefaultSettings();
+  settings.shortcuts['at365.watch.toggle'] = ['Pause'];
+  settings.globalShortcutCommands = ['at365.watch.toggle'];
   assert.deepEqual(settings.shortcuts['at365.watch.toggle'], ['Pause']);
   assert.deepEqual(settings.globalShortcutCommands, ['at365.watch.toggle']);
   settings.shortcuts['at365.watch.toggle'] = [];
@@ -46,6 +48,8 @@ test('registration follows availability, rebinding, recording suspension and shu
     assert.fail,
   );
   const settings = createDefaultSettings();
+  settings.shortcuts['at365.watch.toggle'] = ['Pause'];
+  settings.globalShortcutCommands = ['at365.watch.toggle'];
   const available = ['at365.watch.toggle'];
   await manager.sync(settings, []);
   await manager.pressed('Pause');
@@ -99,6 +103,8 @@ test('registration conflicts and host failure are visible; duplicate callbacks c
     (error) => reports.push(error),
   );
   const settings = createDefaultSettings();
+  settings.shortcuts['at365.watch.toggle'] = ['Pause'];
+  settings.globalShortcutCommands = ['at365.watch.toggle'];
   await manager.sync(settings, ['at365.watch.toggle']);
   await manager.pressed('Pause');
   assert.equal(calls, 0);
