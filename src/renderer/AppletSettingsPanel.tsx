@@ -1,9 +1,5 @@
 import type { ExtensionSnapshot, GlobalHotKeyStatus } from '../shared/contracts';
-import {
-  defaultGlobalShortcutCommands,
-  defaultShortcuts,
-  type UiCommand,
-} from '../shared/commands';
+import type { UiCommand } from '../shared/commands';
 import { AppletSettings } from './AppletSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { ShortcutsEditor } from './ShortcutsEditor';
@@ -14,6 +10,7 @@ import { useLayoutEffect, useRef } from 'react';
 /** Both pages render this panel against the same host editing session. */
 export function AppletSettingsPanel({
   applet,
+  applets,
   editor,
   commands,
   globalHotKeys,
@@ -23,6 +20,7 @@ export function AppletSettingsPanel({
   webAccounts,
 }: {
   applet: ExtensionSnapshot;
+  applets: { id: string; title: string }[];
   editor: SettingsEditor;
   commands: UiCommand[];
   globalHotKeys: GlobalHotKeyStatus[];
@@ -71,23 +69,10 @@ export function AppletSettingsPanel({
           key={applet.id}
           commands={commands}
           owner={applet.id}
-          bindings={draft.shortcuts}
-          onChange={(shortcuts) => edit({ ...draft, shortcuts })}
-          globalCommands={draft.globalShortcutCommands}
-          onGlobalChange={(globalShortcutCommands) => edit({ ...draft, globalShortcutCommands })}
+          settings={draft}
+          onChange={edit}
+          applets={applets}
           statuses={globalHotKeys}
-          trayCommands={draft.trayCommands}
-          onTrayChange={(trayCommands) => edit({ ...draft, trayCommands })}
-          onRestore={(id) =>
-            edit({
-              ...draft,
-              shortcuts: { ...draft.shortcuts, [id]: [...(defaultShortcuts[id] ?? [])] },
-              globalShortcutCommands: defaultGlobalShortcutCommands.includes(id)
-                ? [...new Set([...draft.globalShortcutCommands, id])]
-                : draft.globalShortcutCommands.filter((command) => command !== id),
-              trayCommands: draft.trayCommands.filter((command) => command !== id),
-            })
-          }
         />
       )}
     </div>

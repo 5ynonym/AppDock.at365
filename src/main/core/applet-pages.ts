@@ -7,13 +7,18 @@ interface PageHost {
   window(): BrowserWindow | null;
   display(key: string, fallback: PageDisplay): PageDisplay;
   selected(key: string | null): void;
-  shortcut(input: Input): boolean;
+  shortcut(input: Input, appletId?: string): boolean;
   failed(message: string): void;
 }
 let host: PageHost | undefined;
 let selected: string | null = null;
 let bounds: Rectangle | null = null;
 const surfaces = new Map<string, AppletSurface>();
+const allSurfaces = new Set<AppletSurface>();
+export function activeShortcutApplet(): string | undefined {
+  return [...allSurfaces].find((surface) => surface.visible && surface.window?.isFocused())?.options
+    .appletId;
+}
 export function configurePageHost(value: PageHost) {
   host = value;
   const window = value.window();
@@ -26,8 +31,8 @@ export function configurePageHost(value: PageHost) {
   window?.on('minimize', layout);
   window?.on('restore', layout);
 }
-export function pageHostShortcut(input: Input) {
-  return host?.shortcut(input) ?? false;
+export function pageHostShortcut(input: Input, appletId?: string) {
+  return host?.shortcut(input, appletId) ?? false;
 }
 export function updatePageViewport(key: string | null, area: Rectangle | null) {
   if (key !== null && (!surfaces.has(key) || surfaces.get(key)!.display !== 'page'))
@@ -57,6 +62,7 @@ export function closeAppletPages(extensionId: string) {
     if (key.startsWith(`page:${extensionId}:`)) surface.close();
 }
 export interface SurfaceOptions {
+  appletId?: string;
   key?: string;
   title: string;
   url: string;
@@ -109,6 +115,7 @@ export class AppletSurface {
     // The caller of open receives load errors; background creation must not reject unhandled.
     void this.ready.catch(() => {});
     if (options.key) surfaces.set(options.key, this);
+    allSurfaces.add(this);
   }
   private requestedDisplay() {
     return this.options.key
@@ -270,6 +277,7 @@ export class AppletSurface {
   close() {
     if (this.closed) return;
     this.closed = true;
+    allSurfaces.delete(this);
     this.detach();
     this.state.flush();
     if (this.options.key) {

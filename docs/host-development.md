@@ -2,6 +2,8 @@
 
 AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
 
+条件付きショートカットの現行設計は[保存形式・入力判定・逐次実行](keybindings.md)を参照してください。以下の版別説明は導入時の経緯です。
+
 ## まず変更範囲を決める
 
 0.17.1のWebアカウント設定連携はhost-apiのサービス経由で自身の宣言済みboolean/静的selectだけを公開し、WebAccountControllerがローカルUIの送信元を検証します。既存SettingsStoreの保存・変更通知を再利用し、停止時に購読を解除します。APIの詳細は[WebアカウントAPI](web-accounts.md)を参照してください。

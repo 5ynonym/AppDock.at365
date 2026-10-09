@@ -27,6 +27,14 @@ async function launch() {
   });
   const page = await application.firstWindow();
   await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await application.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().startsWith('appdock:'),
+    );
+    w.show();
+    w.focus();
+  });
+  await page.waitForTimeout(200);
   return page;
 }
 async function waitPins(page, pins) {
@@ -66,12 +74,12 @@ async function waitPins(page, pins) {
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
       .press('Control+Alt+p');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.getByRole('alert').filter({ hasText: '重複' }).waitFor();
+    await page.getByText('すべて保存されています', { exact: true }).waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
         'appdock.commands.search'
       ][0],
-      'Ctrl+P',
+      'Ctrl+Alt+P',
     );
     await page
       .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
@@ -185,7 +193,7 @@ async function waitPins(page, pins) {
           checks: [
             'legacy settings / Ctrl+P default',
             'pin / order / filter / unpin',
-            'shortcut recording / conflicts / remapping',
+            'shortcut recording / shared bindings / remapping',
             'TypeScript and .NET keyboard commands',
             'profile name / image upload / overwrite',
             'invalid image preserves profile and previous PNG',

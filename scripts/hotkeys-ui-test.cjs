@@ -100,7 +100,7 @@ async function until(check, message) {
     const row = page.locator('[data-shortcut-command="at365.watch.toggle"]');
     const input = row.locator('[data-shortcut-recorder]');
     assert.equal(await input.inputValue(), 'Pause');
-    assert.equal(await row.getByRole('checkbox').isChecked(), true);
+    assert.equal(await row.getByRole('checkbox', { name: /割り当てを有効/ }).isChecked(), true);
     await input.focus();
     await until(async () => !(await registered('Pause')), 'Recorder did not release Pause.');
     send(0x13);
@@ -136,7 +136,7 @@ async function until(check, message) {
     assert.equal(await visible(), false);
     checks.push('focused AppDock executes global key once');
 
-    await row.getByRole('checkbox').uncheck();
+    await row.getByRole('combobox').selectOption('app');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(async () => !(await registered('Pause')), 'Global opt-out did not release Pause.');
     assert.equal((await contender.sync(['Pause']))[0].registered, true);
@@ -155,11 +155,21 @@ async function until(check, message) {
     await page.evaluate(async () => {
       const snapshot = await window.dock.snapshot();
       const value = snapshot.settings.value;
-      value.shortcuts['appdock.commands.search'] = ['F24'];
-      value.shortcuts['appdock.welcome.verify-storage'] = ['F23'];
-      value.globalShortcutCommands.push(
-        'appdock.commands.search',
-        'appdock.welcome.verify-storage',
+      value.keybindings = value.keybindings.filter(
+        (row) =>
+          !['appdock.commands.search', 'appdock.welcome.verify-storage'].includes(row.command),
+      );
+      value.keybindings.push(
+        ...[
+          ['appdock.commands.search', 'F24'],
+          ['appdock.welcome.verify-storage', 'F23'],
+        ].map(([command, key]) => ({
+          id: crypto.randomUUID(),
+          command,
+          key,
+          enabled: true,
+          when: { scope: 'global', appletIds: [] },
+        })),
       );
       await window.dock.saveSettings(value, snapshot.settings.revision);
     });

@@ -27,6 +27,9 @@ import { createHostApi } from './core/host-api';
 import { saveUserSettings } from './core/profile';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
+import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
+import { ShortcutDispatcher } from './core/shortcut-dispatcher';
+import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
@@ -44,6 +47,7 @@ import {
   activateNotification,
 } from './core/notifications';
 import {
+  activeShortcutApplet,
   configurePageHost,
   updatePageViewport,
   refreshPageDisplays,
@@ -228,6 +232,34 @@ async function executeCommand(id: string) {
       : webApplets.navigate(web, id.slice(split + 1));
   return manager.execute(id);
 }
+const shortcutDispatcher = new ShortcutDispatcher(
+  executeCommand,
+  (message) => log.write('error', 'shortcuts', message),
+  () => quitting || shortcutRecording,
+);
+function shortcutContext() {
+  const appletId = activeShortcutApplet();
+  return { appFocused: !!appletId || !!window?.isFocused(), appletId };
+}
+function availableShortcutCommands() {
+  return [
+    ...hostCommands.map((c) => ({ id: c.id, extensionId: null })),
+    ...allApplets().flatMap((e) =>
+      e.commands.filter((c) => c.available).map((c) => ({ id: c.id, extensionId: e.id })),
+    ),
+  ];
+}
+function dispatchShortcut(key: string, globalEvent = false) {
+  if (shortcutRecording || quitting) return Promise.resolve();
+  const commands = resolveKeybindings(
+    getKeybindings(settings.value),
+    key,
+    shortcutContext(),
+    availableShortcutCommands(),
+    globalEvent,
+  );
+  return shortcutDispatcher.dispatch(key, commands);
+}
 function runTrayCommand(id: string) {
   void executeCommand(id).catch((error) => {
     log.write('error', 'tray', `${id}: ${String(error)}`);
@@ -354,6 +386,12 @@ function registerIpc() {
     if (manager.items.get(id)?.state !== 'waiting')
       throw new Error('開始待ちのAppletが見つかりません。');
     return manager.restart(id, true);
+  });
+  handle('dock:dispatchShortcut', (key: unknown) => {
+    if (!window?.isFocused()) return;
+    const normalized = normalizeShortcut(key);
+    if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
+    return dispatchShortcut(normalized);
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:setShortcutRecording', async (recording: boolean) => {
@@ -547,6 +585,7 @@ async function initialize() {
     },
     changed,
     (message) => log.write('error', 'hotkeys', message),
+    (key) => dispatchShortcut(key, true),
   );
   webApplets = new WebAppletManager(settings, dataDirectory, changed, executeCommand);
   manager.on('changed', () => {
@@ -676,7 +715,7 @@ async function initialize() {
       if (!quitting) window?.webContents.send('dock:appletPage', key);
     },
     failed: (message) => log.write('error', 'pages', message),
-    shortcut: (input) => {
+    shortcut: (input, appletId) => {
       if (
         input.type !== 'keyDown' ||
         input.isAutoRepeat ||
@@ -685,7 +724,9 @@ async function initialize() {
         quitting
       )
         return false;
-      const shortcut = shortcutFromEvent({
+      const context = shortcutContext();
+      if (!context.appFocused || (appletId && context.appletId !== appletId)) return false;
+      const key = shortcutFromEvent({
         key: input.key,
         code: input.code,
         ctrlKey: input.control,
@@ -694,16 +735,16 @@ async function initialize() {
         metaKey: input.meta,
         isComposing: input.isComposing,
       });
-      const commands = hostCommands.filter(
-        (command) =>
-          !!shortcut &&
-          !settings.value.globalShortcutCommands.includes(command.id) &&
-          settings.value.shortcuts[command.id]?.includes(shortcut),
+      if (!key) return false;
+      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === key)) return true;
+      const commands = resolveKeybindings(
+        getKeybindings(settings.value),
+        key,
+        context,
+        availableShortcutCommands(),
       );
-      if (commands.length !== 1) return false;
-      void executeCommand(commands[0].id).catch((error) =>
-        log.write('error', 'pages', String(error)),
-      );
+      if (!commands.length) return false;
+      void shortcutDispatcher.dispatch(key, commands);
       return true;
     },
   });

@@ -4,7 +4,6 @@ import { AppletSurface, pageHostShortcut } from './applet-pages';
 import type { SettingsStore } from './settings';
 import { WebProfileStore } from './web-profiles';
 import type { ExtensionSnapshot } from '../../shared/contracts';
-import { shortcutFromEvent } from '../../shared/commands';
 import {
   allowedWebAppletNavigation,
   manifestDefaults,
@@ -199,6 +198,7 @@ export class WebAppletManager {
       };
       let wc: WebContents;
       const surface = new AppletSurface({
+        appletId: id,
         key: `page:${id}:main`,
         title: a.name,
         url: a.url,
@@ -244,32 +244,7 @@ export class WebAppletManager {
                 input.key !== 'Pause')
             )
               return;
-            if (pageHostShortcut(input)) {
-              event.preventDefault();
-              return;
-            }
-            if (input.type !== 'keyDown' || input.isAutoRepeat || input.isComposing) return;
-            const key = shortcutFromEvent({
-              key: input.key,
-              code: input.code,
-              ctrlKey: input.control,
-              altKey: input.alt,
-              shiftKey: input.shift,
-              metaKey: input.meta,
-            });
-            const commands =
-              this.snapshot()
-                .find((a) => a.id === id)
-                ?.commands.filter(
-                  (c) =>
-                    key &&
-                    !this.settings.value.globalShortcutCommands.includes(c.id) &&
-                    this.settings.value.shortcuts[c.id]?.includes(key),
-                ) ?? [];
-            if (commands.length === 1) {
-              event.preventDefault();
-              void this.execute(commands[0].id).catch(() => {});
-            }
+            if (pageHostShortcut(input, id)) event.preventDefault();
           });
           const update = () => {
             if (wc.isDestroyed()) return;

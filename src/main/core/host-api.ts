@@ -11,7 +11,7 @@ import type { Panel } from '../../shared/contracts';
 import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
 import { parseExtensionCommands } from '../../shared/extension-commands';
 import { getWebAccounts } from './web-accounts';
-import { shortcutFromEvent } from '../../shared/commands';
+import { safePageShortcut } from '../../shared/keybindings';
 import { pathToFileURL } from 'node:url';
 import { contained } from './extensions';
 import { pageKey } from '../../shared/applet-pages';
@@ -62,6 +62,7 @@ export function createHostApi(
         if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
         return openLocalPage(
           {
+            appletId: id,
             key: pageKey(id, page.id),
             title: page.title,
             url: pathToFileURL(contained(e.manifest.folder, page.ui!)).href,
@@ -72,7 +73,7 @@ export function createHostApi(
             onLayout: () => {},
             onCreated: (contents) =>
               contents.on('before-input-event', (event, input) => {
-                if (pageHostShortcut(input)) event.preventDefault();
+                if (safePageShortcut(input) && pageHostShortcut(input, id)) event.preventDefault();
               }),
           },
           {
@@ -162,30 +163,7 @@ export function createHostApi(
               return () => settings.removeListener('changed', callback);
             },
             failed: (message) => log('error', id, message),
-            shortcut: (input) => {
-              if (input.type !== 'keyDown' || input.isAutoRepeat || e.state !== 'running')
-                return false;
-              const shortcut = shortcutFromEvent({
-                key: input.key,
-                code: input.code,
-                ctrlKey: input.control,
-                altKey: input.alt,
-                shiftKey: input.shift,
-                metaKey: input.meta,
-                isComposing: input.isComposing,
-              });
-              const matches = e.commands.filter(
-                (command) =>
-                  !settings.value.globalShortcutCommands.includes(command.id) &&
-                  !!shortcut &&
-                  settings.value.shortcuts[command.id]?.includes(shortcut),
-              );
-              if (matches.length !== 1) return false;
-              void executeCommand(matches[0].id).catch(() =>
-                log('error', id, 'ショートカットのコマンドを実行できませんでした。'),
-              );
-              return true;
-            },
+            shortcut: (input) => pageHostShortcut(input, id),
           },
         );
         if (method.endsWith('.start')) {

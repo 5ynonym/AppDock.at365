@@ -1,3 +1,4 @@
+import { getKeybindings } from '../../shared/keybindings';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import { JsonLinePeer } from './rpc';
@@ -80,15 +81,16 @@ export class GlobalHotKeyManager {
     private execute: (id: string) => Promise<unknown>,
     private changed: () => void,
     private report: (message: string) => void,
+    private dispatch?: (shortcut: string) => Promise<unknown>,
   ) {}
   sync(settings: Settings, available: string[], suspended = false, retry = false): Promise<void> {
     const desired = suspended
       ? []
-      : settings.globalShortcutCommands.flatMap((commandId) =>
-          available.includes(commandId)
-            ? (settings.shortcuts[commandId] ?? []).map((shortcut) => ({ commandId, shortcut }))
-            : [],
-        );
+      : getKeybindings(settings)
+          .filter(
+            (row) => row.enabled && row.when.scope === 'global' && available.includes(row.command),
+          )
+          .map((row) => ({ commandId: row.command, shortcut: row.key }));
     this.queue = this.queue.then(async () => {
       if (this.stopped) return;
       const signature = JSON.stringify(desired);
@@ -97,7 +99,7 @@ export class GlobalHotKeyManager {
       // Stop dispatching old registrations immediately, including queued Windows messages.
       this.statuses = [];
       try {
-        const result = await this.backend.sync(desired.map((item) => item.shortcut));
+        const result = await this.backend.sync([...new Set(desired.map((item) => item.shortcut))]);
         this.statuses = desired.map((item) => {
           const status = result.find((entry) => entry.shortcut === item.shortcut);
           return {
@@ -126,19 +128,32 @@ export class GlobalHotKeyManager {
     this.changed();
   }
   async pressed(shortcut: string) {
-    const commandId = this.statuses.find(
-      (status) => status.shortcut === shortcut && status.registered,
-    )?.commandId;
-    if (this.stopped || !commandId || this.executing.has(commandId)) return;
-    this.executing.add(commandId);
-    try {
-      await this.execute(commandId);
-    } catch (error) {
-      this.report(error instanceof Error ? error.message : String(error));
-    } finally {
-      this.executing.delete(commandId);
+    if (this.stopped) return;
+    const commands = [
+      ...new Set(
+        this.statuses
+          .filter((status) => status.shortcut === shortcut && status.registered)
+          .map((status) => status.commandId),
+      ),
+    ];
+    if (!commands.length) return;
+    if (this.dispatch) {
+      await this.dispatch(shortcut);
+      return;
+    }
+    for (const commandId of commands) {
+      if (this.executing.has(commandId)) continue;
+      this.executing.add(commandId);
+      try {
+        await this.execute(commandId);
+      } catch (error) {
+        this.report(String(error));
+      } finally {
+        this.executing.delete(commandId);
+      }
     }
   }
+
   async close() {
     this.stopped = true;
     await this.queue;
