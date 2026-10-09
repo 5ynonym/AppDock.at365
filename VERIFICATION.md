@@ -944,3 +944,22 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 初回sandbox回帰はTemp内renameのEPERM等で失敗。プロジェクト内TEMP/通常権限で再実行し最終成功。sandboxのpnpm supply-chain検証待ちは中断し、ローカルNodeと通常権限のdev.batで検証を完了。GUI試験の未保存マーク付きカテゴリの検索、停止snapshotから画面反映までの待機、追加コマンド分の旧件数期待値を修正。共通buttonスタイルによる中央寄せを修正し最終GUIへ反映。
 - publish.bat終了0。publish/AppDock.at365.exeは142527598 bytes、SHA256 020357ea0447823e66e53f411ac9d0d71199dec3c2c328d88210944d34bdb1ea。update.jsonの版0.26.10/size/hashと一致（artifacts/tray-menu-publish-result.json）。単一EXEのコピーによるtray-menu-ui-1791558966808はok:true、コピーhash一致。移行/全編集/保存/破棄/両テーマ3幅/停止時保持/空構成/再起動を確認。portableはCDP経由のrenderer検証、実Trayイベント検査はソース版で実施。
 - 既存AppDock.at365-all-in-one-0.26.2.zipはhash/size/mtimeMs不変（artifacts/tray-menu-bundles-before.json）。未変更Applet再発行、全体ZIP生成/整理、実利用deploy、commit/push/GitHub Releaseは実施していない。
+
+## 2026-10-10 AppDock 0.26.11 保存導線とWebApplet管理
+
+- 設定/Applet詳細のページ見出し下に共通SettingsToolbarを配置し、タブ内・並べ替え欄の保存を集約。全共有draftを保存する。Webアカウント操作は専用ファイルで即時反映を維持。
+- 未保存で他ページへ移ると本体Window上部へnative WebContentsView通知を表示。背景レイアウトを変えず、保存・キャンセル既定dialog付き破棄・入力不備/競合から編集元へ戻る。保存失敗は浮動通知に表示して本文を押し下げない。専用preload/送信元mainFrame/URL照合と二重操作ガードを実装。
+- WebAppletの追加/管理をApplet一覧の組み込み管理項目へ移動。設定タブ=サイト、ショートカットタブ=将来のサイト用初期値。個別サイトID/リボン/設定/sessionは維持し、管理項目はruntime snapshot/更新/並べ替えへ混ぜない。設定カテゴリを指定の9項目順へ変更。別Appletへ切り替えても4タブの選択を保持。
+- 型検査、build、変更ファイルのPrettier、git diff --check成功。全本体回帰171/171成功（artifacts/settings-notice-unit.log）。初回sandboxではTEMP内のrenameがEPERM、Electronの起動も拒否された。project内の隔離TEMPと通常Windows実行で成功し、製品不具合として扱わない。
+- 既存GUI: navigation 17群、applet-order 4群、web-applets 12群、applet-pages 7群成功。新仕様で変更した試験はタブ保持/保存入口/カテゴリ導線/role=statusの表示先を更新。navigationの旧「選択で説明へ戻る」期待値とWeb管理移動後のstatus locatorを修正した。GUIは直列・隔離profile、製品ソース/固定EXEのビルドを重ねていない。
+- source最終専用GUI9群: artifacts/settings-notice-1791562372910/result.json。共通保存の同位置、4タブ保持、Web追加/初期キーのコピー、ホーム/Web上の保存、入力保持、無効JSONとrevision競合の拒否/下書き保持/本文位置不変、通知に一般host/Nodeブリッジがないこと、破棄dialog応答のキャンセル/確定、両テーマ/サイズ/--restore-view起動を確認。
+- Gmailは既存Appletのオフラインfixtureで入れ子のWebContentsView上に通知が最前面となり、検索/選択account/メールWebContentsを保ったままhost draftを保存できた（artifacts/applet-pages-1791562206131/result.json）。実サイト認証/実メール到着・物理dialogのクリックは今回の範囲外。親Windowのcaptureだけでは子Viewが写らないため通知/remoteを個別確認、native View順も確認。
+- publish.bat最終終了0。EXE=142,517,882 bytes、SHA256=4e68d7b1e55c7d5ce0d049a52247e3b8d80e175bd8c27f66af6d4bef7a024a82。publish/update.jsonのkind/id/version/payload/size/hashを照合。途中の表示調整も同じ版へ再発行し、同じ変更で重ねて版更新していない。
+- 固定配布EXEの隔離コピーhash一致。専用GUI8群（artifacts/settings-notice-1791562376022/result.json）、WebApplet portable3群（artifacts/web-portable-1791562393375/result.json）、Applet順序portable4群（artifacts/applet-order-1791562418737/result.json）が終了0。保存/競合/復元起動、Web page/window入力/session、Gmail保存領域の保持、両テーマ/幅、並び順保持を確認。配布EXEの破棄dialogはGUI応答fixtureを使えるsource側で検証したものと区別する。
+- 通常publishは本体だけ。旧AppDock.at365-all-in-one-0.26.2.zipのsize=317655348、SHA256=4819317bf7f49aa852515bb85543058f93a290adc0742f8491882fbbe17cbda6とmtimeを保持。未変更Appletの再発行・commit/push/公開/実利用deployは未実施。他チャットで追加されたartifacts整理文書を保持。
+- 作業完了時の整理: 今回作成し終了/成功が確認できたsource通知試験だけ、直近3回を保持。旧settings-notice-1791561449412、settings-notice-1791561783732の2件を削除。対象の絶対パス/通常ディレクトリ/全配下非再解析ポイント/該当process不在を確認。1857230/2047485/2372910をsourceとして、2376022のportableと失敗/不明/他チャット/固定ビルド/Release証拠を保持（artifacts/settings-notice-cleanup.json）。artifacts改名・除外設定は変更なし。
+
+## 2026-10-10 0.26.11のコミット・正式リリース依頼
+
+- 上記の保存導線/WebApplet管理変更をユキちゃんの確認後、mainへコミットして正式Releaseへ公開する依頼を受領。既存のartifacts整理文書も保持してコミット対象へ含める。本体版は0.26.11を継続し、未変更Appletの版は増やさない。
+- 正式Prepareは本体回帰/発行と6Appletの再発行・オールインワン検証・更新UI/復旧検証を行う。準備/アセットhash/公開後の匿名取得と更新チェック・保持3件の整理の実結果は、artifacts/release-0.26.11-settings-20261010-01/plan.jsonおよび隣接チェックログを正本とする。未完の結果を成功として扱わない。実利用先へのdeployは含めない。

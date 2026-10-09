@@ -23,7 +23,8 @@ import { ProfileEditor } from './ProfileEditor';
 import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { AppletIndex } from './AppletIndex';
 import { orderApplets } from '../shared/applet-order';
-import { SettingsActions, SettingsMessages } from './SettingsActions';
+import { SettingsToolbar, SettingsMessages } from './SettingsActions';
+import { SettingsNotice } from './SettingsNotice';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
@@ -42,6 +43,7 @@ declare global {
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
 type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
+const webManagerId = 'appdock.web-manager';
 function Brand({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand-mark ${small ? 'small' : ''}`}>
@@ -94,7 +96,6 @@ function App() {
   const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
-  const [webRequest, setWebRequest] = useState(0);
   const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   const [detailView, setDetailView] = useRestartView<AppletDetailView>(
@@ -104,6 +105,32 @@ function App() {
   );
   const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
   const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
+  const noticeError = editor.parseError || editor.saveError;
+  const lastEditorPage = useRef<Page>('settings');
+  if (page === 'settings' || page === 'extensions') lastEditorPage.current = page;
+  useEffect(() => {
+    void window.dock
+      .settingsNotice({
+        visible: editor.dirty && page !== 'extensions' && page !== 'settings',
+        busy: busy || editor.pending || editor.avatarLoading,
+        dark: snapshot?.dark ?? true,
+        message: noticeError.slice(0, 2000),
+      })
+      .catch((e) => setError(String(e)));
+  }, [editor.dirty, page, busy, editor.pending, editor.avatarLoading, snapshot?.dark, noticeError]);
+  const noticeAction = useRef<(action: 'save' | 'discard' | 'edit') => void>(() => {});
+  noticeAction.current = (kind) => {
+    if (busy || editor.pending || editor.avatarLoading) return;
+    if (kind === 'edit') setPage(lastEditorPage.current);
+    else if (kind === 'save') {
+      setError('');
+      void editor.save();
+    } else {
+      setError('');
+      void editor.discard();
+    }
+  };
+  useEffect(() => window.dock.onSettingsNoticeAction((kind) => noticeAction.current(kind)), []);
   useLayoutEffect(() => {
     // The retained detail view may be revisited after editing the shared JSON draft.
     if (page === 'extensions' && detailSettings && editor.mode === 'json') {
@@ -269,7 +296,15 @@ function App() {
   }
   const goExtension = (id: string) => {
     setSelected(id);
-    setDetailView('description');
+    setPage('extensions');
+  };
+  const goWebManager = () => {
+    if (!editor.switchToForm()) {
+      setError('設定ページのJSONの内容を修正してからWebAppletの設定を開いてください。');
+      return;
+    }
+    setSelected(webManagerId);
+    setDetailView('settings');
     setPage('extensions');
   };
   const commands: UiCommand[] = [
@@ -320,7 +355,27 @@ function App() {
     await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
   }
   const updatePins = (ids: string[]) => void action(() => window.dock.setPinnedCommands(ids));
-  const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
+  const webManagerSelected = selected === webManagerId;
+  const selectedApplet: ExtensionSnapshot | undefined = webManagerSelected
+    ? {
+        apiVersion: 1,
+        id: webManagerId,
+        name: 'WebApplet',
+        displayName: 'WebApplet',
+        description: 'WebサイトをAppletとして追加・管理します。各サイトをリボンから開けます。',
+        version: snapshot?.version ?? '',
+        runtime: 'web',
+        entry: '',
+        folder: '',
+        state: 'running',
+        enabled: true,
+        error: null,
+        commands: [],
+        tray: [],
+        panel: null,
+        settingOptions: {},
+      }
+    : (orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0]);
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   const ribbon = orderRibbon(
     visibleRibbonItems(
@@ -452,11 +507,11 @@ function App() {
           <AppletIndex
             applets={orderedApplets}
             selected={selectedApplet?.id}
+            webManagerSelected={webManagerSelected}
+            onWebManager={() => goExtension(webManagerId)}
             onSelect={goExtension}
             editor={editor}
             busy={busy}
-            revision={snapshot?.settings.revision ?? -1}
-            showMessages={!detailSettings}
           />
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
@@ -471,21 +526,27 @@ function App() {
           page === 'settings'
             ? 'settings-main'
             : page === 'extensions'
-              ? `applet-detail-main${detailSettings ? ' settings-main applet-detail-settings-main' : ''}`
+              ? 'applet-detail-main settings-main applet-detail-settings-main'
               : page.startsWith('page:')
                 ? 'applet-page-main'
                 : undefined
         }
       >
         {snapshot && <UpdateProgress state={snapshot.updates} />}
-        {error && (
-          <div className="error-banner" role="alert">
-            {error}
-            <button aria-label="エラーを閉じる" onClick={() => setError('')}>
-              <Icon name="close" size={14} />
-            </button>
-          </div>
-        )}
+        {error &&
+          !(
+            editor.dirty &&
+            page !== 'settings' &&
+            page !== 'extensions' &&
+            editor.saveError === error
+          ) && (
+            <div className="error-banner" role="alert">
+              {error}
+              <button aria-label="エラーを閉じる" onClick={() => setError('')}>
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          )}
         {!snapshot ? (
           <div className="loading">Dockに接続しています…</div>
         ) : (
@@ -651,8 +712,7 @@ function App() {
                       <button
                         className="secondary"
                         onClick={() => {
-                          setPage('settings');
-                          setWebRequest((n) => n + 1);
+                          goWebManager();
                         }}
                       >
                         WebAppletを追加
@@ -667,8 +727,13 @@ function App() {
                     </div>
                   }
                 />
+                <SettingsToolbar editor={editor} busy={busy} />
+                {!detailSettings && (
+                  <SettingsMessages editor={editor} currentRevision={snapshot.settings.revision} />
+                )}
                 <div className="extensions-layout">
                   <ExtensionDetail
+                    builtin={webManagerSelected}
                     extension={selectedApplet}
                     view={detailView}
                     onView={(view) => {
@@ -684,30 +749,45 @@ function App() {
                     settingsPanel={
                       detailSettings && selectedApplet ? (
                         <>
-                          <div className="settings-toolbar applet-settings-toolbar">
-                            <SettingsActions editor={editor} busy={busy} />
-                          </div>
                           <SettingsMessages
                             editor={editor}
                             currentRevision={snapshot.settings.revision}
                           />
-                          <AppletSettingsPanel
-                            extensions={orderedApplets}
-                            applets={orderedApplets.map((e) => ({
-                              id: e.id,
-                              title: e.displayName,
-                            }))}
-                            applet={selectedApplet}
-                            editor={editor}
-                            commands={shortcutCommands}
-                            globalHotKeys={snapshot.globalHotKeys}
-                            tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
-                            webAccounts={snapshot.webAccounts}
-                            onWebAccounts={() => {
-                              setPage('settings');
-                              setWebAccountsRequest((n) => n + 1);
-                            }}
-                          />
+                          {webManagerSelected ? (
+                            <div className="applet-settings-panel">
+                              <WebAppletSettings
+                                editor={editor}
+                                accounts={snapshot.webAccounts}
+                                applets={orderedApplets.map((e) => ({
+                                  id: e.id,
+                                  title: e.displayName,
+                                }))}
+                                tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
+                                onAccounts={() => {
+                                  setPage('settings');
+                                  setWebAccountsRequest((n) => n + 1);
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <AppletSettingsPanel
+                              extensions={orderedApplets}
+                              applets={orderedApplets.map((e) => ({
+                                id: e.id,
+                                title: e.displayName,
+                              }))}
+                              applet={selectedApplet}
+                              editor={editor}
+                              commands={shortcutCommands}
+                              globalHotKeys={snapshot.globalHotKeys}
+                              tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
+                              webAccounts={snapshot.webAccounts}
+                              onWebAccounts={() => {
+                                setPage('settings');
+                                setWebAccountsRequest((n) => n + 1);
+                              }}
+                            />
+                          )}
                         </>
                       ) : undefined
                     }
@@ -718,6 +798,7 @@ function App() {
                           snapshot={snapshot}
                           run={action}
                           source={selectedApplet.id}
+                          webManager={webManagerSelected}
                         />
                       ) : undefined
                     }
@@ -741,7 +822,6 @@ function App() {
                 profileRequest={profileRequest}
                 updatesRequest={updatesRequest}
                 ribbonRequest={ribbonRequest}
-                webRequest={webRequest}
                 webAccountsRequest={webAccountsRequest}
                 webAccounts={snapshot.webAccounts}
                 editor={editor}
@@ -819,12 +899,14 @@ function ExtensionDetail({
   onView,
   settingsPanel,
   logsPanel,
+  builtin = false,
 }: {
   extension?: ExtensionSnapshot;
   view: AppletDetailView;
   onView(view: AppletDetailView): boolean;
   settingsPanel?: React.ReactNode;
   logsPanel?: React.ReactNode;
+  builtin?: boolean;
   busy: boolean;
   updateDisabled: boolean;
   run: Run;
@@ -844,20 +926,28 @@ function ExtensionDetail({
         <div>
           <h2>{e.displayName}</h2>
           <p>
-            v{e.version} <span className="divider">/</span>{' '}
-            {e.runtime === 'web'
-              ? 'WebApplet'
-              : e.runtime === 'node'
-                ? 'TypeScript · Node.js'
-                : 'C# · .NET 10'}
+            {builtin ? (
+              '組み込み'
+            ) : (
+              <>
+                v{e.version} <span className="divider">/</span>{' '}
+                {e.runtime === 'web'
+                  ? 'WebApplet'
+                  : e.runtime === 'node'
+                    ? 'TypeScript · Node.js'
+                    : 'C# · .NET 10'}
+              </>
+            )}
           </p>
         </div>
-        <Toggle
-          checked={e.enabled}
-          label={`${e.displayName}を有効にする`}
-          disabled={busy}
-          onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
-        />
+        {!builtin && (
+          <Toggle
+            checked={e.enabled}
+            label={`${e.displayName}を有効にする`}
+            disabled={busy}
+            onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
+          />
+        )}
       </div>
       <div className="detail-tabs" role="tablist" aria-label="Applet詳細の切り替え">
         {(
@@ -924,149 +1014,163 @@ function ExtensionDetail({
           aria-labelledby="applet-detail-tab-description"
         >
           <p className="detail-description">{e.description}</p>
-          {e.minimumHostVersion && (
-            <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
-          )}
-          {e.runtime !== 'web' && (
-            <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
-          )}
-          <div className="detail-state">
-            <StateBadge extension={e} />
-            <button
-              className="text-button"
-              disabled={busy || !e.enabled}
-              onClick={() =>
-                void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
-              }
-            >
-              <Icon name="refresh" size={14} />
-              再起動
-            </button>
-          </div>
-          {e.error && <div className="error-text">{e.error}</div>}
-          {e.state === 'waiting' && (
-            <div className="extension-panel">
-              <p>
-                {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()}{' '}
-                に開始します。
+          {builtin ? (
+            <>
+              <p className="muted">
+                設定タブでサイトを追加し、ショートカットタブで新しく追加するサイトの初期割り当てを編集できます。
               </p>
-              <button
-                className="secondary"
-                disabled={busy}
-                onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
-              >
-                今すぐ開始
+              <button className="secondary" onClick={() => onView('settings')}>
+                WebAppletを追加・管理
               </button>
-            </div>
-          )}
-          {e.panel ? (
-            <div className="extension-panel">
-              <h3>{e.panel.title}</h3>
-              <p>{e.panel.description}</p>
-              {!!e.panel.tabs?.length && (
-                <nav className="panel-tabs" aria-label="パネルの切り替え">
-                  {e.panel.tabs.map((tab) => (
-                    <button
-                      className="secondary"
-                      key={tab.actionId ?? tab.command}
-                      aria-pressed={tab.selected ?? false}
-                      disabled={
-                        busy ||
-                        (!tab.actionId &&
-                          !e.commands.some(
-                            (command) => command.id === tab.command && command.available,
-                          ))
-                      }
-                      onClick={() =>
-                        void run(() =>
-                          tab.actionId
-                            ? window.dock.executePanelAction(e.id, tab.actionId)
-                            : window.dock.executeCommand(tab.command),
-                        )
-                      }
-                    >
-                      {tab.title}
-                    </button>
-                  ))}
-                </nav>
+            </>
+          ) : (
+            <>
+              {e.minimumHostVersion && (
+                <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
               )}
-              {!!e.panel.images?.length && (
-                <div className="panel-images">
-                  {e.panel.images.map((item, i) => (
-                    <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
-                  ))}
-                </div>
+              {e.runtime !== 'web' && (
+                <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
               )}
-              <dl>
-                {e.panel.facts?.map((f, i) => (
-                  <div key={i}>
-                    <dt>{f.label}</dt>
-                    <dd>{f.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="actions">
-                {e.panel.actions?.map((a) => (
+              <div className="detail-state">
+                <StateBadge extension={e} />
+                <button
+                  className="text-button"
+                  disabled={busy || !e.enabled}
+                  onClick={() =>
+                    void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
+                  }
+                >
+                  <Icon name="refresh" size={14} />
+                  再起動
+                </button>
+              </div>
+              {e.error && <div className="error-text">{e.error}</div>}
+              {e.state === 'waiting' && (
+                <div className="extension-panel">
+                  <p>
+                    {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()}{' '}
+                    に開始します。
+                  </p>
                   <button
                     className="secondary"
-                    key={a.actionId ?? a.command}
-                    disabled={
-                      busy ||
-                      (!a.actionId && !e.commands.some((c) => c.id === a.command && c.available))
-                    }
-                    onClick={() =>
-                      void run(() =>
-                        a.actionId
-                          ? window.dock.executePanelAction(e.id, a.actionId)
-                          : window.dock.executeCommand(a.command),
-                      )
-                    }
+                    disabled={busy}
+                    onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
                   >
-                    {a.title}
+                    今すぐ開始
                   </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="inactive-panel">
-              <Icon name="extensions" size={28} />
-              <h3>
-                {!e.enabled
-                  ? 'このAppletをDockにつなぐ'
-                  : e.state === 'waiting'
-                    ? 'Appletの開始を待っています'
-                    : e.state === 'starting'
-                      ? 'Appletを起動しています'
-                      : e.state === 'stopping'
-                        ? 'Appletを停止しています'
-                        : e.state === 'error'
-                          ? 'Appletでエラーが発生しました'
-                          : e.state === 'running'
-                            ? '専用の操作画面はありません'
-                            : 'Appletは停止しています'}
-              </h3>
-              <p>
-                {!e.enabled
-                  ? '有効にすると、Appletの画面とコマンドを使えます。'
-                  : e.state === 'error'
-                    ? 'ログを確認して、必要に応じて再起動してください。'
-                    : e.state === 'running'
-                      ? '設定やコマンド検索から操作できます。'
-                      : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
-              </p>
-            </div>
+                </div>
+              )}
+              {e.panel ? (
+                <div className="extension-panel">
+                  <h3>{e.panel.title}</h3>
+                  <p>{e.panel.description}</p>
+                  {!!e.panel.tabs?.length && (
+                    <nav className="panel-tabs" aria-label="パネルの切り替え">
+                      {e.panel.tabs.map((tab) => (
+                        <button
+                          className="secondary"
+                          key={tab.actionId ?? tab.command}
+                          aria-pressed={tab.selected ?? false}
+                          disabled={
+                            busy ||
+                            (!tab.actionId &&
+                              !e.commands.some(
+                                (command) => command.id === tab.command && command.available,
+                              ))
+                          }
+                          onClick={() =>
+                            void run(() =>
+                              tab.actionId
+                                ? window.dock.executePanelAction(e.id, tab.actionId)
+                                : window.dock.executeCommand(tab.command),
+                            )
+                          }
+                        >
+                          {tab.title}
+                        </button>
+                      ))}
+                    </nav>
+                  )}
+                  {!!e.panel.images?.length && (
+                    <div className="panel-images">
+                      {e.panel.images.map((item, i) => (
+                        <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
+                      ))}
+                    </div>
+                  )}
+                  <dl>
+                    {e.panel.facts?.map((f, i) => (
+                      <div key={i}>
+                        <dt>{f.label}</dt>
+                        <dd>{f.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="actions">
+                    {e.panel.actions?.map((a) => (
+                      <button
+                        className="secondary"
+                        key={a.actionId ?? a.command}
+                        disabled={
+                          busy ||
+                          (!a.actionId &&
+                            !e.commands.some((c) => c.id === a.command && c.available))
+                        }
+                        onClick={() =>
+                          void run(() =>
+                            a.actionId
+                              ? window.dock.executePanelAction(e.id, a.actionId)
+                              : window.dock.executeCommand(a.command),
+                          )
+                        }
+                      >
+                        {a.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="inactive-panel">
+                  <Icon name="extensions" size={28} />
+                  <h3>
+                    {!e.enabled
+                      ? 'このAppletをDockにつなぐ'
+                      : e.state === 'waiting'
+                        ? 'Appletの開始を待っています'
+                        : e.state === 'starting'
+                          ? 'Appletを起動しています'
+                          : e.state === 'stopping'
+                            ? 'Appletを停止しています'
+                            : e.state === 'error'
+                              ? 'Appletでエラーが発生しました'
+                              : e.state === 'running'
+                                ? '専用の操作画面はありません'
+                                : 'Appletは停止しています'}
+                  </h3>
+                  <p>
+                    {!e.enabled
+                      ? '有効にすると、Appletの画面とコマンドを使えます。'
+                      : e.state === 'error'
+                        ? 'ログを確認して、必要に応じて再起動してください。'
+                        : e.state === 'running'
+                          ? '設定やコマンド検索から操作できます。'
+                          : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
+                  </p>
+                </div>
+              )}
+              <details className="detail-meta">
+                <summary>技術情報</summary>
+                <div>
+                  <span>Extension ID</span>
+                  <code>{e.id}</code>
+                </div>
+                <div>
+                  <span>Host API</span>
+                  <p>{e.capabilities?.join(' · ') || 'なし'}</p>
+                </div>
+              </details>
+            </>
           )}
-          <details className="detail-meta">
-            <summary>技術情報</summary>
-            <div>
-              <span>Extension ID</span>
-              <code>{e.id}</code>
-            </div>
-            <div>
-              <span>Host API</span>
-              <p>{e.capabilities?.join(' · ') || 'なし'}</p>
-            </div>
-          </details>
         </div>
       )}
     </section>
@@ -1084,7 +1188,6 @@ function SettingsPage({
   profileRequest,
   updatesRequest,
   ribbonRequest,
-  webRequest,
   webAccountsRequest,
   webAccounts,
   globalHotKeys,
@@ -1104,7 +1207,6 @@ function SettingsPage({
   profileRequest: number;
   updatesRequest: number;
   ribbonRequest: number;
-  webRequest: number;
   webAccountsRequest: number;
   webAccounts: HostSnapshot['webAccounts'];
   editor: SettingsEditor;
@@ -1139,7 +1241,6 @@ function SettingsPage({
     | 'profile'
     | 'about'
     | 'ribbon'
-    | 'web-applets'
     | 'web-accounts'
   >('category', 'appearance', [
     'appearance',
@@ -1150,7 +1251,6 @@ function SettingsPage({
     'profile',
     'about',
     'ribbon',
-    'web-applets',
     'web-accounts',
   ]);
   const settingsBody = useRef<HTMLDivElement>(null);
@@ -1169,43 +1269,38 @@ function SettingsPage({
         ? changed(draft.gestures, snapshot.value.gestures)
         : id === 'web-accounts'
           ? false
-          : id === 'web-applets'
-            ? changed(draft.webApplets.items, snapshot.value.webApplets.items)
-            : id === 'ribbon'
-              ? changed(draft.ribbon, snapshot.value.ribbon)
-              : id === 'about'
-                ? changed(draft.updates, snapshot.value.updates) ||
-                  extensions.some(
-                    (e) =>
-                      draft.extensions[e.id]?.updateSource !==
-                      snapshot.value.extensions[e.id]?.updateSource,
-                  )
-                : id === 'appearance'
-                  ? draft.host.theme !== snapshot.value.host.theme
-                  : id === 'general'
-                    ? changed(
-                        {
-                          ...draft.host,
-                          theme: '',
-                          trayClickCommand: '',
-                          trayDoubleClickCommand: null,
-                        },
-                        {
-                          ...snapshot.value.host,
-                          theme: '',
-                          trayClickCommand: '',
-                          trayDoubleClickCommand: null,
-                        },
-                      )
-                    : id === 'profile'
-                      ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-                      : id === 'shortcuts'
-                        ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
-                          changed(
-                            draft.globalShortcutCommands,
-                            snapshot.value.globalShortcutCommands,
-                          )
-                        : false;
+          : id === 'ribbon'
+            ? changed(draft.ribbon, snapshot.value.ribbon)
+            : id === 'about'
+              ? changed(draft.updates, snapshot.value.updates) ||
+                extensions.some(
+                  (e) =>
+                    draft.extensions[e.id]?.updateSource !==
+                    snapshot.value.extensions[e.id]?.updateSource,
+                )
+              : id === 'appearance'
+                ? draft.host.theme !== snapshot.value.host.theme
+                : id === 'general'
+                  ? changed(
+                      {
+                        ...draft.host,
+                        theme: '',
+                        trayClickCommand: '',
+                        trayDoubleClickCommand: null,
+                      },
+                      {
+                        ...snapshot.value.host,
+                        theme: '',
+                        trayClickCommand: '',
+                        trayDoubleClickCommand: null,
+                      },
+                    )
+                  : id === 'profile'
+                    ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+                    : id === 'shortcuts'
+                      ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
+                        changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands)
+                      : false;
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1222,9 +1317,6 @@ function SettingsPage({
     }
   }, [ribbonRequest]);
   useEffect(() => {
-    if (webRequest && switchToForm()) setCategory('web-applets');
-  }, [webRequest]);
-  useEffect(() => {
     if (webAccountsRequest) setCategory('web-accounts');
   }, [webAccountsRequest]);
   const navigateSettings = () => (category === 'web-accounts' && mode === 'json') || switchToForm();
@@ -1240,13 +1332,12 @@ function SettingsPage({
               {(
                 [
                   ['appearance', '表示'],
-                  ['ribbon', 'リボン'],
-                  ['web-applets', 'WebApplet'],
-                  ['web-accounts', 'Webアカウント'],
                   ['general', '一般'],
+                  ['ribbon', 'リボン'],
                   ['tray', 'タスクトレイ'],
                   ['shortcuts', 'ショートカット'],
                   ['gestures', 'マウスジェスチャー'],
+                  ['web-accounts', 'Webアカウント'],
                   ['profile', 'プロフィール'],
                   ['about', 'バージョン情報・更新'],
                 ] as const
@@ -1290,8 +1381,8 @@ function SettingsPage({
           )
         }
       />
-      {category !== 'web-accounts' && (
-        <div className="settings-toolbar">
+      <SettingsToolbar editor={editor} busy={busy}>
+        {category !== 'web-accounts' && (
           <div className="tabs">
             <button
               className={mode === 'form' ? 'selected' : ''}
@@ -1313,13 +1404,10 @@ function SettingsPage({
               JSON
             </button>
           </div>
-          <SettingsActions editor={editor} busy={busy} />
-        </div>
-      )}
-      <div className="settings-body" ref={settingsBody}>
-        {category !== 'web-accounts' && (
-          <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
         )}
+      </SettingsToolbar>
+      <div className="settings-body" ref={settingsBody}>
+        <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
         {category === 'web-accounts' ? (
           <div className="settings-layout">
             <div className="settings-form">
@@ -1356,20 +1444,6 @@ function SettingsPage({
                   commands={commands}
                   applets={extensions}
                 />
-              )}
-              {category === 'web-applets' && (
-                <>
-                  <h2>WebApplet</h2>
-                  <WebAppletSettings
-                    editor={editor}
-                    accounts={webAccounts}
-                    applets={extensions.map((extension) => ({
-                      id: extension.id,
-                      title: extension.displayName,
-                    }))}
-                    onAccounts={() => setCategory('web-accounts')}
-                  />
-                </>
               )}
               {category === 'ribbon' && (
                 <RibbonSettings draft={draft} extensions={extensions} onChange={edit} />
@@ -1558,17 +1632,21 @@ function LogsPage({
   run,
   source,
   onSource,
+  webManager = false,
 }: {
   snapshot: HostSnapshot;
   run: Run;
   source: string;
   onSource?(value: string): void;
+  webManager?: boolean;
 }) {
   const [filter, setFilter] = useState('');
   const [level, setLevel] = useState('all');
   const logs = snapshot.logs.filter(
     (l) =>
-      (!source || l.source === source) &&
+      (webManager
+        ? l.source.startsWith('web.') || l.source === 'web-applets'
+        : !source || l.source === source) &&
       (level === 'all' || level === l.level) &&
       `${l.source} ${l.message}`.toLowerCase().includes(filter.toLowerCase()),
   );
@@ -1641,4 +1719,6 @@ function LogsPage({
     </>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  new URLSearchParams(location.search).has('settingsNotice') ? <SettingsNotice /> : <App />,
+);

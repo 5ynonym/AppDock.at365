@@ -173,6 +173,9 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  settingsNotice(state: SettingsNoticeState): Promise<void>;
+  confirmDiscardSettings(): Promise<boolean>;
+  onSettingsNoticeAction(callback: (action: 'save' | 'discard' | 'edit') => void): () => void;
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
   webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
@@ -210,6 +213,18 @@ export interface DockApi {
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   onChanged(callback: () => void): () => void;
+}
+export interface SettingsNoticeState {
+  visible: boolean;
+  busy: boolean;
+  dark: boolean;
+  message: string;
+}
+export interface SettingsNoticeApi {
+  state(): Promise<SettingsNoticeState>;
+  onChanged(callback: (state: SettingsNoticeState) => void): () => void;
+  act(action: 'save' | 'discard' | 'edit'): Promise<void>;
+  resize(height: number): Promise<void>;
 }
 export interface UpdateResult {
   status: 'current' | 'available' | 'unpublished' | 'unsupported' | 'incompatible' | 'error';

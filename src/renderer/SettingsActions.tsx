@@ -1,7 +1,7 @@
 import type { SettingsEditor } from './useSettingsEditor';
 
 export function SettingsActions({ editor, busy }: { editor: SettingsEditor; busy: boolean }) {
-  const disabled = !editor.dirty || busy || editor.avatarLoading;
+  const disabled = !editor.dirty || busy || editor.avatarLoading || editor.pending;
   return (
     <>
       <span className={editor.dirty ? 'unsaved' : 'muted'}>
@@ -14,6 +14,23 @@ export function SettingsActions({ editor, busy }: { editor: SettingsEditor; busy
         変更をすべて保存
       </button>
     </>
+  );
+}
+
+export function SettingsToolbar({
+  editor,
+  busy,
+  children,
+}: {
+  editor: SettingsEditor;
+  busy: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="settings-toolbar" aria-label="設定の保存">
+      {children}
+      <SettingsActions editor={editor} busy={busy} />
+    </div>
   );
 }
 

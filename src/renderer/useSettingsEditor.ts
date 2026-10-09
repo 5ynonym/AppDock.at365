@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ExtensionSnapshot, Settings, SettingsSnapshot } from '../shared/contracts';
 import { createDefaultSettings, parseSettings } from '../shared/settings-schema';
 import { validateAppletSettings } from '../shared/setting-definitions';
@@ -21,9 +21,14 @@ export function useSettingsEditor(
   const [dirty, setDirty] = useState(false);
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [parseError, setParseError] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [pending, setPending] = useState(false);
+  const operation = useRef(false);
+  const latest = useRef(snapshot);
+  latest.current = snapshot;
   const switchToForm = () => {
     if (mode === 'json') {
       try {
@@ -50,15 +55,30 @@ export function useSettingsEditor(
     setDirty(true);
   };
   const reset = () => {
+    const snapshot = latest.current;
     setDirty(false);
     setDraft(snapshot.value);
     setText(JSON.stringify(snapshot.value, null, 2));
     setRevision(snapshot.revision);
     setParseError('');
+    setSaveError('');
     setAvatarDraft(undefined);
     setAvatarPreview(undefined);
   };
+  const discard = async () => {
+    if (operation.current || avatarLoading || !dirty) return;
+    operation.current = true;
+    setPending(true);
+    try {
+      if (await window.dock.confirmDiscardSettings()) reset();
+    } finally {
+      operation.current = false;
+      setPending(false);
+    }
+  };
   const save = async () => {
+    if (operation.current || avatarLoading || !dirty) return;
+    setSaveError('');
     let value: Settings;
     try {
       value = parseSettings(mode === 'json' ? JSON.parse(text) : draft);
@@ -70,13 +90,26 @@ export function useSettingsEditor(
       );
       return;
     }
-    await run(async () => {
-      const result = await window.dock.saveSettings(value, revision, avatarDraft);
-      setRevision(result.revision);
-      setDirty(false);
-      setAvatarDraft(undefined);
-      setAvatarPreview(undefined);
-    }, '設定を保存しました。');
+    operation.current = true;
+    setPending(true);
+    try {
+      await run(async () => {
+        let result: SettingsSnapshot;
+        try {
+          result = await window.dock.saveSettings(value, revision, avatarDraft);
+        } catch (error) {
+          setSaveError(error instanceof Error ? error.message : String(error));
+          throw error;
+        }
+        setRevision(result.revision);
+        setDirty(false);
+        setAvatarDraft(undefined);
+        setAvatarPreview(undefined);
+      }, '設定を保存しました。');
+    } finally {
+      operation.current = false;
+      setPending(false);
+    }
   };
   return {
     draft,
@@ -88,6 +121,7 @@ export function useSettingsEditor(
     mode,
     setMode,
     parseError,
+    saveError,
     setParseError,
     avatarDraft,
     avatarPreview,
@@ -97,6 +131,8 @@ export function useSettingsEditor(
     setAvatarLoading,
     edit,
     reset,
+    discard,
+    pending,
     save,
     switchToForm,
   };

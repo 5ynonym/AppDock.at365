@@ -182,9 +182,14 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 ## Applet設定パネルの共用
 
+- 0.26.11ではページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/プロフィール/バージョン情報・更新です。
+- 他ページで未保存の場合、`core/settings-notice.ts`が小さな透明背景のWebContentsViewを本体Window上部へ重ねます。Viewの追加後とリサイズ時に通知を最前面へ戻し、背景Webの領域/入力/寿命は変えません。通知は時間で消えず、設定/Appletへ戻る・保存成功・破棄確定で非表示になります。表示でfocusしません。通知と専用preloadは通知状態/操作/高さだけを公開し、IPCはそのViewのmainFrameとURLを照合します。通常host IPCを通知やリモートページへ許可しません。
+- draft/JSON/画像/revisionはhost rendererの`useSettingsEditor`だけが所有します。通知の保存/破棄はhostへ戻し、pendingとrefで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
+- `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
+
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
 - `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて既存`AppletSettings`/`ShortcutsEditor`を描画します。設定ページのApplet別一覧と本体専用ショートカット入口は削除し、全体一覧にグループを表示します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
-- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
+- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
 - JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
 - 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
 

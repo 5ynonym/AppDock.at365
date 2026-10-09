@@ -69,6 +69,7 @@ import {
 } from './core/applet-pages';
 import { pageDisplay, pageKey } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
+import { SettingsNotice } from './core/settings-notice';
 import { webId } from '../shared/web-applets';
 
 configureWindowRendering(app);
@@ -123,6 +124,7 @@ if (locked) {
   }
 }
 let window: BrowserWindow | null = null;
+let settingsNotice: SettingsNotice | undefined;
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
@@ -359,6 +361,19 @@ function registerIpc() {
       return callback(...args);
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:settingsNotice', (state) => settingsNotice?.update(state));
+  handle('dock:confirmDiscardSettings', async () => {
+    const answer = await dialog.showMessageBox(window!, {
+      type: 'warning',
+      message: '未保存の変更をすべて破棄しますか？',
+      detail:
+        '設定・ショートカット・Appletの並び順など、すべての未保存変更を破棄して保存済みの状態へ戻します。Webアカウントの即時反映操作は対象外です。',
+      buttons: ['キャンセル', 'すべて破棄'],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    return answer.response === 1;
+  });
   handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
     if (webId(extensionId) && pageId === 'main') return webApplets.open(extensionId);
     const extension = manager.items.get(extensionId);
@@ -748,7 +763,14 @@ async function initialize() {
     });
   }
   windowState.track(window);
+  settingsNotice = new SettingsNotice(
+    window,
+    'appdock://host/index.html?settingsNotice=1',
+    path.join(__dirname, 'settings-notice-preload.js'),
+    (message) => log.write('error', 'settings', message),
+  );
   configurePageHost({
+    overlay: () => settingsNotice?.layout(),
     window: () => window,
     display: (key, fallback) => {
       const web = settings.value.webApplets.items.find((item) => pageKey(item.id, 'main') === key);

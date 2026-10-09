@@ -10,6 +10,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## 開発・発行・配置の注意
 
+- 実装・修正の作業完了時は、必要なテストと発行物の動作確認がすべて成功した後、[テストフォルダーの整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)を行う（2026-10-10ユーザー指定）。終了・成功を確認できる古いテスト専用フォルダーだけを対象とし、種類ごとに直近3回分を残す。実行中・状態不明・未解決の失敗記録・旧版移行用資料・固定ビルド出力・Release記録は削除しない。名前や経過日数だけで削除せず、安全確認できないものは保持して報告する。整理結果を検証記録へ残す。これは作業者の完了手順であり、通常publishや製品起動へ自動削除を追加する指示ではない。`artifacts`の改名と同期/バックアップ除外設定は別途依頼まで行わない。
 - 完成した本体の実装・修正は、Release前でもバージョンをインクリメントして`publish.bat`を実行し、`publish`へ発行する。通常の修正はパッチ番号を上げ、指定版を優先する。同じ変更の発行再試行・検証用再発行・リリースでは重ねて増やさず、同梱だけの未変更Appletの版は上げない。版更新は[リリース手順](docs/RELEASING.md)のSetVersionでpackage.jsonを更新し、README等の現行版記載も揃える。ユキちゃんの動作確認場所なので、開発ビルドだけで完了にしない。通常publishは本体単一EXEとupdate.jsonだけを生成し、終了コード・成果物の整合・発行版の隔離起動を確認する。変更したAppletはそのrepoで版更新・publishを行う。オールインワンZIP作成・未変更Appletの再発行・旧版ZIP整理は通常publishに含めず、AppDockのリリース時だけ行う。調査/計画/文書だけ、または明示的な発行不要指定は除く。commit・公開・実利用deployは別の指示に従う。
 - Node/pnpmはtoolchain.jsonの版を.toolsへ配置してdev.bat経由で使う。pnpm 12の導入ではinstall.jsとWindows shimの再生成が必要。Electron取得は既存のpostinstall/setup手順に従う。依存更新時は初回導入と再実行も確認する。
 - node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
@@ -31,7 +32,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 背景Webの動作はvisibilityState、rAF、observer.readyだけで成功としない。Playwrightのfocus emulationが結果を変えるため、未表示の通常起動も別途検証する。ページ自身の描画/取得開始と、必要に応じて許可された実受信を確認する。実メール送信は明示許可の範囲に限定する。
 - keepActiveの認証遷移/別文書/破棄時の解除、native focus時の入力を保つ。破棄後にWebContents.debugger getterを呼ばず、生存中の参照と冪等disposeで解放する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
 - 設定はuseSettingsEditorの共有draft/JSON/revision/saveを維持し、詳細/設定画面で二重draftや二重入力を作らない。settingActionsは自身の宣言済みcommandに限定し、実行中ガード・結果表示・未保存入力を保つ。
-- Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletを選ぶと説明へ戻す。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
+- Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletへ切り替えても選択中のタブを維持する。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
 - 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
 - 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/.appdockの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
@@ -55,6 +56,9 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - READMEは利用者向け、開発/発行手順はDEVELOPMENT/docs、実測結果と未確認事項はVERIFICATIONへ記録する。BATはCP932/CRLFを保つ。
 
 ## WebAppletの維持事項
+
+- 追加/管理と新規サイト用ショートカット初期値はApplet一覧の組み込み「WebApplet」の設定/ショートカットへ集約する。管理項目はrendererだけの入口で、runtime snapshot・更新・リボン・並べ替え・コマンド提供元へ混ぜない。各サイトのID/個別設定/リボンは維持し、設定カテゴリへWebApplet入口を戻さない。
+- 設定/全Applet詳細はページ見出し下のSettingsToolbarで全編集内容を保存する。未保存のままそれ以外へ移ったら、本体Window上部のSettingsNoticeから保存/確認付き破棄を行う。共有draftを通知へ複製せず、専用preloadの通知操作をhost rendererへ戻す。別WebContentsViewへ重なるnative通知の最前面・フォーカス・サイズ・破棄・IPC送信元検査を保つ。専用GUIはscripts/settings-notice-ui-test.cjs。
 
 - URLから動的に追加する本体管理Applet。設定・アカウント・遷移・Web提供JSON・検証の正本は[WebApplet](docs/web-applets.md)。従来の未実装相談は実装履歴として扱う。
 - Gmailとはaccounts/session/Cookieの保存領域とライフサイクルを分離する。認証データのコピー・移行を追加しない。WebApplet専用の同じ枠はWebApplet間で共有する。
