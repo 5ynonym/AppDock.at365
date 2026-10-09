@@ -14,11 +14,14 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
 - build-main.cjsはout/mainを再生成する。GUI試験や再起動の最中にビルドを重ねない。発行完了後の固定した配布物を使い、検証コピーと最終EXEのSHA256を照合する。
 - 本体の単一EXEとportableの展開先/Tray IDの安定性を維持する。scripts/build-portable.cjs・portable.nsiの展開mutex/lease、子プロセスの寿命、hProc形式のHANDLE変換を保つ。electron-builder更新時はcustom templateとの連携と実EXEの更新/再起動/同時起動/異常終了を確認する。
+- オールインワンZIPの置換はstage内のprevious-all-in-one.zipをbackupとして指定する。null backupで既存ファイルの削除に失敗する実例があり、旧ZIPを保持する既存の回帰試験と発行先での実置換を確認する。実利用先deploy時の退避不要という指定とは区別する。
 - .NET SDK/Runtime・プロセス契約を変えたらnative AppletのRelease buildと接続/停止/表示/保存も確認する。runtimeconfig欠落は発行元・EXE内・実展開先を比較して原因を切り分ける。
 - deployは依頼範囲で実施し、発行成功と実利用先への配置を区別する。ユーザー指定によりdeploy.batの配置先は同期/変更履歴で復元できるため、旧EXE等の別フォルダー退避を追加しない。配置ハッシュと設定保持は確認する。この指定を自己更新helperの復旧用backupへ流用しない。
 - Windows PowerShell用PS1はUTF-8 BOM/CRLF。Get-FileHashを解決できない環境では.NET FileStream/SHA256を使う。PowerShell 5.1のFile.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATHや認証境界は実行環境で確認する。
 
 ## ホスト・UI・Webアカウントの維持事項
+
+- Windows通知のクリックは配置専用protocol activationを使い、元のportable EXE/保存先へ戻す。Electronの共有製品名shortcut/COM登録に起動先を依存させない。URIから任意commandを実行せず、一度限りのトークンと稼働中子プロセスのガードを維持する。通知変更ではtests/notification-routing.test.cjsとscripts/notification-portable-test.cjsを確認し、Windows ShellによるURI起動と物理toastクリックの検証範囲を区別する。
 
 - メインWindowと共有sessionのスペルチェック無効化を維持する。起動遅延とminimumHostVersion照合はホスト共通で管理し、停止/無効化/終了で予約を取り消す。削除済みウィジェット基盤は互換性のために復活させない。
 - AppletページのUI WebContentsと表示先Window/領域を分離し、page/window切替でsession/Viewを作り直さない。非選択時の背景描画、表示中だけのキー処理、OS/入力フォーカスを奪わないことを検証する。詳細は[Appletページ](docs/applet-pages.md)。
@@ -46,11 +49,14 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - AppDockのpublish.batはこれらのrepoを自動検出するため、名前一覧の追記は不要。追加後は[オールインワン発行](docs/all-in-one.md)の検査と展開起動で、新Appletも含まれることを確認する。探索範囲外のrepoは勝手に無視せず、配置または明示のAppletRootを整える。
 - READMEは利用者向け、開発/発行手順はDEVELOPMENT/docs、実測結果と未確認事項はVERIFICATIONへ記録する。BATはCP932/CRLFを保つ。
 
-## WebAppletの維持事項（0.24.0）
+## WebAppletの維持事項
 
 - URLから動的に追加する本体管理Applet。設定・アカウント・遷移・Web提供JSON・検証の正本は[WebApplet](docs/web-applets.md)。従来の未実装相談は実装履歴として扱う。
 - Gmailとはaccounts/session/Cookieの保存領域とライフサイクルを分離する。認証データのコピー・移行を追加しない。WebApplet専用の同じ枠はWebApplet間で共有する。
+- 枠の削除は保存データも消去し、枠除去とpendingDeletionを同じatomic writeで記録する。生成済みsessionの物理回収は次回起動のsession生成前に行い、ロック等の失敗は記録を残して再試行する。登録中/設定で参照中/同プロセスで生成済みのsessionを回収せず、削除済みsessionを終了時に再flushしない。専用sessions直下の検証済みIDと非転送rootを守り、Gmail/他枠/外部junction先を削除しない。旧版の記録なし残存領域を自動削除するものとは区別する。
+- Webアカウント管理は独立した設定カテゴリと専用accounts.jsonを使う。操作は設定draft/revision/saveから独立して即時反映し、削除/クリアはホストの警告dialogで確認する。旧settings内の枠はIDとsessionを保って移行し、専用ファイルの保存成功後だけ旧フィールドを除く。使用中枠の削除ガードと設定保存時の参照検証を維持する。
+- アカウント名はblur/Enter/ボタンで確定、確定前のEscapeで保存済みの名前へ戻す。IME変換中/空欄の確定、Enterとblurの重複送信、名前変更で直後の削除/クリアのクリックを失うことを避ける。非同期snapshot反映で次の編集中の名前を上書きしない。
 - リモートページにpreload/Node/ホストIPCを公開しない。外部JSONは検証した推奨初期値だけを取り込み、アカウント/コマンド/許可範囲拡張を受け入れず、手動変更を再取得で上書きしない。
 - WebAppletはページを開いた時に生成する。既存AppletSurfaceを使い、表示先の切替でWebContents/session/入力を作り直さない。無効化/削除/アカウント・URL変更時の破棄、Cookie保存、共有枠消去時の対象画面終了を確認する。
 - WebAppletのID接頭辞web.は本体管理用。ファイルmanifestからこの名前空間やweb runtimeを読み込まない。本体と一緒に更新されるため、個別Appletの配布更新対象へ混ぜない。
-- 今後の同機能変更ではtests/web-applets.test.cjs、scripts/web-applets-ui-test.cjs、scripts/web-applets-portable-test.cjsに加え、既存ページ/Gmail表示の回帰を確認する。実サイト認証・長期背景動作とオフラインfixtureの成功を区別する。
+- 今後の同機能変更ではtests/web-applets.test.cjs、tests/web-profiles.test.cjs、scripts/web-applets-ui-test.cjs、scripts/web-applets-portable-test.cjsに加え、既存ページ/Gmail表示の回帰を確認する。保存形式変更時は保持した旧配布物でscripts/web-profiles-migration-ui-test.cjsも実施する。実サイト認証・長期背景動作とオフラインfixtureの成功を区別する。

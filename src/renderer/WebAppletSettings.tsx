@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SettingsEditor } from './useSettingsEditor';
-import type { WebApplet, WebNavigation } from '../shared/web-applets';
+import type { WebApplet, WebNavigation, WebProfile } from '../shared/web-applets';
 
-export function WebAppletSettings({ editor, itemId }: { editor: SettingsEditor; itemId?: string }) {
+export function WebAppletSettings({
+  editor,
+  itemId,
+  onAccounts,
+  accounts,
+}: {
+  editor: SettingsEditor;
+  itemId?: string;
+  accounts: WebProfile[];
+  onAccounts(): void;
+}) {
   const { draft, edit } = editor;
   const data = draft.webApplets;
   const [selected, setSelected] = useState(itemId ?? data.items[0]?.id ?? '');
@@ -30,35 +40,35 @@ export function WebAppletSettings({ editor, itemId }: { editor: SettingsEditor; 
         },
       });
   };
-  const addAccount = () => {
-    const account = {
-      id: `account.${crypto.randomUUID()}`,
-      name: `Webアカウント ${data.accounts.length + 1}`,
-    };
-    edit({ ...draft, webApplets: { ...data, accounts: [...data.accounts, account] } });
-  };
-  const add = () => {
-    const account = data.accounts[0] ?? { id: `account.${crypto.randomUUID()}`, name: '個人用' };
-    const a: WebApplet = {
-      id: `web.${crypto.randomUUID()}`,
-      name: '新しいWebApplet',
-      url: 'https://example.com/',
-      accountId: account.id,
-      enabled: true,
-      display: 'page',
-      navigation: 'same-origin',
-      allowedOrigins: [],
-      icon: '',
-    };
-    edit({
-      ...draft,
-      webApplets: {
-        accounts: data.accounts.length ? data.accounts : [account],
-        items: [...data.items, a],
-      },
-    });
-    setSelected(a.id);
-    setMessage('名前とURLを入力して設定を保存してください。');
+  const add = async () => {
+    setBusy(true);
+    try {
+      const account = accounts[0] ?? (await window.dock.createWebAccount('個人用'));
+      const current = liveEditor.current.draft;
+      const a: WebApplet = {
+        id: `web.${crypto.randomUUID()}`,
+        name: '新しいWebApplet',
+        url: 'https://example.com/',
+        accountId: account.id,
+        enabled: true,
+        display: 'page',
+        navigation: 'same-origin',
+        allowedOrigins: [],
+        icon: '',
+      };
+      edit({
+        ...current,
+        webApplets: {
+          items: [...current.webApplets.items, a],
+        },
+      });
+      setSelected(a.id);
+      setMessage('名前とURLを入力して設定を保存してください。');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'WebAppletを追加できませんでした。');
+    } finally {
+      setBusy(false);
+    }
   };
   async function defaults() {
     if (!item) return;
@@ -129,7 +139,11 @@ export function WebAppletSettings({ editor, itemId }: { editor: SettingsEditor; 
             URLからWebAppletを追加できます。アカウント枠はGmailとは別管理です。
           </p>
           <div className="actions">
-            <button className="secondary" disabled={data.items.length >= 64} onClick={add}>
+            <button
+              className="secondary"
+              disabled={busy || data.items.length >= 64}
+              onClick={() => void add()}
+            >
               ＋ WebAppletを追加
             </button>
           </div>
@@ -271,13 +285,23 @@ export function WebAppletSettings({ editor, itemId }: { editor: SettingsEditor; 
               value={item.accountId}
               onChange={(e) => change({ accountId: e.target.value })}
             >
-              {data.accounts.map((a) => (
+              {!accounts.some((a) => a.id === item.accountId) && (
+                <option value={item.accountId} disabled>
+                  アカウント枠を選び直してください
+                </option>
+              )}
+              {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
             </select>
           </label>
+          <div className="actions">
+            <button className="text-button" onClick={onAccounts}>
+              Webアカウントを管理
+            </button>
+          </div>
           <p className="muted">
             同じ枠を選んだWebAppletはログイン状態を共有します。Gmailの枠とは共有しません。
           </p>
@@ -301,64 +325,6 @@ export function WebAppletSettings({ editor, itemId }: { editor: SettingsEditor; 
         </div>
       )}
       {message && <p role="status">{message}</p>}
-      <h3>WebApplet専用のアカウント枠</h3>
-      <div className="actions">
-        <button className="secondary" disabled={data.accounts.length >= 32} onClick={addAccount}>
-          アカウント枠を追加
-        </button>
-      </div>
-      {data.accounts.map((a) => (
-        <div className="web-account-row" key={a.id}>
-          <input
-            aria-label={`アカウント名 ${a.name}`}
-            maxLength={80}
-            value={a.name}
-            onChange={(e) =>
-              edit({
-                ...draft,
-                webApplets: {
-                  ...data,
-                  accounts: data.accounts.map((p) =>
-                    p.id === a.id ? { ...p, name: e.target.value } : p,
-                  ),
-                },
-              })
-            }
-          />
-          <button
-            className="secondary"
-            disabled={busy || editor.dirty}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await window.dock.clearWebAccount(a.id);
-                setMessage('アカウントの消去操作を終了しました。');
-              } catch {
-                setMessage('アカウント枠を保存してから操作してください。');
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            ログイン情報を消去
-          </button>
-          <button
-            className="text-button"
-            disabled={data.items.some((i) => i.accountId === a.id)}
-            onClick={() =>
-              edit({
-                ...draft,
-                webApplets: { ...data, accounts: data.accounts.filter((p) => p.id !== a.id) },
-              })
-            }
-          >
-            枠の登録を削除
-          </button>
-        </div>
-      ))}
-      <p className="muted">
-        使用中の枠は削除できません。登録の削除は保存で反映し、サイトデータは残ります。完全に消去する場合は設定を保存してから「ログイン情報を消去」を使ってください。
-      </p>
     </section>
   );
 }

@@ -12,7 +12,6 @@ import {
   protocol,
   net,
   screen,
-  Notification,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +39,11 @@ import type { HostSnapshot, Settings } from '../shared/contracts';
 import { configureWindowRendering } from './core/window-rendering';
 import { trayIdentity } from './core/tray-identity';
 import {
+  configureNotifications,
+  showNotification,
+  activateNotification,
+} from './core/notifications';
+import {
   configurePageHost,
   updatePageViewport,
   refreshPageDisplays,
@@ -57,6 +61,7 @@ protocol.registerSchemesAsPrivileged([
 const restoreView = process.argv.includes('--restore-view');
 const hostDocumentUrl = `appdock://host/index.html${restoreView ? '?restoreView=1' : ''}`;
 let startupReady = false;
+let pendingNotificationArgs: string[] | undefined;
 const smoke = process.argv.includes('--smoke-test');
 const smokeDirectory = process.argv
   .find((a) => a.startsWith('--smoke-dir='))
@@ -76,6 +81,18 @@ fs.mkdirSync(dataDirectory, { recursive: true });
 app.setPath('userData', path.join(dataDirectory, 'chromium'));
 app.setAppUserModelId('at365.appdock');
 const locked = app.requestSingleInstanceLock({ baseDirectory });
+if (locked)
+  configureNotifications(
+    app.isPackaged
+      ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe')
+      : app.getPath('exe'),
+    baseDirectory,
+    [
+      ...(app.isPackaged ? [] : [app.getAppPath()]),
+      ...(testDirectory ? [`--test-profile=${baseDirectory}`] : []),
+      ...(smoke && smokeDirectory ? ['--smoke-test', `--smoke-dir=${baseDirectory}`] : []),
+    ],
+  );
 const settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
 let settingsLoadError: Error | undefined;
 if (locked) {
@@ -227,6 +244,7 @@ function snapshot(): HostSnapshot {
     settings: settings.snapshot(),
     extensions: allApplets(),
     webPages: webApplets.states(),
+    webAccounts: webApplets.accounts(),
     logs: log.entries,
     version: app.getVersion(),
     runtime: {
@@ -293,6 +311,11 @@ function registerIpc() {
   handle('dock:webDefaults', discoverWebDefaults);
   handle('dock:webNavigate', (id: string, action: string) => webApplets.navigate(id, action));
   handle('dock:clearWebAccount', (id: string) => webApplets.clearAccount(id));
+  handle('dock:createWebAccount', (name: unknown) => webApplets.addAccount(name));
+  handle('dock:renameWebAccount', (id: string, name: unknown) =>
+    webApplets.renameAccount(id, name),
+  );
+  handle('dock:deleteWebAccount', (id: string) => webApplets.deleteAccount(id));
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   handle('dock:chooseDirectory', async () => {
@@ -340,6 +363,7 @@ function registerIpc() {
   });
   handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) => {
     const next = parseSettings(value);
+    webApplets.validateAccounts(next.webApplets.items);
     validateAppletSettings(next, manager.snapshot());
     return saveUserSettings(settings, baseDirectory, next, revision, avatar);
   });
@@ -795,21 +819,25 @@ async function initialize() {
   startupUpdateTimer = updater.scheduleStartup(smoke, (results) => {
     if (!results.length || quitting) return;
     log.write('info', 'updates', `${results.length}件の更新があります。`);
-    if (Notification.isSupported()) {
-      const notification = new Notification({
-        title: 'AppDock — 更新があります',
-        body: results.map((result) => `${result.name}: ${result.latestVersion}`).join('\n'),
-        silent: true,
-      });
-      notification.on('click', () => {
-        showWindow();
-        window?.webContents.send('dock:hostCommand', 'appdock.updates.open');
-      });
-      notification.show();
+    try {
+      showNotification(
+        'AppDock — 更新があります',
+        results.map((result) => `${result.name}: ${result.latestVersion}`).join('\n'),
+        true,
+        () => {
+          showWindow();
+          window?.webContents.send('dock:hostCommand', 'appdock.updates.open');
+        },
+      );
+    } catch (error) {
+      log.write('error', 'updates', String(error));
     }
   });
   if (smoke) await runSmoke();
   else if (restoreView || !settings.value.host.startMinimized) showWindow();
+  activateNotification(process.argv, showWindow);
+  if (pendingNotificationArgs) activateNotification(pendingNotificationArgs, showWindow);
+  pendingNotificationArgs = undefined;
   // Optional startup command only for an explicit isolated test profile.
   const testCommand =
     testDirectory &&
@@ -968,7 +996,13 @@ async function runSmoke() {
   quitting = true;
   app.quit();
 }
-app.on('second-instance', () => showWindow());
+app.on('second-instance', (_event, argv) => {
+  if (!startupReady) {
+    pendingNotificationArgs = argv;
+    return;
+  }
+  if (!activateNotification(argv, showWindow)) showWindow();
+});
 app.on('before-quit', (event) => {
   clearTimeout(startupUpdateTimer);
   quitting = true;

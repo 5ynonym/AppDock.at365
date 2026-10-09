@@ -34,6 +34,7 @@ import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
 import { WebAppletSettings } from './WebAppletSettings';
+import { WebAccountSettings } from './WebAccountSettings';
 declare global {
   interface Window {
     dock: DockApi;
@@ -240,6 +241,7 @@ function App() {
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [webRequest, setWebRequest] = useState(0);
+  const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   const [detailSettings, setDetailSettings] = useRestartView<boolean>('detailSettings', false);
   const [detailTab, setDetailTab] = useRestartView<AppletSettingsTab>('detailTab', 'settings', [
@@ -873,6 +875,11 @@ function App() {
                             globalHotKeys={snapshot.globalHotKeys}
                             tab={detailTab}
                             onTab={setDetailTab}
+                            webAccounts={snapshot.webAccounts}
+                            onWebAccounts={() => {
+                              setPage('settings');
+                              setWebAccountsRequest((n) => n + 1);
+                            }}
                           />
                         </>
                       ) : undefined
@@ -902,6 +909,8 @@ function App() {
                 updatesRequest={updatesRequest}
                 ribbonRequest={ribbonRequest}
                 webRequest={webRequest}
+                webAccountsRequest={webAccountsRequest}
+                webAccounts={snapshot.webAccounts}
                 editor={editor}
                 onApplet={goExtension}
                 globalHotKeys={snapshot.globalHotKeys}
@@ -1335,6 +1344,8 @@ function SettingsPage({
   updatesRequest,
   ribbonRequest,
   webRequest,
+  webAccountsRequest,
+  webAccounts,
   globalHotKeys,
   editor,
   onApplet,
@@ -1354,6 +1365,8 @@ function SettingsPage({
   updatesRequest: number;
   ribbonRequest: number;
   webRequest: number;
+  webAccountsRequest: number;
+  webAccounts: HostSnapshot['webAccounts'];
   editor: SettingsEditor;
   onApplet(id: string): void;
   globalHotKeys: GlobalHotKeyStatus[];
@@ -1388,6 +1401,7 @@ function SettingsPage({
     | 'about'
     | 'ribbon'
     | 'web-applets'
+    | 'web-accounts'
   >('category', 'appearance', [
     'appearance',
     'general',
@@ -1398,6 +1412,7 @@ function SettingsPage({
     'about',
     'ribbon',
     'web-applets',
+    'web-accounts',
   ]);
   const [appletId, setAppletId] = useRestartView<string>('appletId', '');
   const [appletTab, setAppletTab] = useRestartView<AppletSettingsTab>('appletTab', 'settings', [
@@ -1432,33 +1447,35 @@ function SettingsPage({
     ) ||
     shortcutChanged(id);
   const categoryChanged = (id: string) =>
-    id === 'web-applets'
-      ? changed(draft.webApplets, snapshot.value.webApplets)
-      : id === 'ribbon'
-        ? changed(draft.ribbon, snapshot.value.ribbon)
-        : id === 'about'
-          ? changed(draft.updates, snapshot.value.updates) ||
-            extensions.some(
-              (e) =>
-                draft.extensions[e.id]?.updateSource !==
-                snapshot.value.extensions[e.id]?.updateSource,
-            )
-          : id === 'appearance'
-            ? draft.host.theme !== snapshot.value.host.theme
-            : id === 'general'
-              ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
-              : id === 'profile'
-                ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-                : id === 'host-shortcuts'
-                  ? shortcutChanged(null)
-                  : id === 'shortcuts'
-                    ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
-                      changed(
-                        draft.globalShortcutCommands,
-                        snapshot.value.globalShortcutCommands,
-                      ) ||
-                      changed(draft.trayCommands, snapshot.value.trayCommands)
-                    : extensions.some((e) => appletChanged(e.id));
+    id === 'web-accounts'
+      ? false
+      : id === 'web-applets'
+        ? changed(draft.webApplets.items, snapshot.value.webApplets.items)
+        : id === 'ribbon'
+          ? changed(draft.ribbon, snapshot.value.ribbon)
+          : id === 'about'
+            ? changed(draft.updates, snapshot.value.updates) ||
+              extensions.some(
+                (e) =>
+                  draft.extensions[e.id]?.updateSource !==
+                  snapshot.value.extensions[e.id]?.updateSource,
+              )
+            : id === 'appearance'
+              ? draft.host.theme !== snapshot.value.host.theme
+              : id === 'general'
+                ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
+                : id === 'profile'
+                  ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+                  : id === 'host-shortcuts'
+                    ? shortcutChanged(null)
+                    : id === 'shortcuts'
+                      ? changed(draft.shortcuts, snapshot.value.shortcuts) ||
+                        changed(
+                          draft.globalShortcutCommands,
+                          snapshot.value.globalShortcutCommands,
+                        ) ||
+                        changed(draft.trayCommands, snapshot.value.trayCommands)
+                      : extensions.some((e) => appletChanged(e.id));
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1477,6 +1494,10 @@ function SettingsPage({
   useEffect(() => {
     if (webRequest && switchToForm()) setCategory('web-applets');
   }, [webRequest]);
+  useEffect(() => {
+    if (webAccountsRequest) setCategory('web-accounts');
+  }, [webAccountsRequest]);
+  const navigateSettings = () => (category === 'web-accounts' && mode === 'json') || switchToForm();
   if (!active) return null;
   return (
     <>
@@ -1491,6 +1512,7 @@ function SettingsPage({
                   ['appearance', '表示'],
                   ['ribbon', 'リボン'],
                   ['web-applets', 'WebApplet'],
+                  ['web-accounts', 'Webアカウント'],
                   ['general', '一般'],
                   ['shortcuts', 'ショートカット'],
                   ['profile', 'プロフィール'],
@@ -1502,7 +1524,7 @@ function SettingsPage({
                   className={category === id ? 'selected' : ''}
                   key={id}
                   onClick={() => {
-                    if (switchToForm()) setCategory(id);
+                    if (id === 'web-accounts' || navigateSettings()) setCategory(id);
                   }}
                 >
                   <span title={label}>{label}</span>
@@ -1529,7 +1551,7 @@ function SettingsPage({
                     className={category === 'host-shortcuts' ? 'selected' : ''}
                     aria-current={category === 'host-shortcuts' ? 'true' : undefined}
                     onClick={() => {
-                      if (switchToForm()) setCategory('host-shortcuts');
+                      if (navigateSettings()) setCategory('host-shortcuts');
                     }}
                   >
                     <span title="AppDock">AppDock</span>
@@ -1558,7 +1580,7 @@ function SettingsPage({
                           : undefined
                       }
                       onClick={() => {
-                        if (!switchToForm()) return;
+                        if (!navigateSettings()) return;
                         setCategory('extensions');
                         setAppletId(e.id);
                       }}
@@ -1590,42 +1612,58 @@ function SettingsPage({
       <PageHeading
         title="設定"
         action={
-          <button
-            className="secondary"
-            onClick={() => void run(() => window.dock.openPath('settings'))}
-          >
-            <Icon name="folder" size={16} />
-            ファイルを開く
-          </button>
+          category === 'web-accounts' ? undefined : (
+            <button
+              className="secondary"
+              onClick={() => void run(() => window.dock.openPath('settings'))}
+            >
+              <Icon name="folder" size={16} />
+              ファイルを開く
+            </button>
+          )
         }
       />
-      <div className="settings-toolbar">
-        <div className="tabs">
-          <button
-            className={mode === 'form' ? 'selected' : ''}
-            onClick={() => {
-              if (mode === 'json') switchToForm();
-            }}
-          >
-            フォーム
-          </button>
-          <button
-            className={mode === 'json' ? 'selected' : ''}
-            onClick={() => {
-              if (mode !== 'json') {
-                setText(JSON.stringify(draft, null, 2));
-                setMode('json');
-              }
-            }}
-          >
-            JSON
-          </button>
+      {category !== 'web-accounts' && (
+        <div className="settings-toolbar">
+          <div className="tabs">
+            <button
+              className={mode === 'form' ? 'selected' : ''}
+              onClick={() => {
+                if (mode === 'json') switchToForm();
+              }}
+            >
+              フォーム
+            </button>
+            <button
+              className={mode === 'json' ? 'selected' : ''}
+              onClick={() => {
+                if (mode !== 'json') {
+                  setText(JSON.stringify(draft, null, 2));
+                  setMode('json');
+                }
+              }}
+            >
+              JSON
+            </button>
+          </div>
+          <SettingsActions editor={editor} busy={busy} />
         </div>
-        <SettingsActions editor={editor} busy={busy} />
-      </div>
+      )}
       <div className="settings-body" ref={settingsBody}>
-        <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
-        {mode === 'json' ? (
+        {category !== 'web-accounts' && (
+          <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
+        )}
+        {category === 'web-accounts' ? (
+          <div className="settings-layout">
+            <div className="settings-form">
+              <WebAccountSettings
+                accounts={webAccounts}
+                savedItems={snapshot.value.webApplets.items}
+                draftItems={draft.webApplets.items}
+              />
+            </div>
+          </div>
+        ) : mode === 'json' ? (
           <div className="json-editor">
             <div>
               <span>settings.json</span>
@@ -1647,7 +1685,11 @@ function SettingsPage({
               {category === 'web-applets' && (
                 <>
                   <h2>WebApplet</h2>
-                  <WebAppletSettings editor={editor} />
+                  <WebAppletSettings
+                    editor={editor}
+                    accounts={webAccounts}
+                    onAccounts={() => setCategory('web-accounts')}
+                  />
                 </>
               )}
               {category === 'ribbon' && (
@@ -1728,6 +1770,8 @@ function SettingsPage({
                     globalHotKeys={globalHotKeys}
                     tab={appletTab}
                     onTab={setAppletTab}
+                    webAccounts={webAccounts}
+                    onWebAccounts={() => setCategory('web-accounts')}
                   />
                 </>
               )}

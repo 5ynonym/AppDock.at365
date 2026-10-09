@@ -143,6 +143,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  webAccounts: import('./web-applets').WebProfile[];
   webPages: Record<string, import('./web-applets').WebPageState>;
   startupReady: boolean;
   windowVisible: boolean;
@@ -166,7 +167,10 @@ export interface GlobalHotKeyStatus {
 export interface DockApi {
   webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
-  clearWebAccount(id: string): Promise<void>;
+  clearWebAccount(id: string): Promise<boolean>;
+  createWebAccount(name: string): Promise<import('./web-applets').WebProfile>;
+  renameWebAccount(id: string, name: string): Promise<void>;
+  deleteWebAccount(id: string): Promise<false | 'deleted' | 'deferred'>;
   cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'host' | 'applets' | string): Promise<UpdateState>;

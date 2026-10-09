@@ -4,6 +4,9 @@ const api: DockApi = {
   webDefaults: (url) => ipcRenderer.invoke('dock:webDefaults', url),
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
   clearWebAccount: (id) => ipcRenderer.invoke('dock:clearWebAccount', id),
+  createWebAccount: (name) => ipcRenderer.invoke('dock:createWebAccount', name),
+  renameWebAccount: (id, name) => ipcRenderer.invoke('dock:renameWebAccount', id, name),
+  deleteWebAccount: (id) => ipcRenderer.invoke('dock:deleteWebAccount', id),
   cancelUpdates: () => ipcRenderer.invoke('dock:cancelUpdates'),
   onAppletPage: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, key: string | null) => callback(key);
