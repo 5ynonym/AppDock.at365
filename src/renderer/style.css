@@ -1976,11 +1976,37 @@ main {
 .extensions-layout {
   display: block;
 }
-.detail-actions {
+.detail-tabs {
+  display: flex;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
   margin-top: 20px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--raised);
 }
-.detail-settings-toggle {
-  min-width: 140px;
+.detail-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 7px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.detail-tabs button svg {
+  flex-shrink: 0;
+}
+.detail-tabs button[aria-selected='true'] {
+  color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 1px 4px #0002;
 }
 .applet-detail-main {
   scrollbar-gutter: stable;
@@ -2108,11 +2134,12 @@ summary {
   align-items: stretch;
 }
 .applet-detail-settings-main .detail-heading,
-.applet-detail-settings-main .detail-actions,
+.applet-detail-settings-main .detail-tabs,
 .detail-settings > .error-text {
   flex-shrink: 0;
 }
-.detail-settings {
+.detail-settings,
+.detail-logs {
   margin-top: 20px;
 }
 .applet-settings-toolbar > span {

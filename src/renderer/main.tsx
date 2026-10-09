@@ -41,6 +41,7 @@ declare global {
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
 type AppletSettingsTab = 'settings' | 'shortcuts';
+type AppletDetailView = 'description' | 'settings' | 'logs';
 type IconName =
   | 'home'
   | 'extensions'
@@ -242,7 +243,12 @@ function App() {
   const [webRequest, setWebRequest] = useState(0);
   const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
-  const [detailSettings, setDetailSettings] = useRestartView<boolean>('detailSettings', false);
+  const [detailView, setDetailView] = useRestartView<AppletDetailView>(
+    'detailView',
+    'description',
+    ['description', 'settings', 'logs'],
+  );
+  const detailSettings = detailView === 'settings';
   const [detailTab, setDetailTab] = useRestartView<AppletSettingsTab>('detailTab', 'settings', [
     'settings',
     'shortcuts',
@@ -252,7 +258,7 @@ function App() {
     // The retained detail view may be revisited after editing the shared JSON draft.
     if (page === 'extensions' && detailSettings && editor.mode === 'json') {
       if (!editor.switchToForm()) {
-        setDetailSettings(false);
+        setDetailView('description');
         setError('設定ページのJSONの内容を修正してから、Appletの設定を開いてください。');
       }
     }
@@ -428,7 +434,7 @@ function App() {
   }
   const goExtension = (id: string) => {
     setSelected(id);
-    setDetailSettings(false);
+    setDetailView('description');
     setDetailTab('settings');
     setPage('extensions');
   };
@@ -868,14 +874,17 @@ function App() {
                 <div className="extensions-layout">
                   <ExtensionDetail
                     extension={selectedApplet}
-                    onSettings={() => {
-                      if (editor.switchToForm()) setDetailSettings(true);
-                      else
+                    view={detailView}
+                    onView={(view) => {
+                      if (view === 'settings' && !editor.switchToForm()) {
                         setError(
                           '設定ページのJSONの内容を修正してから、Appletの設定を開いてください。',
                         );
+                        return false;
+                      }
+                      setDetailView(view);
+                      return true;
                     }}
-                    onDescription={() => setDetailSettings(false)}
                     settingsPanel={
                       detailSettings && selectedApplet ? (
                         <>
@@ -906,10 +915,16 @@ function App() {
                         </>
                       ) : undefined
                     }
-                    onLogs={(id) => {
-                      setLogSource(id);
-                      setPage('logs');
-                    }}
+                    logsPanel={
+                      detailView === 'logs' && selectedApplet ? (
+                        <LogsPage
+                          key={selectedApplet.id}
+                          snapshot={snapshot}
+                          run={action}
+                          source={selectedApplet.id}
+                        />
+                      ) : undefined
+                    }
                     busy={busy}
                     updateDisabled={editor.dirty}
                     run={action}
@@ -1142,16 +1157,16 @@ function ExtensionDetail({
   busy,
   updateDisabled,
   run,
-  onSettings,
-  onLogs,
-  onDescription,
+  view,
+  onView,
   settingsPanel,
+  logsPanel,
 }: {
   extension?: ExtensionSnapshot;
-  onSettings(): void;
-  onDescription(): void;
+  view: AppletDetailView;
+  onView(view: AppletDetailView): boolean;
   settingsPanel?: React.ReactNode;
-  onLogs(id: string): void;
+  logsPanel?: React.ReactNode;
   busy: boolean;
   updateDisabled: boolean;
   run: Run;
@@ -1186,24 +1201,69 @@ function ExtensionDetail({
           onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
         />
       </div>
-      <div className="actions detail-actions">
-        <button
-          className="secondary detail-settings-toggle"
-          onClick={settingsPanel ? onDescription : onSettings}
-        >
-          <Icon name="settings" />
-          {settingsPanel ? '説明に戻る' : '設定を開く'}
-        </button>
-        {!settingsPanel && (
-          <button className="text-button" onClick={() => onLogs(e.id)}>
-            ログを見る
+      <div className="detail-tabs" role="tablist" aria-label="Applet詳細の切り替え">
+        {(
+          [
+            { id: 'description', title: '説明', icon: 'extensions' },
+            { id: 'settings', title: '設定', icon: 'settings' },
+            { id: 'logs', title: 'ログ', icon: 'logs' },
+          ] as const
+        ).map((tab, index, tabs) => (
+          <button
+            key={tab.id}
+            id={`applet-detail-tab-${tab.id}`}
+            role="tab"
+            aria-selected={view === tab.id}
+            aria-controls="applet-detail-panel"
+            tabIndex={view === tab.id ? 0 : -1}
+            onClick={() => onView(tab.id)}
+            onKeyDown={(event) => {
+              const next =
+                event.key === 'ArrowRight'
+                  ? (index + 1) % tabs.length
+                  : event.key === 'ArrowLeft'
+                    ? (index + tabs.length - 1) % tabs.length
+                    : event.key === 'Home'
+                      ? 0
+                      : event.key === 'End'
+                        ? tabs.length - 1
+                        : undefined;
+              if (next === undefined) return;
+              event.preventDefault();
+              if (onView(tabs[next].id))
+                document.getElementById(`applet-detail-tab-${tabs[next].id}`)?.focus();
+            }}
+          >
+            <Icon name={tab.icon} size={16} />
+            {tab.title}
           </button>
-        )}
+        ))}
       </div>
       {settingsPanel ? (
-        <div className="detail-settings">{settingsPanel}</div>
+        <div
+          className="detail-settings"
+          id="applet-detail-panel"
+          role="tabpanel"
+          aria-labelledby="applet-detail-tab-settings"
+        >
+          {settingsPanel}
+        </div>
+      ) : logsPanel ? (
+        <div
+          className="detail-logs"
+          id="applet-detail-panel"
+          role="tabpanel"
+          aria-labelledby="applet-detail-tab-logs"
+        >
+          {logsPanel}
+        </div>
       ) : (
-        <>
+        <div
+          className="detail-description-panel"
+          id="applet-detail-panel"
+          role="tabpanel"
+          aria-labelledby="applet-detail-tab-description"
+        >
           <p className="detail-description">{e.description}</p>
           {e.minimumHostVersion && (
             <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
@@ -1348,7 +1408,7 @@ function ExtensionDetail({
               <p>{e.capabilities?.join(' · ') || 'なし'}</p>
             </div>
           </details>
-        </>
+        </div>
       )}
     </section>
   );
@@ -1972,7 +2032,7 @@ function LogsPage({
   snapshot: HostSnapshot;
   run: Run;
   source: string;
-  onSource(value: string): void;
+  onSource?(value: string): void;
 }) {
   const [filter, setFilter] = useState('');
   const [level, setLevel] = useState('all');
@@ -1984,18 +2044,13 @@ function LogsPage({
   );
   return (
     <>
-      <PageHeading
-        title="ログ"
-        action={
-          <button
-            className="secondary"
-            onClick={() => void run(() => window.dock.openPath('logs'))}
-          >
-            <Icon name="folder" size={16} />
-            保存先を開く
-          </button>
-        }
-      />
+      <div className="page-heading compact">
+        {onSource ? <h1>ログ</h1> : <h3>ログ</h3>}
+        <button className="secondary" onClick={() => void run(() => window.dock.openPath('logs'))}>
+          <Icon name="folder" size={16} />
+          保存先を開く
+        </button>
+      </div>
       <div className="log-toolbar">
         <Icon name="search" size={16} />
         <input
@@ -2004,24 +2059,26 @@ function LogsPage({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <select
-          aria-label="ログのApplet"
-          value={source}
-          onChange={(event) => onSource(event.target.value)}
-        >
-          <option value="">すべてのログ</option>
-          {[
-            ...new Set([
-              ...snapshot.extensions.map((e) => e.id),
-              ...snapshot.logs.map((entry) => entry.source),
-              ...(source ? [source] : []),
-            ]),
-          ].map((id) => (
-            <option key={id} value={id}>
-              {snapshot.extensions.find((e) => e.id === id)?.displayName ?? id}
-            </option>
-          ))}
-        </select>
+        {onSource && (
+          <select
+            aria-label="ログのApplet"
+            value={source}
+            onChange={(event) => onSource(event.target.value)}
+          >
+            <option value="">すべてのログ</option>
+            {[
+              ...new Set([
+                ...snapshot.extensions.map((e) => e.id),
+                ...snapshot.logs.map((entry) => entry.source),
+                ...(source ? [source] : []),
+              ]),
+            ].map((id) => (
+              <option key={id} value={id}>
+                {snapshot.extensions.find((e) => e.id === id)?.displayName ?? id}
+              </option>
+            ))}
+          </select>
+        )}
         <select aria-label="ログレベル" value={level} onChange={(e) => setLevel(e.target.value)}>
           <option value="all">すべてのレベル</option>
           <option value="info">Info</option>

@@ -190,6 +190,6 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
 - `AppletSettingsPanel.tsx`は「設定項目／ショートカットキー」の切替と既存`AppletSettings`/`ShortcutsEditor`をまとめます。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifest/設定JSONの追加はありません。
-- `ExtensionDetail`はヘッダーと共通の操作列を保ち、「設定を開く／説明に戻る」を同じ位置・同じsecondaryボタンで切り替えます。その下だけ説明と設定を描画します。スクロールバーの領域を両表示で確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログを見る操作は既存ログページへ移動します。別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
+- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定へ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択では説明へ戻ります。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
 - JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
-- 詳細設定はパネル内をスクロールし、保存操作と説明へ戻る操作は長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
+- 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。

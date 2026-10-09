@@ -393,7 +393,7 @@ async function remote(id) {
   );
   assert.equal((await snapshot()).webAccounts[0].name, '個人用（変更）');
   await dock.locator('[data-ribbon-id="extensions"]').click();
-  await dock.getByRole('button', { name: '設定を開く', exact: true }).click();
+  await dock.getByRole('tab', { name: '設定', exact: true }).click();
   assert.equal(await dock.locator('.web-account-row').count(), 0);
   await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
   await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
