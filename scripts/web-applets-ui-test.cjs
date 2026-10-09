@@ -374,7 +374,10 @@ async function remote(id) {
   assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), settingsBytes);
   assert.equal(JSON.parse(settingsBytes).webApplets.accounts, undefined);
   assert.equal(JSON.parse(fs.readFileSync(accountFile)).accounts[0].name, '個人用（変更）');
-  await dock.locator('.settings-categories [data-settings-owner="appdock"]').click();
+  await dock
+    .locator('.settings-categories')
+    .getByRole('button', { name: 'ショートカット', exact: true })
+    .click();
   assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
   await categories.getByRole('button', { name: /^Webアカウント/ }).click();
   await categories.getByRole('button', { name: /^WebApplet/ }).click();

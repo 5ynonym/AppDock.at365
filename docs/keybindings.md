@@ -37,3 +37,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 `dev.bat exec node scripts/keybindings-ui-test.cjs [win-unpacked EXE]`は隔離profile/local Applet/HTTP WebAppletで本体・埋め込み・別Window・ページ切替・実Windowsキー・非表示・一覧保存を確認する。Fキー単独の既存登録との競合を避け、Ctrl+Alt+F10を試験用に使う。競合時は製品動作と区別する。実Gmail認証を使わず、既存のapplet-pages-ui-testを併用してGmailのオフラインViewを確認する。
 
 実入力ヘルパーは押下中の修飾キーを解除せず、最大3秒待つ。専用GUIは非同期起動したヘルパーの`-ScanCode`でCtrl/Alt/F10をスキャンコードとして送り、Chromiumの合成入力より先に実OS入力を検証する。仮想キー送信が未到達になる試験環境で、この方式の実行を確認した。各押下/解放間に20ms置く。この試験用待機や方式を製品のショートカット処理へ持ち込まない。
+
+## 編集画面と表示順
+
+Applet個別のキー編集は詳細上部の「ショートカット」タブへ集約します。全体の設定ページではAppDockを先頭、以降をsettings.appletOrderに従うAppletグループとして表示し、提供元不明の保存済みコマンドは末尾の「未確認のコマンド」に残します。検索と割り当て状態のフィルターは全グループに適用します。Appletの並べ替えは表示だけで、keybindings配列や実行順を変更しません。各行の番号と実行順操作は従来の全体保存順を使います。両画面はuseSettingsEditorの下書き/JSON/revision/saveを共有します。

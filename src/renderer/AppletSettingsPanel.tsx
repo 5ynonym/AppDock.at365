@@ -8,7 +8,7 @@ import type { WebProfile } from '../shared/web-applets';
 import { useLayoutEffect, useRef } from 'react';
 import { resetAppletKeybindings } from '../shared/keybindings';
 
-/** Both pages render this panel against the same host editing session. */
+/** Separate detail tabs edit the same host settings session. */
 export function AppletSettingsPanel({
   applet,
   applets,
@@ -17,7 +17,6 @@ export function AppletSettingsPanel({
   commands,
   globalHotKeys,
   tab,
-  onTab,
   onWebAccounts,
   webAccounts,
 }: {
@@ -28,7 +27,6 @@ export function AppletSettingsPanel({
   commands: UiCommand[];
   globalHotKeys: GlobalHotKeyStatus[];
   tab: 'settings' | 'shortcuts';
-  onTab(tab: 'settings' | 'shortcuts'): void;
   onWebAccounts(): void;
   webAccounts: WebProfile[];
 }) {
@@ -39,22 +37,6 @@ export function AppletSettingsPanel({
   }, [applet.id, tab]);
   return (
     <div className="applet-settings-panel" ref={panel}>
-      <div className="tabs" aria-label="Applet設定の表示">
-        <button
-          aria-pressed={tab === 'settings'}
-          className={tab === 'settings' ? 'selected' : ''}
-          onClick={() => onTab('settings')}
-        >
-          設定項目
-        </button>
-        <button
-          aria-pressed={tab === 'shortcuts'}
-          className={tab === 'shortcuts' ? 'selected' : ''}
-          onClick={() => onTab('shortcuts')}
-        >
-          ショートカットキー
-        </button>
-      </div>
       {tab === 'settings' ? (
         applet.runtime === 'web' ? (
           <WebAppletSettings

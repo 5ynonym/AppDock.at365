@@ -85,7 +85,7 @@ const count = (page) =>
 const trayItems = () =>
   application.evaluate(() =>
     globalThis.testTrayMenu.items
-      .slice(0, -2)
+      .slice(0, -3)
       .flatMap((item) =>
         item.submenu
           ? item.submenu.items.map((child) => ({ label: child.label, enabled: child.enabled }))
@@ -131,28 +131,12 @@ const trayStructure = () =>
     assert.deepEqual(snapshot.settings.value.trayCommands, []);
     assert.equal(snapshot.settings.value.host.trayClickCommand, 'appdock.open');
     await page.keyboard.press('Control+,');
-    await page.getByLabel('設定するAppletを検索').fill('Applet.Tray.InternalName');
-    await page
-      .locator('.settings-applet-list')
-      .getByRole('button', { name: 'Tray Test', exact: true })
-      .click();
-    await page
-      .locator('.applet-settings-heading')
-      .getByRole('heading', { name: 'Tray Test', exact: true })
-      .waitFor();
-    await page.getByLabel('設定するAppletを検索').fill('Tray Test');
-    assert.equal(
-      await page
-        .locator('.settings-applet-list')
-        .getByRole('button', { name: 'Tray Test', exact: true })
-        .count(),
-      1,
-    );
+    assert.equal(await page.locator('.settings-applet-list').count(), 0);
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
     assert.equal(
       await page
-        .locator('[data-shortcut-command="test.tray.run"] .shortcut-meta span')
-        .textContent(),
+        .locator('[data-shortcut-command="test.tray.run"] .command-id')
+        .getAttribute('title'),
       'Tray Test',
     );
     assert.equal(
@@ -171,6 +155,7 @@ const trayStructure = () =>
       { 'Tray Test': ['トレイテストを実行'] },
       '---',
       '設定…',
+      'マウスジェスチャーを一時停止',
       '終了',
     ]);
     await page.screenshot({ path: path.join(profile, 'commands-1280.png') });
@@ -186,7 +171,7 @@ const trayStructure = () =>
         .getByLabel('トレイクリックのコマンド', { exact: true })
         .locator('option[value="test.tray.run"]')
         .textContent(),
-      'Tray Test / トレイテストを実行',
+      'トレイテストを実行 (test.tray.run)',
     );
     await page
       .getByLabel('トレイクリックのコマンド', { exact: true })
@@ -303,6 +288,7 @@ const trayStructure = () =>
       '終了',
       '---',
       '設定…',
+      'マウスジェスチャーを一時停止',
       '終了',
     ]);
     await application.evaluate(({ BrowserWindow }) => {
@@ -325,6 +311,7 @@ const trayStructure = () =>
       '終了',
       '---',
       '設定…',
+      'マウスジェスチャーを一時停止',
       '終了',
     ]);
     await page
@@ -334,7 +321,7 @@ const trayStructure = () =>
     await page.getByRole('checkbox', { name: '終了をトレイに表示', exact: true }).uncheck();
     await save(page);
     assert.deepEqual(await trayItems(), []);
-    assert.deepEqual(await trayStructure(), ['設定…', '終了']);
+    assert.deepEqual(await trayStructure(), ['設定…', 'マウスジェスチャーを一時停止', '終了']);
     console.log(
       JSON.stringify({
         ok: true,

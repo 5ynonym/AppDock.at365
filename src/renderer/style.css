@@ -1997,15 +1997,16 @@ main {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--raised);
+  overflow-x: auto;
 }
 .detail-tabs button {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
-  padding: 9px 12px;
+  padding: 9px 10px;
   border-radius: 7px;
   color: var(--muted);
   white-space: nowrap;
@@ -2092,22 +2093,6 @@ summary {
 .settings-layout {
   align-items: start;
 }
-.settings-applet-list {
-  border-top: 1px solid var(--border);
-  padding-top: 15px;
-}
-.settings-applet-list h3 {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-.settings-applet-list .sidebar-extensions {
-  margin-top: 16px;
-}
-.settings-applet-list p {
-  padding: 10px;
-  font-size: 12px;
-}
 .unsaved-mark {
   margin-left: auto;
   font-size: 9px;
@@ -2115,22 +2100,6 @@ summary {
 }
 .sidebar-extensions .unsaved-mark {
   color: #bd873a;
-}
-.applet-settings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.applet-settings-heading h3 {
-  margin: 0;
-  color: var(--text);
-  font-size: 18px;
-}
-.applet-settings-panel > .tabs {
-  margin-bottom: 20px;
 }
 .applet-detail-settings-main .extensions-layout,
 .applet-detail-settings-main .detail,
@@ -3065,4 +3034,120 @@ summary {
 .gesture-applet-picker label {
   display: flex;
   gap: 6px;
+}
+
+.applet-index-heading,
+.applet-reorder-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.applet-index-heading {
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.applet-index-heading h2 {
+  margin: 0;
+}
+.applet-reorder-toggle {
+  font-size: 11px;
+  color: var(--muted);
+}
+.applet-reorder-toggle .toggle {
+  flex-shrink: 0;
+}
+.applet-index-row {
+  min-width: 0;
+  border-radius: 7px;
+}
+.sidebar-extensions .applet-select {
+  width: 100%;
+}
+.reordering .applet-index-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar-extensions .applet-drag-handle {
+  display: block;
+  padding: 8px 2px;
+  cursor: grab;
+  font-size: 20px;
+}
+.sidebar-extensions .applet-drag-handle:active {
+  cursor: grabbing;
+}
+.applet-order-actions {
+  display: flex;
+}
+.sidebar-extensions .applet-order-actions button {
+  display: block;
+  padding: 6px;
+  font-size: 13px;
+}
+.applet-index-row.drop-target {
+  outline: 2px solid var(--accent);
+  background: var(--raised);
+}
+.applet-reorder-help {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 0;
+}
+.applet-reorder-help p,
+.applet-reorder-help small {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+}
+.applet-reorder-help button {
+  font-size: 11px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.shortcut-group {
+  margin: 24px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 0;
+}
+.shortcut-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+.shortcut-group-heading small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+.shortcut-group:not(:has(.shortcut-group-heading)) {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+@media (max-width: 800px) {
+  .detail-tabs {
+    gap: 2px;
+  }
+  .detail-tabs button {
+    gap: 4px;
+    padding: 9px 6px;
+    font-size: 11px;
+  }
 }

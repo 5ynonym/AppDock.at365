@@ -75,22 +75,18 @@ async function launch() {
     assert.ok((await ribbonIds('top')).includes('page:at365.gmail:gmail'));
     await button('設定').click();
     assert.equal(await dock.getByRole('button', { name: 'AppDockのキー', exact: true }).count(), 0);
-    assert.equal(
-      await dock
-        .locator('.settings-applet-list .sidebar-extensions button')
-        .first()
-        .locator('span')
-        .textContent(),
-      'AppDock',
-    );
+    assert.equal(await dock.locator('.settings-applet-list').count(), 0);
     await dock
-      .locator('.settings-applet-list')
-      .getByRole('button', { name: 'AppDock', exact: true })
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'ショートカット', exact: true })
       .click();
-    assert.ok((await dock.locator('.shortcut-row').count()) > 0);
-    await dock.getByLabel('設定するAppletを検索').fill('AppDock');
-    assert.equal(await dock.locator('.settings-applet-list .empty').count(), 0);
-    await dock.getByLabel('設定するAppletを検索').fill('');
+    assert.equal(
+      await dock.locator('.shortcut-group').first().getAttribute('data-shortcut-owner'),
+      'appdock',
+    );
+    assert.ok(
+      (await dock.locator('[data-shortcut-owner="appdock"] [data-shortcut-command]').count()) > 0,
+    );
     await dock
       .locator('.settings-categories')
       .getByRole('button', { name: 'リボン', exact: true })

@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-09: Applet設定の集約・独立ショートカットタブ・表示順（0.26.5）
+
+- Applet詳細を説明/設定/ショートカット/ログの4タブへ整理。設定ページのApplet別一覧と本体専用キー入口を削除し、全体キー一覧をAppDock→保存されたApplet順→提供元不明のグループにした。上部tablist/tab/tabpanelとキーボード循環、固定ログsource、未保存入力/JSON/revisionの共有を保持。
+- AppletIndexのトグルON中は全件表示・検索停止とし、ドラッグハンドル/上下ボタン/上下キーで共有draftのappletOrderを編集。全体保存/破棄に含め、再起動後も順を保持。WebAppletも対象、新規IDは末尾、不在IDは表示せず保存に保持。ホーム一覧/対象Applet候補も同じ順を使い、keybindingsの保存/実行順・起動順・ribbon.orderは変更しない。
+- main/renderer型検査、dev.bat testの166/166、Prettier、git diff --check、変更文書のローカルリンク95件成功。新規unitは旧設定の補完、ID検証、不在/新規IDと順変更、元配列とキーの実行順の保持を確認。通常環境のtypecheck成功を確認し、sandboxのpnpm供給網確認の待機は中断した。依存/lockfile/BATの変更なし。
+- ソースGUI: applet-order-1791548121973の4群、navigation-1791548125155の17群、applet-default-shortcuts-1791548134118の3群、web-applets-1791548134894の12群成功。ui-1791548270138（8群）、ribbon-layout-1791548272763（3群）、tray-ui-1791548315489も成功。旧入口のテストを新しい上部タブ/全体グループへ更新し、既存トレイ試験の固定ジェスチャーメニュー/完全ID表示の期待値も現行仕様へ修正した。フォーム/JSON/競合/破棄、停止中キー、設定action、ログ独立、Webアカウント/Gmail保存先、リボン/トレイの動作を確認。
+- dark/light、幅1280/900/700pxのPNGを保存し、900pxの並べ替えとグループ画面、700pxの4タブを目視確認。等分flexで長いショートカット名が窮屈になったため自然幅へ修正し、単行/非切れ/ヘッダー座標/横overflowの検証成功。
+- publish.bat終了0。AppDock.at365.exeは0.26.5、142514363 bytes、SHA256 `5d625c88e0e521f960d923604670bab894b753bcca73af30ff397f92e20cd502`。publish/update.jsonの版/size/hash一致（artifacts/applet-layout-publish-result-20261009.json）。既存0.26.2全体ZIPの個数/size/更新日時/hash不変。新版全体ZIPの作成/旧ZIP削除/未変更Appletの再発行はなし。
+- 実単一EXE: publishと同じSHA256の隔離コピーでscripts/applet-order-ui-test.cjsを実行し、artifacts/applet-order-1791548674214/result.jsonはok:true。実ドラッグ・上下キー・共有設定/キーの保存と破棄・WebApplet順・全体グループ・dark/light全3幅・完全終了/再起動/順保持の4群成功。NSISのchild inspector出力はPlaywright electron.launchへ流れないため、直接接続の初回試行は停止して今回のprofileに一致する試験プロセスだけを終了し、既存web-applets-portable-testと同じ隔離CDP方式へ試験を修正した。製品への検証用API追加なし。
+- README/DEVELOPMENT/ホスト開発/キー仕様/AGENTS/版ノートを更新。commit/push/GitHub Release/実利用deployは未実施。実利用中の設定・認証データは試験に使用していない。
+
 ## 2026-10-09: 通常publishとReleaseの分離・公開済みReleaseの3件保持（0.26.3）
 
 - ユーザー指定で実装→版更新→変更モジュールのpublishを通常フローとし、本体のdistからpack:all-in-oneを分離。Release Prepareにpack-all-in-one工程を追加し、全体ZIPの作成・検証とseal成功後の旧版ZIP整理をリリース準備へ移した。通常publishは本体EXE/update.jsonだけ、変更したAppletは各repoで発行する。

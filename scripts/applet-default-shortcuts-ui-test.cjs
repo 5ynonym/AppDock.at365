@@ -69,8 +69,12 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       await window.dock.saveSettings(current.settings.value, current.settings.revision);
       await window.dock.executeCommand('appdock.settings.open');
     });
-    await dock.getByRole('button', { name: '初期値テスト', exact: true }).click();
-    await dock.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
+    await dock.getByRole('button', { name: 'Applet', exact: true }).click();
+    await dock
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /初期値テスト/ })
+      .click();
+    await dock.getByRole('tab', { name: 'ショートカット', exact: true }).click();
     await dock.getByRole('button', { name: 'このAppletのショートカットを初期値に戻す' }).click();
     assert.equal(
       (await snapshot()).settings.value.keybindings.find(

@@ -15,6 +15,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  appletOrder: string[];
   gestures?: import('./gestures').GestureSettings;
   gestureDefaultsInitialized?: string[];
   keybindings?: import('./keybindings').Keybinding[];

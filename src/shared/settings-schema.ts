@@ -13,6 +13,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
+  appletOrder: [],
   gestures: defaultGestures(),
   gestureDefaultsInitialized: [],
   webApplets: { items: [], shortcutDefaults: defaultWebShortcutDefaults() },
@@ -106,6 +107,19 @@ export function parseSettings(value: unknown): Settings {
     )
       throw Error(`拡張設定 ${id} のページ表示方法が不正です。`);
   }
+  const appletOrder = value.appletOrder === undefined ? [] : value.appletOrder;
+  if (
+    !Array.isArray(appletOrder) ||
+    appletOrder.length > 500 ||
+    appletOrder.some(
+      (id) =>
+        typeof id !== 'string' ||
+        !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(id) ||
+        ['constructor', 'prototype', '__proto__'].includes(id),
+    ) ||
+    new Set(appletOrder).size !== appletOrder.length
+  )
+    throw Error('appletOrder は重複のないApplet IDの配列です。');
   const rawRibbon = value.ribbon === undefined ? defaultRibbon() : value.ribbon;
   const ribbon = object(rawRibbon)
     ? {
@@ -217,6 +231,7 @@ export function parseSettings(value: unknown): Settings {
     shortcuts,
     globalShortcutCommands,
     pinnedCommands,
+    appletOrder,
     ribbon,
     profile: { ...profile, name: profile.name.trim() },
   };
