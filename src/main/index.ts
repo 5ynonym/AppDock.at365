@@ -41,6 +41,13 @@ import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import {
+  getTrayMenu,
+  resolveTrayMenu,
+  trayCommandCatalog,
+  gesturePauseCommand,
+  type ResolvedTrayItem,
+} from '../shared/tray-menu';
+import {
   DEFAULT_DOUBLE_CLICK_TIME_MS,
   TrayClickDispatcher,
   readDoubleClickTime,
@@ -170,35 +177,30 @@ function trayMenu() {
     tray.setImage(nativeImage.createFromBitmap(pixels, { width: 20, height: 20 }));
   } else tray.setImage(icon);
   tray.setToolTip(attention ? 'AppDock.at365 — 新しい通知があります' : 'AppDock.at365');
-  const groups = trayCommandGroups(settings.value, allApplets());
-  const appletGroups = groups.filter((group) => group.extensionId !== null);
-  const builtins = groups.find((group) => group.extensionId === null)?.commands ?? [];
+  const applets = allApplets();
+  const entries = resolveTrayMenu(
+    getTrayMenu(settings.value, applets),
+    trayCommandCatalog(applets),
+  );
+  const template = (items: ResolvedTrayItem[]): Electron.MenuItemConstructorOptions[] =>
+    items.map((item) =>
+      item.type === 'separator'
+        ? { type: 'separator' }
+        : item.type === 'group'
+          ? { label: item.title!.replace(/&/g, '&&'), submenu: template(item.children!) }
+          : {
+              label: item.title!.replace(/&/g, '&&'),
+              enabled: item.enabled,
+              ...(item.command === gesturePauseCommand
+                ? { type: 'checkbox' as const, checked: gestures?.paused ?? false }
+                : {}),
+              click: () => runTrayCommand(item.command!),
+            },
+    );
   const menu = Menu.buildFromTemplate([
-    ...appletGroups.map((group) => ({
-      label: group.title,
-      submenu: group.commands.map((command) => ({
-        label: command.title,
-        enabled: command.enabled,
-        click: () => runTrayCommand(command.id),
-      })),
-    })),
-    ...(appletGroups.length ? [{ type: 'separator' as const }] : []),
-    ...builtins.map((command) => ({
-      label: command.title,
-      enabled: command.enabled,
-      click: () => runTrayCommand(command.id),
-    })),
-    ...(builtins.length ? [{ type: 'separator' as const }] : []),
+    ...template(entries),
+    ...(entries.length ? [{ type: 'separator' as const }] : []),
     { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
-    {
-      label: 'マウスジェスチャーを一時停止',
-      type: 'checkbox',
-      checked: gestures?.paused ?? false,
-      click: () => {
-        gestures?.togglePause();
-        trayMenu();
-      },
-    },
     { label: '終了', click: () => runTrayCommand('appdock.quit') },
   ]);
   menu.on('menu-will-show', () => trayClicks?.cancel());
@@ -232,6 +234,12 @@ function quitHost(restart = false) {
 }
 async function executeCommand(id: string, invocation?: GestureInvocation) {
   if (quitting) return;
+  if (id === gesturePauseCommand) {
+    gestures?.togglePause();
+    trayMenu();
+    changed();
+    return;
+  }
   if (id === 'appdock.restart' || id === 'appdock.quit') {
     quitHost(id === 'appdock.restart');
     return;
@@ -865,6 +873,7 @@ async function initialize() {
     ),
     [...manager.items.values()].map((item) => item.manifest),
   );
+  migrated.trayMenu = getTrayMenu(migrated, allApplets());
   if (JSON.stringify(migrated) !== JSON.stringify(settings.value))
     settings.save(migrated, settings.revision);
   await manager.reconcile();

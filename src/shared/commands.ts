@@ -4,6 +4,12 @@ export const hostCommands = [
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },
   { id: 'appdock.restart', title: '再起動', extension: 'AppDock', available: true },
+  {
+    id: 'appdock.gestures.togglePause',
+    title: 'マウスジェスチャーを一時停止／再開',
+    extension: 'AppDock',
+    available: true,
+  },
   { id: 'appdock.quit', title: '終了', extension: 'AppDock', available: true },
 ];
 export interface UiCommand extends Command {

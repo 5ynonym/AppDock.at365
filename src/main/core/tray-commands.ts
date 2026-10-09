@@ -55,6 +55,19 @@ export function withoutMissingSamples(
   next.globalShortcutCommands = next.globalShortcutCommands.filter((id) => !isRetired(id));
   next.pinnedCommands = next.pinnedCommands.filter((id) => !isRetired(id));
   next.trayCommands = next.trayCommands.filter((id) => !isRetired(id));
+  if (next.trayMenu)
+    next.trayMenu = next.trayMenu
+      .filter((item) => item.type !== 'command' || !isRetired(item.command))
+      .map((item) =>
+        item.type === 'group'
+          ? {
+              ...item,
+              children: item.children.filter(
+                (child) => child.type !== 'command' || !isRetired(child.command),
+              ),
+            }
+          : item,
+      );
   if (isRetired(next.host.trayClickCommand)) next.host.trayClickCommand = 'appdock.open';
   if (next.host.trayDoubleClickCommand && isRetired(next.host.trayDoubleClickCommand))
     next.host.trayDoubleClickCommand = null;

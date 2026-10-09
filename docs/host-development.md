@@ -139,15 +139,9 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 [panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDK既存コンストラクターは維持し、新機能のminimumHostVersionは0.6.0です。
 
-## v0.7.0のトレイコマンド
+## トレイコマンドとメニュー
 
-トレイのグループは`extensionId: null`でビルトイン、AppletのIDでAppletを区別します。表示名には依存せず、`index.ts`はAppletサブメニュー→ビルトインの最上位項目→固定の設定/終了の順で構成します。セパレータは空でない区画の末尾だけに追加し、先頭や連続したセパレータを防ぎます。選択済みの設定/終了コマンドもビルトイン区画に含み、固定の末尾2項目は維持します。
-
-表示可否はホスト設定`trayCommands`（既定`[]`）、クリック先は`host.trayClickCommand`（既定`appdock.open`）で管理します。`tray-commands.ts`はコマンドカタログとユーザーの選択からメニューを構成し、従来の`Tray.Add`はラベルの提案としてのみ参照します。設定保存・外部編集・Appletのコマンド置換・状態変更で再構成します。保存された未取得のIDは保持し、利用不可の宣言は無効表示、`activateOnExecute`は共通の実行経路を利用します。
-
-トレイ、IPC、グローバルキーはmainの`executeCommand`でホスト/Appletを振り分けます。`appdock.open`はウィンドウ表示、検索・設定はrenderer通知。トレイは`click`だけを処理し、`double-click`に追加の実行を登録しません。クリック先の失敗はログとウィンドウ表示で復旧し、固定の「設定…」「終了」で管理画面への入口を確保します。
-
-未インストールの旧サンプル設定はdiscover後に整理して既存の原子的な保存を使います。インストール済みfixtureとほかの未知コマンドは保持します。[回帰テスト](../tests/tray-commands.test.cjs)、[実トレイUIテスト](../scripts/tray-commands-ui-test.cjs)、完成EXEのsmokeで検証します。Applet API v1とSDKは変更しません。
+0.26.10以降の正本は[タスクトレイの設定とメニュー](tray-menu.md)。自由なグループと配置をtrayMenuへ保存し、旧trayCommandsは初回だけ移行します。設定/終了はホストが末尾固定し、一時停止/再開は通常の本体コマンドです。クリック判定は下記のv0.9.0の契約を維持します。
 
 ## v0.8.0の描画設定
 

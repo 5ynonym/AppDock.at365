@@ -18,6 +18,7 @@ import './style.css';
 import { hostCommands, rankCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
+import { TraySettings } from './TraySettings';
 import { ProfileEditor } from './ProfileEditor';
 import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { AppletIndex } from './AppletIndex';
@@ -1131,6 +1132,7 @@ function SettingsPage({
   } = editor;
   const [category, setCategory] = useRestartView<
     | 'appearance'
+    | 'tray'
     | 'general'
     | 'shortcuts'
     | 'gestures'
@@ -1141,6 +1143,7 @@ function SettingsPage({
     | 'web-accounts'
   >('category', 'appearance', [
     'appearance',
+    'tray',
     'general',
     'shortcuts',
     'gestures',
@@ -1158,35 +1161,51 @@ function SettingsPage({
   const changed = (part: unknown, original: unknown) =>
     JSON.stringify(part) !== JSON.stringify(original);
   const categoryChanged = (id: string) =>
-    id === 'gestures'
-      ? changed(draft.gestures, snapshot.value.gestures)
-      : id === 'web-accounts'
-        ? false
-        : id === 'web-applets'
-          ? changed(draft.webApplets.items, snapshot.value.webApplets.items)
-          : id === 'ribbon'
-            ? changed(draft.ribbon, snapshot.value.ribbon)
-            : id === 'about'
-              ? changed(draft.updates, snapshot.value.updates) ||
-                extensions.some(
-                  (e) =>
-                    draft.extensions[e.id]?.updateSource !==
-                    snapshot.value.extensions[e.id]?.updateSource,
-                )
-              : id === 'appearance'
-                ? draft.host.theme !== snapshot.value.host.theme
-                : id === 'general'
-                  ? changed({ ...draft.host, theme: '' }, { ...snapshot.value.host, theme: '' })
-                  : id === 'profile'
-                    ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-                    : id === 'shortcuts'
-                      ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
-                        changed(
-                          draft.globalShortcutCommands,
-                          snapshot.value.globalShortcutCommands,
-                        ) ||
-                        changed(draft.trayCommands, snapshot.value.trayCommands)
-                      : false;
+    id === 'tray'
+      ? changed(draft.trayMenu, snapshot.value.trayMenu) ||
+        draft.host.trayClickCommand !== snapshot.value.host.trayClickCommand ||
+        draft.host.trayDoubleClickCommand !== snapshot.value.host.trayDoubleClickCommand
+      : id === 'gestures'
+        ? changed(draft.gestures, snapshot.value.gestures)
+        : id === 'web-accounts'
+          ? false
+          : id === 'web-applets'
+            ? changed(draft.webApplets.items, snapshot.value.webApplets.items)
+            : id === 'ribbon'
+              ? changed(draft.ribbon, snapshot.value.ribbon)
+              : id === 'about'
+                ? changed(draft.updates, snapshot.value.updates) ||
+                  extensions.some(
+                    (e) =>
+                      draft.extensions[e.id]?.updateSource !==
+                      snapshot.value.extensions[e.id]?.updateSource,
+                  )
+                : id === 'appearance'
+                  ? draft.host.theme !== snapshot.value.host.theme
+                  : id === 'general'
+                    ? changed(
+                        {
+                          ...draft.host,
+                          theme: '',
+                          trayClickCommand: '',
+                          trayDoubleClickCommand: null,
+                        },
+                        {
+                          ...snapshot.value.host,
+                          theme: '',
+                          trayClickCommand: '',
+                          trayDoubleClickCommand: null,
+                        },
+                      )
+                    : id === 'profile'
+                      ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
+                      : id === 'shortcuts'
+                        ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
+                          changed(
+                            draft.globalShortcutCommands,
+                            snapshot.value.globalShortcutCommands,
+                          )
+                        : false;
   useEffect(() => {
     if (profileRequest) {
       setCategory('profile');
@@ -1225,6 +1244,7 @@ function SettingsPage({
                   ['web-applets', 'WebApplet'],
                   ['web-accounts', 'Webアカウント'],
                   ['general', '一般'],
+                  ['tray', 'タスクトレイ'],
                   ['shortcuts', 'ショートカット'],
                   ['gestures', 'マウスジェスチャー'],
                   ['profile', 'プロフィール'],
@@ -1466,57 +1486,17 @@ function SettingsPage({
                   </SettingRow>
                 </>
               )}
+              {category === 'tray' && (
+                <TraySettings
+                  draft={draft}
+                  extensions={extensions}
+                  commands={commands}
+                  onChange={edit}
+                />
+              )}
               {category === 'general' && (
                 <>
                   <h3>一般</h3>
-                  {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
-                    <SettingRow
-                      key={key}
-                      title={
-                        key === 'trayClickCommand'
-                          ? 'トレイクリックのコマンド'
-                          : 'トレイダブルクリックのコマンド'
-                      }
-                      description={
-                        key === 'trayClickCommand'
-                          ? 'トレイアイコンをクリックしたときに実行します。既定は「AppDockを開く」です。'
-                          : '既定は未設定です。割り当てると、シングルクリックはWindowsの判定時間だけ待機し、ダブルクリック時はこのコマンドだけを実行します。'
-                      }
-                    >
-                      <select
-                        aria-label={
-                          key === 'trayClickCommand'
-                            ? 'トレイクリックのコマンド'
-                            : 'トレイダブルクリックのコマンド'
-                        }
-                        value={draft.host[key] ?? ''}
-                        onChange={(event) =>
-                          edit({
-                            ...draft,
-                            host: { ...draft.host, [key]: event.target.value || null },
-                          })
-                        }
-                      >
-                        {key === 'trayDoubleClickCommand' && (
-                          <option value="">未設定（シングルクリックをすぐ実行）</option>
-                        )}
-                        {commands
-                          .filter((command) => !command.hidden || command.id === draft.host[key])
-                          .map((command) => (
-                            <option key={command.id} value={command.id}>
-                              {command.title} ({command.id})
-                              {command.available ? '' : '（現在利用できません）'}
-                            </option>
-                          ))}
-                        {draft.host[key] &&
-                          !commands.some((command) => command.id === draft.host[key]) && (
-                            <option value={draft.host[key]}>
-                              {draft.host[key]}（現在利用できません）
-                            </option>
-                          )}
-                      </select>
-                    </SettingRow>
-                  ))}
                   {(
                     [
                       [

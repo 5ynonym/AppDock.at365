@@ -932,3 +932,15 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 初回sandbox型検査はpnpmの供給網ポリシー確認で停止したため中断。通常Windows権限で同じ既存dev.batを再実行して成功。製品や依存設定を回避目的で変更していない。
 - 実GitHub/UNC取得、実利用先の更新、物理native確認操作は今回未検証。通常publishのみで本体EXE/feedを更新し、未変更Applet再発行/全体ZIP作成・整理/commit/push/Release/実利用deployなし。
 - ユーザーの動作確認: ユキちゃんが「うまくうごいてる」と確認し、今回の変更のコミットを依頼（2026-10-09）。上記の未コミット状態は検証時点の記録。
+
+
+## 2026-10-10: タスクトレイ設定と一時停止コマンド（0.26.10）
+
+- 実装: タスクトレイ専用カテゴリ、クリック/ダブルクリックの検索式選択、自由グループ/トップレベル/区切り線、ドラッグ/上下ボタン/キー/配置先変更、グループ解除時の子保持。設定/終了はホストが末尾固定。ショートカットのトレイチェックを撤去。appdock.gestures.togglePauseを共通の検索/キー/トレイ/クリック経路へ登録しチェック状態を同期。共有draft/JSON/revision/saveを維持。
+- 保存: trayMenuを正本とし旧trayCommandsは派生値。旧設定だけdiscover後に変換して原子的に保存、未知IDと明示空配列を保持。旧上限500コマンド＋500グループ＋一時停止も移行可能（新形式全項目上限1500）。
+- 最終型検査・ビルド・Prettier・git diff --check成功。回帰171/171成功（artifacts/tray-menu-regression.log）。更新文書のローカルリンク100件に欠落なし。
+- ソースGUI: tray-menu-ui-1791558765880で移行/不正名拒否/固定項目追加拒否/混在グループ/改名/区切り/移動/並べ替え/ドラッグ/共有draft/保存/破棄/停止コマンド保持/空配列/再起動を確認。実Tray構造とcallback、単/ダブルクリックの別実行、一時停止のIPC/メニュー/キー実行とチェック、利用不可クリック時のWindow復帰も成功。両テーマ、1280/1000/900幅のはみ出し/左揃えと画像を確認。
+- 既存GUI: navigation-1791558771295の17群、shortcuts-ui-1791558780461の7群（実Windows登録競合/解放/再試行を含む）、host-commands-1791558786125のrestart/quit/プロセス終了、gestures-ui-1791558788649の編集4群成功。ジェスチャーは明示UI-only、入力フックの実操作は今回再検証していない。
+- 初回sandbox回帰はTemp内renameのEPERM等で失敗。プロジェクト内TEMP/通常権限で再実行し最終成功。sandboxのpnpm supply-chain検証待ちは中断し、ローカルNodeと通常権限のdev.batで検証を完了。GUI試験の未保存マーク付きカテゴリの検索、停止snapshotから画面反映までの待機、追加コマンド分の旧件数期待値を修正。共通buttonスタイルによる中央寄せを修正し最終GUIへ反映。
+- publish.bat終了0。publish/AppDock.at365.exeは142527598 bytes、SHA256 020357ea0447823e66e53f411ac9d0d71199dec3c2c328d88210944d34bdb1ea。update.jsonの版0.26.10/size/hashと一致（artifacts/tray-menu-publish-result.json）。単一EXEのコピーによるtray-menu-ui-1791558966808はok:true、コピーhash一致。移行/全編集/保存/破棄/両テーマ3幅/停止時保持/空構成/再起動を確認。portableはCDP経由のrenderer検証、実Trayイベント検査はソース版で実施。
+- 既存AppDock.at365-all-in-one-0.26.2.zipはhash/size/mtimeMs不変（artifacts/tray-menu-bundles-before.json）。未変更Applet再発行、全体ZIP生成/整理、実利用deploy、commit/push/GitHub Releaseは実施していない。

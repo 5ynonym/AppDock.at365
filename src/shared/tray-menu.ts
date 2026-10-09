@@ -1,0 +1,134 @@
+import type { ExtensionSnapshot, Settings } from './contracts';
+import { hostCommands, validCommandId } from './commands';
+import { appletDisplayName } from './applet-display-name';
+
+export const gesturePauseCommand = 'appdock.gestures.togglePause';
+export const fixedTrayCommands = ['appdock.settings.open', 'appdock.quit'];
+// The legacy maximum is 500 commands; migration can also add 500 groups and the pause item.
+export const maximumTrayItems = 1500;
+export type TrayMenuLeaf =
+  { id: string; type: 'command'; command: string } | { id: string; type: 'separator' };
+export type TrayMenuItem =
+  TrayMenuLeaf | { id: string; type: 'group'; title: string; children: TrayMenuLeaf[] };
+
+export function parseTrayMenu(value: unknown): TrayMenuItem[] {
+  const ids = new Set<string>();
+  function parse(items: unknown, nested = false): TrayMenuItem[] {
+    if (!Array.isArray(items)) throw Error('trayMenu はメニュー項目の配列です。');
+    return items.map((item) => {
+      if (!item || typeof item !== 'object' || !validCommandId(item.id) || ids.has(item.id))
+        throw Error('トレイの項目IDは重複のない有効なIDにしてください。');
+      ids.add(item.id);
+      if (ids.size > maximumTrayItems)
+        throw Error(`トレイの項目は${maximumTrayItems}件以下にしてください。`);
+      const id = item.id as string;
+      if (item.type === 'separator') return { id, type: 'separator' };
+      if (
+        item.type === 'command' &&
+        validCommandId(item.command) &&
+        !fixedTrayCommands.includes(item.command)
+      )
+        return { id, type: 'command', command: item.command };
+      if (
+        item.type === 'group' &&
+        !nested &&
+        typeof item.title === 'string' &&
+        item.title.trim() &&
+        item.title.trim().length <= 80
+      )
+        return {
+          id,
+          type: 'group',
+          title: item.title.trim(),
+          children: parse(item.children, true) as TrayMenuLeaf[],
+        };
+      throw Error('トレイ項目を確認してください。グループは1段、設定と終了は末尾固定です。');
+    });
+  }
+  return parse(value);
+}
+
+export function trayMenuCommandIds(items: TrayMenuItem[]): string[] {
+  return [
+    ...new Set(
+      items.flatMap((item) =>
+        item.type === 'group'
+          ? trayMenuCommandIds(item.children)
+          : item.type === 'command'
+            ? [item.command]
+            : [],
+      ),
+    ),
+  ];
+}
+
+/** Resolve legacy opt-ins only when no layout exists; an explicit empty layout stays empty. */
+export function getTrayMenu(settings: Settings, extensions: ExtensionSnapshot[]): TrayMenuItem[] {
+  if (settings.trayMenu !== undefined) return settings.trayMenu;
+  const selected = new Set(settings.trayCommands.filter((id) => !fixedTrayCommands.includes(id)));
+  const items: TrayMenuItem[] = [];
+  let serial = 0;
+  const id = () => `tray.legacy.${++serial}`;
+  const command = (command: string): TrayMenuLeaf => {
+    selected.delete(command);
+    return { id: id(), type: 'command', command };
+  };
+  for (const extension of extensions) {
+    const commands = extension.commands.filter((c) => selected.has(c.id));
+    if (commands.length)
+      items.push({
+        id: id(),
+        type: 'group',
+        title: appletDisplayName(extension).slice(0, 80),
+        children: commands.map((c) => command(c.id)),
+      });
+  }
+  if (items.length) items.push({ id: id(), type: 'separator' });
+  for (const c of hostCommands) if (selected.has(c.id)) items.push(command(c.id));
+  for (const c of [...selected]) items.push(command(c));
+  if (!trayMenuCommandIds(items).includes(gesturePauseCommand))
+    items.push(command(gesturePauseCommand));
+  return items;
+}
+
+export interface ResolvedTrayItem {
+  id: string;
+  type: 'command' | 'separator' | 'group';
+  title?: string;
+  command?: string;
+  enabled?: boolean;
+  children?: ResolvedTrayItem[];
+}
+/** Shared by preview and native menu so unavailable commands and separators match. */
+export function resolveTrayMenu(
+  items: TrayMenuItem[],
+  commands: { id: string; title: string; available: boolean }[],
+): ResolvedTrayItem[] {
+  const catalog = new Map(commands.map((c) => [c.id, c]));
+  const result: ResolvedTrayItem[] = [];
+  for (const item of items) {
+    if (item.type === 'separator') {
+      if (result.length && result.at(-1)?.type !== 'separator') result.push(item);
+    } else if (item.type === 'group') {
+      const children = resolveTrayMenu(item.children, commands);
+      if (children.length) result.push({ ...item, children });
+    } else {
+      const c = catalog.get(item.command);
+      result.push({ ...item, title: c?.title ?? item.command, enabled: c?.available ?? false });
+    }
+  }
+  if (result.at(-1)?.type === 'separator') result.pop();
+  return result;
+}
+
+export function trayCommandCatalog(extensions: ExtensionSnapshot[]) {
+  return [
+    ...hostCommands,
+    ...extensions.flatMap((e) =>
+      e.commands.map((c) => ({
+        ...c,
+        title: e.tray.find((t) => t.command === c.id)?.title ?? c.title,
+      })),
+    ),
+  ];
+}

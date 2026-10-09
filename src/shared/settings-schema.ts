@@ -1,4 +1,5 @@
 import { parseKeybindings, withKeybindings } from './keybindings';
+import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, migrateGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
 import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
@@ -70,10 +71,16 @@ export function parseSettings(value: unknown): Settings {
     value.host.trayDoubleClickCommand === undefined ? null : value.host.trayDoubleClickCommand;
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
     throw new Error('host.trayDoubleClickCommand はコマンドIDまたはnullです。');
-  const trayCommands = value.trayCommands === undefined ? [] : value.trayCommands;
+  const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
+  const trayCommands =
+    trayMenu !== undefined
+      ? trayMenuCommandIds(trayMenu)
+      : value.trayCommands === undefined
+        ? []
+        : value.trayCommands;
   if (
     !Array.isArray(trayCommands) ||
-    trayCommands.length > 500 ||
+    trayCommands.length > (trayMenu === undefined ? 500 : maximumTrayItems) ||
     trayCommands.some((id) => !validCommandId(id)) ||
     new Set(trayCommands).size !== trayCommands.length
   )
@@ -228,6 +235,7 @@ export function parseSettings(value: unknown): Settings {
     extensions: value.extensions,
     host: { ...value.host, trayClickCommand, trayDoubleClickCommand, hardwareAcceleration },
     trayCommands,
+    ...(trayMenu === undefined ? {} : { trayMenu }),
     shortcuts,
     globalShortcutCommands,
     pinnedCommands,
