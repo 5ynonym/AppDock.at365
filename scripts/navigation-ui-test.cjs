@@ -365,11 +365,11 @@ const checks = [];
     assert.equal(await page.locator('.settings-applet-list').count(), 0);
     assert.equal(
       await page.locator('.shortcut-group-heading h3').first().textContent(),
-      'AppDock6件',
+      'AppDock7件',
     );
     assert.equal(
       await page.locator('[data-shortcut-owner="appdock"] .keybindings-table tbody tr').count(),
-      6,
+      7,
     );
     checks.push(
       'owner scope / cross-applet shared keys / status filters / unknown commands / host keys',

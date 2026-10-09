@@ -28,6 +28,7 @@ export interface Settings {
   shortcuts: Record<string, string[]>;
   globalShortcutCommands: string[];
   trayCommands: string[];
+  trayMenu?: import('./tray-menu').TrayMenuItem[];
   pinnedCommands: string[];
   ribbon: { order: string[]; hidden: string[]; bottom: string[]; separators: string[] };
   profile: { name: string; avatar: 'avatar.png' | null };

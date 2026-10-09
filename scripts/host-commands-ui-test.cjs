@@ -120,6 +120,8 @@ let output = '';
       return page;
     }
     let page = await connect(1);
+    // Startup may migrate older settings; subsequent restarts must preserve that result.
+    const migratedSettings = fs.readFileSync(settingsFile, 'utf8');
     const originalHost = events()[0].host;
     const originalWorker = events()[0].worker;
     await page.keyboard.press('Control+p');
@@ -136,7 +138,7 @@ let output = '';
       ['start', 'stop', 'start'],
     );
     assert.notEqual(events()[2].host, originalHost);
-    assert.equal(fs.readFileSync(settingsFile, 'utf8'), JSON.stringify(settings));
+    assert.equal(fs.readFileSync(settingsFile, 'utf8'), migratedSettings);
     // Concurrent requests must schedule only one relaunch. Saved settings apply on startup.
     await page.evaluate(async () => {
       const snapshot = await window.dock.snapshot();

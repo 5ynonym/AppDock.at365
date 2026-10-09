@@ -406,22 +406,6 @@ export function ShortcutsEditor({
                         {['appdock.quit', 'appdock.restart'].includes(command.id) && (
                           <small>終了・再起動より後の処理は実行されません。</small>
                         )}
-                        <label className="keybinding-tray">
-                          <input
-                            type="checkbox"
-                            aria-label={`${command.title}をトレイに表示`}
-                            checked={settings.trayCommands.includes(command.id)}
-                            onChange={(e) =>
-                              onChange({
-                                ...settings,
-                                trayCommands: e.target.checked
-                                  ? [...new Set([...settings.trayCommands, command.id])]
-                                  : settings.trayCommands.filter((id) => id !== command.id),
-                              })
-                            }
-                          />
-                          トレイに表示
-                        </label>
                       </td>
                       <td>
                         <input
