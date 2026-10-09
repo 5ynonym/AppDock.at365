@@ -28,6 +28,7 @@ function fixture(t) {
     corruptUpload: false,
     uploadFailure: false,
     tag: '',
+    olderReleases: [],
   };
   const run = (exe, args) => {
     state.calls.push([exe, ...args]);
@@ -42,8 +43,19 @@ function fixture(t) {
       if (args[0] === 'api') {
         if (args.at(-1).endsWith('/commits/main'))
           return JSON.stringify({ sha: state.remoteCommit });
-        if (args.includes('--slurp')) return JSON.stringify([state.release ? [state.release] : []]);
+        if (args.includes('--slurp'))
+          return JSON.stringify([state.release ? [state.release, ...state.olderReleases] : []]);
+        if (args.includes('DELETE')) {
+          if (state.retentionFailure) throw Error('simulated retention failure');
+          const id = Number(args.at(-1).split('/').at(-1));
+          assert.ok(state.olderReleases.some((item) => item.id === id));
+          state.olderReleases = state.olderReleases.filter((item) => item.id !== id);
+          return '';
+        }
+        if (args[1].endsWith('/releases/latest')) return JSON.stringify(state.release);
         if (args[1].endsWith('/releases/42')) return JSON.stringify(state.release);
+        const older = state.olderReleases.find((item) => args[1].endsWith(`/releases/${item.id}`));
+        if (older) return JSON.stringify(older);
       }
       if (args[0] === 'release') {
         if (args[1] === 'create') {
@@ -55,6 +67,7 @@ function fixture(t) {
             body: fs.readFileSync(notes, 'utf8'),
             draft: true,
             prerelease: false,
+            published_at: '2026-10-09T00:00:00Z',
             assets: [],
             html_url: 'https://github.com/fixture/release',
           };
@@ -195,4 +208,120 @@ test('version update increases stable version and leaves other package data unch
   assert.deepEqual(read(path.join(root, 'package.json')), { version: '1.3.0' });
   assert.throws(() => release.setVersion('1.2.9'), /must increase/);
   assert.throws(() => release.setVersion('2.0.0-beta.1'), /stable/);
+});
+
+test('successful release preparation removes only older stable bundles in publish', (t) => {
+  const { root, release, planPath, archive } = fixture(t);
+  const publish = path.join(root, 'publish');
+  const old = ['AppDock.at365-all-in-one-0.26.2.zip', 'AppDock.at365-all-in-one-1.2.2.zip'];
+  const keep = [
+    'AppDock.at365-all-in-one-1.10.0.zip',
+    'AppDock.at365-all-in-one-2.0.0.zip',
+    'AppDock.at365-all-in-one-1.0.0-beta.1.zip',
+    'AppDock.at365-all-in-one-01.0.0.zip',
+    'other-1.0.0.zip',
+    'update.zip',
+  ];
+  for (const name of [...old, ...keep]) fs.writeFileSync(path.join(publish, name), name);
+  const nested = path.join(publish, 'nested/AppDock.at365-all-in-one-1.0.0.zip');
+  fs.mkdirSync(path.dirname(nested));
+  fs.writeFileSync(nested, 'nested');
+  const directory = path.join(publish, 'AppDock.at365-all-in-one-0.0.1.zip');
+  fs.mkdirSync(directory);
+  const backup = path.join(root, 'artifacts/previous-all-in-one.zip');
+  fs.writeFileSync(backup, 'backup');
+  const current = asset(archive);
+  release.seal(planPath);
+  assert.deepEqual(read(planPath).removedOldBundles.sort(), old.sort());
+  for (const name of old) assert.equal(fs.existsSync(path.join(publish, name)), false);
+  for (const name of keep) assert.equal(fs.readFileSync(path.join(publish, name), 'utf8'), name);
+  assert.deepEqual(asset(archive), current);
+  assert.equal(fs.readFileSync(nested, 'utf8'), 'nested');
+  assert.equal(fs.statSync(directory).isDirectory(), true);
+  assert.equal(fs.readFileSync(backup, 'utf8'), 'backup');
+});
+
+test('failed preparation or changed bundle preserves older packages', (t) => {
+  const { root, release, planPath, archive } = fixture(t);
+  const old = path.join(root, 'publish/AppDock.at365-all-in-one-1.2.2.zip');
+  fs.writeFileSync(old, 'last complete package');
+  const checks = path.join(root, 'artifacts/checks.json');
+  save(
+    checks,
+    CHECKS.filter((name) => name !== 'pack-all-in-one'),
+  );
+  assert.throws(() => release.seal(planPath), /All checks/);
+  assert.equal(fs.readFileSync(old, 'utf8'), 'last complete package');
+  save(checks, CHECKS);
+  fs.appendFileSync(archive, 'changed after verification');
+  assert.throws(() => release.seal(planPath), /Bundle changed/);
+  assert.equal(fs.readFileSync(old, 'utf8'), 'last complete package');
+  assert.equal(read(planPath).phase, 'preparing');
+});
+
+test('release cleanup refuses a redirected publish directory', (t) => {
+  const { root, release, planPath } = fixture(t);
+  const publish = path.join(root, 'publish');
+  const redirected = path.join(root, 'redirected');
+  const oldName = 'AppDock.at365-all-in-one-1.2.2.zip';
+  fs.writeFileSync(path.join(publish, oldName), 'keep');
+  fs.renameSync(publish, redirected);
+  fs.symlinkSync(redirected, publish, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.throws(() => release.seal(planPath), /Publish cannot be a link/);
+  assert.equal(fs.readFileSync(path.join(redirected, oldName), 'utf8'), 'keep');
+  assert.equal(read(planPath).phase, 'preparing');
+});
+
+test('remote retention starts only after public downloads and application update verification', async (t) => {
+  const { root, state, release, planPath } = fixture(t);
+  state.olderReleases = [1, 2, 3, 4].map((id) => ({
+    id,
+    tag_name: `v0.${id}.0`,
+    draft: false,
+    prerelease: false,
+    published_at: `2026-10-0${id}T00:00:00Z`,
+    assets: [],
+  }));
+  release.seal(planPath);
+  await release.remote('draft', planPath, 'gh');
+  await release.remote('publish', planPath, 'gh');
+  state.tag = `${state.commit}\trefs/tags/v1.2.3`;
+  const deletes = () => state.calls.filter((args) => args.includes('DELETE'));
+  assert.equal(deletes().length, 0);
+  let badDownload = true;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.endsWith('/latest')) return Response.json({ id: 42 });
+    const file = path.join(root, 'publish', url.split('/').at(-1));
+    return new Response(badDownload ? 'corrupt' : fs.readFileSync(file));
+  });
+  await assert.rejects(release.remote('verify', planPath, 'gh'));
+  assert.equal(deletes().length, 0);
+  const updaterPath = path.join(root, 'out/main/main/core/portable-updates.js');
+  const settingsPath = path.join(root, 'out/main/shared/settings-schema.js');
+  fs.mkdirSync(path.dirname(updaterPath), { recursive: true });
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(
+    updaterPath,
+    `exports.PortableUpdates = class { async check() { return { results: [{ status: 'available', latestVersion: '1.2.3', installable: true }] }; } };`,
+  );
+  fs.writeFileSync(settingsPath, 'exports.createDefaultSettings = () => ({ updates: {} });');
+  badDownload = false;
+  state.retentionFailure = true;
+  await assert.rejects(release.remote('verify', planPath, 'gh'), /simulated retention failure/);
+  assert.equal(
+    read(planPath).phase,
+    'verified',
+    'Cleanup failure must not undo successful verification',
+  );
+  assert.equal(read(read(planPath).retentionReport).phase, 'failed');
+  assert.equal(state.olderReleases.length, 4);
+  state.retentionFailure = false;
+  await release.remote('verify', planPath, 'gh');
+  assert.equal(read(planPath).phase, 'verified');
+  assert.deepEqual(
+    state.olderReleases.map((item) => item.id),
+    [3, 4],
+  );
+  assert.equal(deletes().length, 3, 'One failed cleanup attempt, then two successful deletions');
+  assert.equal(read(read(planPath).retentionReport).phase, 'complete');
 });

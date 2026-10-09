@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.26.2",
+  "version": "0.26.3",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -16,7 +16,7 @@
     "build:dotnet": "node scripts/build-dotnet.cjs",
     "build:updater": "node scripts/build-updater.cjs",
     "pack:update": "node scripts/pack-update.cjs",
-    "dist": "pnpm run dist:host && pnpm run pack:all-in-one",
+    "dist": "pnpm run dist:host",
     "dist:host": "pnpm run build:dotnet && pnpm run build:updater && pnpm run build && node scripts/build-portable.cjs && node scripts/pack-update.cjs host publish/AppDock.at365.exe publish",
     "pack:all-in-one": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-all-in-one.ps1",
     "smoke": "node scripts/smoke.cjs",

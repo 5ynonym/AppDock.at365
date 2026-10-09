@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.26.2はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.1は本体ページと別ウィンドウの両方に対応します。
+0.26.3はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.1は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 
@@ -57,7 +57,7 @@ Applet画面と設定画面の左側の一覧は、同じ背景・余白・選�
 
 ## オールインワン版
 
-`AppDock.at365-all-in-one-<本体の版>.zip`には、単一EXEのAppDock本体と、発行時に同梱した全Appletが入っています。ZIP全体を新しい書き込み可能なフォルダーへ展開し、`AppDock.at365.exe`を起動してください。AppletはEXEの隣の`extensions`に配置済みなので、使いたいものを一覧から有効にできます。初期状態はすべて無効です。.NET 10 Runtimeなど、本体・各Appletの動作要件は通常版と同じです。
+AppDockのGitHub Releaseに添付する`AppDock.at365-all-in-one-<本体の版>.zip`には、単一EXEのAppDock本体と、リリース時に同梱した全Appletが入っています。ZIP全体を新しい書き込み可能なフォルダーへ展開し、`AppDock.at365.exe`を起動してください。AppletはEXEの隣の`extensions`に配置済みなので、使いたいものを一覧から有効にできます。初期状態はすべて無効です。.NET 10 Runtimeなど、本体・各Appletの動作要件は通常版と同じです。
 
 同梱したAppletの版は`bundle.json`で確認できます。このファイルは配布時の一覧で、導入後の個別更新には追従しません。既存環境の更新には、本体・Appletの更新ボタンを利用してください。オールインワンZIPを既存フォルダーへ重ねて展開すると、個別に更新したAppletを古い版へ戻す場合があります。
 

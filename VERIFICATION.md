@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-09: 通常publishとReleaseの分離・公開済みReleaseの3件保持（0.26.3）
+
+- ユーザー指定で実装→版更新→変更モジュールのpublishを通常フローとし、本体のdistからpack:all-in-oneを分離。Release Prepareにpack-all-in-one工程を追加し、全体ZIPの作成・検証とseal成功後の旧版ZIP整理をリリース準備へ移した。通常publishは本体EXE/update.jsonだけ、変更したAppletは各repoで発行する。
+- 追加指定のGitHub整理は公開後Verifyの成功保存後に共通release-retention.cjsで実行。公開日時順で最新3件の公開済みReleaseを保持し、古いRelease/assetだけを削除する。draft・Gitタグ/履歴は保持。全ページ取得、候補/保持対象/latestの再照合、削除前後と応答不明状態の記録を実装。Appletは公開後検証結果を保存して共通コマンドを実行する手順へ統一。
+- 関連回帰: release.test.cjs/release-retention.test.cjsの16/16成功。既存all-in-one.test.cjsの隔離Git repoによる再発行/失敗時保持等の1件も成功。旧ZIPの数値版比較・新版/新しい版/別名/ネスト/backup保持・publishのjunction拒否、公開検証失敗時の削除抑止、整理失敗時もverified保持、3件以下/ページ分割/draft/対象変化/通信断の再開を確認。GitHubと公開ダウンロードはfixture。最終ログはartifacts/release-split-tests-20261009.log。
+- 初回sandboxのfixtureはTEMPのGit書込/rename拒否で失敗。通常環境の隔離試験で成功。その後A:内TEMPで既存plan更新に一時的なEPERMが1件発生したため、既定TEMPで再実行し全件成功。製品のrename処理は変更していない。発行完了前の先行照合では旧feedの版不一致を検出し、終了0後の正式照合で解消した。
+- SetVersionで0.26.2→0.26.3、README整合、型検査・ビルド・publish.bat終了0。単一EXEは142506046 bytes、SHA256 `c1b7181a7721248232ceca1fd82219f265bf78dfae55d21e036ae801ed486664`、update.jsonと一致。全Appletのpublishと既存ZIPの計34ファイルは発行前後で一覧/size/SHA256/更新日時一致。0.26.3全体ZIPは未生成、既存0.26.2 ZIPは保持。証跡artifacts/publish-scope-before-20261009.json、publish-scope-result-20261009.json、publish-split-20261009.log、publish-split-typecheck-20261009.log。
+- 発行済み単一EXEの隔離smoke成功（artifacts/smoke-1791543109263、publish-split-smoke-20261009.log）。起動/保存先/プロフィール/トレイ等を確認。正式Prepare・実GitHub公開/削除・実利用deploy・commitは行っていない。releaseスクリプトは配布EXEに収録されないため、公開整理の追加後に同じ製品を再発行する必要はない。
+- 共通30.PROJECT/AGENTS、本体AGENTS/DEVELOPMENT/README/all-in-one/RELEASINGとALICEの継続記録を新方針へ更新。前項の「通常発行後に旧ZIP整理」という当初指定は、この追加指定によりリリース時だけの実施へ変更。
+
+## 2026-10-09: publishの旧版オールインワンZIP整理
+
+- ユーザー指定で、新版の配置・検証成功後にpublish直下の旧版オールインワンZIPを削除する手順をAGENTS.mdとdocs/all-in-one.mdへ記録。発行失敗時は旧版保持。作業手順の整備であり、発行スクリプト・アプリ実装・版は変更していない。
+- 現行0.26.2のpackage.json/update.json/ZIP内bundle.jsonの版一致、EXEのsize/SHA256、ZIPの安全なパス・重複拒否・全21ファイルのsize/SHA256・同梱本体の一致を再確認。全6Applet収録。実行結果は`artifacts/publish-zip-cleanup-20261009.json`。
+- 0.23.0〜0.26.1の旧版ZIP9個を削除し、残存ZIPが`AppDock.at365-all-in-one-0.26.2.zip`だけであることを確認。アプリの変更・再発行・起動試験・commit・公開・実利用deployは行っていない。
+
 ## 2026-10-09: Applet別ショートカット初期値と一括初期化（0.25.2）
 
 - `extension.json`の宣言コマンドだけを初期割り当てに指定できるようにし、初回発見時だけ設定へ追加。Gmail 0.9.1はCtrl+Tab/Ctrl+Shift+Tabをowner条件、Watch 0.1.2はPauseをglobal条件で宣言。本体のApplet固有既定値は除去。既存設定・ユーザーが解除した行を再追加せず、Applet詳細の一括初期化は対象Appletの行だけを下書きで置換する。
