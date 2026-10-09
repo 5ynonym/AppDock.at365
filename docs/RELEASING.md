@@ -1,6 +1,26 @@
 # AppDockのGitHub Release手順
 
-この文書をリリースの正本とします。ユーザーから「バージョンアップして一緒にリリースして」と依頼されたら、版・変更範囲を確認し、以下を最後まで実施します。単なるビルドや手順整備では公開しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
+この文書をリリースの正本とします。ユーザーからAppDockのリリースを依頼されたら、本体とフルパッケージに同梱したAppletを下記の範囲でまとめて扱い、各repoの公開後検証と整理まで実施します（2026-10-10ユーザー指定）。単なるビルドや手順整備では公開しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
+
+## 本体と同梱Appletをまとめてリリース
+
+作業者が次の全工程を一つのリリース作業として実施します。`scripts/release.ps1`は本体用のPrepare/Draft/Publish/Verifyであり、同梱Appletの個別公開は[Applet個別Release](#applet個別release)の手順を併せて行います。単一のスクリプト呼出しで全repoが公開されると扱わないでください。
+
+| 対象 | 判定と操作 | 添付する配布物 |
+| --- | --- | --- |
+| AppDock | 現行版が未公開ならPrepareから公開・検証。本体版が公開済みなら再作成・上書き・版更新をしない | 単一EXE、update.json、全体ZIP |
+| 全体ZIPの各Applet | 同梱した版が自身のrepoで未公開なら、その同梱版を個別公開・検証。公開済み同版はskip | update.zip、update.json |
+| 今回公開した全repo | 各repoの公開後検証が成功してから、公開日時順で最新3件を保持して古いRelease/assetを削除 | draft・Gitタグ/履歴は保持 |
+
+1. 本体版とGitHubの公開Release/タグを確認します。本体版が未公開なら下記の本体Prepareを実行し、固定した全体ZIPと`bundle.json`のApplet一覧（repository/id/version/commit/updateZipSha256）を公開対象の正本にします。Applet数や名前を固定リストにしません。
+2. 本体版がすでに公開済みの場合は、その公開ZIPと検証済みbundle/planを使います。公開EXE/feed/ZIPのhashと検証済み資料の一致を確認し、未公開Appletのために同版の本体を再ビルド・再公開しません。資料がなければ公開ZIPを隔離して取得・照合し、同梱版を確認します。最新checkoutが同梱版と異なる場合は混ぜず、新しい本体版のフルパッケージを準備するか、差を報告して止めます。
+3. 全同梱Appletのorigin・GitHub main・既存タグ・公開Releaseを読み取ります。同梱manifestの版が公開済みなら、当該タグの公開配布物のID/版を確認してskipと記録します。最新版がローカルより新しい場合や同版の内容/タグが不一致なら、ダウングレードや上書きで合わせず停止します。無関係なrepoやWebAppletのサイト項目は公開対象にしません。
+4. 未公開の各Appletについて、そのrepoの指示・既存検証を確認し、cleanな対象commit/main、ノート、manifest/feedのID/版/最低ホスト版、ZIP全収録ファイルのsize/hashを検証します。同梱の`updateZipSha256`と元update.zip、bundle中の各ファイルとの一致を必須とし、同梱版をそのまま使います。再発行でhashや内容が変われば本体Prepareへ戻します。同梱だけでApplet版を増やしません。
+5. 未公開本体と未公開Appletの下書き/全asset照合を完了してから順番に公開します。各Appletは下記の個別Release手順を使い、既存の一致するdraftは不足assetだけを追加して再利用します。既存の公開済みassetには`--clobber`を使わず、タグを移動しません。
+6. 本体はVerify、各Appletは匿名feed/ZIP取得とsize/hash、実`PortableUpdates.check()`の個別/一括結果（同梱版がavailable/installable）まで確認します。repoごとに公開/検証/整理/skipを記録します。新版が必要とする本体版を先に公開し、Appletが本体更新を待つ関係も確認します。実インストールやdeployは別です。
+7. 今回公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。ユキちゃんは2026-10-10にこの整理を今後も毎回行うことを継続承認しています。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
+
+この工程は製品の起動・通常publishで自動実行する処理ではありません。複数repoの公開は一括トランザクションではないため、一部の公開/検証が失敗しても他repoの公開成功を取り消したり隠したりしません。
 
 本体Releaseには必ず次の3ファイルを添付します。GitHubが自動生成するSource code ZIPは実行用配布物ではありません。
 
@@ -131,13 +151,15 @@ Release Prepareの`pack:all-in-one`が毎回全対象を列挙するため、6�
 
 ## Applet個別Release
 
-本体のReleaseスクリプトは全体ZIPを作りますが、Applet repoのReleaseまで無条件に作りません。変更/公開を依頼されたAppletは、そのrepoの指示に従って版更新・テスト・publishを行い、clean mainをpushします。manifestと更新JSON、ZIPの全ファイル、size/SHA256を確認し、以下の既存手順を適用します。
+AppDockのリリース作業では、全体ZIPに同梱した版が自身のrepoで未公開のAppletをこの手順で公開します。公開済み同版のAppletはskipします。Appletだけを指定してリリースする場合も、そのrepoの指示と検証に従います。実装時に版更新・テスト・publish済みの同梱版を使い、必要ならclean mainをpushします。公開のためだけに版を重ねて増やしません。manifestと更新JSON、ZIPの全ファイル、size/SHA256を確認し、以下の既存手順を適用します。
 
 ```powershell
 # 各変数は対象Appletの確認済み値。実行前に既存タグ/Releaseを確認する。
 & $taskGh release create $taskTag $taskZip $taskFeed --repo $taskAppletRepo `
   --target $taskCommit --title $taskTitle --notes-file $taskAppletNotes --draft
-& $taskGh api "repos/$taskAppletRepo/releases/tags/$taskTag"
+& $taskGh api --paginate --slurp "repos/$taskAppletRepo/releases?per_page=100"
+# tag_nameで対象を一意に選択し、Release IDで再取得する。
+# draftは公開タグ用のREST endpointから取得できない場合がある。
 # target、draft=true、ノート、update.zip/update.jsonのstate/size/digestを照合。
 # すべて成功した場合だけ実行する。
 & $taskGh release edit $taskTag --repo $taskAppletRepo --draft=false --latest

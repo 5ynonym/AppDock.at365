@@ -42,7 +42,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 - バージョン更新・リリースを依頼されたら、作業前に[docs/RELEASING.md](docs/RELEASING.md)を読む。手順書を正本とし、過去チャットや.artifactsだけに依存しない。
 - 「バージョンアップして一緒にリリースして」という依頼は、その変更の検証・配布物作成・対象mainのpush・タグ/Release作成・アセット添付・公開後確認までの指示として扱う。対象や版が不明なら必要な点だけ確認する。単なる文書整備・ビルドの依頼で公開しない。
-- リリースは依頼範囲の版更新済みモジュールを各GitHub Releaseへ公開する。AppDock本体は単一EXEを維持し、通常EXE、update.json、全ローカルAppletを拡張として配置したオールインワンZIPを同じ本体Releaseへ含める。Applet個別のReleaseは各repoのupdate.zip/update.jsonを使い、本体Releaseだけで未変更Appletの個別Releaseまで作らない。
+- AppDockのリリース依頼は本体と同梱Appletをまとめて扱う（2026-10-10ユーザー指定）。本体版が未公開なら単一EXE/update.json/全ローカルApplet入りZIPを本体Releaseへ公開する。同梱Appletの版が自身のrepoで未公開なら同梱版のupdate.zip/update.jsonをそのrepoへ公開・検証する。本体・Appletとも公開済み同版は再作成・上書きしない。同梱だけの版更新は不要。本体が公開済みでも検証済みbundleの一覧から未公開Appletを判定して続行できる。各repoの公開後検証と最新3件への整理まで完了し、skip/公開/失敗を個別記録する。単なる通常publishでは公開しない。詳細は[まとめてリリース](docs/RELEASING.md#本体と同梱appletをまとめてリリース)。
 - プロジェクト内のNode/pnpmを使う。既存のpublish.bat・更新JSON仕様・Applet個別更新を維持する。公開済みアセット/タグを自動上書きしない。
 - `scripts/release.ps1`のPrepareでビルド・テスト・配布物検証を完了させ、Draftで全アセットを照合してからPublishへ進む。失敗時は非公開のまま停止し、手順書の復旧手順に従う。公開リクエストの結果が不明なら再作成せず状態を確認する。
 - GUI試験は直列・隔離profileで行う。実利用設定・認証データは配布物へ入れない。
