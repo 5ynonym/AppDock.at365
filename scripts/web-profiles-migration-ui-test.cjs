@@ -6,9 +6,9 @@ const fs = require('node:fs'),
 const { randomUUID, createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const legacyExe = path.resolve(
-  process.argv[2] || path.join(root, 'artifacts/web-account-legacy-0.24/win-unpacked/AppDock.at365.exe'),
+  process.argv[2] || path.join(root, '.artifacts/web-account-legacy-0.24/win-unpacked/AppDock.at365.exe'),
 );
-const profile = path.join(root, 'artifacts', `web-profile-migration-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `web-profile-migration-${Date.now()}`);
 const account = { id: `account.${randomUUID()}`, name: '0.24.0の枠' },
   id = `web.${randomUUID()}`;
 const file = path.join(profile, 'settings.json'),

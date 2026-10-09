@@ -2,7 +2,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'artifacts', 'dotnet-host');
+const output = path.join(root, '.artifacts', 'dotnet-host');
 function run(args) {
   const result = spawnSync('dotnet', args, { cwd: root, stdio: 'inherit', windowsHide: true });
   if (result.error) throw result.error;
@@ -12,7 +12,7 @@ function run(args) {
 if (
   fs.existsSync(output) &&
   path.relative(fs.realpathSync(root), fs.realpathSync(output)).toLowerCase() !==
-    path.join('artifacts', 'dotnet-host')
+    path.join('.artifacts', 'dotnet-host')
 )
   throw new Error('.NET publish output must be inside this project: ' + output);
 fs.rmSync(output, { recursive: true, force: true });

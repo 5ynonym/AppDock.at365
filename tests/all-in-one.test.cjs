@@ -6,7 +6,7 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
-const helper = path.join(root, 'artifacts/updater/AppDock.Updater.exe');
+const helper = path.join(root, '.artifacts/updater/AppDock.Updater.exe');
 
 test(
   'all-in-one uses fresh packages and preserves the last archive on invalid inputs',
@@ -47,8 +47,8 @@ test(
     init(applet);
     fs.mkdirSync(path.join(host, 'scripts'));
     fs.mkdirSync(path.join(host, 'publish'));
-    fs.mkdirSync(path.join(host, 'artifacts/updater'), { recursive: true });
-    fs.copyFileSync(helper, path.join(host, 'artifacts/updater/AppDock.Updater.exe'));
+    fs.mkdirSync(path.join(host, '.artifacts/updater'), { recursive: true });
+    fs.copyFileSync(helper, path.join(host, '.artifacts/updater/AppDock.Updater.exe'));
     fs.copyFileSync(
       path.join(root, 'scripts/build-all-in-one.ps1'),
       path.join(host, 'scripts/build-all-in-one.ps1'),

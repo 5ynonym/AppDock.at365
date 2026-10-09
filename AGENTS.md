@@ -10,13 +10,13 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## 開発・発行・配置の注意
 
-- 実装・修正の作業完了時は、必要なテストと発行物の動作確認がすべて成功した後、[テストフォルダーの整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)を行う（2026-10-10ユーザー指定）。終了・成功を確認できる古いテスト専用フォルダーだけを対象とし、種類ごとに直近3回分を残す。実行中・状態不明・未解決の失敗記録・旧版移行用資料・固定ビルド出力・Release記録は削除しない。名前や経過日数だけで削除せず、安全確認できないものは保持して報告する。整理結果を検証記録へ残す。これは作業者の完了手順であり、通常publishや製品起動へ自動削除を追加する指示ではない。`artifacts`の改名と同期/バックアップ除外設定は別途依頼まで行わない。
+- 実装・修正の作業完了時は、必要なテストと発行物の動作確認がすべて成功した後、[テストフォルダーの整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)を行う（2026-10-10ユーザー指定）。終了・成功を確認できる古いテスト専用フォルダーだけを対象とし、種類ごとに直近3回分を残す。実行中・状態不明・未解決の失敗記録・旧版移行用資料・固定ビルド出力・Release記録は削除しない。名前や経過日数だけで削除せず、安全確認できないものは保持して報告する。整理結果を検証記録へ残す。これは作業者の完了手順であり、通常publishや製品起動へ自動削除を追加する指示ではない。開発生成物の保存先は`.artifacts`（2026-10-10に`artifacts`から改名）。同期/バックアップ/スナップショットの設定はユキちゃんが担当する。
 - 完成した本体の実装・修正は、Release前でもバージョンをインクリメントして`publish.bat`を実行し、`publish`へ発行する。通常の修正はパッチ番号を上げ、指定版を優先する。同じ変更の発行再試行・検証用再発行・リリースでは重ねて増やさず、同梱だけの未変更Appletの版は上げない。版更新は[リリース手順](docs/RELEASING.md)のSetVersionでpackage.jsonを更新し、README等の現行版記載も揃える。ユキちゃんの動作確認場所なので、開発ビルドだけで完了にしない。通常publishは本体単一EXEとupdate.jsonだけを生成し、終了コード・成果物の整合・発行版の隔離起動を確認する。変更したAppletはそのrepoで版更新・publishを行う。オールインワンZIP作成・未変更Appletの再発行・旧版ZIP整理は通常publishに含めず、AppDockのリリース時だけ行う。調査/計画/文書だけ、または明示的な発行不要指定は除く。commit・公開・実利用deployは別の指示に従う。
 - Node/pnpmはtoolchain.jsonの版を.toolsへ配置してdev.bat経由で使う。pnpm 12の導入ではinstall.jsとWindows shimの再生成が必要。Electron取得は既存のpostinstall/setup手順に従う。依存更新時は初回導入と再実行も確認する。
 - node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
 - build-main.cjsはout/mainを再生成する。GUI試験や再起動の最中にビルドを重ねない。発行完了後の固定した配布物を使い、検証コピーと最終EXEのSHA256を照合する。
 - 本体の単一EXEとportableの展開先/Tray IDの安定性を維持する。scripts/build-portable.cjs・portable.nsiの展開mutex/lease、子プロセスの寿命、hProc形式のHANDLE変換を保つ。electron-builder更新時はcustom templateとの連携と実EXEの更新/再起動/同時起動/異常終了を確認する。
-- オールインワンZIPの作成・旧版整理はAppDockのリリース時だけ行う（2026-10-09ユーザーの追加指定）。Release Prepareは通常publish後に全Appletを再発行・同梱し、全チェックと新版ZIP/本体の整合検証成功後、sealでpublish直下の`AppDock.at365-all-in-one-<version>.zip`のうち新版より古い正式版を削除する。削除名はplanのremovedOldBundlesへ記録する。生成・配置・検証に失敗した場合は旧版を残す。別のZIP、ディレクトリ/リンク、`artifacts`、GitHub Releaseへこの削除ルールを適用しない。詳細は[オールインワン作成](docs/all-in-one.md#publishの旧版zip整理)。
+- オールインワンZIPの作成・旧版整理はAppDockのリリース時だけ行う（2026-10-09ユーザーの追加指定）。Release Prepareは通常publish後に全Appletを再発行・同梱し、全チェックと新版ZIP/本体の整合検証成功後、sealでpublish直下の`AppDock.at365-all-in-one-<version>.zip`のうち新版より古い正式版を削除する。削除名はplanのremovedOldBundlesへ記録する。生成・配置・検証に失敗した場合は旧版を残す。別のZIP、ディレクトリ/リンク、`.artifacts`、GitHub Releaseへこの削除ルールを適用しない。詳細は[オールインワン作成](docs/all-in-one.md#publishの旧版zip整理)。
 - 同じ版のオールインワンZIPの置換はstage内のprevious-all-in-one.zipをbackupとして指定する。null backupで既存ファイルの削除に失敗する実例があり、失敗時に旧ZIPを保持する既存の回帰試験と発行先での実置換を確認する。実利用先deploy時の退避不要という指定とは区別する。
 - .NET SDK/Runtime・プロセス契約を変えたらnative AppletのRelease buildと接続/停止/表示/保存も確認する。runtimeconfig欠落は発行元・EXE内・実展開先を比較して原因を切り分ける。
 - deployは依頼範囲で実施し、発行成功と実利用先への配置を区別する。ユーザー指定によりdeploy.batの配置先は同期/変更履歴で復元できるため、旧EXE等の別フォルダー退避を追加しない。配置ハッシュと設定保持は確認する。この指定を自己更新helperの復旧用backupへ流用しない。
@@ -40,7 +40,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## リリース
 
-- バージョン更新・リリースを依頼されたら、作業前に[docs/RELEASING.md](docs/RELEASING.md)を読む。手順書を正本とし、過去チャットやartifactsだけに依存しない。
+- バージョン更新・リリースを依頼されたら、作業前に[docs/RELEASING.md](docs/RELEASING.md)を読む。手順書を正本とし、過去チャットや.artifactsだけに依存しない。
 - 「バージョンアップして一緒にリリースして」という依頼は、その変更の検証・配布物作成・対象mainのpush・タグ/Release作成・アセット添付・公開後確認までの指示として扱う。対象や版が不明なら必要な点だけ確認する。単なる文書整備・ビルドの依頼で公開しない。
 - リリースは依頼範囲の版更新済みモジュールを各GitHub Releaseへ公開する。AppDock本体は単一EXEを維持し、通常EXE、update.json、全ローカルAppletを拡張として配置したオールインワンZIPを同じ本体Releaseへ含める。Applet個別のReleaseは各repoのupdate.zip/update.jsonを使い、本体Releaseだけで未変更Appletの個別Releaseまで作らない。
 - プロジェクト内のNode/pnpmを使う。既存のpublish.bat・更新JSON仕様・Applet個別更新を維持する。公開済みアセット/タグを自動上書きしない。
@@ -50,7 +50,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## Applet追加
 
-- 新しいAppletはAppDockの親フォルダー直下の独立Gitリポジトリに置き、ルートに`extension.json`と`publish.bat`を用意する。既存の6件を固定リストとして扱わない。
+- 新しいAppletはAppDockの親フォルダー直下の独立Gitリポジトリに置き、ルートに`extension.json`と`publish.bat`を用意する。開発/テスト生成物は`.artifacts`へ保存しGit除外する（既存Appletも2026-10-10に改名済み）。同期/バックアップ設定はユキちゃんが担当する。既存の6件を固定リストとして扱わない。
 - publish.batはビルドに失敗したら非0終了とし、共通`scripts/pack-applet-update.ps1`で、そのAppletの`publish/update.json`と`publish/update.zip`を生成する。manifestのIDは一意にし、版・minimumHostVersion・entryを正しく記載する。
 - AppDockのRelease Prepareのpack-all-in-oneはこれらのrepoを自動検出するため、名前一覧の追記は不要。追加したAppletは自身のpublishで確認し、AppDockリリース時に[オールインワン作成](docs/all-in-one.md)の検査と展開起動で収録を確認する。探索範囲外のrepoは勝手に無視せず、配置または明示のAppletRootを整える。
 - READMEは利用者向け、開発/発行手順はDEVELOPMENT/docs、実測結果と未確認事項はVERIFICATIONへ記録する。BATはCP932/CRLFを保つ。

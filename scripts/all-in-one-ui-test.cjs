@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const version = require('../package.json').version;
 const archive = path.join(root, `publish/AppDock.at365-all-in-one-${version}.zip`);
 const archiveSha256 = createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
-const profile = path.join(root, 'artifacts', `bundle-verify-${randomUUID()}`);
+const profile = path.join(root, '.artifacts', `bundle-verify-${randomUUID()}`);
 const extracted = spawnSync(
   'powershell.exe',
   [

@@ -2,7 +2,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `smoke-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `smoke-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const portable = !!process.argv[2];
 const clockApplet = process.argv[3] ? path.resolve(process.argv[3]) : null;

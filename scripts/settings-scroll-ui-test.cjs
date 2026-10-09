@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `settings-scroll-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `settings-scroll-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(createDefaultSettings()));

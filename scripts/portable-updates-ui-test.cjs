@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
 const hostVersion = require('../package.json').version;
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `portable-updates-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `portable-updates-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
 fs.copyFileSync(path.join(root, 'publish/AppDock.at365.exe'), executable);
@@ -37,7 +37,7 @@ for (const [id, enabled] of [
   ]) {
     fs.mkdirSync(folder, { recursive: true });
     if (enabled) {
-      fs.cpSync(path.join(root, 'artifacts/test-extensions/dotnet-demo'), folder, {
+      fs.cpSync(path.join(root, '.artifacts/test-extensions/dotnet-demo'), folder, {
         recursive: true,
       });
       const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'extension.json')));

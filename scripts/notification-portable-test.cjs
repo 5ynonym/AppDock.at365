@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const { notificationProtocol } = require('../out/main/main/core/notification-routing');
 const root = path.resolve(__dirname, '..');
 const source = path.resolve(process.argv[2] || path.join(root, 'publish/AppDock.at365.exe'));
-const profile = path.join(root, 'artifacts', `notification-portable-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `notification-portable-${Date.now()}`);
 const sha256 = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const powershell = (code) => {
   try {

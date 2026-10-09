@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `keybindings-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `keybindings-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.keys');
 fs.mkdirSync(fixture, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();

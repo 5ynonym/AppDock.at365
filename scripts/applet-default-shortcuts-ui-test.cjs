@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `applet-default-shortcuts-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `applet-default-shortcuts-${Date.now()}`);
 const folder = path.join(profile, 'extensions', 'test.defaults');
 fs.mkdirSync(folder, { recursive: true });
 fs.writeFileSync(path.join(folder, 'index.js'), 'exports.activate = async () => {};');

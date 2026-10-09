@@ -515,7 +515,7 @@ async function initialize() {
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
   const helperPath = app.isPackaged
     ? path.join(process.resourcesPath, 'updater', 'AppDock.Updater.exe')
-    : path.join(app.getAppPath(), 'artifacts', 'updater', 'AppDock.Updater.exe');
+    : path.join(app.getAppPath(), '.artifacts', 'updater', 'AppDock.Updater.exe');
   if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) {
     try {
       execFileSync(helperPath, ['--recover', baseDirectory], { windowsHide: true });
@@ -538,7 +538,7 @@ async function initialize() {
     nodeWorker: path.join(__dirname, 'node-worker.js'),
     dotnetHost: app.isPackaged
       ? path.join(process.resourcesPath, 'dotnet-host')
-      : path.join(app.getAppPath(), 'artifacts', 'dotnet-host'),
+      : path.join(app.getAppPath(), '.artifacts', 'dotnet-host'),
     api: createHostApi(
       settings,
       dataDirectory,
@@ -613,7 +613,7 @@ async function initialize() {
   });
   const hotKeyHost = app.isPackaged
     ? path.join(process.resourcesPath, 'dotnet-host', 'AppDock.ExtensionHost.exe')
-    : path.join(app.getAppPath(), 'artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
+    : path.join(app.getAppPath(), '.artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
   hotKeys = new GlobalHotKeyManager(
     new WindowsHotKeyBackend(
       hotKeyHost,

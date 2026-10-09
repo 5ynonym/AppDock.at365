@@ -12,7 +12,7 @@ const server = http.createServer((req, res) =>
   res.end('<h1>Gesture web fixture</h1><input aria-label="Web入力">'),
 );
 const root = path.resolve(__dirname, '..'),
-  profile = path.join(root, 'artifacts', `gestures-ui-${Date.now()}`);
+  profile = path.join(root, '.artifacts', `gestures-ui-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.gestures');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(

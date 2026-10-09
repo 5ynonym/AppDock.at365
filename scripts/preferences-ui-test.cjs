@@ -4,7 +4,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
-const profile = path.join(root, 'artifacts', `preferences-${Date.now()}`);
+const profile = path.join(root, '.artifacts', `preferences-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
 const legacy = createDefaultSettings();

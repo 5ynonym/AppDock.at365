@@ -5,7 +5,7 @@ if (-not $AppletRoot) { $AppletRoot = Split-Path $taskRoot -Parent }
 $AppletRoot = [IO.Path]::GetFullPath($AppletRoot)
 $taskPublish = Join-Path $taskRoot 'publish'
 $taskVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'package.json') -Raw | ConvertFrom-Json).version
-$taskHelper = Join-Path $taskRoot 'artifacts\updater\AppDock.Updater.exe'
+$taskHelper = Join-Path $taskRoot '.artifacts\updater\AppDock.Updater.exe'
 
 function Read-Json([string]$File) { Get-Content -LiteralPath $File -Raw -Encoding UTF8 | ConvertFrom-Json }
 function File-Hash([string]$File) {
@@ -60,7 +60,7 @@ $taskApplets = @(foreach ($taskDirectory in (Get-ChildItem -LiteralPath $AppletR
 })
 if ($taskApplets.Count -eq 0) { throw "No Applet repositories found in $AppletRoot" }
 
-$taskStage = Join-Path $taskRoot ('artifacts\all-in-one-' + [guid]::NewGuid().ToString('N'))
+$taskStage = Join-Path $taskRoot ('.artifacts\all-in-one-' + [guid]::NewGuid().ToString('N'))
 $taskPackage = Join-Path $taskStage 'package'
 New-Item -ItemType Directory -Path (Join-Path $taskPackage 'extensions') -Force | Out-Null
 Copy-Item -LiteralPath $taskHostExe -Destination (Join-Path $taskPackage 'AppDock.at365.exe')

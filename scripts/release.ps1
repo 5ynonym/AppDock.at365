@@ -22,7 +22,7 @@ if ($Mode -eq 'SetVersion') {
 }
 if ($Mode -eq 'Prepare') {
     if (-not $NotesFile) { throw 'Prepare requires -NotesFile (reviewed release notes).' }
-    if (-not $PlanPath) { $PlanPath = Join-Path $taskRoot ('artifacts\release-' + [guid]::NewGuid().ToString('N') + '\plan.json') }
+    if (-not $PlanPath) { $PlanPath = Join-Path $taskRoot ('.artifacts\release-' + [guid]::NewGuid().ToString('N') + '\plan.json') }
     $PlanPath = [IO.Path]::GetFullPath($PlanPath)
     Invoke-Node @($taskCore, 'preflight', $PlanPath, [IO.Path]::GetFullPath($NotesFile))
     $taskLogRoot = Split-Path $PlanPath -Parent

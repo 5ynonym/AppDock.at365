@@ -1,7 +1,7 @@
 node_modules/
 .tools/
 publish/
-artifacts/
+.artifacts/
 out/
 .appdock/
 settings.json

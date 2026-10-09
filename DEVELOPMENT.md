@@ -82,7 +82,7 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
-`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
 `build`は`scripts/build-main.cjs`で生成済みの`out/main`を整理してからTypeScriptをコンパイルします。削除したモジュールが次の配布物に残ることを防ぎます。React/Viteも`out/renderer`を再生成します。設定の読み込み・保存は定義済みのトップレベル項目のみを返し、Applet固有の`extensions.<id>.settings`は保持します。
 
@@ -110,22 +110,22 @@ tests/                     設定・通信・実プロセスの回帰テスト
 scripts/                   ビルドと実機UI/portable検証
 ```
 
-テストは専用の一時フォルダ／`artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Node・C#の検証用拡張は `build:test-extensions` で `artifacts/test-extensions` に生成し、UIテストの専用プロファイルにだけ配置します。通常のビルド・発行・起動では読み込みません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
+テストは専用の一時フォルダ／`.artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Node・C#の検証用拡張は `build:test-extensions` で `.artifacts/test-extensions` に生成し、UIテストの専用プロファイルにだけ配置します。通常のビルド・発行・起動では読み込みません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
 
 ### 作業完了時のテストフォルダー整理
 
 実装・修正に必要なテストと、発行した固定EXEの動作確認がすべて成功した後、作業者が以下を行います。リリースまで待たず、各作業の完了手順として実施します。調査・手順書だけの変更でテストを行っていない場合は、整理対象なしで構いません。
 
-1. テストスクリプトの出力先と結果形式を確認し、`artifacts`直下のテスト専用フォルダーを列挙します。`smoke-<timestamp>`や`navigation-<timestamp>`などの名前は候補の抽出にだけ使います。
+1. テストスクリプトの出力先と結果形式を確認し、`.artifacts`直下のテスト専用フォルダーを列挙します。`smoke-<timestamp>`や`navigation-<timestamp>`などの名前は候補の抽出にだけ使います。
 2. 結果JSON・ログ・既存の検証記録から、そのフォルダーの試験が終了し成功したことを確認します。結果形式は試験ごとに異なります。終了だけでは成功と扱わず、成功の証拠がないもの、失敗記録があるもの、調査中のものは保持します。解決済みの失敗記録の整理は別途判断します。
 3. 同じテストスクリプト・実行方式ごとに、確認済みの成功分を実行日時順に並べ、直近3回分を残します。それより古い成功分だけを削除候補にします。移行試験用の旧版EXE、今後使うfixture、検証記録から再利用を指定された資料は候補から除きます。
 4. テストランナーと起動したElectron/.NET子プロセスが終了し、ほかの作業・チャットで使用されていないことを確認します。候補のパスを参照する実行中プロセスがないことも確認し、確認権限不足や状態不明なら保持します。
-5. 削除直前に絶対パスと対象を再確認します。対象は当該repoの`artifacts`直下にある通常のテスト専用ディレクトリに限定します。対象と配下にjunction・シンボリックリンク等の再解析ポイントがある場合は除外し、repo外へたどりません。PowerShellの`Remove-Item -LiteralPath`など同じシェル内で処理し、使用中や削除失敗時は強制終了・制限迂回をせず残します。
+5. 削除直前に絶対パスと対象を再確認します。対象は当該repoの`.artifacts`直下にある通常のテスト専用ディレクトリに限定します。対象と配下にjunction・シンボリックリンク等の再解析ポイントがある場合は除外し、repo外へたどりません。PowerShellの`Remove-Item -LiteralPath`など同じシェル内で処理し、使用中や削除失敗時は強制終了・制限迂回をせず残します。
 6. 残す直近分と保護対象が保持され、削除対象がなくなったことを確認します。削除名・件数、保持したものの理由、未実施や失敗を`VERIFICATION.md`の当該作業記録へ簡潔に残します。
 
-`dotnet-host`、`updater`、`test-extensions`、`node-extensions`などの固定ビルド出力、`release-*`、`all-in-one-*`、単独の調査ファイルは、この手順の削除対象に含めません。`artifacts`全体への再帰削除や、更新日時だけを使った一括削除は行いません。publishの旧版ZIP整理・GitHub Release保持数とは別の手順です。
+`dotnet-host`、`updater`、`test-extensions`、`node-extensions`などの固定ビルド出力、`release-*`、`all-in-one-*`、単独の調査ファイルは、この手順の削除対象に含めません。`.artifacts`全体への再帰削除や、更新日時だけを使った一括削除は行いません。publishの旧版ZIP整理・GitHub Release保持数とは別の手順です。
 
-この手順は通常publishや製品起動に自動削除を追加するものではありません。`.artifacts`への改名と同期・バックアップ・スナップショットの除外設定は、別途依頼されるまで変更しません。
+この手順は通常publishや製品起動に自動削除を追加するものではありません。開発生成物の保存先は2026-10-10に本体と各Appletで`artifacts`から`.artifacts`へ改名しました。既存の検証記録内の旧`artifacts/`パスは当該repoの`.artifacts/`へ読み替えてください。保存済みJSON/ログにある実行当時の絶対パスやハッシュは履歴として保持し、旧planを無条件に再実行せず、再開前にパス・phase・実状態を照合します。同期・バックアップ・スナップショットの設定はユキちゃんが担当します。
 
 ## 配置
 

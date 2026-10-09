@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.26.11",
+  "version": "0.26.12",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -58,11 +58,11 @@
     ],
     "extraResources": [
       {
-        "from": "artifacts/updater/AppDock.Updater.exe",
+        "from": ".artifacts/updater/AppDock.Updater.exe",
         "to": "updater/AppDock.Updater.exe"
       },
       {
-        "from": "artifacts/dotnet-host",
+        "from": ".artifacts/dotnet-host",
         "to": "dotnet-host"
       },
       {
