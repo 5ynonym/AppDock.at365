@@ -34,6 +34,8 @@ import {
   resolveKeybindings,
 } from '../shared/keybindings';
 import { ShortcutDispatcher } from './core/shortcut-dispatcher';
+import { GestureManager, type GestureInvocation } from './core/gestures';
+import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
@@ -121,6 +123,7 @@ let webApplets: WebAppletManager;
 const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
+let gestures: GestureManager | undefined;
 let shortcutRecording = false;
 let windowState: WindowStateStore | undefined;
 let restoreMaximized = false;
@@ -187,6 +190,15 @@ function trayMenu() {
     })),
     ...(builtins.length ? [{ type: 'separator' as const }] : []),
     { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
+    {
+      label: 'マウスジェスチャーを一時停止',
+      type: 'checkbox',
+      checked: gestures?.paused ?? false,
+      click: () => {
+        gestures?.togglePause();
+        trayMenu();
+      },
+    },
     { label: '終了', click: () => runTrayCommand('appdock.quit') },
   ]);
   menu.on('menu-will-show', () => trayClicks?.cancel());
@@ -218,7 +230,7 @@ function quitHost(restart = false) {
   quitting = true;
   app.quit();
 }
-async function executeCommand(id: string) {
+async function executeCommand(id: string, invocation?: GestureInvocation) {
   if (quitting) return;
   if (id === 'appdock.restart' || id === 'appdock.quit') {
     quitHost(id === 'appdock.restart');
@@ -235,7 +247,7 @@ async function executeCommand(id: string) {
     return id.endsWith('.open')
       ? webApplets.open(web)
       : webApplets.navigate(web, id.slice(split + 1));
-  return manager.execute(id);
+  return manager.execute(id, invocation);
 }
 const shortcutDispatcher = new ShortcutDispatcher(
   executeCommand,
@@ -248,9 +260,11 @@ function shortcutContext() {
 }
 function availableShortcutCommands() {
   return [
-    ...hostCommands.map((c) => ({ id: c.id, extensionId: null })),
+    ...hostCommands.map((c) => ({ id: c.id, title: c.title, extensionId: null })),
     ...allApplets().flatMap((e) =>
-      e.commands.filter((c) => c.available).map((c) => ({ id: c.id, extensionId: e.id })),
+      e.commands
+        .filter((c) => c.available)
+        .map((c) => ({ id: c.id, title: c.title, extensionId: e.id })),
     ),
   ];
 }
@@ -594,6 +608,29 @@ async function initialize() {
     (key) => dispatchShortcut(key, true),
   );
   webApplets = new WebAppletManager(settings, dataDirectory, changed, executeCommand);
+  gestures = new GestureManager(
+    path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
+    () => {
+      const focused = BrowserWindow.getFocusedWindow();
+      return {
+        settings: settings.value,
+        context: {
+          ...shortcutContext(),
+          window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
+        },
+        commands: availableShortcutCommands(),
+        recording: shortcutRecording || quitting,
+      };
+    },
+    shortcutDispatcher,
+    executeCommand,
+    (session) => {
+      for (const item of manager.items.values())
+        if (item.peer && !item.peer.closed)
+          item.peer.send({ jsonrpc: '2.0', method: 'command.cancel', params: { session } });
+    },
+    (message) => log.write('error', 'gestures', message),
+  );
   manager.on('changed', () => {
     trayMenu();
     void syncHotKeys();
@@ -821,14 +858,18 @@ async function initialize() {
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
   if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
   manager.discover();
-  const migrated = initializeExtensionDefaults(
-    withoutMissingSamples(settings.value, manager.items.keys()),
+  const migrated = initializeGestureDefaults(
+    initializeExtensionDefaults(
+      withoutMissingSamples(settings.value, manager.items.keys()),
+      [...manager.items.values()].map((item) => item.manifest),
+    ),
     [...manager.items.values()].map((item) => item.manifest),
   );
   if (JSON.stringify(migrated) !== JSON.stringify(settings.value))
     settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
+  await gestures.start();
   startupReady = true;
   changed();
   log.write('info', 'host', 'AppDockを起動しました。');
@@ -1064,6 +1105,7 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   void (async () => {
     for (const stop of [
+      () => gestures?.close(),
       () => hotKeys?.close(),
       () => webApplets.close(),
       () => manager.shutdown(),

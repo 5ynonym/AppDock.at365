@@ -7,7 +7,11 @@ export class ShortcutDispatcher {
     private report: (message: string) => void,
     private stopped: () => boolean = () => false,
   ) {}
-  async dispatch(key: string, commands: string[]) {
+  async dispatch(
+    key: string,
+    commands: string[],
+    options?: { valid(): Promise<boolean>; execute(id: string): Promise<unknown> },
+  ) {
     if (this.keys.has(key) || this.stopped()) return;
     const captured = [...new Set(commands)].filter((id) => !this.executing.has(id));
     this.keys.add(key);
@@ -17,9 +21,9 @@ export class ShortcutDispatcher {
     captured.forEach((id) => this.executing.add(id));
     try {
       for (const id of captured) {
-        if (this.stopped()) break;
+        if (this.stopped() || (options && !(await options.valid()))) break;
         try {
-          await this.execute(id);
+          await (options?.execute ?? this.execute)(id);
           executed++;
         } catch (error) {
           failed++;

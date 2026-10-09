@@ -8,6 +8,7 @@ import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseSettingActions } from '../../shared/setting-actions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
+import { appletInputSettings, parseGestures, defaultGestures } from '../../shared/gestures';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
@@ -87,11 +88,21 @@ function readManifest(folder: string): LoadedManifest {
     m.defaultKeybindings,
     (commands ?? []).map((command) => command.id),
   );
+  const defaultGestureBindings = parseGestures({
+    ...defaultGestures(),
+    bindings: m.defaultGestureBindings ?? [],
+  }).bindings;
+  if (
+    defaultGestureBindings.length > 100 ||
+    defaultGestureBindings.some((r) => !commands?.some((c) => c.id === r.command))
+  )
+    throw Error('既定ジェスチャーには自身の宣言コマンドだけを指定してください。');
   return {
     ...m,
     settings: parseSettingDefinitions(m.settings),
     commands,
     defaultKeybindings,
+    defaultGestureBindings,
     settingActions: parseSettingActions(m.settingActions, commands ?? []),
     folder,
     entryPath: contained(folder, m.entry),
@@ -256,7 +267,7 @@ class ExtensionManager extends EventEmitter {
             try {
               await e.peer!.request(
                 'settings.changed',
-                this.settings.value.extensions[e.manifest.id]?.settings ?? {},
+                appletInputSettings(this.settings.value, e.manifest.id),
               );
             } catch (err: any) {
               this.log('warn', e.manifest.id, err.message);
@@ -383,7 +394,7 @@ class ExtensionManager extends EventEmitter {
       });
       const result = await e.peer.request('activate', {
         id: m.id,
-        settings: this.settings.value.extensions[m.id]?.settings ?? {},
+        settings: appletInputSettings(this.settings.value, m.id),
       });
       if (e.error) throw new Error(e.error);
       if (
@@ -458,7 +469,10 @@ class ExtensionManager extends EventEmitter {
     e.error = null;
     this.emit('changed');
   }
-  execute(id: string) {
+  execute(
+    id: string,
+    invocation?: { session: string; window: string; process: string; source: string },
+  ) {
     for (const item of this.items.values()) {
       const target = item.manifest.commands?.find((command) => command.aliases?.includes(id));
       if (target) {
@@ -471,7 +485,7 @@ class ExtensionManager extends EventEmitter {
     );
     if (running) {
       if (!running.peer || running.peer.closed) throw new Error('拡張との接続が終了しました。');
-      return running.peer.request('command.execute', { id });
+      return running.peer.request('command.execute', { id, ...(invocation ? { invocation } : {}) });
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));
     if (!e) throw new Error('このコマンドは現在利用できません。');
@@ -493,7 +507,7 @@ class ExtensionManager extends EventEmitter {
           e.peer.closed
         )
           throw new Error(e.error ?? 'Appletがコマンドを登録できませんでした。');
-        return e.peer.request('command.execute', { id });
+        return e.peer.request('command.execute', { id, ...(invocation ? { invocation } : {}) });
       });
     this.queue = execution.then(
       () => {},

@@ -21,8 +21,8 @@ const hash = () =>
 let application;
 async function launch() {
   application = await electron.launch({
-    executablePath: require('electron'),
-    args: [root, `--test-profile=${profile}`],
+    executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
+    args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     timeout: 30000,
   });
   const page = await application.firstWindow();

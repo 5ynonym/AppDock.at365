@@ -1430,7 +1430,17 @@ main {
   box-shadow: var(--shadow);
   overflow: hidden;
   max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+.palette-results {
+  min-height: 0;
   overflow-y: auto;
+}
+.palette-input,
+.palette-label,
+.palette-footer {
+  flex-shrink: 0;
 }
 .palette-input {
   display: flex;
@@ -2864,4 +2874,187 @@ summary {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+/* Gesture assignments share the settings draft and scroll inside the settings page. */
+.gestures-editor {
+  min-width: 0;
+  width: 100%;
+}
+.gesture-enabled {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.gesture-options {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.gesture-options summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.gesture-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 14px;
+}
+.gesture-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.gesture-option input {
+  width: 100%;
+  min-width: 0;
+}
+.gesture-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0;
+}
+.gesture-add > select {
+  flex: 0 1 310px;
+  min-width: 0;
+  max-width: 100%;
+}
+.gesture-table-scroll {
+  overflow-x: auto;
+}
+.gesture-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  text-align: left;
+}
+.gesture-table th {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.gesture-table th:first-child {
+  white-space: nowrap;
+  min-width: 42px;
+}
+.gesture-table td {
+  padding: 16px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.gesture-table td:nth-child(3) {
+  min-width: 150px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+.gesture-table td:nth-child(4) {
+  width: 155px;
+}
+.gesture-table td:nth-child(5) {
+  width: 175px;
+}
+.gesture-table select,
+.gesture-table input:not([type='checkbox']) {
+  width: 100%;
+  min-width: 130px;
+  margin-bottom: 6px;
+}
+.gesture-table small {
+  display: block;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+.gesture-group {
+  margin: 28px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.gesture-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gesture-group-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.gesture-group-heading small {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.gesture-drag-handle {
+  cursor: grab;
+  white-space: nowrap;
+  padding: 8px 5px;
+}
+.gesture-drag-handle:active {
+  cursor: grabbing;
+}
+.gesture-drag-handle span {
+  font-size: 22px;
+  color: var(--muted);
+}
+.gesture-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft);
+}
+.gesture-menu-trigger {
+  min-width: 40px;
+  font-size: 22px;
+  padding: 2px 10px;
+}
+.gesture-menu-trigger[aria-expanded='true'] {
+  background: var(--raised);
+}
+.gesture-actions-popup {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.gesture-actions-popup > button {
+  text-align: left;
+  padding: 9px 14px;
+  border: 0;
+  background: transparent;
+}
+.gesture-actions-popup > button:hover,
+.gesture-actions-popup > button:focus-visible {
+  background: var(--raised);
+}
+.gesture-actions-popup p {
+  margin: 8px 12px;
+  font-size: 13px;
+}
+.gesture-table .toggle {
+  margin-top: 6px;
+}
+.gesture-applet-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+.gesture-applet-picker label {
+  display: flex;
+  gap: 6px;
 }
