@@ -817,3 +817,35 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 実EXE: artifacts/notification-portable-1791514866382/result.json、最終試験終了0。2つの隔離単一EXEに合成通知を表示しWindows通知履歴のXML/起動登録を確認、通知内のURIをWindows Shellから起動。配置先ごとのcallback・他方のcount不変・一度限り処理・停止Appletガード・終了後の元EXE/profile起動を確認、コピーSHA一致。物理toastクリック/実Gmail受信は未実施。
 - 後片づけ: 通知履歴の古いContent=null項目で初期のcleanupが失敗。null項目を対象外にして最終試験終了0。途中試験を含む合成URIを限定削除、試験前のCOM起動先とAppDock shortcutのtarget/cwdを復元。artifacts/notification-cleanup.logで全試験URI消去/元target照合、関連プロセス0を確認。ユーザーの実利用通知を消去していない。
 - 更新前の既存通知は旧launchを持つため、修正後の新しい通知で確認が必要。README/DEVELOPMENT/AGENTSへ仕様と実通知clickの検証境界を記載。
+
+## 2026-10-09: v0.26.0 汎用マウスジェスチャー
+
+- ユーザー承認に従いmainへ実装。InputHostが右押下中の上下左右・左/中クリック・ホイール・キー入力を受け、本体/ブラウザ/指定exe/ページ/提供元/選択Applet/グローバル条件、保存順、同一コマンド重複抑制、除外、一時停止を管理する。WebBrowserToolsの11コマンドと送信キーは維持。旧設定の一回移行、Applet初期値のID衝突回避、開始対象/取消情報、共通ショートカット予約を追加。
+- 最終型検査と全回帰141/141成功（artifacts/gestures-typecheck-final.log、gestures-regression-final.log）。WPF入力プロセスを自己完結で収録し、追加Desktop Runtimeを要求しない。publish.bat終了0、AppDock 0.26.0、WebBrowserTools 0.3.0、6Applet同梱ZIPを発行。実利用deploy/commit/push/Releaseは未実施。
+- InputTestsの専用Windowで実SendInput/カーソル操作17項目成功（artifacts/gestures-native-final.log）。単方向、方向転換取消、通常右クリック再送、左/中と対応解放、キーrepeat/解放/通常キー、細粒度ホイール/逆転/間隔/滞留破棄、設定変更、除外、browser/exe条件、別HWND拒否、前面変更と取消通知を確認。入力表示をフック登録前に初期化、初回設定同期の完了をstartupReady前に待つ。
+- 最終単一EXEの実ジェスチャーGUI8群成功: artifacts/gestures-ui-1791535182689/result.json（portable:true）。グローバル/本体の順次実行と重複抑制、pages/owner/指定Applet、独立Appletウィンドウ、埋込み/独立WebApplet、キー/Ctrl付きキー、共有draft・保存・複製・順番・ブラウザ一覧を確認。dark/light画像を保存し目視確認。実EXEのSHA256/試験コピー一致。
+- 既存GUI: keybindings-1791535140820は10群、applet-pages-1791535150999は6群成功。Windowsの実グローバルキー、Gmail UI/本文とページ切替/入力保持も確認。artifacts/bundle-verify-509e8e39-c6bf-4eb0-81c5-c795775f710aは全ZIP収録hash/size・単一EXE一致・全6Appletの版/初期無効/エラーなしでok:true。
+- WebBrowserTools回帰14/14、専用native WindowのWM_APPCOMMAND/SendInput/最前面変更取消と20回の連続キー送信成功。発行済みAppletのhost-1791535311624で旧7割り当て/操作感移行、旧UI除去、本体設定の編集、11コマンド、キー即時反映/再起動後保持、無効化、エラーなしを確認。
+- 途中のGUIでは初回入力未到達や前面取得失敗が発生。ユーザーからRDPの接続/切断中と確認。診断付き試験では操作全群が通ったものの診断をerrorログとして出したため末尾のno-error検査で失敗。診断コードを除去。portable試験は対象を明示的に表示/前面化し、最終配布物で終了0。RDPだけを原因と断定しない。試験は直列、隔離profile、カーソル復元で実施。
+- 未確認: 人手の物理操作、実Chrome/Edge/Firefoxの履歴・タブ受理、管理者権限差、複数DPIモニター、RDP切替をまたぐ連続操作、他ジェスチャーソフトとの併用。OSへ送信済みの操作や、取消非対応の任意Applet内の副作用は取り消せない。
+- 最終EXE: 142505370 bytes、SHA256 3edc9a6fe1e17547be70676f0d4bc3c2804617e13cfda3fec9691d4665aaa4f2。publish/update.jsonと一致。新しい入力用WPFランタイムが本体内に加わるため、以前の約100MBから増加。
+
+## 2026-10-09: v0.26.1 ジェスチャー編集と共通パレット
+
+- ユーザーの試用結果を反映し、同一gesture単位のグループ表示、グループ内だけのドラッグ/ハンドル上下キー並べ替え、共通Toggleのスイッチを実装。保存形式は既存bindingsのまま。別グループの相対順/設定値を保持し、キー違いも個別グループ。複製/削除は右端のメニューへ分離し、削除は確認後だけ下書きに適用する。
+- CommandPaletteを実行/選択/ピン留めで共用。検索・提供元/完全ID・矢印/Enter・IMEガード・Escape/フォーカス復帰・Tab移動を共通化。選択モードでは実行せず、停止中のコマンドも選択可能。選択内のピン変更は共有draft、実行用は従来の即時保存。Icon/Toggleをmainから共通部品へ移動。キー記録欄が別グループへ移動して消える時の記録停止も保証。
+- typecheck成功、dev.bat testは142/142成功（artifacts/gestures-ui2-typecheck-final.log、gestures-ui2-regression.log）。追加回帰はグループ内の実行順、異なるジェスチャー間の移動拒否、別行の位置と元配列の保持を確認。Prettierとdiff checkも成功。
+- ソースGUI: artifacts/gestures-ui-1791540085907/result.json。最終単一EXE GUI: artifacts/gestures-ui-1791540351063/result.json（portable:true、下記SHAと一致）。ドラッグ、上下キー、複製、削除取消/確認、スイッチ、保存前のdraft保持、検索/矢印/IME、選択で実行しないこと、フォーカス復帰、ピン共有、キー変更後のCtrl+P復帰、実行モード、ブラウザ設定を確認。dark/lightとpalette-select画像を保存し目視確認。
+- 今回の実OS入力を含む試験は最初のジェスチャー未到達（source）、前面HWND取得失敗（portable）で停止。入力フック自体は今回変更していない。APPDOCK_GESTURE_UI_ONLY=1で今回の編集/パレットを分離して成功したものであり、0.26.1の実マウスジェスチャー全群の再成功とは扱わない。RDP接続/切断の既知の状況はあるが原因を断定しない。前版0.26.0の実入力17項目/単一EXE8群成功は前節の証跡。
+- 既存配布版GUI: preferences-1791540312996の7群成功（ピン留め/順番/絞込み/解除、設定、キー、再起動保持）、applet-pages-1791540315870の6群成功（Gmail/ローカル/独立ページとパレット重ね表示等）。WBTのhost-1791540326790も旧設定移行/本体スイッチ/送信キー/再起動保持で成功。WBTの試験を新スイッチと安定ID参照へ追従し、Applet製品版0.3.0は据置。
+- publish.bat終了0。AppDock 0.26.1、単一EXE 142504831 bytes、SHA256 152073654baf11fbadc44a3b68c02b459653a1a20c1a2077b0e8f3f5fedbd2b4、update.json/GUI検証コピー一致。全6Applet入りZIPの全ファイルsize/hashと通常起動も成功（bundle-verify-d600028e-662d-4c37-adc3-4113a23829aa）。初回bundle試験はrenderer未準備時に接続済みbrowserを閉じてしまい接続不能になったため、接続を保ってrendererを待つ試験処理へ修正して同じ配布物で再確認。
+- 途中のドラッグ試験は移動先への自動スクロールで開始位置が変わったため、同じグループが見える位置へスクロールしてから実施。キー変更試験は移動後の配列先頭ではなく安定IDを照合。最終GUIは終了0。sandboxのtypecheckはpnpmポリシー確認で停滞したため中断し、通常Windows環境の同じtypecheckで成功。
+- mainの既存未コミット変更へ継続実装。ローカルpublishのみで、実利用deploy/commit/push/Release公開は未実施。
+
+## 2026-10-09: 0.26.2 行メニューのドロップダウン化
+
+- ジェスチャー行の「…」をボタンと浮動メニューへ変更。スクロール表の外へ描画し行の高さを維持、画面端で位置を補正。外側クリック/Escape/スクロール/リサイズで閉じ、上下/Home/Endキーで移動。Escapeでボタンへ戻り、削除は確認とキャンセルを維持。
+- typecheck終了0、回帰142/142（artifacts/gestures-dropdown-regression.log）。初回整形は依存未配置で失敗し、既存dev.batのローカル依存復元後に同じPrettierを再実行して成功。新たな依存追加なし。
+- ソースGUI（gestures-ui-1791541764462）と固定単一EXE（gestures-ui-1791541935557）で、メニュー表示中の行高不変/画面内配置、上下キー、Escape/フォーカス復帰、再クリック/外側クリック、複製/削除確認/キャンセル、既存グループ並べ替え/スイッチ/共通パレット/保存を確認。スクリーンショットgestures-dropdown.pngも目視確認。今回はUI変更のためAPPDOCK_GESTURE_UI_ONLY=1を明示し、OS入力試験は再実施していない。
+- publish.bat終了0、0.26.2単一EXE/update.json/6Applet入りZIPを配置。EXE142516690 bytes、SHA256 f3cebdb6b932aa4041e357df0cfe70517bba15c71695853448a74a0ef8102298、feedと実試験コピーが一致。all-in-one-ui-test.cjs終了0、ZIP全収録size/hash/本体一致と隔離通常起動を確認（artifacts/gestures-dropdown-bundle-result.json）。
+- ユーザーの追加指示に従い、発行・検証後に今回までの汎用ジェスチャー/UI変更をAppDockとWebBrowserToolsのmainへコミットする。push/Release/実利用deployは依頼範囲外。

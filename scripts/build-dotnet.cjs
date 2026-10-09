@@ -28,3 +28,15 @@ run([
   '-o',
   output,
 ]);
+run([
+  'publish',
+  'dotnet/AppDock.InputHost/AppDock.InputHost.csproj',
+  '-c',
+  'Release',
+  '-r',
+  'win-x64',
+  '--self-contained',
+  'true',
+  '-o',
+  path.join(output, 'input'),
+]);

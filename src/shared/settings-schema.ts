@@ -1,4 +1,5 @@
 import { parseKeybindings, withKeybindings } from './keybindings';
+import { parseGestures, migrateGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
 import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
@@ -12,6 +13,8 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
+  gestures: defaultGestures(),
+  gestureDefaultsInitialized: [],
   webApplets: { items: [], shortcutDefaults: defaultWebShortcutDefaults() },
   schemaVersion: 1,
   host: {
@@ -198,6 +201,11 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    gestures:
+      value.gestures === undefined
+        ? migrateGestures(value as unknown as Settings)
+        : parseGestures(value.gestures),
+    gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),
     ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),
     webApplets: parseWebApplets(value.webApplets),
@@ -217,4 +225,10 @@ export function parseSettings(value: unknown): Settings {
   if (new TextEncoder().encode(JSON.stringify(result)).length > 1024 * 1024)
     throw new Error('設定は1MB以下にしてください。');
   return result;
+}
+function parseGestureInitialized(value: unknown): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 500 || value.some((v) => !validCommandId(v)))
+    throw Error('ジェスチャー初期設定の適用済み一覧が不正です。');
+  return [...new Set(value)] as string[];
 }

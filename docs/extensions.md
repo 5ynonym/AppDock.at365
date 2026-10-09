@@ -197,3 +197,9 @@ WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の�
 通知の`command`は登録済みの自Appletコマンドのみ受け付け、クリック時にも同じプロセスが稼働中であることを確認します。`silent`を省略した既存通知の動作は維持します。トレイのattentionは停止・異常終了で解除し、トレイメニューへのコマンド表示やクリック割当は変更しません。
 
 長い認証やファイル選択を行うAppletはコマンドを即時受付し、バックグラウンドで処理してパネルへ状態を反映してください。通常のコマンドRPCは従来どおり15秒です。GmailCheckerが利用例です。
+
+## v0.26.0: ジェスチャーの初期値と実行文脈
+
+manifestのdefaultGestureBindingsに、自身のcommandsに宣言したコマンドの割り当て（id/command/gesture/enabled/when、最大100行）を宣言できる。初回だけ設定へコピーする。詳細は[マウスジェスチャー](gestures.md)。
+
+command.executeは任意のinvocation（session/window/process/source）を受け取る。.NETハンドラーはCommandExecution.Currentから読み取れる。source=gestureの場合のwindowは開始対象HWNDの10進文字列。command.cancelのsessionが一致すればハンドラーのCancellationTokenを取り消す。引数なしの既存ハンドラーは変更不要。対象固定や取消を実操作まで反映するかはAppletの実装による。

@@ -15,6 +15,8 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  gestures?: import('./gestures').GestureSettings;
+  gestureDefaultsInitialized?: string[];
   keybindings?: import('./keybindings').Keybinding[];
   keybindingDefaultsInitialized?: string[];
   webApplets: import('./web-applets').WebAppletSettings;
@@ -107,6 +109,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;
   id: string;
   name: string;

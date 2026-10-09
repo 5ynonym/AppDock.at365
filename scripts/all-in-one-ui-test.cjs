@@ -41,19 +41,20 @@ assert.equal(
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function connect(port) {
   let last;
+  let browser;
   for (let i = 0; i < 40; i++) {
     try {
-      const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
+      browser ??= await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
       const pages = browser.contexts().flatMap((context) => context.pages());
       const page = pages.find((page) => page.url().startsWith('appdock://host/'));
       if (!page) {
-        await browser.close();
         throw Error('host renderer not ready');
       }
       await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor({ timeout: 3000 });
       return { browser, page };
     } catch (error) {
       last = error;
+      if (browser && !browser.isConnected()) browser = undefined;
       await wait(200);
     }
   }

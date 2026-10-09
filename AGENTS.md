@@ -74,3 +74,14 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 未割り当てのAppletコマンドへキーを追加する時はowner、本体/提供元不明はappを既定にする。既存条件の編集/複製を上書きしない。コマンド一覧の補助表示は完全なIDを見せ、提供元表示名とIDの双方で検索できることを保つ。
 - Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細の一括初期化は対象Appletの行だけを置き換える。正本の形式と検証境界はdocs/keybindings.mdを参照する。
 - UIはuseSettingsEditorのdraft/JSON/revision/saveを共用。条件のない旧設定への完全互換のために新設計を複雑化しない（2026-10-09ユーザー指定）。
+
+## マウスジェスチャーの維持事項
+
+- 正本は[マウスジェスチャー](docs/gestures.md)。本体管理InputHost、共通コマンド予約、条件判定、共有設定draftを使い、Appletへフックを重複登録しない。WebBrowserToolsはブラウザ操作と送信キーを担当する。
+- 旧設定はgestures未指定時だけ取り込み、空配列/解除済み割り当てを復活させない。初期値はApplet manifestのdefaultGestureBindingsから初回だけ追加する。WebBrowserToolsの対象exeは本体側と一致させる。
+- 開始対象HWNDとページ文脈を固定し、対象/設定変更や取消後に次のアプリへ送らない。command.executeのinvocationとcommand.cancel/.NET CancellationTokenを保つ。キーとジェスチャーのコマンド予約は共用し、再入防止のためにジェスチャーの連続操作全体へ固定待機を追加しない。
+- 右クリック復元、捕捉した左/中/キーの解放、ホイールの積算/滞留破棄、停止時の解除を実入力で確認する。待機表示の初期化はフック登録前。InputHostは必要なWPFランタイムを自己完結で収録し、配布は本体単一EXEを維持する。
+- 変更時はtests/gestures.test.cjs、tests/InputTests、scripts/gestures-ui-test.cjs、既存ショートカット/ページ回帰を確認する。GUIは直列・隔離profile、発行後は固定配布物で確認する。
+- ジェスチャー一覧は入力ごとにグループ化し、ドラッグ/上下キーで同じグループ内だけ順序を変える。コマンド選択はCommandPaletteを実行モード/選択モードで共用し、選択用から実行しない。スイッチは共通Toggle、削除/複製はメニューと削除確認を使う。グループ移動でキー記録欄が消える場合も記録停止を保証する。
+
+- 行の操作メニューはスクロール表の外へ浮かべ、行の高さを変えない。画面端の位置補正、外側クリック/Escapeで閉じる操作、キーボード移動、削除確認を維持する。

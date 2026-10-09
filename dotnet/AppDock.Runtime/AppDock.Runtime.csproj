@@ -1,3 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup><ProjectReference Include="../AppDock.SDK/AppDock.SDK.csproj" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="AppDock.InputHost" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="AppDock.InputTests" /></ItemGroup>
 </Project>

@@ -116,13 +116,14 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     Task ISecretService.SetAsync(string key, string value, CancellationToken cancellationToken) => CallAsync("host.secrets.set", new { key, value }, cancellationToken);
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default) => CallAsync("host.secrets.delete", new { key }, cancellationToken);
     private async Task CallAsync(string method, object value, CancellationToken token) => _ = await connection.RequestAsync(method, value, token);
-    public async Task ExecuteAsync(string commandId)
+    public async Task ExecuteAsync(string commandId, CancellationToken token)
     {
-        await commandLock.WaitAsync(lifetime);
+        await commandLock.WaitAsync(token);
         try
         {
             if (!commands.TryGetValue(commandId, out var command)) throw new ArgumentException("Unknown command.");
-            await command.Handler(lifetime);
+            token.ThrowIfCancellationRequested();
+            await command.Handler(token);
         }
         finally { commandLock.Release(); }
     }

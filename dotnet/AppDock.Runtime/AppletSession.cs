@@ -11,6 +11,10 @@ public static class AppletSession
         using var active = CancellationTokenSource.CreateLinkedTokenSource(connection.Lifetime, cancellationToken);
         ExtensionContext? context = null;
         var deactivated = false;
+        var invocations = new System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource>();
+        // RPC handlers run concurrently: cancellation may arrive before command registration.
+        var cancelledInvocations = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>();
+        var cancellationOrder = new System.Collections.Concurrent.ConcurrentQueue<string>();
         try
         {
             await connection.ReadAsync(async (method, parameters) =>
@@ -27,7 +31,29 @@ public static class AppletSession
                         return null;
                     case "command.execute":
                         if (context is null) throw new InvalidOperationException("Not activated.");
-                        await context.ExecuteAsync(parameters.GetProperty("id").GetString()!);
+                        var invocation = parameters.TryGetProperty("invocation", out var metadata)
+                            ? System.Text.Json.JsonSerializer.Deserialize<CommandInvocation>(metadata, JsonRpcConnection.Json) : null;
+                        using (var commandLifetime = CancellationTokenSource.CreateLinkedTokenSource(active.Token)) {
+                            if (invocation is not null && !invocations.TryAdd(invocation.Session, commandLifetime))
+                                throw new InvalidOperationException("Invocation already running.");
+                            try {
+                                if (invocation is not null && cancelledInvocations.ContainsKey(invocation.Session)) commandLifetime.Cancel();
+                                CommandExecution.Current = invocation;
+                                await context.ExecuteAsync(parameters.GetProperty("id").GetString()!, commandLifetime.Token);
+                            } finally {
+                                CommandExecution.Current = null;
+                                if (invocation is not null) invocations.TryRemove(invocation.Session, out _);
+                            }
+                        }
+                        return null;
+                    case "command.cancel":
+                        var cancelledSession = parameters.GetProperty("session").GetString()!;
+                        if (cancelledInvocations.TryAdd(cancelledSession, 0)) cancellationOrder.Enqueue(cancelledSession);
+                        while (cancelledInvocations.Count > 256 && cancellationOrder.TryDequeue(out var expired))
+                            cancelledInvocations.TryRemove(expired, out _);
+                        if (invocations.TryGetValue(cancelledSession, out var pending))
+                            try { await pending.CancelAsync(); }
+                            catch (ObjectDisposedException) { /* Command completed concurrently. */ }
                         return null;
                     case "panel.action":
                         if (context is null || applet is not IPanelActionHandler panelActions)
