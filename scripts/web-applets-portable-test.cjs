@@ -183,8 +183,37 @@ async function open(id) {
   await start();
   web = await open(id);
   assert.ok((await web.evaluate(() => document.cookie)).includes('portable=retained'));
-  await dock.evaluate((id) => window.dock.toggleExtension(id, false), id);
+  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await dock
+    .locator('.sidebar-extensions')
+    .getByRole('button', { name: /^単一EXEのWeb/ })
+    .click();
+  const toggle = dock.getByRole('switch', { name: '単一EXEのWebを有効にする', exact: true });
+  await toggle.click();
   await until(() => web.isClosed(), 'disable closes remote');
+  await until(
+    async () => (await dock.locator(`[data-ribbon-id="page:${id}:main"]`).count()) === 0,
+    'disabled WebApplet ribbon disappears',
+  );
+  assert.equal(await dock.locator(`[data-ribbon-id="page:${second}:main"]`).count(), 1);
+  await stop();
+  await start();
+  assert.equal(await dock.locator(`[data-ribbon-id="page:${id}:main"]`).count(), 0);
+  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await dock
+    .locator('.sidebar-extensions')
+    .getByRole('button', { name: /^単一EXEのWeb/ })
+    .click();
+  await dock.getByRole('switch', { name: '単一EXEのWebを有効にする', exact: true }).click();
+  await until(
+    async () => (await dock.locator(`[data-ribbon-id="page:${id}:main"]`).count()) === 1,
+    'resumed WebApplet ribbon returns',
+  );
+  web = await open(id);
+  assert.ok((await web.evaluate(() => document.cookie)).includes('portable=retained'));
+  checks.push(
+    'single portable EXE: Applet page stop removes only its ribbon, persists across restart and resume restores a usable ribbon with Cookies retained',
+  );
   assert.equal(fs.readFileSync(gmail, 'utf8'), 'untouched Gmail data');
   checks.push(
     'single portable EXE: multiple ribbons, account Cookie separation, restart persistence, disable disposal and Gmail storage preservation',

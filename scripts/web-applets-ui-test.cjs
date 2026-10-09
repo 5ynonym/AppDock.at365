@@ -645,10 +645,59 @@ async function remote(id) {
   checks.push(
     'account clear confirmation cancellation preserves data; confirmed clear closes shared views and clears only that Web account',
   );
-  await dock.evaluate((id) => window.dock.toggleExtension(id, false), id);
+  const ribbonId = `page:${id}:main`;
+  await update((v, ribbonId) => {
+    v.ribbon.order = [ribbonId, ...v.ribbon.order.filter((key) => key !== ribbonId)];
+    v.ribbon.bottom = [...v.ribbon.bottom.filter((key) => key !== ribbonId), ribbonId];
+  }, ribbonId);
+  const ribbonPreferences = structuredClone((await snapshot()).settings.value.ribbon);
+  await until(
+    async () =>
+      (await dock
+        .locator('.ribbon-bottom [data-ribbon-id]')
+        .first()
+        .getAttribute('data-ribbon-id')) === ribbonId,
+    'saved ribbon placement rendered',
+  );
+  const ribbonOrder = () =>
+    dock
+      .locator('.ribbon-buttons [data-ribbon-id]')
+      .evaluateAll((items) => items.map((item) => item.dataset.ribbonId));
+  const beforeStop = await ribbonOrder();
+  assert.ok(beforeStop.includes(ribbonId));
+  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await dock
+    .locator('.sidebar-extensions')
+    .getByRole('button', { name: /^ユキのWeb/ })
+    .click();
+  const toggle = dock.getByRole('switch', { name: 'ユキのWebを有効にする', exact: true });
+  await toggle.click();
   await until(() => web.isClosed(), 'disable closes view');
-  await dock.evaluate((id) => window.dock.toggleExtension(id, true), id);
-  web = await remote(id);
+  await until(
+    async () => (await dock.locator(`[data-ribbon-id="${ribbonId}"]`).count()) === 0,
+    'disabled WebApplet ribbon disappears',
+  );
+  assert.equal(await dock.locator(`[data-ribbon-id="page:${copied}:main"]`).count(), 1);
+  assert.deepEqual((await snapshot()).settings.value.ribbon, ribbonPreferences);
+  await toggle.click();
+  await until(
+    async () => (await dock.locator(`[data-ribbon-id="${ribbonId}"]`).count()) === 1,
+    'enabled WebApplet ribbon returns',
+  );
+  assert.deepEqual(await ribbonOrder(), beforeStop);
+  await dock.locator(`[data-ribbon-id="${ribbonId}"]`).click();
+  web = await until(
+    () =>
+      app
+        .context()
+        .pages()
+        .find((p) => p.url().startsWith(`http://127.0.0.1:${port}/`)),
+    'reopened from restored ribbon',
+  );
+  assert.ok((await web.evaluate(() => document.cookie)).includes('proof=second'));
+  checks.push(
+    'Applet page stop hides only the disabled WebApplet ribbon; resume restores saved order/placement and opens without error',
+  );
   await update((v, id) => {
     v.webApplets.items = v.webApplets.items.filter((a) => a.id !== id);
   }, id);

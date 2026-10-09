@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.23.0はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.0は本体ページと別ウィンドウの両方に対応します。
+0.24.2はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.0は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 
@@ -63,6 +63,9 @@ Applet画面と設定画面の左側の一覧は、同じ背景・余白・選�
 ## Appletの追加
 
 ### URLからWebAppletを追加する
+
+Appletページで停止すると、対象Applet（WebAppletやGmailなど）のリボンアイコンを自動で隠します。再開すると元の配置へ戻ります。
+
 
 「Applet → WebAppletを追加」または「設定 → WebApplet」で、好きなWebページの名前とURLを登録できます。「変更をすべて保存」でApplet一覧とリボンへ追加され、本体ページまたは別ウィンドウで開けます。ページ遷移は開始ページ固定・同じorigin内・HTTP(S)のページを許可から選び、認証先を追加で許可できます。
 

@@ -1,4 +1,4 @@
-import type { ExtensionManifest, Settings } from './contracts';
+import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
 
 export type PageDisplay = 'page' | 'window';
 export interface AppletPageDefinition {
@@ -116,6 +116,15 @@ export function ribbonItems(
       kind: 'separator',
     })),
   ];
+}
+export function visibleRibbonItems(
+  extensions: ExtensionSnapshot[],
+  separators: string[] = [],
+): RibbonItem[] {
+  return ribbonItems(
+    extensions.filter((extension) => extension.enabled),
+    separators,
+  );
 }
 export function orderRibbon(items: RibbonItem[], order: string[]): RibbonItem[] {
   const byId = new Map(items.map((item) => [item.id, item]));

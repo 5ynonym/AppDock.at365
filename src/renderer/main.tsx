@@ -31,7 +31,7 @@ import { UpdateCompletionNotice } from './UpdateCompletionNotice';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
-import { ribbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
+import { visibleRibbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
 import { RibbonSettings } from './RibbonSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { WebAccountSettings } from './WebAccountSettings';
@@ -484,7 +484,10 @@ function App() {
     snapshot?.extensions.find((e) => e.id === selected) ?? snapshot?.extensions[0];
   const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
   const ribbon = orderRibbon(
-    ribbonItems(snapshot?.extensions ?? [], snapshot?.settings.value.ribbon.separators ?? []),
+    visibleRibbonItems(
+      snapshot?.extensions ?? [],
+      snapshot?.settings.value.ribbon.separators ?? [],
+    ),
     snapshot?.settings.value.ribbon.order ?? [],
   ).filter((item) => !snapshot?.settings.value.ribbon.hidden.includes(item.id));
   const renderRibbonItem = (item: RibbonItem) =>

@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-09: 停止中Appletのリボン修正を0.24.2としてリリース
+
+- ユーザーがローカル修正版の正常動作を確認し、版更新/公開と、不具合があった直前のRelease削除を指定。0.24.2へ更新し、下記のWeb/Gmail共通リボン修正と関連回帰をコミットする。Gmail Appletの版・API・保存形式は変更しない。
+- 現在のGitHub latestはv0.24.1（Release ID 407459037、対象commit d57e9d4eac4403346adfc97733db74ecc6af3aa3）、v0.24.2のタグは未作成と読取確認。新しい`artifacts/release-0.24.2-ribbon-20261009/plan.json`で正式Prepare→Draft→Publish→Verifyを行い、固定配布物のWeb/既存ページGmail/リボン配置/実単一EXEの追加GUIも直列実施する。
+- 新版のVerify成功後にv0.24.1のReleaseとアセットを削除し、Gitタグ/コミット履歴を保持する。削除前metadata・削除結果・latest/旧タグ照合は同じartifactsへ保存する。最終の版・hash・公開状態はPlanとALICE日記を参照し、Prepare後にソース/ノート/配布物を変更しない。実利用先deployは行わない。
+
+## 2026-10-09: 停止中のWebApplet/Gmailをリボンから非表示
+
+- 公開済み0.24.1のローカルEXEを隔離コピーして再現。AppletページでWebAppletを無効化してもアイコンが残る回帰を、`artifacts/web-ribbon-before-fix.log`の`disabled WebApplet ribbon disappears`で検出した。ユーザーの追加指定によりGmailも含め、実リボンのページ一覧を有効なAppletだけに限定した。設定の一覧・保存済み表示/順序/上下配置、開始待ち/エラー中の有効なApplet、コマンドによる明示起動の契約を保持する。
+- project-local Node/pnpmの型検査・ビルド成功。ページ/WebApplet/Webプロフィールの回帰16/16成功、fail/skip 0（`artifacts/web-ribbon-typecheck.log`、`web-ribbon-build.log`、`web-ribbon-unit.log`）。Web GUIの最初の配置比較は画面更新前に読み取って失敗したため、保存済み下寄せの画面反映を待つ試験へ修正して成功。最終ソースの既存ページ/Gmail GUIも成功（`artifacts/web-ribbon-pages-source.log`）。
+- `publish.bat`でローカルの通常単一EXE・update.json・全6Applet入りZIPを再発行、終了0（`artifacts/web-ribbon-publish-final.log`）。版は0.24.1のままのローカル確認用修正版で、今回のコミット/push/新Release公開/公開済みアセットの置換/実利用先deployは行っていない。
+- 最終固定配布物の隔離GUIを直列実行し、全て終了0/ok:true。Web12群=`artifacts/web-applets-1791516642725/result.json`、既存ページ/Gmail6群=`artifacts/applet-pages-1791516651144/result.json`、リボン配置3群=`artifacts/ribbon-layout-1791516661820/result.json`、実単一EXE3群=`artifacts/web-portable-1791516667616/result.json`。Appletページの実スイッチで停止→対象だけ非表示→再開→リボンから正常表示、Gmail/WebのCookieとアカウント保持、上下/順序/手動非表示の保持、停止したWebAppletの再起動後の非表示を確認。実サイト認証・実メール受信は今回の変更範囲外。
+- 最終EXEは100609206bytes、SHA256=`559fa6d46142c025f0a1510363e8bf5b6fe2bb541934df2c190bff092d87f5a2`。update.jsonのsize/hash、ZIP内の本体、実単一EXE試験コピーが一致（`artifacts/web-ribbon-artifact-check.json`）。README/開発ガイド/ページ・WebApplet仕様/repo AGENTSへ挙動を反映。
+
 ## 2026-10-09: Webアカウント改善と通知起動先修正を0.24.1へ統合
 
 - ユーザーが「Gmail通知の起動先を修正」の完了を待って一緒にコミット/Releaseすることを明示承認。完了を確認し、Webアカウント独立管理・即時操作・削除後処理・名前blur/Escapeと、配置先/profile別の通知protocol activationを同じ本体版へ統合する。Applet API/各Appletの版・単一EXE形式は変更しない。

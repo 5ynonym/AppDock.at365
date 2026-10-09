@@ -41,6 +41,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - プロジェクト内のNode/pnpmを使う。既存のpublish.bat・更新JSON仕様・Applet個別更新を維持する。公開済みアセット/タグを自動上書きしない。
 - `scripts/release.ps1`のPrepareでビルド・テスト・配布物検証を完了させ、Draftで全アセットを照合してからPublishへ進む。失敗時は非公開のまま停止し、手順書の復旧手順に従う。公開リクエストの結果が不明なら再作成せず状態を確認する。
 - GUI試験は直列・隔離profileで行う。実利用設定・認証データは配布物へ入れない。
+- 旧Releaseの削除はユーザーの指定がある時だけ、修正版のVerify成功後に対象ID/タグを確認して行う。Releaseと添付アセットを削除し、追加指定がなければGitタグ/コミット履歴を残す。詳細はRelease手順の旧Release削除を参照する。
 
 ## Applet追加
 
@@ -58,5 +59,6 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - アカウント名はblur/Enter/ボタンで確定、確定前のEscapeで保存済みの名前へ戻す。IME変換中/空欄の確定、Enterとblurの重複送信、名前変更で直後の削除/クリアのクリックを失うことを避ける。非同期snapshot反映で次の編集中の名前を上書きしない。
 - リモートページにpreload/Node/ホストIPCを公開しない。外部JSONは検証した推奨初期値だけを取り込み、アカウント/コマンド/許可範囲拡張を受け入れず、手動変更を再取得で上書きしない。
 - WebAppletはページを開いた時に生成する。既存AppletSurfaceを使い、表示先の切替でWebContents/session/入力を作り直さない。無効化/削除/アカウント・URL変更時の破棄、Cookie保存、共有枠消去時の対象画面終了を確認する。
+- 無効化したApplet（WebApplet/Gmailを含む）は実リボンから除外し、再開時に元の表示/順序/上下配置へ戻す。リボン設定の一覧には保持し、コマンドによる明示起動や、有効なAppletの開始待ち/エラー表示/再試行を妨げない。
 - WebAppletのID接頭辞web.は本体管理用。ファイルmanifestからこの名前空間やweb runtimeを読み込まない。本体と一緒に更新されるため、個別Appletの配布更新対象へ混ぜない。
 - 今後の同機能変更ではtests/web-applets.test.cjs、tests/web-profiles.test.cjs、scripts/web-applets-ui-test.cjs、scripts/web-applets-portable-test.cjsに加え、既存ページ/Gmail表示の回帰を確認する。保存形式変更時は保持した旧配布物でscripts/web-profiles-migration-ui-test.cjsも実施する。実サイト認証・長期背景動作とオフラインfixtureの成功を区別する。
