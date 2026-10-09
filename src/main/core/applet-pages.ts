@@ -9,6 +9,7 @@ interface PageHost {
   selected(key: string | null): void;
   shortcut(input: Input, appletId?: string): boolean;
   failed(message: string): void;
+  overlay?(): void;
 }
 let host: PageHost | undefined;
 let selected: string | null = null;
@@ -273,6 +274,7 @@ export class AppletSurface {
     this.contentView.setBounds(area);
     this.ui.setBounds({ x: 0, y: 0, width: area.width, height: area.height });
     this.options.onLayout();
+    host?.overlay?.();
   }
   close() {
     if (this.closed) return;

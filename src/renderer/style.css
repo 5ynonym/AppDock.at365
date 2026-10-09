@@ -2283,6 +2283,52 @@ summary {
   margin-left: 0;
   margin-right: auto;
 }
+.applet-detail-settings-main .detail-description-panel,
+.applet-detail-settings-main .detail-logs {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.settings-notice-document,
+.settings-notice-document[data-theme='light'],
+.settings-notice-document body {
+  background: transparent;
+  overflow: hidden;
+}
+.settings-notice-card {
+  margin: 8px;
+  padding: 14px 18px;
+  border: 1px solid #d5a052;
+  border-radius: 12px;
+  background: #352b1f;
+  color: #ffe0a7;
+  box-shadow: 0 3px 8px #0006;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+:root[data-theme='light'] .settings-notice-card {
+  background: #fff4db;
+  color: #704611;
+  box-shadow: 0 3px 8px #64431930;
+}
+.settings-notice-copy {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.settings-notice-copy p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  max-height: 92px;
+  overflow: auto;
+}
+.settings-notice-card .actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
 .detail-settings > .applet-settings-panel {
   flex: 1;
   min-height: 0;

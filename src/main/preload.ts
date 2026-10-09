@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  settingsNotice: (state) => ipcRenderer.invoke('dock:settingsNotice', state),
+  confirmDiscardSettings: () => ipcRenderer.invoke('dock:confirmDiscardSettings'),
+  onSettingsNoticeAction: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, action: 'save' | 'discard' | 'edit') =>
+      callback(action);
+    ipcRenderer.on('dock:settingsNoticeAction', handler);
+    return () => ipcRenderer.removeListener('dock:settingsNoticeAction', handler);
+  },
   webDefaults: (url) => ipcRenderer.invoke('dock:webDefaults', url),
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
   clearWebAccount: (id) => ipcRenderer.invoke('dock:clearWebAccount', id),

@@ -199,7 +199,7 @@ async function launch() {
       await page.getByLabel('保持する入力', { exact: true }).inputValue(),
       '未保存の入力',
     );
-    await button('並び順を含む変更を保存').click();
+    await button('変更をすべて保存').click();
     await page.waitForFunction(
       async () =>
         (await window.dock.snapshot()).settings.value.appletOrder[0] ===
@@ -298,7 +298,7 @@ async function launch() {
     );
     await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
     await button('順序 test.bを下へ移動').click();
-    await button('すべての変更を破棄').click();
+    await button('変更を破棄して再読み込み').click();
     assert.deepEqual(await ids(), [
       'web.11111111-1111-1111-1111-111111111111',
       'test.b',

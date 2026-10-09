@@ -11,12 +11,14 @@ export function WebAppletSettings({
   onAccounts,
   accounts,
   applets = [],
+  tab = 'settings',
 }: {
   editor: SettingsEditor;
   itemId?: string;
   accounts: WebProfile[];
   applets?: { id: string; title: string }[];
   onAccounts(): void;
+  tab?: 'settings' | 'shortcuts';
 }) {
   const { draft, edit } = editor;
   const data = draft.webApplets;
@@ -147,196 +149,202 @@ export function WebAppletSettings({
     <section className="web-applet-settings" aria-label="WebApplet設定">
       {!itemId && (
         <>
-          <p className="muted">
-            URLからWebAppletを追加できます。アカウント枠はGmailとは別管理です。
-          </p>
-          <div className="actions">
-            <button
-              className="secondary"
-              disabled={busy || data.items.length >= 64}
-              onClick={() => void add()}
-            >
-              ＋ WebAppletを追加
-            </button>
-          </div>
-          <div className="web-applet-list">
-            {data.items.map((a) => (
-              <button
-                key={a.id}
-                className={a.id === selected ? 'selected' : 'secondary'}
-                onClick={() => {
-                  setSelected(a.id);
-                  setMessage('');
-                }}
-              >
-                {a.icon && <img src={a.icon} alt="" />}
-                {a.name}
-              </button>
-            ))}
-          </div>
-          <div className="web-shortcut-defaults">
-            <h3>これから追加するWebAppletのショートカット</h3>
-            <p className="muted">
-              追加時に各WebAppletへコピーします。既存の割り当ては変更しません。
-            </p>
-            <div className="keybindings-scroll">
-              <table className="keybindings-table">
-                <thead>
-                  <tr>
-                    <th>有効</th>
-                    <th>コマンド</th>
-                    <th>キーバインド</th>
-                    <th>いつ・どこで</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.shortcutDefaults.map((row, index) => (
-                    <tr key={index}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          aria-label={`既定の割り当て${index + 1}を有効にする`}
-                          checked={row.enabled}
-                          onChange={(event) =>
-                            changeDefault(index, { enabled: event.target.checked })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <select
-                          aria-label={`既定のコマンド${index + 1}`}
-                          value={row.command}
-                          onChange={(event) =>
-                            changeDefault(index, {
-                              command: event.target.value as WebShortcutDefault['command'],
-                            })
-                          }
-                        >
-                          <option value="reload">リロード</option>
-                          <option value="back">戻る</option>
-                          <option value="forward">進む</option>
-                          <option value="open">開く</option>
-                          <option value="home">開始ページへ</option>
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          readOnly
-                          data-shortcut-recorder="true"
-                          aria-label={`既定のショートカット${index + 1}`}
-                          value={row.key}
-                          onFocus={() => void window.dock.setShortcutRecording(true)}
-                          onBlur={() => void window.dock.setShortcutRecording(false)}
-                          onKeyDown={(event) => {
-                            event.stopPropagation();
-                            if (event.key === 'Tab' && !event.ctrlKey && !event.altKey) return;
-                            event.preventDefault();
-                            if (event.key === 'Escape') {
-                              event.currentTarget.blur();
-                              return;
-                            }
-                            const key = shortcutFromEvent(event.nativeEvent);
-                            if (key) changeDefault(index, { key });
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <select
-                          aria-label={`既定のいつ・どこで${index + 1}`}
-                          value={row.when.scope}
-                          onChange={(event) =>
-                            changeDefault(index, {
-                              when: { scope: event.target.value as ShortcutScope, appletIds: [] },
-                            })
-                          }
-                        >
-                          {shortcutScopes.map((scope) => (
-                            <option key={scope.id} value={scope.id}>
-                              {scope.id === 'owner' ? '追加されるWebApplet' : scope.title}
-                            </option>
-                          ))}
-                        </select>
-                        {row.when.scope === 'applets' && (
-                          <div
-                            className="web-shortcut-targets"
-                            role="group"
-                            aria-label={`既定の対象Applet${index + 1}`}
-                          >
-                            {[
-                              ...applets,
-                              ...row.when.appletIds
-                                .filter((id) => !applets.some((applet) => applet.id === id))
-                                .map((id) => ({ id, title: `未導入: ${id}` })),
-                            ].map((applet) => (
-                              <label key={applet.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={row.when.appletIds.includes(applet.id)}
-                                  onChange={(event) =>
-                                    changeDefault(index, {
-                                      when: {
-                                        scope: 'applets',
-                                        appletIds: event.target.checked
-                                          ? [...row.when.appletIds, applet.id]
-                                          : row.when.appletIds.filter((id) => id !== applet.id),
-                                      },
-                                    })
-                                  }
-                                />
-                                {applet.title}
-                              </label>
-                            ))}
-                            {!row.when.appletIds.length && (
-                              <small role="alert">1件以上選択してください。</small>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          className="text-button"
-                          onClick={() =>
-                            changeDefaults(data.shortcutDefaults.filter((_, i) => i !== index))
-                          }
-                        >
-                          解除
-                        </button>
-                      </td>
+          {tab === 'settings' && (
+            <>
+              <p className="muted">
+                URLからWebAppletを追加できます。アカウント枠はGmailとは別管理です。
+              </p>
+              <div className="actions">
+                <button
+                  className="secondary"
+                  disabled={busy || data.items.length >= 64}
+                  onClick={() => void add()}
+                >
+                  ＋ WebAppletを追加
+                </button>
+              </div>
+              <div className="web-applet-list">
+                {data.items.map((a) => (
+                  <button
+                    key={a.id}
+                    className={a.id === selected ? 'selected' : 'secondary'}
+                    onClick={() => {
+                      setSelected(a.id);
+                      setMessage('');
+                    }}
+                  >
+                    {a.icon && <img src={a.icon} alt="" />}
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {tab === 'shortcuts' && (
+            <div className="web-shortcut-defaults">
+              <h3>これから追加するWebAppletのショートカット</h3>
+              <p className="muted">
+                追加時に各WebAppletへコピーします。既存の割り当ては変更しません。
+              </p>
+              <div className="keybindings-scroll">
+                <table className="keybindings-table">
+                  <thead>
+                    <tr>
+                      <th>有効</th>
+                      <th>コマンド</th>
+                      <th>キーバインド</th>
+                      <th>いつ・どこで</th>
+                      <th>操作</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.shortcutDefaults.map((row, index) => (
+                      <tr key={index}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`既定の割り当て${index + 1}を有効にする`}
+                            checked={row.enabled}
+                            onChange={(event) =>
+                              changeDefault(index, { enabled: event.target.checked })
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            aria-label={`既定のコマンド${index + 1}`}
+                            value={row.command}
+                            onChange={(event) =>
+                              changeDefault(index, {
+                                command: event.target.value as WebShortcutDefault['command'],
+                              })
+                            }
+                          >
+                            <option value="reload">リロード</option>
+                            <option value="back">戻る</option>
+                            <option value="forward">進む</option>
+                            <option value="open">開く</option>
+                            <option value="home">開始ページへ</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            readOnly
+                            data-shortcut-recorder="true"
+                            aria-label={`既定のショートカット${index + 1}`}
+                            value={row.key}
+                            onFocus={() => void window.dock.setShortcutRecording(true)}
+                            onBlur={() => void window.dock.setShortcutRecording(false)}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                              if (event.key === 'Tab' && !event.ctrlKey && !event.altKey) return;
+                              event.preventDefault();
+                              if (event.key === 'Escape') {
+                                event.currentTarget.blur();
+                                return;
+                              }
+                              const key = shortcutFromEvent(event.nativeEvent);
+                              if (key) changeDefault(index, { key });
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            aria-label={`既定のいつ・どこで${index + 1}`}
+                            value={row.when.scope}
+                            onChange={(event) =>
+                              changeDefault(index, {
+                                when: { scope: event.target.value as ShortcutScope, appletIds: [] },
+                              })
+                            }
+                          >
+                            {shortcutScopes.map((scope) => (
+                              <option key={scope.id} value={scope.id}>
+                                {scope.id === 'owner' ? '追加されるWebApplet' : scope.title}
+                              </option>
+                            ))}
+                          </select>
+                          {row.when.scope === 'applets' && (
+                            <div
+                              className="web-shortcut-targets"
+                              role="group"
+                              aria-label={`既定の対象Applet${index + 1}`}
+                            >
+                              {[
+                                ...applets,
+                                ...row.when.appletIds
+                                  .filter((id) => !applets.some((applet) => applet.id === id))
+                                  .map((id) => ({ id, title: `未導入: ${id}` })),
+                              ].map((applet) => (
+                                <label key={applet.id}>
+                                  <input
+                                    type="checkbox"
+                                    checked={row.when.appletIds.includes(applet.id)}
+                                    onChange={(event) =>
+                                      changeDefault(index, {
+                                        when: {
+                                          scope: 'applets',
+                                          appletIds: event.target.checked
+                                            ? [...row.when.appletIds, applet.id]
+                                            : row.when.appletIds.filter((id) => id !== applet.id),
+                                        },
+                                      })
+                                    }
+                                  />
+                                  {applet.title}
+                                </label>
+                              ))}
+                              {!row.when.appletIds.length && (
+                                <small role="alert">1件以上選択してください。</small>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              changeDefaults(data.shortcutDefaults.filter((_, i) => i !== index))
+                            }
+                          >
+                            解除
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="actions">
+                <button
+                  className="secondary"
+                  disabled={data.shortcutDefaults.length >= 20}
+                  onClick={() =>
+                    changeDefaults([
+                      ...data.shortcutDefaults,
+                      {
+                        command: 'reload',
+                        key: 'F5',
+                        enabled: true,
+                        when: { scope: 'owner', appletIds: [] },
+                      },
+                    ])
+                  }
+                >
+                  ＋ 割り当てを追加
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => changeDefaults(defaultWebShortcutDefaults())}
+                >
+                  既定に戻す
+                </button>
+              </div>
             </div>
-            <div className="actions">
-              <button
-                className="secondary"
-                disabled={data.shortcutDefaults.length >= 20}
-                onClick={() =>
-                  changeDefaults([
-                    ...data.shortcutDefaults,
-                    {
-                      command: 'reload',
-                      key: 'F5',
-                      enabled: true,
-                      when: { scope: 'owner', appletIds: [] },
-                    },
-                  ])
-                }
-              >
-                ＋ 割り当てを追加
-              </button>
-              <button
-                className="text-button"
-                onClick={() => changeDefaults(defaultWebShortcutDefaults())}
-              >
-                既定に戻す
-              </button>
-            </div>
-          </div>
+          )}
         </>
       )}
-      {item && (
+      {tab === 'settings' && item && (
         <div className="web-applet-form" key={item.id}>
           <label>
             名前

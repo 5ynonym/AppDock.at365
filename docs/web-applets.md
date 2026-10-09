@@ -4,7 +4,9 @@ WebAppletはURLから追加する本体管理のAppletです。配布用のexten
 
 ## 設定と保存
 
-「Applet → WebAppletを追加」または「設定 → WebApplet」から追加し、名前・HTTP(S)の開始URL・本体ページ/別ウィンドウ・ページ遷移・アカウントを指定して「変更をすべて保存」を押します。既存の共有draft/JSON/revision/競合検出を使い、Applet詳細の設定にも同じ編集内容を表示します。追加・削除は再起動なしで反映します。
+管理入口はApplet一覧の組み込み「WebApplet」です。設定タブに追加/編集、ショートカットタブに将来のサイト用初期値を置きます。設定カテゴリの旧WebApplet入口は削除しました。管理項目`appdock.web-manager`はrendererの選択状態だけに存在し、manifest/runtime snapshot/更新/起動順/リボン/コマンド提供元へ追加しません。各サイトの`web.<UUID>`と保存形式は変更しません。ログタブはWebAppletに関係するsourceだけを表示します。
+
+「Applet → WebApplet → 設定」またはAppletページ上部の「WebAppletを追加」から追加し、名前・HTTP(S)の開始URL・本体ページ/別ウィンドウ・ページ遷移・アカウントを指定して「変更をすべて保存」を押します。既存の共有draft/JSON/revision/競合検出を使い、Applet詳細の設定にも同じ編集内容を表示します。追加・削除は再起動なしで反映します。
 
 `settings.json`の`webApplets`は`items:[{id,name,url,accountId,enabled,display,navigation,allowedOrigins,icon,imported?}]`と`shortcutDefaults:[{command,key,enabled,when}]`です。アカウント枠の一覧は含めません。旧設定では空の一覧とリロード=F5・戻る=Alt+左・進む=Alt+右の初期テンプレートを補います。名前/URLを変えてもIDを維持し、リボン配置・ショートカット・表示先を保持します。WebAppletは本体に含まれるため、個別のバージョン確認/更新対象にはしません。
 

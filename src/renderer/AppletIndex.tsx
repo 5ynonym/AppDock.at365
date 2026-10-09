@@ -3,7 +3,6 @@ import type { ExtensionSnapshot } from '../shared/contracts';
 import { moveApplet } from '../shared/applet-order';
 import { Toggle } from './Toggle';
 import type { SettingsEditor } from './useSettingsEditor';
-import { SettingsMessages } from './SettingsActions';
 
 export function AppletIndex({
   applets,
@@ -11,16 +10,16 @@ export function AppletIndex({
   onSelect,
   editor,
   busy,
-  revision,
-  showMessages,
+  onWebManager,
+  webManagerSelected,
 }: {
   applets: ExtensionSnapshot[];
   selected?: string;
   onSelect(id: string): void;
   editor: SettingsEditor;
   busy: boolean;
-  revision: number;
-  showMessages: boolean;
+  onWebManager(): void;
+  webManagerSelected: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [reordering, setReordering] = useState(false);
@@ -75,21 +74,22 @@ export function AppletIndex({
       {reordering && (
         <div className="applet-reorder-help">
           <p>つまみをドラッグするか、上下ボタンで移動できます。変更は保存で反映します。</p>
-          <button
-            className="primary"
-            disabled={busy || !editor.dirty || editor.avatarLoading}
-            onClick={() => void editor.save()}
-          >
-            並び順を含む変更を保存
-          </button>
-          <button className="text-button" disabled={busy || !editor.dirty} onClick={editor.reset}>
-            すべての変更を破棄
-          </button>
-          <small>設定・ショートカットの未保存変更も対象です。</small>
+          <small>ページ上部で設定・ショートカットと一緒に保存できます。</small>
         </div>
       )}
-      {showMessages && <SettingsMessages editor={editor} currentRevision={revision} />}
       <div className={`sidebar-extensions${reordering ? ' reordering' : ''}`}>
+        {!reordering && (!search || 'WebApplet'.toLowerCase().includes(search.toLowerCase())) && (
+          <div className="applet-index-row">
+            <button
+              className={`applet-select${webManagerSelected ? ' selected' : ''}`}
+              onClick={onWebManager}
+              aria-current={webManagerSelected ? 'true' : undefined}
+            >
+              <span title="WebApplet">WebApplet</span>
+              <small>組み込み</small>
+            </button>
+          </div>
+        )}
         {filtered.map((applet, index) => (
           <div
             key={applet.id}

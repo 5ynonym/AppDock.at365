@@ -525,7 +525,10 @@ const checks = [];
       assert.equal(source, 'appdock.welcome');
     await page.getByLabel('Appletを検索', { exact: true }).fill('検証Applet 01');
     await page.locator('.sidebar-extensions button').click();
-    assert.equal(await page.locator('.detail-logs').count(), 0);
+    assert.equal(await page.locator('.detail-logs').count(), 1);
+    assert.equal(await detailTab('ログ').getAttribute('aria-selected'), 'true');
+    for (const source of await page.locator('.detail-logs .log-row > div > span').allTextContents())
+      assert.equal(source, 'test.applet-1');
     await detailTab('設定').click();
     await page.getByLabel('検証項目 0', { exact: true }).fill('ログ切替で保持する下書き');
     await detailTab('ログ').click();
@@ -537,7 +540,7 @@ const checks = [];
     await button('変更を破棄して再読み込み').click();
     await detailTab('説明').click();
     checks.push(
-      'inline applet logs / fixed source / search and level / stable tabs / shared draft / independent global logs / applet selection resets',
+      'inline applet logs / fixed source / search and level / stable tabs / shared draft / independent global logs / applet selection retains tab',
     );
 
     const searchButton = page.locator('.titlebar-search');

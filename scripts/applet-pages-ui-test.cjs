@@ -264,6 +264,53 @@ async function launch() {
           ).id,
       account,
     );
+    await button('設定').click();
+    await button('JSON').click();
+    const noticeDraft = JSON.parse(await dock.getByLabel('設定JSON', { exact: true }).inputValue());
+    noticeDraft.profile.name = 'Gmail overlay fixture';
+    await dock.getByLabel('設定JSON', { exact: true }).fill(JSON.stringify(noticeDraft));
+    await button('Gmail').click();
+    const noticeUi = await until(
+      () =>
+        app
+          .context()
+          .pages()
+          .find((page) => page.url().includes('settingsNotice=1')),
+      'Gmail unsaved notice renderer',
+    );
+    await noticeUi.getByRole('region', { name: '未保存の変更', exact: true }).waitFor();
+    assert.equal(
+      await gmailUi.getByPlaceholder('送信元・件名・アカウント名で検索').inputValue(),
+      '保持',
+    );
+    assert.equal((await snapshot()).selected, account);
+    assert.equal(
+      await app.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().startsWith('appdock://host/'),
+        );
+        return window.contentView.children.at(-1).webContents.getURL();
+      }),
+      'appdock://host/index.html?settingsNotice=1',
+    );
+    await noticeUi.screenshot({ path: path.join(profile, 'gmail-settings-notice.png') });
+    await noticeUi.getByRole('button', { name: 'すべて保存', exact: true }).click();
+    await until(
+      async () =>
+        (await noticeUi.getByRole('region', { name: '未保存の変更', exact: true }).count()) === 0,
+      'Gmail notice save',
+    );
+    assert.equal(
+      await dock.evaluate(async () => (await window.dock.snapshot()).settings.value.profile.name),
+      'Gmail overlay fixture',
+    );
+    assert.equal(
+      await app.evaluate(({ webContents }, id) => !!webContents.fromId(id), contentsId),
+      true,
+    );
+    checks.push(
+      'floating notice above nested Gmail views / search and account retained / host draft saved without rebuilding mail contents',
+    );
     await setDisplay('at365.gmail', 'gmail', 'window');
     await button('Gmail').click();
     assert.equal(

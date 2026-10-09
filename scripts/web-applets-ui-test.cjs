@@ -87,6 +87,14 @@ async function until(fn, label) {
   throw Error(label);
 }
 const snapshot = () => dock.evaluate(() => window.dock.snapshot());
+const manageWeb = async () => {
+  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await dock
+    .locator('.applet-select')
+    .filter({ has: dock.locator('span[title="WebApplet"]') })
+    .click();
+  await dock.getByRole('tab', { name: '設定', exact: true }).click();
+};
 const update = async (fn, arg) => {
   const s = await snapshot();
   fn(s.settings.value, arg);
@@ -157,8 +165,10 @@ async function remote(id) {
   );
   await dock.locator('[data-ribbon-id="extensions"]').click();
   await dock.getByRole('button', { name: 'WebAppletを追加', exact: true }).click();
+  await dock.getByRole('tab', { name: 'ショートカット', exact: true }).click();
   await dock.getByLabel('既定のショートカット1', { exact: true }).press('Control+F6');
   await dock.getByLabel('既定の割り当て2を有効にする', { exact: true }).uncheck();
+  await dock.getByRole('tab', { name: '設定', exact: true }).click();
   await dock.getByRole('button', { name: '＋ WebAppletを追加', exact: true }).click();
   await dock.getByLabel('WebAppletのURL', { exact: true }).fill(`http://127.0.0.1:${port}/start`);
   await dock.getByLabel('WebAppletの表示方法', { exact: true }).focus();
@@ -215,7 +225,7 @@ async function remote(id) {
   assert.deepEqual(fs.readFileSync(accountFile), originalAccountFile);
   assert.equal(
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
-    0,
+    1,
   );
   await dock.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
   await until(async () => (await snapshot()).webAccounts.length === 2, 'immediate add');
@@ -267,13 +277,8 @@ async function remote(id) {
       .count(),
     0,
   );
-  assert.equal(
-    await categories
-      .getByRole('button', { name: /^WebApplet/ })
-      .locator('.unsaved-mark')
-      .count(),
-    1,
-  );
+  assert.equal(await categories.getByRole('button', { name: /^WebApplet/ }).count(), 0);
+  await dock.getByText('未保存の変更があります', { exact: true }).waitFor();
   assert.equal(
     await dock
       .getByRole('button', { name: 'ログイン情報をクリア', exact: true })
@@ -289,7 +294,7 @@ async function remote(id) {
       .isDisabled(),
     true,
   );
-  await categories.getByRole('button', { name: /^WebApplet/ }).click();
+  await manageWeb();
   assert.equal(
     await dock.getByLabel('WebAppletの名前', { exact: true }).inputValue(),
     '編集中のWeb',
@@ -301,6 +306,8 @@ async function remote(id) {
       .textContent(),
     '個人用（変更）',
   );
+  await dock.locator('[data-ribbon-id="settings"]').click();
+  await categories.getByRole('button', { name: /^一般/ }).click();
   await dock.getByRole('button', { name: 'JSON', exact: true }).click();
   const validJson = await dock.getByLabel('設定JSON', { exact: true }).inputValue(),
     invalidJson = '{unfinished settings';
@@ -380,10 +387,11 @@ async function remote(id) {
     .click();
   assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
   await categories.getByRole('button', { name: /^Webアカウント/ }).click();
-  await categories.getByRole('button', { name: /^WebApplet/ }).click();
+  await categories.getByRole('button', { name: /^一般/ }).click();
   assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
   await dock.getByLabel('設定JSON', { exact: true }).fill(validJson);
   await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
+  await manageWeb();
   await dock.getByLabel('WebAppletの名前', { exact: true }).fill('ユキのWeb');
   await dock.getByLabel('WebAppletのページ遷移', { exact: true }).selectOption('same-origin');
   manifestName = 'Web側の変更';
@@ -391,7 +399,7 @@ async function remote(id) {
   await until(
     () =>
       dock
-        .getByRole('status')
+        .locator('.web-applet-settings [role="status"]')
         .textContent()
         .then((t) => t.includes('内容を確認')),
     'refresh defaults',
@@ -567,8 +575,7 @@ async function remote(id) {
   checks.push(
     'different Web profiles isolate Cookies; same Web profile shares Cookies; Gmail storage untouched',
   );
-  await dock.locator('[data-ribbon-id="settings"]').click();
-  await dock.getByRole('button', { name: 'WebApplet', exact: true }).click();
+  await manageWeb();
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().startsWith('appdock://host/'),
@@ -578,6 +585,7 @@ async function remote(id) {
   });
   await until(() => dock.evaluate(() => innerWidth <= 1000), 'compact width');
   await dock.screenshot({ path: path.join(profile, 'settings-dark.png') });
+  await dock.locator('[data-ribbon-id="settings"]').click();
   await categories.getByRole('button', { name: /^Webアカウント/ }).click();
   await dock.screenshot({ path: path.join(profile, 'accounts-dark.png') });
   await update((v) => {
@@ -588,7 +596,7 @@ async function remote(id) {
     'light theme rendered',
   );
   await dock.screenshot({ path: path.join(profile, 'accounts-light.png') });
-  await categories.getByRole('button', { name: /^WebApplet/ }).click();
+  await manageWeb();
   await dock.screenshot({ path: path.join(profile, 'settings-light.png') });
   await app.close();
   app = undefined;
