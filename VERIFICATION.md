@@ -973,3 +973,12 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 
 - 上記の保存導線/WebApplet管理変更をユキちゃんの確認後、mainへコミットして正式Releaseへ公開する依頼を受領。既存のartifacts整理文書も保持してコミット対象へ含める。本体版は0.26.11を継続し、未変更Appletの版は増やさない。
 - 正式Prepareは本体回帰/発行と6Appletの再発行・オールインワン検証・更新UI/復旧検証を行う。準備/アセットhash/公開後の匿名取得と更新チェック・保持3件の整理の実結果は、artifacts/release-0.26.11-settings-20261010-01/plan.jsonおよび隣接チェックログを正本とする。未完の結果を成功として扱わない。実利用先へのdeployは含めない。
+
+## 2026-10-10 本体と同梱AppletのまとめたRelease
+
+- ユーザーの追加指定により、リリースは未公開の本体（3asset）と全体ZIP内の未公開版Applet（各repoのupdate.zip/update.json）をまとめて判定・公開し、公開後検証に成功した今回の全repoを最新3件へ整理する手順へ更新。30.PROJECT/AGENTS.md、本体AGENTS/DEVELOPMENT/docs/RELEASING.mdへ反映。公開済み同版はskip、同梱だけの版更新や同版asset上書きはしない。release.ps1は本体用のままで、作業者がApplet個別公開まで行うことを明記した。
+- 既存の本体0.26.11 planはverifiedで、通常EXE/feed/フルパッケージは公開済み。この本体と6Appletの製品ソース・版・配布物は再ビルド/変更せず、検証済みbundleと各Appletの元ZIP全ファイルをsize/SHA256で再照合した。6件すべて一致（artifacts/release-bundled-applets-20261010/bundle-match.json）。初回のWindows PowerShell 5.1ではUTF-8 JSONを既定文字コードで誤読して停止、-Encoding UTF8を明示して再実行後に成功。製品ファイルの文字コードは変更なし。
+- 全6repoのremote main・タグ・公開版を確認し、未公開のGmail0.9.1（b3bc366）、Watch0.1.2（d21d6b4）、WebBrowserTools0.3.1（f7bdbd8）を自身のrepoで下書き/2asset照合/正式公開。既存のclean mainとbundle commitが一致し、追加commit/push不要。WallpaperSlideshow0.4.0、WindowMover0.2.1、WindowsTools0.1.1は同梱版の公開タグ/commit/feed ID・版を確認してskipした。
+- 公開3repoの全6assetを匿名で取得しsize/SHA256を検証、各tag/remote main/latest/ノート/digest一致。実PortableUpdates.check()の一括結果は3件すべてavailable、同梱version、installable:true（host0.26.11、実インストールなし）。成功をrepo別に保存後、共通release-retention.cjsで各repoは2件保持/削除0・complete。既に整理済み本体は3件、skipした3repoは各1件。全7repoの最終latest/保持件数を読み取りで確認し、公開済み本体/skip repoは変更なし。
+- 公開URL: [Gmail0.9.1](https://github.com/5ynonym/Applet.Gmail.at365/releases/tag/v0.9.1)、[Watch0.1.2](https://github.com/5ynonym/Applet.Watch.at365/releases/tag/v0.1.2)、[WebBrowserTools0.3.1](https://github.com/5ynonym/Applet.WebBrowserTools.at365/releases/tag/v0.3.1)。ノートと封印した配布物、draft/public/verified状態、個別更新結果、整理レポートはartifacts/release-bundled-applets-20261010/plan.jsonと各*-verified.json/*-retention-*.json、全7repo一覧はfinal-roster.json。plan.phaseはcomplete。
+- 手順文書の相対リンク69件と追加見出しリンク3件、git diff --check成功。今回は製品ソース変更なしで、新しいruntimeテスト/本体版更新/本体再発行/実利用deployは不要。既存の正式Prepareと各Applet版の検証を使用した。Release記録と失敗/不明/他作業のartifactは保持し、今回の手順作業でテストフォルダー削除は行っていない。
