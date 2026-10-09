@@ -187,6 +187,25 @@ export function getKeybindings(
     settings.keybindings ?? migrateKeybindings(settings.shortcuts, settings.globalShortcutCommands)
   );
 }
+/** Reorder the visible provider's slots, preserving other providers' dispatch positions. */
+export function moveKeybindingInGroup(
+  rows: Keybinding[],
+  id: string,
+  target: string,
+  groupForCommand: (command: string) => string,
+) {
+  const row = rows.find((row) => row.id === id),
+    to = rows.find((row) => row.id === target);
+  if (!row || !to || groupForCommand(row.command) !== groupForCommand(to.command)) return rows;
+  const group = groupForCommand(row.command);
+  const members = rows.filter((item) => groupForCommand(item.command) === group);
+  const fromIndex = members.indexOf(row),
+    toIndex = members.indexOf(to);
+  members.splice(fromIndex, 1);
+  members.splice(toIndex, 0, row);
+  let index = 0;
+  return rows.map((item) => (groupForCommand(item.command) === group ? members[index++] : item));
+}
 export function defaultKeybindings() {
   return migrateKeybindings(defaultShortcuts, defaultGlobalShortcutCommands);
 }

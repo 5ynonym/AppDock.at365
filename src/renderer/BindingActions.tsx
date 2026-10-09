@@ -2,14 +2,18 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 /** Keep row actions outside the scrolling table so opening them never changes its layout. */
-export function GestureActions({
+export function BindingActions({
   label,
   onDuplicate,
   onDelete,
+  removalKind = 'delete',
+  extraActions = [],
 }: {
   label: string;
-  onDuplicate(): void;
-  onDelete(): void;
+  onDuplicate?(): void;
+  onDelete?(): void;
+  removalKind?: 'delete' | 'clear-key';
+  extraActions?: { title: string; onClick(): void; disabled?: boolean }[];
 }) {
   const [stage, setStage] = useState<'menu' | 'confirm' | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -34,7 +38,7 @@ export function GestureActions({
         innerHeight - bounds.height - 8,
       ),
     )}px`;
-    popup.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+    popup.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
     const outside = (e: PointerEvent) => {
       if (
         e.target instanceof Node &&
@@ -84,7 +88,13 @@ export function GestureActions({
             ref={panel}
             className="gesture-actions-popup"
             role={stage === 'menu' ? 'menu' : 'alertdialog'}
-            aria-label={stage === 'menu' ? label : '割り当ての削除確認'}
+            aria-label={
+              stage === 'menu'
+                ? label
+                : removalKind === 'clear-key'
+                  ? 'キーの割り当てのクリア確認'
+                  : '割り当ての削除確認'
+            }
             aria-describedby={stage === 'confirm' ? `${id}-message` : undefined}
             onKeyDown={(e) => {
               e.stopPropagation();
@@ -98,7 +108,10 @@ export function GestureActions({
                 e.key === 'Tab'
               ) {
                 e.preventDefault();
-                const buttons = Array.from(panel.current?.querySelectorAll('button') ?? []);
+                const buttons = Array.from(
+                  panel.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [],
+                );
+                if (!buttons.length) return;
                 const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
                 const next =
                   e.key === 'Home'
@@ -113,31 +126,52 @@ export function GestureActions({
           >
             {stage === 'menu' ? (
               <>
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    close();
-                    onDuplicate();
-                  }}
-                >
-                  複製
-                </button>
-                <button role="menuitem" className="danger" onClick={() => setStage('confirm')}>
-                  削除…
-                </button>
+                {extraActions.map((action) => (
+                  <button
+                    key={action.title}
+                    role="menuitem"
+                    disabled={action.disabled}
+                    onClick={() => {
+                      close();
+                      action.onClick();
+                    }}
+                  >
+                    {action.title}
+                  </button>
+                ))}
+                {onDuplicate && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      onDuplicate();
+                    }}
+                  >
+                    複製
+                  </button>
+                )}
+                {onDelete && (
+                  <button role="menuitem" className="danger" onClick={() => setStage('confirm')}>
+                    {removalKind === 'clear-key' ? 'キーのクリア…' : '削除…'}
+                  </button>
+                )}
               </>
             ) : (
               <>
-                <p id={`${id}-message`}>この割り当てを削除しますか？</p>
+                <p id={`${id}-message`}>
+                  {removalKind === 'clear-key'
+                    ? 'このキーの割り当てをクリアしますか？'
+                    : 'この割り当てを削除しますか？'}
+                </p>
                 <button onClick={() => setStage('menu')}>キャンセル</button>
                 <button
                   className="danger"
                   onClick={() => {
                     close();
-                    onDelete();
+                    onDelete?.();
                   }}
                 >
-                  削除する
+                  {removalKind === 'clear-key' ? 'クリアする' : '削除する'}
                 </button>
               </>
             )}

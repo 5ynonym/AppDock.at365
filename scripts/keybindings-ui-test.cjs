@@ -339,7 +339,8 @@ const expectCalls = async (before, expected) => {
       2,
     );
     await row.getByRole('button', { name: '閉じる', exact: true }).click();
-    await row.getByRole('button', { name: '割り当てを追加' }).click();
+    await row.getByRole('button', { name: /その他の操作/ }).click();
+    await dock.getByRole('menuitem', { name: '複製', exact: true }).click();
     assert.equal(await dock.locator('[data-shortcut-command="test.keys.c"]').count(), 2);
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
@@ -368,8 +369,9 @@ const expectCalls = async (before, expected) => {
         ).key === 'Ctrl+Shift+F11',
       'Recorded key saved',
     );
-    await row.getByRole('button', { name: '実行順を上げる' }).click();
-    await row.getByRole('checkbox', { name: /割り当てを有効/ }).uncheck();
+    await row.getByRole('button', { name: /その他の操作/ }).click();
+    await dock.getByRole('menuitem', { name: '全体の実行順を上げる', exact: true }).click();
+    await row.getByRole('switch', { name: /割り当てを有効/ }).click();
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -383,14 +385,11 @@ const expectCalls = async (before, expected) => {
     assert.equal(saved.keybindings[1].enabled, false);
     assert.equal(saved.keybindings[1].key, 'Ctrl+Shift+F11');
     assert.equal(saved.keybindings[1].when.scope, 'applets');
-    assert.deepEqual(await row.locator('select option').allTextContents(), [
-      'グローバル',
-      'AppDock全体',
-      'すべてのApplet',
-      'キー検証',
-      '指定したApplet',
-    ]);
-    await row.locator('select').selectOption('owner');
+    assert.deepEqual(
+      await row.locator('select[aria-label*="いつ・どこで"] option').allTextContents(),
+      ['グローバル', 'AppDock全体', 'すべてのApplet', 'キー検証', '指定したApplet'],
+    );
+    await row.locator('select[aria-label*="いつ・どこで"]').selectOption('owner');
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -425,7 +424,7 @@ const expectCalls = async (before, expected) => {
       const entry = dock.locator(`[data-shortcut-command="${command}"]`);
       await entry.locator('[data-shortcut-recorder]').focus();
       await entry.locator('[data-shortcut-recorder]').press(key);
-      assert.equal(await entry.locator('select').inputValue(), scope);
+      assert.equal(await entry.locator('select[aria-label*="いつ・どこで"]').inputValue(), scope);
       assert.equal(await entry.locator('.command-id').textContent(), command);
       await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
       await until(

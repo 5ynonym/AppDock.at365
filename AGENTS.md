@@ -76,6 +76,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 未割り当てのAppletコマンドへキーを追加する時はowner、本体/提供元不明はappを既定にする。既存条件の編集/複製を上書きしない。コマンド一覧の補助表示は完全なIDを見せ、提供元表示名とIDの双方で検索できることを保つ。
 - Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細の一括初期化は対象Appletの行だけを置き換える。正本の形式と検証境界はdocs/keybindings.mdを参照する。
 - UIはuseSettingsEditorのdraft/JSON/revision/saveを共用。条件のない旧設定への完全互換のために新設計を複雑化しない（2026-10-09ユーザー指定）。
+- グローバルキーの登録ステータスはWindowsの受付状態であり、設定の保存状態とは別。キー記録中は全登録を一時解除しstatusesが空になる。表示の調査時はこの一時停止/復帰を区別する。詳細はdocs/keybindings.md。
+- 正常時の登録済み/未登録と、正常な同キー割り当ての注意文は行に表示しない。登録エラーは記録中も直近の再検査結果を保持し、行高とエラー絞り込みを安定させる。表示用キャッシュをbackendの受付や共有draftへ使わない。全体順のメニューは操作範囲を明記する。
 
 ## マウスジェスチャーの維持事項
 
@@ -89,3 +91,11 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 行の操作メニューはスクロール表の外へ浮かべ、行の高さを変えない。画面端の位置補正、外側クリック/Escapeで閉じる操作、キーボード移動、削除確認を維持する。
 
 - Applet設定は詳細ページへ集約し、設定ページにApplet別一覧/本体専用キー入口を戻さない。全体キー一覧はAppDock→appletOrderによるApplet順→未確認コマンドのグループ表示。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、保存/破棄は全編集内容を対象にする。起動順・keybindingsの実行順・独立したribbon.orderを表示順で変更しない。仕様はdocs/host-development.mdとdocs/keybindings.md、回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。
+
+- ShortcutsEditor/GesturesEditorの行末メニューはBindingActions.tsxで共用する。共通Toggle/選択専用CommandPalette/ドラッグハンドルと細いその他列を維持。ショートカットのグループ内並べ替えは他提供元の保存位置を保持し、全体の実行順操作はメニューで残す。新規キー未指定はdraftとして保持し、保存時に拒否する。複製で既存条件を変更せず、削除は確認を通す。仕様はdocs/keybindings.md、検証はscripts/shortcuts-ui-test.cjsと既存キー/ジェスチャーGUI。
+
+- 割り当て表の全グループは同じcolgroup/固定レイアウトで列境界を揃える。順番など操作列は共通の固定幅、コマンド列は残り幅、グループ見出しは表の外。内容依存の自動列幅へ戻さず、狭幅は表内スクロールで扱う。GUIでは両テーマ/全3幅で全グループの列座標・幅と細いその他列を照合する。
+
+- ショートカットの表示番号は提供元グループ内で1から採番し、検索/状態フィルターで番号を振り直さない。表示用番号で保存配列やdispatcherの実行順を変更しない。
+
+- ショートカットの解除はその他メニューの「キーのクリア…」から確認後に選んだ行だけをdraftから除く。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは割り当て可能なキーとして残す。共通BindingActionsのremovalKindで文言を切り替え、ジェスチャーの削除確認は保持する。

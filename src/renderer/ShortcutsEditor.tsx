@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { BindingActions } from './BindingActions';
+import { CommandPalette } from './CommandPalette';
+import { Toggle } from './Toggle';
 import { shortcutFromEvent, type UiCommand } from '../shared/commands';
 import type { Settings, GlobalHotKeyStatus, ExtensionSnapshot } from '../shared/contracts';
 import {
@@ -7,6 +10,7 @@ import {
   getKeybindings,
   withKeybindings,
   shortcutScopes,
+  moveKeybindingInGroup,
   type Keybinding,
   type ShortcutScope,
 } from '../shared/keybindings';
@@ -34,6 +38,16 @@ export function ShortcutsEditor({
   const [recording, setRecording] = useState('');
   const [choosing, setChoosing] = useState<string | null>(null);
   const [appletFilter, setAppletFilter] = useState('');
+  const [adding, setAdding] = useState<string | null>(null);
+  const [focusBinding, setFocusBinding] = useState<string | null>(null);
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const lastStatuses = useRef(statuses);
+  useEffect(() => {
+    // Recording temporarily releases all OS registrations; keep any error visible until rechecked.
+    if (statuses.length) lastStatuses.current = statuses;
+  }, [statuses]);
+  const displayedStatuses = statuses.length ? statuses : lastStatuses.current;
   const rows = getKeybindings(settings);
   const defaults = [
     ...defaultKeybindings(),
@@ -89,6 +103,50 @@ export function ShortcutsEditor({
         extension: '未確認のコマンド',
         available: false,
       });
+  const groupForCommand = (id: string) => {
+    const command = known.get(id);
+    return !command ||
+      command.extension === '未確認のコマンド' ||
+      (command.extensionId && !extensions.some((applet) => applet.id === command.extensionId))
+      ? 'unknown'
+      : (command.extensionId ?? 'appdock');
+  };
+  const groupOrders = new Map<string, number>();
+  const groupCounts = new Map<string, number>();
+  for (const row of rows) {
+    const group = groupForCommand(row.command);
+    const order = (groupCounts.get(group) ?? 0) + 1;
+    groupCounts.set(group, order);
+    groupOrders.set(row.id, order);
+  }
+  const moveInGroup = (id: string, target: string) =>
+    change(moveKeybindingInGroup(rows, id, target, groupForCommand));
+  const addBinding = (command: UiCommand) => {
+    const binding = create(command, '');
+    change([...rows, binding]);
+    setFilter('');
+    setStatusFilter('all');
+    setAdding(null);
+    setFocusBinding(binding.id);
+  };
+  const duplicate = (row: Keybinding) => {
+    const index = rows.indexOf(row),
+      binding = { ...structuredClone(row), id: crypto.randomUUID() };
+    change([...rows.slice(0, index + 1), binding, ...rows.slice(index + 1)]);
+    setFocusBinding(binding.id);
+  };
+  useEffect(() => {
+    if (!focusBinding) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLInputElement>(
+          `[data-binding-id="${focusBinding}"] [data-shortcut-recorder]`,
+        )
+        ?.focus();
+      setFocusBinding(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusBinding]);
   const entries = [
     ...rows.map((row) => ({ command: known.get(row.command)!, row })),
     ...[...known.values()]
@@ -105,7 +163,12 @@ export function ShortcutsEditor({
         (statusFilter === 'unassigned' && !row) ||
         (statusFilter === 'conflict' &&
           row &&
-          statuses.some((s) => s.commandId === row.command && s.shortcut === row.key && s.error))),
+          row.enabled &&
+          row.when.scope === 'global' &&
+          command.available &&
+          displayedStatuses.some(
+            (s) => s.commandId === row.command && s.shortcut === row.key && s.error,
+          ))),
   );
   const groups =
     owner === undefined
@@ -138,7 +201,7 @@ export function ShortcutsEditor({
       : [{ id: owner ?? 'appdock', title: '', entries }];
   return (
     <div className="shortcuts-editor">
-      <h3>ショートカットキー</h3>
+      <h2>ショートカットキー</h2>
       <p className="settings-help">
         キー欄を選んでキーを押し、「いつ・どこで」を選びます。変更は保存で反映します。同じキーで条件を満たしたコマンドを実行順に処理し、同じコマンドは1回だけ実行します。Tabで次の欄、Escapeで記録を終了します。
       </p>
@@ -182,28 +245,68 @@ export function ShortcutsEditor({
           AppDockを先頭に、Applet一覧の順で表示します。グループの表示順と、割り当ての実行順は別です。
         </p>
       )}
+      <p className="settings-help">
+        左端のつまみをドラッグ、または上下キーで同じApplet内の実行順を変更できます。番号はグループ内の順番です。その他の操作は「…」から開けます。新しい割り当てはキーを指定してから保存してください。
+      </p>
+      <div className="gesture-add shortcut-add">
+        <button onClick={() => setAdding(owner === undefined ? '*' : (owner ?? 'appdock'))}>
+          割り当てを追加
+        </button>
+      </div>
+      {adding !== null && (
+        <CommandPalette
+          mode="select"
+          commands={commands.filter(
+            (command) => adding === '*' || groupForCommand(command.id) === adding,
+          )}
+          pins={settings.pinnedCommands}
+          shortcuts={settings.shortcuts}
+          onPinsChange={(pinnedCommands) => onChange({ ...settings, pinnedCommands })}
+          onClose={() => setAdding(null)}
+          onChoose={addBinding}
+        />
+      )}
       {groups.map((group) => (
         <section
-          className="shortcut-group"
+          className={`shortcut-group${group.title ? ' gesture-group' : ''}`}
           key={group.id}
           data-shortcut-owner={group.id}
           aria-label={group.title || undefined}
         >
           {group.title && (
-            <h3 className="shortcut-group-heading">
-              {group.title}
-              <small>{group.entries.length}件</small>
-            </h3>
+            <div className="shortcut-group-heading gesture-group-heading">
+              <h3>
+                {group.title}
+                <small>{group.entries.length}件</small>
+              </h3>
+              {group.id !== 'unknown' && (
+                <button
+                  aria-label={`${group.title}に割り当てを追加`}
+                  onClick={() => setAdding(group.id)}
+                >
+                  ＋ 割り当てを追加
+                </button>
+              )}
+            </div>
           )}
-          <div className="keybindings-scroll">
-            <table className="keybindings-table">
+          <div className="keybindings-scroll gesture-table-scroll">
+            <table className="keybindings-table gesture-table">
+              <colgroup>
+                <col className="binding-order-column" />
+                <col className="binding-enabled-column" />
+                <col />
+                <col className="binding-input-column" />
+                <col className="binding-condition-column" />
+                <col className="binding-actions-column" />
+              </colgroup>
               <thead>
                 <tr>
+                  <th>順番</th>
                   <th>有効</th>
                   <th>コマンド</th>
                   <th>キーバインド</th>
                   <th>いつ・どこで</th>
-                  <th>実行順・操作</th>
+                  <th>その他</th>
                 </tr>
               </thead>
               <tbody>
@@ -214,8 +317,10 @@ export function ShortcutsEditor({
                     ? rows.filter((r) => r.command === command.id).indexOf(row) + 1
                     : 1;
                   const status =
-                    row?.when.scope === 'global' && row.enabled
-                      ? statuses.find((s) => s.commandId === row.command && s.shortcut === row.key)
+                    row?.when.scope === 'global' && row.enabled && command.available
+                      ? displayedStatuses.find(
+                          (s) => s.commandId === row.command && s.shortcut === row.key,
+                        )
                       : undefined;
                   const choices = [
                     ...applets,
@@ -224,23 +329,83 @@ export function ShortcutsEditor({
                       .map((id) => ({ id, title: `未導入: ${id}` })),
                   ];
                   return (
-                    <tr key={rowKey} data-shortcut-command={command.id} data-binding-id={row?.id}>
+                    <tr
+                      key={rowKey}
+                      data-shortcut-command={command.id}
+                      data-binding-id={row?.id}
+                      className={dropTarget === row?.id ? 'gesture-drop-target' : ''}
+                      onDragOver={(event) => {
+                        const source = rows.find((item) => item.id === dragged);
+                        if (
+                          !row ||
+                          !source ||
+                          groupForCommand(source.command) !== groupForCommand(row.command)
+                        )
+                          return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                        setDropTarget(row.id);
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (row && dragged) moveInGroup(dragged, row.id);
+                        setDragged(null);
+                        setDropTarget(null);
+                      }}
+                    >
+                      <td>
+                        {row ? (
+                          <button
+                            className="gesture-drag-handle"
+                            draggable
+                            aria-label={`${command.title}のショートカット ${commandIndex}を並べ替え`}
+                            title="ドラッグ、または上下キーで同じApplet内の実行順を変更"
+                            onDragStart={(event) => {
+                              setDragged(row.id);
+                              event.dataTransfer.effectAllowed = 'move';
+                              event.dataTransfer.setData('text/plain', row.id);
+                            }}
+                            onDragEnd={() => {
+                              setDragged(null);
+                              setDropTarget(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const visible = group.entries.flatMap((entry) =>
+                                entry.row ? [entry.row] : [],
+                              );
+                              const target =
+                                visible[visible.indexOf(row) + (event.key === 'ArrowUp' ? -1 : 1)];
+                              if (target) moveInGroup(row.id, target.id);
+                            }}
+                          >
+                            <span aria-hidden="true">⠿</span> {groupOrders.get(row.id)}
+                          </button>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
                       <td>
                         {row && (
-                          <input
-                            type="checkbox"
-                            aria-label={`${command.title}の割り当てを有効にする`}
+                          <Toggle
+                            label={`${command.title}の割り当てを有効にする`}
                             checked={row.enabled}
-                            onChange={(e) => update(row.id, { enabled: e.target.checked })}
+                            onChange={(enabled) => update(row.id, { enabled })}
                           />
                         )}
                       </td>
                       <td>
                         <strong>{command.title}</strong>
+                        <small>{command.extension}</small>
                         <small className="command-id" title={command.extension}>
                           {command.id}
                         </small>
                         {!command.available && <small>現在利用できません</small>}
+                        {['appdock.quit', 'appdock.restart'].includes(command.id) && (
+                          <small>終了・再起動より後の処理は実行されません。</small>
+                        )}
                         <label className="keybinding-tray">
                           <input
                             type="checkbox"
@@ -292,12 +457,32 @@ export function ShortcutsEditor({
                             }
                           }}
                         />
-                        {status && (
-                          <small
-                            role={status.error ? 'alert' : undefined}
-                            className={status.error ? 'shortcut-conflict' : ''}
-                          >
-                            {status.error ?? (status.registered ? '登録済み' : '未登録')}
+                        <select
+                          aria-label={`${command.title}の特殊キー ${commandIndex}`}
+                          value=""
+                          onChange={(event) => {
+                            if (!event.target.value) return;
+                            if (row) update(row.id, { key: event.target.value });
+                            else change([...rows, create(command, event.target.value)]);
+                          }}
+                        >
+                          <option value="">特殊キーを選択…</option>
+                          {[
+                            'Tab',
+                            'Ctrl+Tab',
+                            'Ctrl+Shift+Tab',
+                            'Escape',
+                            'Enter',
+                            'Space',
+                            'Pause',
+                          ].map((key) => (
+                            <option key={key}>{key}</option>
+                          ))}
+                        </select>
+                        {row && !row.key && <small>キーを指定してください。</small>}
+                        {status?.error && (
+                          <small role="alert" className="shortcut-conflict">
+                            {status.error}
                           </small>
                         )}
                         {status?.error && (
@@ -308,10 +493,6 @@ export function ShortcutsEditor({
                             登録を再試行
                           </button>
                         )}
-                        {row &&
-                          rows.some((r) => r.id !== row.id && r.enabled && r.key === row.key) && (
-                            <small>同じキーの割り当てあり（条件一致時に実行）</small>
-                          )}
                       </td>
                       <td>
                         {row ? (
@@ -418,61 +599,42 @@ export function ShortcutsEditor({
                         )}
                       </td>
                       <td>
-                        <div className="keybinding-actions">
-                          {row && (
-                            <>
-                              <span>{index + 1}</span>
-                              <button
-                                aria-label="実行順を上げる"
-                                disabled={index === 0}
-                                onClick={() => move(row.id, -1)}
-                              >
-                                ↑
-                              </button>
-                              <button
-                                aria-label="実行順を下げる"
-                                disabled={index === rows.length - 1}
-                                onClick={() => move(row.id, 1)}
-                              >
-                                ↓
-                              </button>
-                              <button
-                                className="text-button"
-                                onClick={() =>
-                                  change([
-                                    ...rows,
-                                    { ...structuredClone(row), id: crypto.randomUUID() },
-                                  ])
-                                }
-                              >
-                                割り当てを追加
-                              </button>
-                              <button
-                                className="text-button"
-                                aria-label={`${command.title}のショートカット ${commandIndex}を解除`}
-                                onClick={() => change(rows.filter((r) => r.id !== row.id))}
-                              >
-                                解除
-                              </button>
-                            </>
-                          )}
-                          <button
-                            className="text-button"
-                            onClick={() =>
-                              change([
-                                ...rows.filter((r) => r.command !== command.id),
-                                ...defaults
-                                  .filter((r) => r.command === command.id)
-                                  .map((r) => ({ ...r, id: crypto.randomUUID() })),
-                              ])
-                            }
-                          >
-                            既定に戻す
-                          </button>
-                        </div>
-                        {['appdock.quit', 'appdock.restart'].includes(command.id) && (
-                          <small>終了・再起動より後の処理は実行されません。</small>
-                        )}
+                        <BindingActions
+                          label={`${command.title}のショートカット ${commandIndex}のその他の操作`}
+                          removalKind="clear-key"
+                          onDuplicate={row ? () => duplicate(row) : undefined}
+                          onDelete={
+                            row
+                              ? () => change(rows.filter((item) => item.id !== row.id))
+                              : undefined
+                          }
+                          extraActions={[
+                            ...(row
+                              ? [
+                                  {
+                                    title: '全体の実行順を上げる',
+                                    disabled: index === 0,
+                                    onClick: () => move(row.id, -1),
+                                  },
+                                  {
+                                    title: '全体の実行順を下げる',
+                                    disabled: index === rows.length - 1,
+                                    onClick: () => move(row.id, 1),
+                                  },
+                                ]
+                              : [{ title: '割り当てを追加', onClick: () => addBinding(command) }]),
+                            {
+                              title: '既定に戻す',
+                              onClick: () =>
+                                change([
+                                  ...rows.filter((item) => item.command !== command.id),
+                                  ...defaults
+                                    .filter((item) => item.command === command.id)
+                                    .map((item) => ({ ...item, id: crypto.randomUUID() })),
+                                ]),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   );

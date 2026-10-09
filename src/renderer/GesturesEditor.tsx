@@ -1,5 +1,5 @@
 import { CommandPalette } from './CommandPalette';
-import { GestureActions } from './GestureActions';
+import { BindingActions } from './BindingActions';
 import { Toggle } from './Toggle';
 import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot } from '../shared/contracts';
@@ -245,6 +245,14 @@ export function GesturesEditor({
           </div>
           <div className="gesture-table-scroll">
             <table className="gesture-table">
+              <colgroup>
+                <col className="binding-order-column" />
+                <col className="binding-enabled-column" />
+                <col />
+                <col className="binding-input-column" />
+                <col className="binding-condition-column" />
+                <col className="binding-actions-column" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>順番</th>
@@ -460,7 +468,7 @@ export function GesturesEditor({
                           )}
                       </td>
                       <td>
-                        <GestureActions
+                        <BindingActions
                           label={`割り当て${index + 1}のその他の操作`}
                           onDuplicate={() =>
                             change({

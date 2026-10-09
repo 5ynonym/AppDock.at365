@@ -204,3 +204,9 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 ## コマンドパレットの共用
 
 実行用・割り当て選択用・ピン留めの表示とキーボード操作は`src/renderer/CommandPalette.tsx`で共用する。呼出し側が候補とonChooseを渡し、mode=selectのEnter/クリックは選択結果だけを返す。ピン留めは同じ保存形式を使い、設定内は共有draft、通常実行用は既存の即時保存に接続する。検索候補は完全コマンドID・提供元名でも絞り込める。IME中の決定抑制、フォーカス復帰、Tabの閉じ込め、選択用での入力停止/復帰を保つ。アイコンとスイッチはIcon/Toggleを共用する。利用例・編集検証は[ジェスチャー](gestures.md)を参照。
+
+## 割り当て操作UIの共用
+
+各グループの表は共通colgroupと固定レイアウトを使い、順番64px/有効52px/入力180px/条件200px/その他48px、コマンド列は残り幅とします。グループ名は表の外で折り返し、長いコマンド表示で列幅を変えません。最小720pxの表を内部スクロールさせ、設定ページ全体の横方向overflowを防ぎます。GUIでは短い/長いグループ名を含む全表の列座標と幅を照合します。
+
+ShortcutsEditor/GesturesEditorは共通Toggle・CommandPaletteのselectモード・BindingActions.tsxとgesture-table系スタイルを使います。BindingActionsは任意の追加操作と複製/削除コールバックを受け取り、portal位置補正・外側クリック/スクロール/Escape・無効項目を除くキーボード移動・削除確認を共用します。両方の末尾列を細く固定し、入力列が使える幅を確保します。行頭ハンドルのショートカット並べ替えは保存配列の同じ提供元の位置だけを入れ替え、Applet表示順と分けます。共有draft/JSON/revision/saveの所有者はuseSettingsEditorのままです。詳細は[keybindings](keybindings.md#マウスジェスチャーと共通の編集ui)、専用GUIはscripts/shortcuts-ui-test.cjsを参照してください。
