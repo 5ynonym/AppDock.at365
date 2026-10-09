@@ -1,5 +1,35 @@
 # 検証記録
 
+## 2026-10-09: Applet詳細タブを0.25.1へ版更新・コミット準備
+
+- ユーザーがタブ表示を確認し、バージョンインクリメントとコミットを依頼。SetVersionで0.25.0→0.25.1、READMEの現行版とv0.25.1の変更ノートを整合。追加指定により、今後の完成時は版更新とpublish発行をセットにする方針を共通/本体AGENTSへ反映。通常修正はパッチ番号、再試行/未変更Applet同梱だけでは追加インクリメントしない。
+- 型検査成功、`publish.bat`終了0。sandboxで版更新直後のpnpm確認が待機し、その対象だけを中断して通常Windows環境の型検査は終了0。lockfile/依存版に変更なし。
+- 発行EXEは100611563 bytes、SHA256 `917e43727bb298f0227a7c637bc545a2ea8d21efcaadfe699d33b8746c6f648a`。update.jsonと0.25.1全体ZIP内の本体の版/hash/size一致。全6Applet/21ファイルの整合と安全な隔離展開を既存verify-all-in-one.ps1で確認（`artifacts/detail-tabs-0.25.1-publish-20261009.json`）。
+- 0.25.1発行win-unpackedのnavigation GUI17群成功（`artifacts/navigation-1791529668175`）、実単一EXEの隔離smoke成功（`artifacts/smoke-1791529678569`）。push/GitHub Release/実利用deployは依頼範囲外。
+
+## 2026-10-09: Applet詳細を横並びの説明・設定・ログタブへ統一
+
+- ユーザーの横並び希望とUI判断の委任に基づき、可変ラベルの操作ボタンを固定の3タブへ統一。アイコン/選択色、tablist/tab/tabpanel、単一選択と左右循環/Home/Endの操作を追加。同ページの下だけ切り替え、共有設定draft・不正JSONの保護・対象Appletへのログ固定・別Applet選択の説明復帰を保持。
+- 型検査/build/diff check成功。開発GUI17群成功（`artifacts/navigation-1791527251407`）、WebApplet GUI12群成功（`artifacts/web-applets-1791527306856`）。初回画像で説明/設定の2文字が折り返したためnowrapとアイコン縮小禁止を追加し、dark/light・700/900/1280pxでラベル1行/クリップなし、タブとヘッダーの座標一致、横overflowなしを検証・目視確認した。
+- 既存JSON下書き試験のElectron fillがWindowsで全選択を失い追記になる現象が再発。下書き状態の検証はtextareaのnative value setterとinputイベントで入力し、全選択のOS状態に依存しない試験へ変更。製品のキー処理は変更していない。
+- `publish.bat`終了0、単一EXE/update.json/全6Applet入りZIPを最新ソースで更新。版は0.25.0のまま。本体100608412 bytes、SHA256 `7ee2f092c84c40880e33cd045d61dd42e33cc359dbd4191e03753adb73fdaab8`。feed/hash/size一致、ZIP内本体一致、全21ファイルのhash/sizeと未収録ファイル/パスを既存verify-all-in-one.ps1で検証・隔離展開（`artifacts/detail-tabs-publish-20261009.json`、`artifacts/detail-tabs-bundle-20261009`）。
+- 発行済みwin-unpackedのnavigation GUI17群成功（`artifacts/navigation-1791527467639`）、実単一EXEの隔離smoke成功（`artifacts/smoke-1791527478061`）。publish版でも上記タブ操作と共有設定・ログの回帰を確認。Release公開/commit/push/実利用deployなし。
+
+## 2026-10-09: Applet内ログ変更をpublishへ発行・完了時の発行を定常化
+
+- ユーザー指定で、アプリ実装・修正の完成時はRelease前でもpublishへ発行する方針を30.PROJECT/AGENTS.mdと本体AGENTS.mdへ記録。ソース/開発ビルドのみを完了とせず、既存発行手順・終了コード・成果物・隔離起動を確認する。公開/版更新/deployは別の指示に従う。
+- `publish.bat`終了0。本体単一EXE/update.json/全6ローカルAppletのオールインワンZIPを発行。sandbox内の初回.NET発行は終了1、通常Windows環境で既存手順を再実行して成功。版は0.25.0のまま、commit/push/Release/実利用deployなし。
+- EXEは100609519 bytes、SHA256 `ccf8dd13f9aaeb3013dd16f75d33dea06d183a9dacb6ebf82d0c72039605a24b`。update.jsonのhash/sizeと一致、ZIP内本体も一致。bundle.json記載の21ファイルのhash/sizeを検証（`artifacts/inline-logs-publish-20261009.json`）。ZIP内のWindows区切りを正規化して照合した。
+- 発行済みwin-unpackedでnavigation GUI16群成功（`artifacts/navigation-1791526686735/result.json`）。初回は既存JSON fillの一時追記で失敗し、再試行成功。Applet内ログ・説明復帰・下書き保持・全体ログ独立・dark/lightと幅900/1280pxを確認。
+- 実単一EXEの隔離smoke成功（`artifacts/smoke-1791526714472/smoke-result.json`）。起動・UI bridge・元EXE隣への設定保存・プロフィール画像・トレイ動作を確認。今回のZIPは収録整合の確認で、全実Appletの個別操作試験とは区別する。
+
+## 2026-10-09: Applet詳細内でログを表示
+
+- 「ログを見る」を別ログページへの遷移から、同じApplet詳細内のログ表示へ変更。説明・設定・ログを排他的に切り替え、両操作ボタンの位置と見た目を保持。選択Appletのsourceに固定し、既存LogsPageの検索・レベル・保存先操作を共用する。別Applet選択で説明へ戻り、リボンのログページのsourceと共有しない。
+- `dev.bat run typecheck`、`dev.bat run build`、`git diff --check`成功。隔離Electronのnavigation GUI16群成功（`artifacts/navigation-1791526237083/result.json`）。固定source/空結果/検索/レベル/説明復帰/設定との往復/下書き保持/全体ログ独立を検証。dark/light、900/1280pxで切替ボタンとヘッダー座標一致・横overflowなし、900pxのログ画像も目視確認。
+- sandbox内のElectron起動は失敗し、通常Windows環境の隔離profileで検証。初回GUIは既存JSON入力試験でfillが追記になり失敗、再実行で解消。追加試験の見出しlocatorがsidebarのh2も拾ったためh1へ限定して修正。最終GUIは全群成功。
+- 版更新・publish・実利用deploy・commit・push・Releaseは未実施。ソースと開発ビルドでの確認結果。
+
 ## 2026-10-09: 条件付きショートカットを0.25.0としてリリース準備
 
 - 新規キー割り当てはApplet提供元を既定にし、本体/提供元不明はAppDock全体。既存行のキー変更・複製は条件を保持。ショートカット表/コマンドパレット/ホームのピン留め/トレイ動作選択へ完全なコマンドIDを表示し、ID・コマンド名・提供元名の検索を維持した。

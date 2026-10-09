@@ -10,6 +10,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## 開発・発行・配置の注意
 
+- 完成した本体の実装・修正は、Release前でもバージョンをインクリメントして`publish.bat`を実行し、`publish`へ発行する。通常の修正はパッチ番号を上げ、指定版を優先する。同じ変更の発行再試行や検証用再発行では重ねて増やさず、同梱だけの未変更Appletの版は上げない。版更新は[リリース手順](docs/RELEASING.md)のSetVersionでpackage.jsonを更新し、README等の現行版記載も揃える。ユキちゃんの動作確認場所なので、開発ビルドだけで完了にしない。本体単一EXE・update.json・オールインワンZIPを既存手順で生成し、終了コード・成果物の整合・発行版の隔離起動を確認する。調査/計画/文書だけ、または明示的な発行不要指定は除く。commit・公開・実利用deployは別の指示に従う。
 - Node/pnpmはtoolchain.jsonの版を.toolsへ配置してdev.bat経由で使う。pnpm 12の導入ではinstall.jsとWindows shimの再生成が必要。Electron取得は既存のpostinstall/setup手順に従う。依存更新時は初回導入と再実行も確認する。
 - node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
 - build-main.cjsはout/mainを再生成する。GUI試験や再起動の最中にビルドを重ねない。発行完了後の固定した配布物を使い、検証コピーと最終EXEのSHA256を照合する。
@@ -29,6 +30,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 背景Webの動作はvisibilityState、rAF、observer.readyだけで成功としない。Playwrightのfocus emulationが結果を変えるため、未表示の通常起動も別途検証する。ページ自身の描画/取得開始と、必要に応じて許可された実受信を確認する。実メール送信は明示許可の範囲に限定する。
 - keepActiveの認証遷移/別文書/破棄時の解除、native focus時の入力を保つ。破棄後にWebContents.debugger getterを呼ばず、生存中の参照と冪等disposeで解放する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
 - 設定はuseSettingsEditorの共有draft/JSON/revision/saveを維持し、詳細/設定画面で二重draftや二重入力を作らない。settingActionsは自身の宣言済みcommandに限定し、実行中ガード・結果表示・未保存入力を保つ。
+- Applet詳細の説明・設定・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletを選ぶと説明へ戻す。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
 - 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
 - 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/.appdockの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
