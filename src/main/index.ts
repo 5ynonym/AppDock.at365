@@ -386,7 +386,7 @@ function registerIpc() {
   handle('dock:installUpdates', (target: string) => {
     if (
       typeof target !== 'string' ||
-      (target !== 'host' && target !== 'applets' && !manager.items.has(target))
+      (target !== 'all' && target !== 'host' && target !== 'applets' && !manager.items.has(target))
     )
       throw Error('更新対象が正しくありません。');
     return updater.install(target);

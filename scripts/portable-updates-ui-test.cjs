@@ -204,15 +204,6 @@ async function restarted(inspectPort, predicate) {
   );
   let connected;
   const keepAlive = setInterval(() => {}, 1000);
-  const trigger = (page, scope) =>
-    Promise.race([
-      page
-        .evaluate((scope) => window.dock.installUpdates(scope), scope)
-        .catch((error) => {
-          if (!/closed|destroyed|context/i.test(String(error))) throw error;
-        }),
-      wait(8000),
-    ]);
   try {
     connected = await connect(port);
     let { page } = connected;
@@ -248,6 +239,13 @@ async function restarted(inspectPort, predicate) {
     assert.equal(await page.locator('.about-host .update-primary').count(), 2);
     assert.equal(await page.locator('.about-host .applet-update-source').count(), 0);
     assert.equal(await page.locator('.about-applets .applet-update-source').count(), 2);
+    for (const control of await page.locator('.about-page .update-check-control').all()) {
+      const button = await control.getByRole('button').boundingBox();
+      const time = await control.locator('time').boundingBox();
+      assert.ok(time.x >= button.x + button.width, 'last-check time is beside the check button');
+      assert.ok(Math.abs(time.y + time.height / 2 - button.y - button.height / 2) < 2);
+    }
+    checks.push('host, Applet and shared last-check times sit beside their check buttons');
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
     // Both source resets use the shared settings draft and preserve unrelated settings.
     const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
@@ -278,6 +276,10 @@ async function restarted(inspectPort, predicate) {
       await page.getByRole('button', { name: 'Appletを一括更新', exact: true }).isDisabled(),
       true,
     );
+    assert.equal(
+      await page.getByRole('button', { name: '本体と全Appletを更新', exact: true }).isDisabled(),
+      true,
+    );
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);
     await page.screenshot({ path: path.join(profile, 'updates-settings.png') });
@@ -305,7 +307,8 @@ async function restarted(inspectPort, predicate) {
     checks.push('settings save, shared check results, and unsaved-draft update guard');
     // Electron dialogs are native. Stub only the final approval UI; the real updater, shutdown, swap and restart all run.
     await approve(inspectPort);
-    await trigger(page, 'applets');
+    const combinedPid = await inspect(inspectPort, 'process.pid');
+    await page.getByRole('button', { name: '本体と全Appletを更新', exact: true }).click();
     await wait(1500);
     const updated = await restarted(inspectPort, (snapshot) =>
       snapshot.extensions.every((e) => e.version === '2.0.0'),
@@ -317,6 +320,18 @@ async function restarted(inspectPort, predicate) {
         snapshot.extensions.find((e) => e.id === 'appdock.dotnet-demo')?.state === 'running',
     );
     assert.equal(updated.extensions.find((e) => e.id === 'test.disabled').enabled, false);
+    const combined = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
+    assert.equal(combined.ok, true);
+    assert.deepEqual(combined.updated.map((item) => item.id).sort(), [
+      'appdock.dotnet-demo',
+      'host',
+      'test.disabled',
+    ]);
+    assert.notEqual(await inspect(inspectPort, 'process.pid'), combinedPid);
+    assert.deepEqual(
+      fs.readFileSync(executable),
+      fs.readFileSync(path.join(root, 'publish/AppDock.at365.exe')),
+    );
     assert.equal(
       fs.existsSync(path.join(profile, 'extensions/appdock.dotnet-demo/obsolete.dll')),
       false,
@@ -339,8 +354,19 @@ async function restarted(inspectPort, predicate) {
     assert.equal(await renderer(inspectPort, "!!document.querySelector('.about-page')"), true);
     checks.push('update restart overrides startMinimized and restores settings/about');
     checks.push(
-      'real portable helper applies Applet batch, restarts once and preserves settings/login/enabled states',
+      'combined button applies host and all Applets in one job/restart and preserves settings/login/enabled states',
     );
+    await approve(inspectPort);
+    await renderer(inspectPort, "void window.dock.installUpdates('applets')");
+    await wait(1500);
+    await restarted(inspectPort, (s) => !s.updates.busy);
+    const batch = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
+    assert.equal(batch.ok, true);
+    assert.deepEqual(batch.updated.map((item) => item.id).sort(), [
+      'appdock.dotnet-demo',
+      'test.disabled',
+    ]);
+    checks.push('Applet-only batch keeps host out of the update job');
     await approve(inspectPort);
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);

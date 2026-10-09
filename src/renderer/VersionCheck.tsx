@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { UpdateResult } from '../shared/contracts';
+export function UpdateCheckTime({ checkedAt }: { checkedAt: string }) {
+  return (
+    <time dateTime={checkedAt} className="muted">
+      最終確認:{' '}
+      {new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
+        new Date(checkedAt),
+      )}
+    </time>
+  );
+}
 const updateError = (error: unknown) => {
   const message = (error instanceof Error ? error.message : '').replace(
     /^Error invoking remote method '[^']+': (?:Error: )?/,
@@ -68,13 +78,16 @@ export function VersionCheck({
       >
         {busy ? '処理中…' : id ? 'このAppletを更新' : 'AppDockを更新'}
       </button>
-      <button
-        className="text-button"
-        disabled={busy || sharedBusy || disabled}
-        onClick={() => void check()}
-      >
-        {busy ? '更新を確認中…' : '更新を確認'}
-      </button>
+      <span className="update-check-control">
+        <button
+          className="text-button"
+          disabled={busy || sharedBusy || disabled}
+          onClick={() => void check()}
+        >
+          {busy ? '更新を確認中…' : '更新を確認'}
+        </button>
+        {details && result && <UpdateCheckTime checkedAt={result.checkedAt} />}
+      </span>
       {result && (
         <span role="status">
           {result.status === 'available'
@@ -97,14 +110,6 @@ export function VersionCheck({
         >
           リリースを開く
         </button>
-      )}
-      {details && result && (
-        <time dateTime={result.checkedAt} className="muted">
-          最終確認:{' '}
-          {new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
-            new Date(result.checkedAt),
-          )}
-        </time>
       )}
       {error && (
         <span className="error-text" role="alert">

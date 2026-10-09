@@ -201,7 +201,10 @@ export class PortableUpdates {
     this.state.results = [...this.state.results.filter((item) => item.id !== result.id), result];
     this.options.changed();
   }
-  private async candidate(target: UpdateTarget): Promise<Candidate | undefined> {
+  private async candidate(
+    target: UpdateTarget,
+    hostVersion: string,
+  ): Promise<Candidate | undefined> {
     const source = target.source.trim();
     validateUpdateSource(source);
     if (!source) return;
@@ -248,7 +251,7 @@ export class PortableUpdates {
           parseVersion(manifest.version);
           if (
             manifest.minimumHostVersion &&
-            compareVersions(manifest.minimumHostVersion, this.options.hostVersion) > 0
+            compareVersions(manifest.minimumHostVersion, hostVersion) > 0
           )
             throw Error(
               `AppDock ${manifest.minimumHostVersion} 以降が必要です。先に本体を更新してください。`,
@@ -261,10 +264,7 @@ export class PortableUpdates {
       json(await readBounded(feedLocation, 1024 * 1024, this.fetcher, this.controller?.signal)),
       target,
     );
-    if (
-      feed.minimumHostVersion &&
-      compareVersions(feed.minimumHostVersion, this.options.hostVersion) > 0
-    )
+    if (feed.minimumHostVersion && compareVersions(feed.minimumHostVersion, hostVersion) > 0)
       throw Error(
         `AppDock ${feed.minimumHostVersion} 以降が必要です。先に本体を更新してください。`,
       );
@@ -282,6 +282,7 @@ export class PortableUpdates {
   }
   private async checkTarget(
     target: UpdateTarget,
+    hostVersion = this.options.hostVersion,
   ): Promise<{ result: UpdateResult; candidate?: Candidate }> {
     const github =
       target.source.match(/^github:(.+)$/i) ??
@@ -294,7 +295,7 @@ export class PortableUpdates {
       releaseUrl: github ? `https://github.com/${github[1]}/releases` : undefined,
     };
     try {
-      const candidate = await this.candidate(target);
+      const candidate = await this.candidate(target, hostVersion);
       if (!candidate) return { result: { ...base, status: 'unsupported' } };
       const comparison = compareVersions(candidate.version, target.version);
       const installable =
@@ -354,15 +355,24 @@ export class PortableUpdates {
     try {
       const targets = this.options
         .targets()
-        .filter((t) => (scope === 'applets' ? t.kind === 'applet' : t.id === scope));
+        .filter(
+          (t) => scope === 'all' || (scope === 'applets' ? t.kind === 'applet' : t.id === scope),
+        );
+      // Check the host first so Applets can use the version installed in this same transaction.
+      if (scope === 'all')
+        targets.sort((a, b) => Number(b.kind === 'host') - Number(a.kind === 'host'));
       if (!targets.length) throw Error('更新対象がありません。');
       if (!this.options.executable) throw Error('更新の適用は配布版のAppDockで行ってください。');
       const candidates: Candidate[] = [];
+      let hostVersion = this.options.hostVersion;
       for (const target of targets) {
         signal.throwIfAborted();
-        const checked = await this.checkTarget(target);
+        const checked = await this.checkTarget(target, hostVersion);
         this.update(checked.result);
-        if (checked.candidate && checked.result.installable) candidates.push(checked.candidate);
+        if (checked.candidate && checked.result.installable) {
+          candidates.push(checked.candidate);
+          if (target.kind === 'host') hostVersion = checked.candidate.version;
+        }
       }
       if (!candidates.length) {
         this.state.phase = '適用できる更新はありません。';
@@ -440,10 +450,7 @@ export class PortableUpdates {
             throw Error('展開したAppletのID・版・エントリーが更新情報と一致しません。');
           if (!['node', 'native', 'dotnet'].includes(m.runtime))
             throw Error('Appletの実行形式が正しくありません。');
-          if (
-            m.minimumHostVersion &&
-            compareVersions(m.minimumHostVersion, this.options.hostVersion) > 0
-          )
+          if (m.minimumHostVersion && compareVersions(m.minimumHostVersion, hostVersion) > 0)
             throw Error('更新するAppletに必要な本体バージョンが不足しています。');
           await fs.access(path.join(staged, m.entry));
           readManifest(staged);

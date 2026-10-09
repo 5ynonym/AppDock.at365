@@ -35,6 +35,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
 - 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
 - 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/.appdockの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
+- 本体と全Appletの更新は`installUpdates('all')`の1job/1確認/1再起動へまとめる。同時適用する本体候補の版でAppletの最低host版を検証し、本体候補がない時は現行版を使う。ファイル型Appletだけを列挙し、WebAppletは本体に含める。確認日時は各確認ボタンの隣に置く。仕様と回帰は[更新ガイド](docs/updates.md)を参照する。
 
 ## リリース
 

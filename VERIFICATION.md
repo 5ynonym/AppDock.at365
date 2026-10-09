@@ -865,3 +865,16 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ソースGUI（gestures-ui-1791541764462）と固定単一EXE（gestures-ui-1791541935557）で、メニュー表示中の行高不変/画面内配置、上下キー、Escape/フォーカス復帰、再クリック/外側クリック、複製/削除確認/キャンセル、既存グループ並べ替え/スイッチ/共通パレット/保存を確認。スクリーンショットgestures-dropdown.pngも目視確認。今回はUI変更のためAPPDOCK_GESTURE_UI_ONLY=1を明示し、OS入力試験は再実施していない。
 - publish.bat終了0、0.26.2単一EXE/update.json/6Applet入りZIPを配置。EXE142516690 bytes、SHA256 f3cebdb6b932aa4041e357df0cfe70517bba15c71695853448a74a0ef8102298、feedと実試験コピーが一致。all-in-one-ui-test.cjs終了0、ZIP全収録size/hash/本体一致と隔離通常起動を確認（artifacts/gestures-dropdown-bundle-result.json）。
 - ユーザーの追加指示に従い、発行・検証後に今回までの汎用ジェスチャー/UI変更をAppDockとWebBrowserToolsのmainへコミットする。push/Release/実利用deployは依頼範囲外。
+
+## 2026-10-09: 0.26.4 本体・全Appletの同時更新と確認日時
+
+- 更新ページに「本体と全Appletを更新」を追加。installUpdates('all')で本体と全ファイル型Applet（有効/無効を含む）の適用可能な候補を1つのjobへ準備し、1回の確認・再起動で交換する。既存の本体のみ/全Appletのみ/個別更新を維持。WebAppletは本体管理のため個別候補に含めない。
+- 本体metadataを先に確認し、同時適用する本体候補の版でAppletのfeed/ローカルmanifest/展開後manifestの最低host版を照合。本体が未設定・取得失敗・再適用不可・旧版なら現行版で判定する。準備途中で本体/ZIPのハッシュが不一致の場合は、確認/終了/交換へ進まない。
+- 最終確認日時を各「更新を確認」の隣へ移動。「すべての更新を確認」の隣には直近の対象checkedAtを表示。日時とボタンを同じグループにし、結果本文を間へ挟まない。
+- 型検査終了0（artifacts/combined-update-typecheck.log）、回帰164/164（artifacts/combined-update-regression.log）、Prettier checkとgit diff --check成功。追加試験はlocal/feedの同時互換性、新本体が利用不能/同版/旧版/不足の場合、host/ZIP破損時の両対象保持と最終確認取消を検証。
+- publish.bat終了0（artifacts/combined-update-publish.log）。AppDock 0.26.4、publish/AppDock.at365.exe 142503045 bytes、SHA256 a1673c06287c0f1ef126ea2fb938bc8424bb1af01c73139c97bcc3ea3b82cb11。publish/update.jsonのversion/size/hashと隔離検証コピーが一致。
+- 固定した実単一EXEのGUI11群成功（artifacts/portable-updates-1791544025489/result.json、combined-update-portable-ui.log）。新ボタンを実クリックして本体+稼働中.NET Applet+無効Node Appletの3対象を1jobで交換・再起動。設定/認証fixture/有効状態保持、旧ファイル除去、画面復元、既存本体のみ/全Appletのみ/個別更新・通常再起動を検証。最終native確認だけ試験内で承認へ差し替え、交換・終了待ち・ランチャー・再起動は製品処理を使用。
+- dark/light/900pxの画像を保存・目視確認。各本体/Applet/全体確認のボタンと日時の横並びを座標照合し、狭い設定本文に横スクロールがないことを確認。
+- 初回sandbox型検査はpnpmの供給網ポリシー確認で停止したため中断。通常Windows権限で同じ既存dev.batを再実行して成功。製品や依存設定を回避目的で変更していない。
+- 実GitHub/UNC取得、実利用先の更新、物理native確認操作は今回未検証。通常publishのみで本体EXE/feedを更新し、未変更Applet再発行/全体ZIP作成・整理/commit/push/Release/実利用deployなし。
+- ユーザーの動作確認: ユキちゃんが「うまくうごいてる」と確認し、今回の変更のコミットを依頼（2026-10-09）。上記の未コミット状態は検証時点の記録。
