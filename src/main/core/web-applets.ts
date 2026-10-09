@@ -2,13 +2,13 @@ import { session, nativeImage, dialog, net, type WebContents } from 'electron';
 import path from 'node:path';
 import { AppletSurface, pageHostShortcut } from './applet-pages';
 import type { SettingsStore } from './settings';
+import { WebProfileStore } from './web-profiles';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { shortcutFromEvent } from '../../shared/commands';
 import {
   allowedWebAppletNavigation,
   manifestDefaults,
   webId,
-  profileId,
   webUrl,
   type WebApplet,
   type WebDefaults,
@@ -23,15 +23,77 @@ export class WebAppletManager {
   private clearing = new Set<string>();
   private sessions = new Map<string, Electron.Session>();
   private closed = false;
+  private profiles: WebProfileStore;
   constructor(
     private settings: SettingsStore,
     private root: string,
     private changed: () => void,
     private execute: (id: string) => Promise<unknown>,
-  ) {}
+  ) {
+    this.profiles = new WebProfileStore(path.join(root, 'web-applets', 'accounts.json'));
+    this.profiles.load(settings);
+    this.profiles.cleanupSessions(settings.value.webApplets.items.map((a) => a.accountId));
+  }
+  accounts() {
+    return this.profiles.snapshot();
+  }
+  validateAccounts(items: WebApplet[]) {
+    for (const item of items) {
+      this.profiles.get(item.accountId);
+      if (this.clearing.has(item.accountId))
+        throw Error('Webアカウントを処理中です。少し待って保存してください。');
+    }
+  }
+  addAccount(name: unknown) {
+    if (this.closed) throw Error('Webアカウント管理を終了しています。');
+    const account = this.profiles.add(name);
+    this.changed();
+    return account;
+  }
+  renameAccount(id: string, name: unknown) {
+    if (this.closed || this.clearing.has(id)) throw Error('Webアカウントを処理中です。');
+    this.profiles.rename(id, name);
+    this.changed();
+  }
+  async deleteAccount(id: string) {
+    const account = this.profiles.get(id);
+    const used = () => this.settings.value.webApplets.items.some((a) => a.accountId === id);
+    if (this.closed || this.clearing.has(id)) throw Error('Webアカウントを処理中です。');
+    if (used())
+      throw Error(
+        '使用中の枠は削除できません。WebAppletのアカウントを変更して設定を保存してください。',
+      );
+    this.clearing.add(id);
+    try {
+      const answer = await dialog.showMessageBox({
+        type: 'warning',
+        message: `「${account.name}」のアカウント枠を削除しますか？`,
+        detail:
+          'この枠と保存されたログイン情報・サイトデータを削除します。元に戻せません。使用中で消せないファイルは次回起動時に自動で片づけます。Gmailのアカウントには影響しません。',
+        buttons: ['キャンセル', '枠を削除'],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (answer.response !== 1 || this.closed) return false;
+      if (used()) throw Error('この枠がWebAppletに割り当てられたため、削除を中止しました。');
+      const ses = this.sessions.get(id);
+      if (ses) await this.eraseSession(ses);
+      if (this.closed) return false;
+      if (used()) throw Error('この枠がWebAppletに割り当てられたため、削除を中止しました。');
+      this.profiles.remove(id);
+      this.changed();
+      const remaining = this.profiles.cleanupSessions(
+        this.settings.value.webApplets.items.map((a) => a.accountId),
+        this.sessions.keys(),
+      );
+      this.changed();
+      return remaining.includes(id) ? ('deferred' as const) : ('deleted' as const);
+    } finally {
+      this.clearing.delete(id);
+    }
+  }
   private account(id: string) {
-    if (!profileId(id) || !this.settings.value.webApplets.accounts.some((a) => a.id === id))
-      throw Error('WebApplet専用のアカウント枠がありません。');
+    this.profiles.get(id);
     const cached = this.sessions.get(id);
     if (cached) return cached;
     const ses = session.fromPath(path.join(this.root, 'web-applets', 'sessions', id));
@@ -42,6 +104,7 @@ export class WebAppletManager {
     return ses;
   }
   snapshot(): ExtensionSnapshot[] {
+    const accounts = new Set(this.accounts().map((a) => a.id));
     return this.settings.value.webApplets.items.map((a) => ({
       apiVersion: 1,
       id: a.id,
@@ -53,8 +116,14 @@ export class WebAppletManager {
       folder: '',
       description: `Webページ · ${new URL(a.url).origin}`,
       enabled: a.enabled,
-      state: !a.enabled ? 'stopped' : this.views.get(a.id)?.state.error ? 'error' : 'running',
-      error: this.views.get(a.id)?.state.error || null,
+      state: !a.enabled
+        ? 'stopped'
+        : !accounts.has(a.accountId) || this.views.get(a.id)?.state.error
+          ? 'error'
+          : 'running',
+      error: !accounts.has(a.accountId)
+        ? 'Webアカウント枠を選び直して設定を保存してください。'
+        : this.views.get(a.id)?.state.error || null,
       capabilities: [],
       settings: [],
       tray: [],
@@ -98,7 +167,13 @@ export class WebAppletManager {
   reconcile() {
     for (const [id, v] of this.views) {
       const a = this.settings.value.webApplets.items.find((a) => a.id === id);
-      if (!a || !a.enabled || a.url !== v.item.url || a.accountId !== v.item.accountId) {
+      if (
+        !a ||
+        !a.enabled ||
+        !this.accounts().some((p) => p.id === a.accountId) ||
+        a.url !== v.item.url ||
+        a.accountId !== v.item.accountId
+      ) {
         v.surface.close();
         this.views.delete(id);
       } else {
@@ -264,43 +339,62 @@ export class WebAppletManager {
     return this.open(id);
   }
   async clearAccount(id: string) {
+    const account = this.profiles.get(id);
     const ses = this.account(id);
     if (this.clearing.has(id)) throw Error('アカウントを処理しています。');
     this.clearing.add(id);
     try {
       const answer = await dialog.showMessageBox({
-        type: 'question',
-        message: 'このWebApplet専用アカウントのログイン情報とサイトデータを消去しますか？',
+        type: 'warning',
+        message: `「${account.name}」のログイン情報とサイトデータをクリアしますか？`,
         detail: 'この枠を使うWebAppletを閉じます。Gmailのアカウントには影響しません。',
-        buttons: ['キャンセル', '消去'],
+        buttons: ['キャンセル', 'クリア'],
         defaultId: 0,
         cancelId: 0,
       });
-      if (answer.response !== 1 || this.closed) return;
+      if (answer.response !== 1 || this.closed) return false;
       for (const [key, v] of this.views)
         if (v.item.accountId === id) {
           v.surface.close();
           this.views.delete(key);
         }
-      await ses.clearStorageData();
-      await ses.clearCache();
-      await ses.cookies.flushStore();
+      await this.eraseSession(ses);
       this.changed();
+      return true;
     } finally {
       this.clearing.delete(id);
     }
+  }
+  private async eraseSession(ses: Electron.Session) {
+    await ses.clearStorageData();
+    await ses.clearCache();
+    await ses.clearAuthCache();
+    await ses.closeAllConnections();
+    await ses.cookies.flushStore();
   }
   async close() {
     this.closed = true;
     for (const v of this.views.values()) v.surface.close();
     this.views.clear();
+    const deleted = new Set(this.profiles.pendingDeletion());
+    let cleanupFailed = false;
+    try {
+      this.profiles.cleanupSessions(
+        this.settings.value.webApplets.items.map((a) => a.accountId),
+        this.sessions.keys(),
+      );
+    } catch {
+      cleanupFailed = true;
+    }
     const results = await Promise.allSettled(
-      [...this.sessions.values()].map(async (ses) => {
-        ses.flushStorageData();
-        await ses.cookies.flushStore();
-      }),
+      [...this.sessions]
+        .filter(([id]) => !deleted.has(id))
+        .map(async ([, ses]) => {
+          ses.flushStorageData();
+          await ses.cookies.flushStore();
+        }),
     );
-    if (results.some((r) => r.status === 'rejected'))
+    if (cleanupFailed || results.some((r) => r.status === 'rejected'))
       throw Error('Webアカウントの保存に失敗しました。');
   }
 }

@@ -176,22 +176,199 @@ async function remote(id) {
     return s.settings.value.webApplets.items.length ? s : null;
   }, 'save new applet');
   const id = s.settings.value.webApplets.items[0].id,
-    accountId = s.settings.value.webApplets.accounts[0].id;
+    accountId = s.webAccounts[0].id;
   assert.ok(s.settings.value.webApplets.items[0].icon.startsWith('data:image/png;base64,'));
   assert.equal(s.extensions.find((a) => a.id === id).runtime, 'web');
   checks.push(
     'UI add, automatic standard manifest name/icon/navigation, saved virtual Applet and ribbon',
   );
+  assert.equal(await dock.locator('.web-account-row').count(), 0);
+  assert.equal(
+    await dock.getByRole('button', { name: 'アカウント枠を追加', exact: true }).count(),
+    0,
+  );
+  await dock.getByLabel('WebAppletの名前', { exact: true }).fill('編集中のWeb');
+  const beforeAccounts = await snapshot(),
+    settingsBytes = fs.readFileSync(path.join(profile, 'settings.json'));
+  const accountFile = path.join(profile, '.appdock', 'web-applets', 'accounts.json');
+  await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
+  const originalAccountFile = fs.readFileSync(accountFile);
+  const initialName = (await snapshot()).webAccounts[0].name;
+  const initialInput = dock.locator('.web-account-row').first().locator('input');
+  await initialInput.fill('Escapeで破棄する名前');
+  await initialInput.press('Escape');
+  assert.equal(await initialInput.inputValue(), initialName);
+  await initialInput.press('Tab');
+  assert.deepEqual(fs.readFileSync(accountFile), originalAccountFile);
+  assert.equal(
+    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+    0,
+  );
   await dock.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
-  await dock.locator('.web-account-row input').last().fill('予備のアカウント');
+  await until(async () => (await snapshot()).webAccounts.length === 2, 'immediate add');
+  await until(
+    async () => (await dock.locator('.web-account-row').count()) === 2,
+    'new account row rendered',
+  );
+  await dock.locator('.web-account-row').last().locator('input').fill('予備のアカウント');
+  await dock
+    .locator('.web-account-row')
+    .last()
+    .getByRole('button', { name: '名前を変更', exact: true })
+    .click();
+  await until(
+    async () => (await snapshot()).webAccounts[1].name === '予備のアカウント',
+    'immediate rename',
+  );
+  const spareInput = dock.locator('.web-account-row').last().locator('input');
+  await spareInput.fill('Enterで確定');
+  await spareInput.press('Enter');
+  await spareInput.press('Tab');
+  await until(
+    async () => (await snapshot()).webAccounts[1].name === 'Enterで確定',
+    'Enter and blur keep the confirmed name',
+  );
+  await spareInput.fill('予備のアカウント');
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).click();
+  await until(
+    async () => (await snapshot()).webAccounts[1].name === '予備のアカウント',
+    'mouse focus loss commits the name',
+  );
+  await dock.locator('.web-account-row').first().locator('input').fill('個人用（変更）');
+  await dock.locator('.web-account-row').first().locator('input').press('Tab');
+  await until(
+    async () => (await snapshot()).webAccounts[0].name === '個人用（変更）',
+    'rename used account on focus loss',
+  );
+  await until(
+    async () =>
+      (await dock.locator('.web-account-row input').first().getAttribute('aria-label')) ===
+      'アカウント名 個人用（変更）',
+    'renamed account rendered',
+  );
+  const categories = dock.locator('.settings-categories .sidebar-extensions').first();
+  assert.equal(
+    await categories
+      .getByRole('button', { name: /^Webアカウント/ })
+      .locator('.unsaved-mark')
+      .count(),
+    0,
+  );
+  assert.equal(
+    await categories
+      .getByRole('button', { name: /^WebApplet/ })
+      .locator('.unsaved-mark')
+      .count(),
+    1,
+  );
+  assert.equal(
+    await dock
+      .getByRole('button', { name: 'ログイン情報をクリア', exact: true })
+      .first()
+      .isDisabled(),
+    false,
+  );
   assert.equal(
     await dock
       .locator('.web-account-row')
       .first()
-      .getByRole('button', { name: '枠の登録を削除', exact: true })
+      .getByRole('button', { name: '枠を削除', exact: true })
       .isDisabled(),
     true,
   );
+  await categories.getByRole('button', { name: /^WebApplet/ }).click();
+  assert.equal(
+    await dock.getByLabel('WebAppletの名前', { exact: true }).inputValue(),
+    '編集中のWeb',
+  );
+  assert.equal(
+    await dock
+      .getByLabel('WebAppletのアカウント', { exact: true })
+      .locator('option:checked')
+      .textContent(),
+    '個人用（変更）',
+  );
+  await dock.getByRole('button', { name: 'JSON', exact: true }).click();
+  const validJson = await dock.getByLabel('設定JSON', { exact: true }).inputValue(),
+    invalidJson = '{unfinished settings';
+  await dock.getByLabel('設定JSON', { exact: true }).fill(invalidJson);
+  await categories.getByRole('button', { name: /^Webアカウント/ }).click();
+  await dock.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
+  await until(
+    async () => (await snapshot()).webAccounts.length === 3,
+    'add while invalid settings JSON',
+  );
+  await until(
+    async () => (await dock.locator('.web-account-row').count()) === 3,
+    'third account row rendered',
+  );
+  const beforeDelete = fs.readFileSync(accountFile);
+  const unusedId = (await snapshot()).webAccounts[2].id;
+  const unusedPath = path.join(profile, '.appdock', 'web-applets', 'sessions', unusedId);
+  fs.mkdirSync(path.join(unusedPath, 'Cache'), { recursive: true });
+  fs.writeFileSync(path.join(unusedPath, 'Cache', 'fixture'), 'remove this entire folder');
+  await app.evaluate(({ dialog }) => {
+    globalThis.webTestDialog = dialog.showMessageBox;
+    dialog.showMessageBox = async (options) => {
+      if (
+        options.type !== 'warning' ||
+        options.defaultId !== 0 ||
+        options.cancelId !== 0 ||
+        options.buttons.length !== 2
+      )
+        throw Error('Unsafe account warning');
+      return { response: 0, checkboxChecked: false };
+    };
+  });
+  await dock
+    .locator('.web-account-row')
+    .last()
+    .getByRole('button', { name: '枠を削除', exact: true })
+    .click();
+  await until(
+    () =>
+      dock
+        .locator('.web-account-settings [role="status"]')
+        .textContent()
+        .then((t) => t.includes('キャンセル')),
+    'cancel account deletion',
+  );
+  assert.equal((await snapshot()).webAccounts.length, 3);
+  assert.deepEqual(fs.readFileSync(accountFile), beforeDelete);
+  assert.ok(fs.existsSync(unusedPath));
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async (options) => {
+      if (options.type !== 'warning') throw Error('Missing warning');
+      return { response: 1, checkboxChecked: false };
+    };
+  });
+  await dock
+    .locator('.web-account-row')
+    .last()
+    .getByRole('button', { name: '枠を削除', exact: true })
+    .click();
+  await until(
+    async () => (await snapshot()).webAccounts.length === 2,
+    'confirmed immediate deletion',
+  );
+  assert.equal(fs.existsSync(unusedPath), false);
+  assert.ok(!JSON.parse(fs.readFileSync(accountFile)).pendingDeletion.includes(unusedId));
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = globalThis.webTestDialog;
+    delete globalThis.webTestDialog;
+  });
+  assert.equal((await snapshot()).settings.revision, beforeAccounts.settings.revision);
+  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), settingsBytes);
+  assert.equal(JSON.parse(settingsBytes).webApplets.accounts, undefined);
+  assert.equal(JSON.parse(fs.readFileSync(accountFile)).accounts[0].name, '個人用（変更）');
+  await dock.locator('.settings-categories [data-settings-owner="appdock"]').click();
+  assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
+  await categories.getByRole('button', { name: /^Webアカウント/ }).click();
+  await categories.getByRole('button', { name: /^WebApplet/ }).click();
+  assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
+  await dock.getByLabel('設定JSON', { exact: true }).fill(validJson);
+  await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
   await dock.getByLabel('WebAppletの名前', { exact: true }).fill('ユキのWeb');
   await dock.getByLabel('WebAppletのページ遷移', { exact: true }).selectOption('same-origin');
   manifestName = 'Web側の変更';
@@ -213,6 +390,15 @@ async function remote(id) {
   await until(
     async () => (await snapshot()).settings.value.webApplets.items[0].name === 'ユキのWeb',
     'save manual overrides',
+  );
+  assert.equal((await snapshot()).webAccounts[0].name, '個人用（変更）');
+  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await dock.getByRole('button', { name: '設定を開く', exact: true }).click();
+  assert.equal(await dock.locator('.web-account-row').count(), 0);
+  await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
+  checks.push(
+    'independent account page and file: immediate add/rename/delete, cancellation/confirmation warnings, used-account guard, unchanged settings revision/bytes and retained valid/invalid drafts',
   );
   checks.push('manual name/navigation override survives explicit defaults refresh');
   let web = await remote(id);
@@ -320,10 +506,9 @@ async function remote(id) {
   checks.push(
     'UI account add/rename/use guard; explicit extra origins, any mode, back/forward/home and focused Web shortcuts',
   );
-  const second = `account.${randomUUID()}`;
+  const second = (await dock.evaluate(() => window.dock.createWebAccount('仕事用'))).id;
   await update(
     (v, { id, second }) => {
-      v.webApplets.accounts.push({ id: second, name: '仕事用' });
       v.webApplets.items.find((a) => a.id === id).accountId = second;
     },
     { id, second },
@@ -372,6 +557,8 @@ async function remote(id) {
   });
   await until(() => dock.evaluate(() => innerWidth <= 1000), 'compact width');
   await dock.screenshot({ path: path.join(profile, 'settings-dark.png') });
+  await categories.getByRole('button', { name: /^Webアカウント/ }).click();
+  await dock.screenshot({ path: path.join(profile, 'accounts-dark.png') });
   await update((v) => {
     v.host.theme = 'light';
   });
@@ -379,6 +566,8 @@ async function remote(id) {
     () => dock.evaluate(() => document.documentElement.dataset.theme === 'light'),
     'light theme rendered',
   );
+  await dock.screenshot({ path: path.join(profile, 'accounts-light.png') });
+  await categories.getByRole('button', { name: /^WebApplet/ }).click();
   await dock.screenshot({ path: path.join(profile, 'settings-light.png') });
   await app.close();
   app = undefined;
@@ -388,12 +577,30 @@ async function remote(id) {
   await app.evaluate(({ dialog }) => {
     globalThis.webTestDialog = dialog.showMessageBox;
     dialog.showMessageBox = async (options) => {
-      if (options.defaultId !== 0 || options.cancelId !== 0 || options.buttons.length !== 2)
+      if (
+        options.type !== 'warning' ||
+        options.defaultId !== 0 ||
+        options.cancelId !== 0 ||
+        options.buttons.length !== 2
+      )
         throw Error('Unsafe clear dialog');
       return { response: 0, checkboxChecked: false };
     };
   });
-  await dock.evaluate((id) => window.dock.clearWebAccount(id), accountId);
+  await dock.locator('[data-ribbon-id="settings"]').click();
+  await dock
+    .locator('.settings-categories')
+    .getByRole('button', { name: /^Webアカウント/ })
+    .click();
+  await dock.getByRole('button', { name: 'ログイン情報をクリア', exact: true }).first().click();
+  await until(
+    () =>
+      dock
+        .locator('.web-account-settings [role="status"]')
+        .textContent()
+        .then((t) => t.includes('キャンセル')),
+    'cancel clear from account page',
+  );
   assert.ok(!web.isClosed());
   assert.ok((await web.evaluate(() => document.cookie)).includes('proof=first'));
   await dock.evaluate((id) => window.dock.openAppletPage(id, 'main'), copied);
@@ -405,8 +612,21 @@ async function remote(id) {
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
   });
-  await dock.evaluate((id) => window.dock.clearWebAccount(id), accountId);
+  await dock.locator('[data-ribbon-id="settings"]').click();
+  await dock
+    .locator('.settings-categories')
+    .getByRole('button', { name: /^Webアカウント/ })
+    .click();
+  await dock.getByRole('button', { name: 'ログイン情報をクリア', exact: true }).first().click();
   await until(() => shared.every((p) => p.isClosed()), 'clear shared views');
+  await until(
+    () =>
+      dock
+        .locator('.web-account-settings [role="status"]')
+        .textContent()
+        .then((t) => t.includes('クリアしました')),
+    'clear data completed',
+  );
   await app.evaluate(({ dialog }) => {
     dialog.showMessageBox = globalThis.webTestDialog;
     delete globalThis.webTestDialog;
@@ -437,9 +657,84 @@ async function remote(id) {
   checks.push(
     'restart retains cookies/settings; disable/delete destroys the right view; Gmail storage still unchanged',
   );
+  const survivor = await remote(copied);
+  await survivor.evaluate(() => (document.cookie = 'proof=survivor; Max-Age=3600; SameSite=Lax'));
+  const removedPath = path.join(profile, '.appdock', 'web-applets', 'sessions', second);
+  const beforeDeletionSettings = fs.readFileSync(path.join(profile, 'settings.json'));
+  await dock.locator('[data-ribbon-id="settings"]').click();
+  await dock
+    .locator('.settings-categories')
+    .getByRole('button', { name: /^Webアカウント/ })
+    .click();
+  await app.evaluate(({ dialog }) => {
+    globalThis.webTestDialog = dialog.showMessageBox;
+    dialog.showMessageBox = async (options) => {
+      assertWarning(options);
+      return { response: 0, checkboxChecked: false };
+      function assertWarning(options) {
+        if (
+          options.type !== 'warning' ||
+          options.defaultId !== 0 ||
+          !options.detail.includes('元に戻せません')
+        )
+          throw Error('Missing destructive deletion warning');
+      }
+    };
+  });
+  const removeRow = dock
+    .locator('.web-account-card')
+    .filter({ has: dock.getByLabel('アカウント名 仕事用', { exact: true }) });
+  await removeRow.getByRole('button', { name: '枠を削除', exact: true }).click();
+  await until(
+    () =>
+      dock
+        .locator('.web-account-settings [role="status"]')
+        .textContent()
+        .then((t) => t.includes('キャンセル')),
+    'cancel real account deletion',
+  );
+  assert.ok(fs.existsSync(removedPath));
+  assert.ok((await snapshot()).webAccounts.some((a) => a.id === second));
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
+  });
+  await removeRow.getByRole('button', { name: '枠を削除', exact: true }).click();
+  await until(
+    () =>
+      dock
+        .locator('.web-account-settings [role="status"]')
+        .textContent()
+        .then((t) => t.includes('次回起動')),
+    'deferred physical cleanup notice',
+  );
+  assert.ok(!(await snapshot()).webAccounts.some((a) => a.id === second));
+  assert.ok(JSON.parse(fs.readFileSync(accountFile)).pendingDeletion.includes(second));
+  const deletedCookies = await app.evaluate(
+    async ({ session }, target) => session.fromPath(target).cookies.get({ name: 'proof' }),
+    removedPath,
+  );
+  assert.equal(deletedCookies.length, 0);
+  assert.equal(await survivor.evaluate(() => document.cookie.includes('proof=survivor')), true);
+  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), beforeDeletionSettings);
+  await app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = globalThis.webTestDialog;
+    delete globalThis.webTestDialog;
+  });
   assert.ok(!(await snapshot()).logs.some((x) => x.level === 'error' && x.source === 'host'));
   await app.close();
   app = undefined;
+  await start();
+  assert.equal(fs.existsSync(removedPath), false);
+  assert.ok(!JSON.parse(fs.readFileSync(accountFile)).pendingDeletion.includes(second));
+  assert.deepEqual(fs.readFileSync(gmailMarker), markerBytes);
+  const retained = await remote(copied);
+  assert.ok((await retained.evaluate(() => document.cookie)).includes('proof=survivor'));
+  assert.ok(!(await snapshot()).logs.some((x) => x.level === 'error' && x.source === 'host'));
+  await app.close();
+  app = undefined;
+  checks.push(
+    'account deletion cancels safely or clears real Cookies; tracked session files disappear on next startup while other account/Gmail data survive',
+  );
   fs.writeFileSync(
     path.join(profile, 'result.json'),
     JSON.stringify({ ok: true, checks, profile }, null, 2),

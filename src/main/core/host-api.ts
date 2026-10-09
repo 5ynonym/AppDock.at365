@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
-import { Notification, safeStorage, shell, dialog, nativeTheme } from 'electron';
+import { safeStorage, shell, dialog, nativeTheme } from 'electron';
+import { showNotification } from './notifications';
 import { queueSound } from './sounds';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
@@ -286,21 +287,14 @@ export function createHostApi(
           (typeof p.command !== 'string' || !e.commands.some((c) => c.id === p.command))
         )
           throw new Error('このAppletの登録済みコマンドを指定してください。');
-        if (settings.value.host.notifications && Notification.isSupported()) {
-          const notification = new Notification({
-            title: p.title.slice(0, 100),
-            body: p.body.slice(0, 500),
-            silent: p.silent === true,
-          });
+        if (settings.value.host.notifications) {
           const child = e.child;
-          if (p.command)
-            notification.on('click', () => {
-              if (e.state === 'running' && e.child === child)
-                void executeCommand(p.command).catch(() =>
-                  log('error', id, '通知のコマンドを実行できませんでした。'),
-                );
-            });
-          notification.show();
+          showNotification(p.title.slice(0, 100), p.body.slice(0, 500), p.silent === true, () => {
+            if (p.command && e.state === 'running' && e.child === child)
+              void executeCommand(p.command).catch(() =>
+                log('error', id, '通知のコマンドを実行できませんでした。'),
+              );
+          });
         }
         return null;
       }

@@ -16,7 +16,6 @@ export interface WebApplet {
   imported?: Partial<Pick<WebApplet, 'name' | 'url' | 'icon' | 'navigation'>>;
 }
 export interface WebAppletSettings {
-  accounts: WebProfile[];
   items: WebApplet[];
 }
 export interface WebPageState {
@@ -50,28 +49,27 @@ export function webUrl(raw: unknown): string {
     throw Error('Webページには資格情報を含まないHTTP(S)のURLを指定してください。');
   return u.href;
 }
-function name(v: unknown): string {
+export function webProfileName(v: unknown): string {
   if (typeof v !== 'string' || !v.trim() || v.length > 80 || /[\x00-\x1f\x7f]/.test(v))
     throw Error('名前は1～80文字で指定してください。');
   return v.trim();
 }
-export function parseWebApplets(raw: unknown): WebAppletSettings {
-  if (raw === undefined) return { accounts: [], items: [] };
-  if (
-    !object(raw) ||
-    !Array.isArray(raw.accounts) ||
-    !Array.isArray(raw.items) ||
-    raw.accounts.length > 32 ||
-    raw.items.length > 64
-  )
-    throw Error('WebAppletは64件、Webアカウントは32枠までです。');
+export function parseWebProfiles(raw: unknown): WebProfile[] {
+  if (!Array.isArray(raw) || raw.length > 32) throw Error('Webアカウントは32枠までです。');
   const ids = new Set<string>();
-  const accounts = raw.accounts.map((a) => {
+  return raw.map((a) => {
     if (!object(a) || !profileId(a.id) || ids.has(a.id))
       throw Error('WebアカウントのIDが不正または重複しています。');
     ids.add(a.id);
-    return { id: a.id, name: name(a.name) };
+    return { id: a.id, name: webProfileName(a.name) };
   });
+}
+export function parseWebApplets(raw: unknown): WebAppletSettings {
+  if (raw === undefined) return { items: [] };
+  if (!object(raw) || !Array.isArray(raw.items) || raw.items.length > 64)
+    throw Error('WebAppletは64件、Webアカウントは32枠までです。');
+  // Validate the old roster for migration, but do not retain it in settings.
+  const legacy = raw.accounts === undefined ? undefined : parseWebProfiles(raw.accounts);
   const itemIds = new Set<string>();
   const items = raw.items.map((a): WebApplet => {
     if (
@@ -79,7 +77,7 @@ export function parseWebApplets(raw: unknown): WebAppletSettings {
       !webId(a.id) ||
       itemIds.has(a.id) ||
       !profileId(a.accountId) ||
-      !ids.has(a.accountId) ||
+      (legacy !== undefined && !legacy.some((p) => p.id === a.accountId)) ||
       typeof a.enabled !== 'boolean' ||
       !['page', 'window'].includes(String(a.display)) ||
       !['none', 'same-origin', 'any'].includes(String(a.navigation)) ||
@@ -104,7 +102,7 @@ export function parseWebApplets(raw: unknown): WebAppletSettings {
     if (a.imported !== undefined) {
       if (!object(a.imported)) throw Error('Web側の初期設定の記録が不正です。');
       imported = {};
-      if (a.imported.name !== undefined) imported.name = name(a.imported.name);
+      if (a.imported.name !== undefined) imported.name = webProfileName(a.imported.name);
       if (a.imported.url !== undefined) imported.url = webUrl(a.imported.url);
       if (a.imported.navigation !== undefined) {
         if (!['none', 'same-origin'].includes(String(a.imported.navigation)))
@@ -123,7 +121,7 @@ export function parseWebApplets(raw: unknown): WebAppletSettings {
     }
     return {
       id: a.id,
-      name: name(a.name),
+      name: webProfileName(a.name),
       url: webUrl(a.url),
       accountId: a.accountId,
       enabled: a.enabled,
@@ -134,7 +132,7 @@ export function parseWebApplets(raw: unknown): WebAppletSettings {
       ...(imported ? { imported } : {}),
     };
   });
-  return { accounts, items };
+  return { items };
 }
 export function allowedWebAppletNavigation(item: WebApplet, target: string): boolean {
   try {
@@ -175,7 +173,7 @@ export function manifestDefaults(
     source: manifestUrl,
   };
   if (typeof raw.short_name === 'string' || typeof raw.name === 'string')
-    result.name = name(raw.short_name ?? raw.name);
+    result.name = webProfileName(raw.short_name ?? raw.name);
   result.url = sameUrl(raw.start_url);
   if (Array.isArray(raw.icons))
     for (const i of raw.icons) {

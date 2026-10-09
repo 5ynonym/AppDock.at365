@@ -113,7 +113,8 @@ $taskTemporaryZip = Join-Path $taskStage 'all-in-one.zip'
 [IO.Compression.ZipFile]::CreateFromDirectory($taskPackage, $taskTemporaryZip, [IO.Compression.CompressionLevel]::Optimal, $false)
 $taskZip = Join-Path $taskPublish "AppDock.at365-all-in-one-$taskVersion.zip"
 # Keep the last complete archive if any build/validation fails before this point.
-if (Test-Path -LiteralPath $taskZip) { [IO.File]::Replace($taskTemporaryZip, $taskZip, [Management.Automation.Language.NullString]::Value) }
+# Retain the previous ZIP in the stage; a null backup can fail on existing files.
+if (Test-Path -LiteralPath $taskZip) { [IO.File]::Replace($taskTemporaryZip, $taskZip, (Join-Path $taskStage 'previous-all-in-one.zip')) }
 else { [IO.File]::Move($taskTemporaryZip, $taskZip) }
 Write-Output "All-in-one package: $taskZip"
 Write-Output "Bundled Applets: $($taskApplets.Count)"

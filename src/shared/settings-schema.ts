@@ -11,7 +11,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
-  webApplets: { accounts: [], items: [] },
+  webApplets: { items: [] },
   schemaVersion: 1,
   host: {
     theme: 'dark',

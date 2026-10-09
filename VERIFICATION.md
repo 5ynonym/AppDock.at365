@@ -1,5 +1,35 @@
 # 検証記録
 
+## 2026-10-09: Webアカウント改善と通知起動先修正を0.24.1へ統合
+
+- ユーザーが「Gmail通知の起動先を修正」の完了を待って一緒にコミット/Releaseすることを明示承認。完了を確認し、Webアカウント独立管理・即時操作・削除後処理・名前blur/Escapeと、配置先/profile別の通知protocol activationを同じ本体版へ統合する。Applet API/各Appletの版・単一EXE形式は変更しない。
+- 統合前の実測は各節の記録を参照。通知側は回帰124件と2か所の実EXEでWindows Shell activation/二重実行防止/終了済みAppletのcallback抑止/cold起動を確認。最終WebソースGUIは11群成功。物理的なGmail通知クリック/実受信は未自動検証、更新前の通知には以前の起動先が残る。
+- 0.24.1のコミット後に、[Release手順](docs/RELEASING.md)のPrepare→Draft→Publish→Verifyで正式検証/公開を行う。新規証跡は`artifacts/release-0.24.1-web-notification-20261009/plan.json`と隣のログへ保存する。Prepareで固定したEXEに対しWeb/既存ページ/通知/単一EXEの追加GUIを直列確認し、公開後は匿名取得ハッシュと実PortableUpdates.checkを照合する。実利用先deployは依頼範囲外。
+
+## 2026-10-09: Webアカウント名のフォーカス確定・Escape取消
+
+- 名前欄のフォーカスが外れた時にも即時確定し、確定前のEscapeで保存済みの名前へ戻す。Enter/専用ボタンを維持し、空欄/IME変換中の確定と同じ値の重複送信を避ける。名前変更と直後の削除/クリアを直列化し、非同期反映中に入力した次の編集を保つ。一般設定の保存とは独立する。
+- 型検査/TS/Vite build成功。隔離した最終ソースのWeb GUIは`artifacts/web-applets-1791514657911/result.json`でok:true、11検証群。Tab/マウスのフォーカス移動、Enterと続くblur、Escape後の表示復元とaccounts.jsonのbyte不変、および既存の独立操作/下書き保持/警告/実Cookie削除/次回起動回収を確認。
+- 最初のローカルpublishはwin-unpackedディレクトリのEBUSYで停止（`artifacts/web-account-name-edit-publish.log`）。同じrepoで「Gmail通知の起動先を修正」の作業が進行していることを確認し、ユーザーが通知修正の完了を待ってまとめて新バージョンのReleaseへ進むよう指定した。別作業の変更やプロセスを破棄/停止せず、完了後にcleanな統合ソースから新規Release Prepareを行う。
+
+## 2026-10-09: 枠の削除で保存データを消去・回収し、ローカルpublishへ発行
+
+- ユーザーの改善承認により、枠除去だけだった削除を保存データも消す動作へ変更。警告は取り消せない削除と次回起動時の後処理を説明し、キャンセルを既定とする。生成済みsessionはCookie/サイト/cache/HTTP認証cacheを消去して接続を閉じ、枠とpendingDeletionを同じatomic writeで保存する。未生成のsessionディレクトリは即時物理削除、生成済み/ロック中は次回起動のsession生成前へ回収を延期する。失敗は削除待ち記録を保持して再試行、登録/参照/同プロセス生成済みの枠は回収せず、削除済みsessionの終了時再flushも避ける。旧版の削除記録がない残存領域は自動削除しない。
+- project-local Node/pnpmで型検査/build成功、全回帰121/121・失敗/skip0（`artifacts/web-account-delete-regression.log`）。追加の隔離試験ではロック失敗の注入→保存→再起動→回収、参照/生成済みガード、パストラバーサル・root/対象junction拒否・nested junctionの外側保持を確認。ソースWeb GUIは`artifacts/web-applets-1791513133518/result.json`でok:true。
+- 最終固定win-unpackedのWeb GUIは`artifacts/web-applets-1791513398956/result.json`でok:true、11検証群。実Cookieの削除、取消での保持、削除待ち通知/記録、終了/次回起動後のディレクトリ消失、別枠Cookie/Gmail領域/設定byteの保持を追加確認。既存ページ/Gmail GUIは`artifacts/applet-pages-1791513407222/result.json`でok:true、5群。旧0.24.0の実Cookie移行も`artifacts/web-profile-migration-1791513596748/result.json`でok:true。
+- ユーザー指定により`publish.bat`で本体/更新情報/全6Applet入りZIPをローカル発行。初回はZIPの最後のFile.Replace(null backup)だけが「置換されるファイルを削除できません」で終了1（`artifacts/web-account-delete-publish.log`）。対象の排他open/属性/ACLを確認し、同じ完成ZIPをstage内backup付きFile.Replaceで安全に置換できたため、発行スクリプトもこの方法へ修正。既存の再発行/不正入力時の前ZIP保持テスト1件成功、`pack:all-in-one`を再実行して終了0（`artifacts/web-account-delete-publish-recovery.log`）。PS1はUTF-8 BOM/CRLFを確認、BAT/ACLは変更しない。
+- 最終単一EXEは`artifacts/web-portable-1791513417496/result.json`でok:true。`publish/AppDock.at365.exe`は100607357bytes、SHA256 `83a3de4872933cfa4415f86d23cb0e3b26c592b59aa1980f6daa614bb2d27cfc`、update.jsonと一致。ZIPは275730805bytes、SHA256 `18908c1bcb66c7e95e00e0855d3c4739089f35c30d3c5c72a97c5a2b2be95fc9`。既存verify-all-in-one.ps1で全inventoryのsize/hashを照合・隔離展開し、本体単体EXEと一致、6Applet収録を確認（`artifacts/web-account-delete-bundle-result.json`）。版は0.24.0の開発用ローカル生成物、今回の変更は未コミット、ユーザー指定によりGitHub公開は最後にまとめる。実利用先deploy/実サイトログインは実施していない。
+
+## 2026-10-09: Webアカウント管理を独立ページ・即時操作へ変更
+
+- 追加のソース確認: ユーザーの残存データへの質問により、deleteAccountは一覧からの除去だけでsessionディレクトリを削除せず、clearAccountもCookie等の消去APIのみでディレクトリ回収を行わないことを確認。削除した枠のIDは再利用されず、UIから操作できない残存データが生じる。自動回収は未実装と文書/AGENTSへ追記。今回の確認では製品コード/実利用データを変更せず、ビルド/GUIの再実行は不要と判断。
+
+- 0.24.0公開後の追加依頼。設定に独立した「Webアカウント」カテゴリを設け、WebApplet側には使用枠の選択と管理ページへのリンクを残した。枠の一覧を`.appdock/web-applets/accounts.json`へ分離し、追加/名前変更/登録削除を設定draft/revision/saveと独立して即時保存する。削除/クリアはキャンセルを既定とするwarning dialogで確認する。保存済み/下書きの使用中枠の削除ガード、保存時の参照検証、旧設定のID/sessionを保つ初回移行を追加。詳細は[WebApplet](docs/web-applets.md)。
+- project-local Node 24.21.0/pnpm 12.10.1で型検査、TS/Vite build、`dev.bat run dist:host`が終了0。回帰118/118・失敗/skip0（`artifacts/web-account-settings-regression.log`）、最終ビルドでWeb関連8件も成功。GUI/実EXEは隔離profileを使う通常Windows実行で確認した。最終GUI追加チェックの初回は試験側のボタン探索範囲が狭くtimeoutしたため、正しいサイドバーへ修正して再実行した。
+- 最終win-unpacked GUIは`artifacts/web-applets-1791512094425/result.json`でok:true、10検証群。独立ページに保存バー/フォーム・JSON切替がないこと、即時追加/名前変更/削除と再起動、settingsのbyte/revision不変、正常/不正JSONの下書き保持とAppDock設定への帰還、削除/クリアのwarning・取消/確認、使用中枠のガード、共有枠の画面終了/Cookie消去と別枠/Gmail領域の保持、従来のWeb表示/遷移/入力保持を確認。dark/lightの管理ページPNGを目視確認。
+- 既存ページ/Gmail GUIは`artifacts/applet-pages-1791511074248/result.json`でok:true、5検証群。旧0.24.0 EXEで実Cookieを作って新ソースへ引き継ぐ移行GUIは`artifacts/web-profile-migration-1791511299195/result.json`でok:true。旧一覧から専用ファイルへの移行、ID/session/Cookieの保持、移行後の即時名前変更でsettingsのbyte/revision不変を確認した。旧版の検証用コピーは`artifacts/web-account-legacy-0.24/win-unpacked`へ保持。
+- 最終単一EXEは`artifacts/web-portable-1791512101750/result.json`でok:true。UI登録、リボン複数、Cookie分離/再起動/停止、WebContents/input保持、Gmail保存領域保持を確認。ローカルEXEは100608492bytes、SHA256 `d3550e719d5d9a916fb99afb5b117ee22127ef5ffb31d7400a2498eee4b12768`でupdate.jsonと一致。版は0.24.0のままの開発用生成物であり、公開済み0.24.0のEXEとは異なる。今回の変更は未コミット、GitHub公開/実利用先deploy/オールインワン再発行は未実施。実サイト認証・HTTP認証サイト固有挙動・長期背景動作は今回確認していない。
+
 ## 2026-10-09: WebApplet（0.24.0）の実装と公開前検証
 
 - URLごとに本体管理のWebAppletを追加し、Applet一覧/リボン/コマンド/共有設定へ統合。最大64件、専用アカウント32枠、page/windowの載せ替え、固定/同じorigin/HTTP(S)遷移、認証用の明示originを実装。Gmailの設定・アカウント・session保存先を流用せず、リモートにはNode/preload/ホストIPCを公開しない。詳細は[WebApplet](docs/web-applets.md)。版は0.23.0→0.24.0。
@@ -694,3 +724,13 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 旧版ごとの実装・検証経緯はdocs/implementation-history.mdへ本文を保持して移動。当時の未実装/未確認を現状と区別する注記を追加し、現行のAppletページ/共有設定/自己更新と照合。WebAppletのGmail保存領域分離と未決定事項も保持。
 - 共通TOOLSにはサービス環境、汎用GitHub CLI、Computer Useの環境診断を残し、AppDock記述は0件。移動先へ無関係なtailnet/サービス設定が混入していないことを確認。移行時に元のAppDock本文と保存先、WebApplet節と保存先の包含一致を確認してから元を整理。
 - AGENTS/DEVELOPMENT/履歴のローカルリンク36件とgit diff --check成功。文書のみの変更のためビルド/製品試験は実行していない。Release・deploy操作なし。
+
+## 2026-10-09: Windows通知からテストEXEが起動する問題
+
+- ユーザー報告: 配布版のApplet.GmailのWindows通知クリックでテストアプリが起動。Gmailは登録済み`at365.gmail.open`を本体通知APIへ渡しており、Appletの変更は不要。全起動でAUMID `at365.appdock`を共有し、実HKCUのElectron通知CLSID `{06A54B3B-33F5-45DF-AFDB-E9B640783044}` のLocalServer32は`publish/win-unpacked/AppDock.at365.exe`だった。Electron 44.6.0の自動登録は製品名の共通shortcutからCLSIDを読み、現在の実EXEを登録するため、テスト/配布の経路が混ざる。公式実装の参照はDEVELOPMENTへ記載。
+- 修正: notifications.tsをApplet/更新通知で共用。Windows toastXmlに配置専用protocol URIを埋め込み、元のportable EXE・profile・packaged状態でschemeを分離。最初の通知時だけ元のEXEと必要な隔離profile引数をHKCUへ登録。second-instance/初回起動でUUID callbackを一度だけ処理し、外部URIの任意commandを受け付けない。同じApplet子プロセスの稼働ガードを維持。古い/前プロセスのトークンは本体を開く。単一EXE・既存AUMID/通知設定・Gmail保存データを維持。
+- 検証: typecheck/build/Prettier/diff-check成功。通常Windows環境の全回帰124/124（artifacts/notification-regression-windows.log）。新規3試験は配置/開発の分離、URI検証/一度限り処理、XML escape/無音保持を確認。sandboxでは既存一時ファイルrename EPERM・子プロセス制限により失敗/停止したため、通常Windowsで実施。残存sandbox試験PID 59180と子46104を終了。
+- 発行: `dev.bat run dist:host`成功、publish/AppDock.at365.exe 100608538 bytes、SHA256 `89A1D78522D9A2CE4B18BC737F6FAFA6B02BBADA8F38D6820C254E355AB92D30`。update.jsonを再生成。版は0.24.0のまま、本体だけのローカル発行。既存の別作業変更を保持、実利用deploy/commit/push/Release公開は行っていない。
+- 実EXE: artifacts/notification-portable-1791514866382/result.json、最終試験終了0。2つの隔離単一EXEに合成通知を表示しWindows通知履歴のXML/起動登録を確認、通知内のURIをWindows Shellから起動。配置先ごとのcallback・他方のcount不変・一度限り処理・停止Appletガード・終了後の元EXE/profile起動を確認、コピーSHA一致。物理toastクリック/実Gmail受信は未実施。
+- 後片づけ: 通知履歴の古いContent=null項目で初期のcleanupが失敗。null項目を対象外にして最終試験終了0。途中試験を含む合成URIを限定削除、試験前のCOM起動先とAppDock shortcutのtarget/cwdを復元。artifacts/notification-cleanup.logで全試験URI消去/元target照合、関連プロセス0を確認。ユーザーの実利用通知を消去していない。
+- 更新前の既存通知は旧launchを持つため、修正後の新しい通知で確認が必要。README/DEVELOPMENT/AGENTSへ仕様と実通知clickの検証境界を記載。

@@ -166,10 +166,9 @@ async function open(id) {
   checks.push(
     'single portable EXE: UI registration, well-known JSON, lazy opening, remote isolation, page/window input and toolbar navigation',
   );
-  const account = `account.${randomUUID()}`,
+  const account = (await dock.evaluate(() => window.dock.createWebAccount('別アカウント'))).id,
     second = `web.${randomUUID()}`;
   await update((v) => {
-    v.webApplets.accounts.push({ id: account, name: '別アカウント' });
     v.webApplets.items.push({
       ...v.webApplets.items.find((a) => a.id === id),
       id: second,

@@ -116,6 +116,16 @@ scripts/                   ビルドと実機UI/portable検証
 
 ## 公式仕様
 
+### Windows通知の起動先
+
+`src/main/core/notifications.ts`でAppletと更新通知を共用します。Windowsは`toastXml`のprotocol activationを使い、元のportable EXEパス・保存先・packaged状態のSHA256から配置専用URI schemeを生成します。最初の通知時にだけ`app.setAsDefaultProtocolClient`で元の単一EXEを登録し、開発起動にはrepoパス、隔離試験には`--test-profile`を付けます。Electron 44.6.0が共有の製品名ショートカットからCLSIDを読み、LocalServer32を現在の実行EXEへ書き換える自動登録にクリック先を依存させません。
+
+クリックは`second-instance`または初回起動の引数から処理します。URIは配置専用schemeとUUIDトークンだけを受け付け、外部URIから任意コマンドを実行しません。実行中のコールバックは一度だけ消費し、Appletの同じ子プロセスが稼働中であることを再確認します。終了後/古いトークンは本体を開くだけです。履歴用コールバックは最大512件保持します。既存の`at365.appdock`通知設定と単一EXE配布を維持します。
+
+`dev.bat exec node scripts/notification-portable-test.cjs`は2つの隔離portableで合成通知を表示し、Windows通知履歴のXMLとURI登録を確認して、Windows Shell経由で同じURIを起動します。稼働中/終了後/停止Applet/同じURIの再実行を検証し、試験URIと合成通知を削除、Electronが触る既存のショートカット/COM登録を復元します。物理的な通知クリックと実Gmail受信は別途確認が必要です。
+
+参照: [Electron通知](https://www.electronjs.org/docs/latest/api/notification#new-notificationoptions)、[Windows toastのprotocol activation](https://learn.microsoft.com/en-us/uwp/schemas/tiles/toastschema/element-toast)、[Electron 44.6.0の自動登録](https://github.com/electron/electron/blob/v44.6.0/shell/browser/notifications/win/windows_toast_activator.cc)。
+
 - [Electron security](https://www.electronjs.org/docs/latest/tutorial/security)
 - [electron-builder portable](https://www.electron.build/nsis/)
 - [Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)
@@ -143,6 +153,8 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 ## 本体・Appletの自己更新
 
 0.24.0の本体管理WebApplet・Gmailから独立したログイン枠・Web提供JSONの初期設定・保存形式・隔離試験は[WebApplet](docs/web-applets.md)を参照してください。
+
+0.24.1はWebアカウント管理を独立ページ/専用ファイル/即時操作へ移し、名前のblur確定/Escape取消と削除待ちsessionの次回起動回収を追加します。同じ文書の移行・操作・削除境界を参照してください。
 
 0.22.0の取得元・更新情報JSON・共通ミニプログラム・発行・復元・隔離試験は[更新の開発ガイド](docs/updates.md)を参照してください。`publish.bat`は本体EXEと`publish/update.json`を生成します。
 

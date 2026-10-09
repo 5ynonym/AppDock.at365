@@ -8,6 +8,7 @@ import { AppletSettings } from './AppletSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import type { SettingsEditor } from './useSettingsEditor';
+import type { WebProfile } from '../shared/web-applets';
 import { useLayoutEffect, useRef } from 'react';
 
 /** Both pages render this panel against the same host editing session. */
@@ -18,6 +19,8 @@ export function AppletSettingsPanel({
   globalHotKeys,
   tab,
   onTab,
+  onWebAccounts,
+  webAccounts,
 }: {
   applet: ExtensionSnapshot;
   editor: SettingsEditor;
@@ -25,6 +28,8 @@ export function AppletSettingsPanel({
   globalHotKeys: GlobalHotKeyStatus[];
   tab: 'settings' | 'shortcuts';
   onTab(tab: 'settings' | 'shortcuts'): void;
+  onWebAccounts(): void;
+  webAccounts: WebProfile[];
 }) {
   const { draft, edit } = editor;
   const panel = useRef<HTMLDivElement>(null);
@@ -51,7 +56,13 @@ export function AppletSettingsPanel({
       </div>
       {tab === 'settings' ? (
         applet.runtime === 'web' ? (
-          <WebAppletSettings key={applet.id} editor={editor} itemId={applet.id} />
+          <WebAppletSettings
+            key={applet.id}
+            editor={editor}
+            itemId={applet.id}
+            onAccounts={onWebAccounts}
+            accounts={webAccounts}
+          />
         ) : (
           <AppletSettings key={applet.id} applet={applet} draft={draft} onChange={edit} />
         )
