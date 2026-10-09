@@ -329,7 +329,10 @@ const checks = [];
     await chooseApplet('Welcome to your Dock');
     assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
     await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).press('Control+p');
-    await page.getByText('同じキーの割り当てあり（条件一致時に実行）', { exact: true }).waitFor();
+    assert.equal(
+      await page.getByText('同じキーの割り当てあり（条件一致時に実行）', { exact: true }).count(),
+      0,
+    );
     await page
       .getByRole('group', { name: 'ショートカットの絞り込み' })
       .getByRole('button', { name: '登録エラー', exact: true })
@@ -360,7 +363,10 @@ const checks = [];
     await button('ショートカット').click();
     await page.locator('.command-id[title="未確認のコマンド"]').first().waitFor();
     assert.equal(await page.locator('.settings-applet-list').count(), 0);
-    assert.equal(await page.locator('.shortcut-group-heading').first().textContent(), 'AppDock6件');
+    assert.equal(
+      await page.locator('.shortcut-group-heading h3').first().textContent(),
+      'AppDock6件',
+    );
     assert.equal(
       await page.locator('[data-shortcut-owner="appdock"] .keybindings-table tbody tr').count(),
       6,

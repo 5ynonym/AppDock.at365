@@ -11,6 +11,7 @@ const {
   initializeExtensionDefaults,
   initializeWebAppletDefaults,
   resetAppletKeybindings,
+  moveKeybindingInGroup,
 } = require('../out/main/shared/keybindings');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
 const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys');
@@ -20,6 +21,43 @@ const row = (id, command, scope = 'app', appletIds = []) => ({
   key: 'Ctrl+F12',
   enabled: true,
   when: { scope, appletIds },
+});
+
+test('provider drag changes dispatch order within its slots and rejects cross-provider drops', () => {
+  const rows = [
+    row('a1', 'a.first'),
+    row('b1', 'b.first'),
+    row('a2', 'a.second'),
+    row('b2', 'b.second'),
+  ];
+  const owners = new Map([
+    ['a.first', 'a'],
+    ['a.second', 'a'],
+    ['b.first', 'b'],
+    ['b.second', 'b'],
+  ]);
+  const group = (command) => owners.get(command);
+  const moved = moveKeybindingInGroup(rows, 'a2', 'a1', group);
+  assert.deepEqual(
+    moved.map((r) => r.id),
+    ['a2', 'b1', 'a1', 'b2'],
+  );
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ['a1', 'b1', 'a2', 'b2'],
+  );
+  assert.equal(moveKeybindingInGroup(rows, 'a1', 'b1', group), rows);
+  assert.equal(moveKeybindingInGroup(rows, 'absent', 'a1', group), rows);
+  assert.deepEqual(
+    resolveKeybindings(
+      moved,
+      'Ctrl+F12',
+      { appFocused: true },
+      rows.map((r) => ({ id: r.command })),
+    ),
+    ['a.second', 'b.first', 'a.first', 'b.second'],
+  );
+  assert.deepEqual(parseKeybindings(moved), moved);
 });
 test('new settings round-trip beyond legacy limits and include bindings in the size limit', () => {
   const keybindings = Array.from({ length: 501 }, (_, i) =>

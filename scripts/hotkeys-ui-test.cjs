@@ -100,7 +100,11 @@ async function until(check, message) {
     const row = page.locator('[data-shortcut-command="at365.watch.toggle"]');
     const input = row.locator('[data-shortcut-recorder]');
     assert.equal(await input.inputValue(), 'Pause');
-    assert.equal(await row.getByRole('checkbox', { name: /割り当てを有効/ }).isChecked(), true);
+    assert.equal(
+      (await row.getByRole('switch', { name: /割り当てを有効/ }).getAttribute('aria-checked')) ===
+        'true',
+      true,
+    );
     await input.focus();
     await until(async () => !(await registered('Pause')), 'Recorder did not release Pause.');
     send(0x13);
@@ -115,7 +119,8 @@ async function until(check, message) {
     assert.equal((await contender.sync(['Pause']))[0].registered, true);
     checks.push('recording suspends Pause; single F24 remapping releases Pause');
 
-    await row.getByRole('button', { name: '既定に戻す', exact: true }).click();
+    await row.getByRole('button', { name: /その他の操作/ }).click();
+    await page.getByRole('menuitem', { name: '既定に戻す', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -136,12 +141,13 @@ async function until(check, message) {
     assert.equal(await visible(), false);
     checks.push('focused AppDock executes global key once');
 
-    await row.getByRole('combobox').selectOption('app');
+    await row.locator('select[aria-label*="いつ・どこで"]').selectOption('app');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(async () => !(await registered('Pause')), 'Global opt-out did not release Pause.');
     assert.equal((await contender.sync(['Pause']))[0].registered, true);
     await contender.sync([]);
-    await row.getByRole('button', { name: '既定に戻す', exact: true }).click();
+    await row.getByRole('button', { name: /その他の操作/ }).click();
+    await page.getByRole('menuitem', { name: '既定に戻す', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(() => registered('Pause'), 'Default restore did not restore global Pause.');
     await page.screenshot({ path: path.join(profile, 'registered.png') });

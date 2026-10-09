@@ -2782,7 +2782,6 @@ summary {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.9rem;
 }
 .keybindings-table th {
   text-align: left;
@@ -2794,18 +2793,6 @@ summary {
   vertical-align: top;
   padding: 14px 10px;
   border-bottom: 1px solid var(--border);
-}
-.keybindings-table td:nth-child(2) {
-  min-width: 155px;
-}
-.keybindings-table td:nth-child(3) {
-  min-width: 175px;
-}
-.keybindings-table td:nth-child(4) {
-  min-width: 190px;
-}
-.keybindings-table td:nth-child(5) {
-  min-width: 140px;
 }
 .keybindings-table small {
   display: block;
@@ -2823,12 +2810,6 @@ summary {
   align-items: center;
   margin-top: 8px;
   font-size: 0.8rem;
-}
-.keybinding-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
 }
 .keybinding-targets {
   margin-top: 8px;
@@ -2906,8 +2887,24 @@ summary {
 .gesture-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   min-width: 720px;
   text-align: left;
+}
+.gesture-table .binding-order-column {
+  width: 64px;
+}
+.gesture-table .binding-enabled-column {
+  width: 52px;
+}
+.gesture-table .binding-input-column {
+  width: 180px;
+}
+.gesture-table .binding-condition-column {
+  width: 200px;
+}
+.gesture-table .binding-actions-column {
+  width: 48px;
 }
 .gesture-table th {
   padding: 12px 10px;
@@ -2915,23 +2912,29 @@ summary {
 }
 .gesture-table th:first-child {
   white-space: nowrap;
-  min-width: 42px;
 }
 .gesture-table td {
   padding: 16px 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
+.gesture-table th:nth-child(-n + 2),
+.gesture-table td:nth-child(-n + 2) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.gesture-table th:last-child,
+.gesture-table td:last-child {
+  width: 48px;
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
+.gesture-table th:last-child {
+  font-size: 12px;
+}
 .gesture-table td:nth-child(3) {
-  min-width: 150px;
-  max-width: 220px;
   overflow-wrap: anywhere;
-}
-.gesture-table td:nth-child(4) {
-  width: 155px;
-}
-.gesture-table td:nth-child(5) {
-  width: 175px;
 }
 .gesture-table select,
 .gesture-table input:not([type='checkbox']) {
@@ -2966,16 +2969,28 @@ summary {
   color: var(--muted);
   margin-left: 8px;
 }
+.gesture-group-heading > button,
+.gesture-add > button {
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 9px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
 .gesture-drag-handle {
   cursor: grab;
   white-space: nowrap;
-  padding: 8px 5px;
+  padding: 8px 2px;
+  gap: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .gesture-drag-handle:active {
   cursor: grabbing;
 }
 .gesture-drag-handle span {
-  font-size: 22px;
+  font-size: 20px;
   color: var(--muted);
 }
 .gesture-drop-target {
@@ -2984,9 +2999,16 @@ summary {
   background: var(--accent-soft);
 }
 .gesture-menu-trigger {
-  min-width: 40px;
+  min-width: 32px;
   font-size: 22px;
-  padding: 2px 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+.gesture-menu-trigger:hover,
+.gesture-menu-trigger:focus-visible {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 .gesture-menu-trigger[aria-expanded='true'] {
   background: var(--raised);
@@ -2997,6 +3019,7 @@ summary {
   display: flex;
   flex-direction: column;
   min-width: 160px;
+  width: max-content;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
   overflow: auto;
