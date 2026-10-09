@@ -1,18 +1,19 @@
-# オールインワンパッケージの発行
+# リリース用オールインワンパッケージの作成
 
 利用者の導入方法は[README](../README.md#オールインワン版)を参照してください。各Appletの実装は独立リポジトリに置き、AppDock側で配布物を組み立てます。
 
-## 発行コマンド
+## 通常publishとリリース準備
 
 ```powershell
+# 通常publish: 変更した本体のEXE・更新JSONを発行
 .\publish.bat
-# 本体EXE・更新JSONだけを発行する場合
-.\dev.bat run dist:host
-# 発行済み本体からオールインワンを組み立て直す場合（Appletは毎回再発行）
+# リリース準備内のZIP作成工程（通常publishでは実行しない）
 .\dev.bat run pack:all-in-one
 ```
 
-`publish.bat → dev.bat run dist → dist:host → pack:all-in-one`の順に処理します。本体の単一EXE形式と通常更新JSONは維持します。オールインワンの組み立ては`scripts/build-all-in-one.ps1`です。
+通常の`publish.bat → dev.bat run dist → dist:host`は本体単一EXEと更新JSONだけを生成します。変更したAppletは各repoのpublishで配置し、個別更新用update.zip/update.jsonも生成します。実装完了時に変更モジュールを版更新して発行し、未変更モジュールを通常publishで再発行しません。
+
+オールインワンZIPの作成・検証・旧版整理はAppDockのリリース時だけ行います。[RELEASING.md](RELEASING.md)の`release.ps1 -Mode Prepare`が本体publishの後に`pack:all-in-one`を実行します。組み立ては`scripts/build-all-in-one.ps1`です。上記のpack単独コマンドはリリース準備の切り分け用で、正式なPrepareの全検証・sealを省略する用途には使いません。
 
 対象は、AppDockリポジトリの親フォルダー直下にある、`.git`と`extension.json`を持つリポジトリすべてです。各repoの`publish.bat`が必要で、足りない場合は失敗します。ネストした試験fixtureや実利用先の`extensions`は探索しません。別の場所を探索する場合はPowerShellから`-AppletRoot <絶対パス>`を指定できます。
 
@@ -38,6 +39,12 @@ AppDock.at365-all-in-one-<version>.zip
 - `bundle.json`に本体/各Appletの版・commit・dirty状態・Applet ZIPハッシュと収録ファイルのサイズ/SHA256を記録します。初期設定は同梱せず、初回起動時の通常動作ですべてのAppletが無効になります。
 
 出力は`publish/AppDock.at365-all-in-one-<version>.zip`。専用stageは`artifacts/all-in-one-<ID>/package`に残します。完成後だけ同じ版の出力ZIPを置換します。途中で失敗した場合、以前の完成済みZIPは残るため、終了コードが失敗の発行物を新しいものとして公開しないでください。Appletが0件でも失敗します。
+
+## publishの旧版ZIP整理
+
+AppDockのリリース準備で新しいオールインワンZIPを`publish`へ配置した後、版・全収録ファイルのサイズ/SHA256・同梱本体と`publish/AppDock.at365.exe`の一致・隔離起動を検証します。Prepareの全チェックとsealの整合検証が成功した時点で、sealが旧版ZIPを削除します。2026-10-09のユーザーの追加指定により、通常publishではZIPの生成も整理も行いません。
+
+削除対象は`publish`直下の`AppDock.at365-all-in-one-<version>.zip`という通常ファイルだけです。正式版x.y.zを数値で比較し、検証済みの新版より古い版だけを削除します。新版、同じ版、より新しい版、別名のZIP、ディレクトリ/リンク、`artifacts`のstage/backup、GitHub Releaseは対象外です。生成・配置・検証の途中で失敗した場合は旧版を残します。削除した名前はplan.jsonの`removedOldBundles`へ保存します。削除時のエラーはPrepareの失敗として報告されるため、ログと残存ZIPを確認してください。
 
 ## リリース
 

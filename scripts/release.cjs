@@ -4,10 +4,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const assert = require('node:assert/strict');
+const { pruneReleases } = require('./release-retention.cjs');
 const CHECKS = [
   'typecheck',
   'regression',
   'publish',
+  'pack-all-in-one',
   'portable-updates',
   'update-progress',
   'update-recovery',
@@ -166,6 +168,30 @@ function createRelease(
     plan.evidence = ['checks.json', 'bundle-ui.json', ...CHECKS.map((name) => `${name}.log`)].map(
       (name) => asset(path.join(directory, name)),
     );
+    // Only release preparation retires old bundles, after every check and asset
+    // comparison has passed. Ordinary publish never creates or deletes bundles.
+    const publish = path.join(root, 'publish');
+    const publishInfo = fs.lstatSync(publish);
+    assert.ok(
+      publishInfo.isDirectory() && !publishInfo.isSymbolicLink(),
+      'Publish cannot be a link',
+    );
+    const current = stable(plan.version);
+    plan.removedOldBundles = [];
+    for (const entry of fs.readdirSync(publish, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const match =
+        /^AppDock\.at365-all-in-one-((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.zip$/.exec(
+          entry.name,
+        );
+      if (!match) continue;
+      const candidate = stable(match[1]);
+      const differing = candidate.findIndex((part, index) => part !== current[index]);
+      if (differing < 0 || candidate[differing] >= current[differing]) continue;
+      const file = path.join(publish, entry.name);
+      fs.unlinkSync(file);
+      plan.removedOldBundles.push(entry.name);
+    }
     plan.phase = 'prepared';
     save(planPath, plan);
   }
@@ -362,6 +388,15 @@ function createRelease(
       assert.equal(state.results[0]?.installable, true);
       plan.applicationUpdateCheck = state.results[0];
       plan.phase = 'verified';
+      plan.url = release.html_url;
+      plan.retentionReport = path.join(
+        path.dirname(planPath),
+        `retention-${crypto.randomUUID()}.json`,
+      );
+      // Persist successful publication separately: a cleanup failure must not
+      // make callers retry publication or overwrite public assets.
+      save(planPath, plan);
+      pruneReleases(plan, plan.retentionReport, command);
     } else throw Error(`Unknown remote mode: ${mode}`);
     plan.url = release.html_url;
     save(planPath, plan);
