@@ -3,6 +3,7 @@ import type { SettingsStore } from './settings';
 import type { AutomationApplet, AutomationCommand } from './automation-commands';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import { AppletManagement, AppletManagementError } from './applet-management';
+import { GestureCommands } from './gesture-commands';
 import { ShortcutCommands } from './shortcut-commands';
 import type { GlobalHotKeyStatus } from '../../shared/contracts';
 
@@ -25,11 +26,13 @@ export const automationMethods = [
   'commands.list',
   'commands.execute',
   'shortcuts.get',
+  'gestures.get',
 ] as const;
 export class AutomationApi {
   private executing = false;
   private settingsCommands: SettingsCommands;
   private shortcuts: ShortcutCommands;
+  private gestures: GestureCommands;
   constructor(
     private options: {
       settings: SettingsStore;
@@ -38,6 +41,7 @@ export class AutomationApi {
       appletManagement?: AppletManagement;
       manageable?(): boolean;
       shortcutsEditable?(): boolean;
+      gesturesEditable?(): boolean;
       shortcutStatus?(): GlobalHotKeyStatus[];
       applets(): AutomationApplet[];
       commands(): AutomationCommand[];
@@ -51,6 +55,11 @@ export class AutomationApi {
   ) {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
+    this.gestures = new GestureCommands({
+      ...options,
+      settingsCommands: this.settingsCommands,
+      commands: () => this.commands(),
+    });
     this.shortcuts = new ShortcutCommands({
       ...options,
       settingsCommands: this.settingsCommands,
@@ -66,6 +75,7 @@ export class AutomationApi {
           ...this.settingsCommands.commands(),
           ...(this.options.appletManagement?.commands() ?? []),
           ...this.shortcuts.commands(),
+          ...this.gestures.commands(),
         ].map((c) => [
           c.id,
           {
@@ -105,6 +115,7 @@ export class AutomationApi {
         return {
           apiVersion: 2,
           appletManagementAllowed: this.options.manageable?.() ?? false,
+          gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
           shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
           version: this.options.version,
           instanceId: this.options.instanceId,
@@ -134,6 +145,7 @@ export class AutomationApi {
       }
       case 'commands.list':
         return {
+          gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
           shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
           appletManagementAllowed: this.options.manageable?.() ?? false,
           commands: this.commands(),
@@ -142,11 +154,19 @@ export class AutomationApi {
         };
       case 'commands.execute':
         return this.execute(this.id(params, true), params.args === undefined ? {} : params.args);
+      case 'gestures.get':
+        return {
+          ...this.gestures.get(),
+          writable: this.options.writable(),
+          executable: this.options.executable(),
+          gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
+        };
       case 'shortcuts.get':
         return {
           ...this.shortcuts.get(),
           writable: this.options.writable(),
           executable: this.options.executable(),
+          gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
           shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
         };
       case 'settings.getSchema':
@@ -204,7 +224,9 @@ export class AutomationApi {
       throw new AutomationError('UNAVAILABLE', 'このコマンドは現在利用できません。');
     if (
       !object(args) ||
-      (!['settings.write', 'shortcuts.write'].includes(command.permission ?? '') &&
+      (!['settings.write', 'shortcuts.write', 'gestures.write'].includes(
+        command.permission ?? '',
+      ) &&
         Object.keys(args).length)
     )
       throw new AutomationError(
@@ -212,7 +234,7 @@ export class AutomationApi {
         'コマンドのinputSchemaに合うargsを指定してください。',
       );
     if (
-      ['settings.write', 'shortcuts.write'].includes(command.permission ?? '') &&
+      ['settings.write', 'shortcuts.write', 'gestures.write'].includes(command.permission ?? '') &&
       !this.options.writable()
     )
       throw new AutomationError(
@@ -220,6 +242,11 @@ export class AutomationApi {
         'AppDockのCodex連携画面で設定変更を許可してください。',
       );
     if (this.executing) throw new AutomationError('BUSY', '別のAPIコマンドを実行中です。');
+    if (command.permission === 'gestures.write' && !this.options.gesturesEditable?.())
+      throw new AutomationError(
+        'GESTURE_EDITING_DISABLED',
+        'AppDockのCodex連携画面でジェスチャー編集を許可してください。',
+      );
     if (command.permission === 'shortcuts.write' && !this.options.shortcutsEditable?.())
       throw new AutomationError(
         'SHORTCUT_EDITING_DISABLED',
@@ -232,8 +259,10 @@ export class AutomationApi {
       );
     this.executing = true;
     try {
-      if (command.permission === 'shortcuts.write') {
-        const result = this.shortcuts.execute(args);
+      if (command.permission === 'shortcuts.write' || command.permission === 'gestures.write') {
+        const result = (
+          command.permission === 'shortcuts.write' ? this.shortcuts : this.gestures
+        ).execute(args);
         return {
           id,
           completion: result.dryRun ? 'validated' : 'settingsSaved',

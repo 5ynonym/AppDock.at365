@@ -71,10 +71,28 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       if (tools.length === 8) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 8, 'Codex discovers all eight MCP tools');
+    assert.equal(tools.length, 9, 'Codex discovers all nine MCP tools');
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
+    const gestures = await call('appdock_get_gestures');
+    assert.equal(gestures.isError ?? false, false);
+    assert.ok(Array.isArray(gestures.structuredContent.bindings));
+    if (gestures.structuredContent.gestureEditingAllowed) {
+      const dry = await call('appdock_execute_command', {
+        id: 'appdock.gestures.update',
+        args: {
+          expectedRevision: gestures.structuredContent.revision,
+          dryRun: true,
+          operations: [{ kind: 'configure', changes: { distance: 75 } }],
+        },
+      });
+      assert.equal(dry.structuredContent.completion, 'validated');
+      assert.deepEqual(
+        (await call('appdock_get_gestures')).structuredContent.settings,
+        gestures.structuredContent.settings,
+      );
+    }
     const shortcuts = await call('appdock_get_shortcuts');
     assert.equal(shortcuts.isError ?? false, false);
     assert.ok(Array.isArray(shortcuts.structuredContent.bindings));
@@ -139,7 +157,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers eight MCP tools; reads shortcuts; lists commands and executes appdock.open',
+        'discovers nine MCP tools; reads shortcuts and gestures with dry-run editing; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,

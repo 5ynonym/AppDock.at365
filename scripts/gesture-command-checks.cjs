@@ -52,7 +52,22 @@ module.exports = async ({ page, profile, checks, calls, send, until }) => {
   const keysBefore = (await snapshot()).settings.value.keybindings;
   const callsBefore = calls().length;
   await filter.fill('test.gestures');
-  assert.equal(await page.locator('.applet-shortcut-overview tbody tr').count(), 4);
+  assert.deepEqual(
+    (
+      await page
+        .locator('[data-shortcut-command]')
+        .evaluateAll((rows) => rows.map((row) => row.dataset.shortcutCommand))
+    ).sort(),
+    [
+      'test.gestures.open',
+      'test.gestures.a',
+      'test.gestures.b',
+      'test.gestures.c',
+      ...['enable', 'disable', 'restart'].map(
+        (action) => `appdock.applets.test.gestures.${action}`,
+      ),
+    ].sort(),
+  );
   assert.match(await row('test.gestures.c').innerText(), /未割り当て/);
   await add('test.gestures.b');
   assert.equal(await panel.getByLabel('割り当てのいつ・どこで').inputValue(), 'owner');

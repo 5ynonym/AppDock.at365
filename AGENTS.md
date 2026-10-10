@@ -107,6 +107,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 ## マウスジェスチャーの維持事項
 
+- 外部編集はgestures.get/appdock.gestures.updateと既定OFFのallowEditGesturesを使用する。共通revision/dryRun/原子的保存と、公開済み引数なしコマンドだけの新規割当を維持する。割当操作とconfigureを同じ検証単位で保存し、browser/exe条件・順序・入力処理は既存gesturesを共用する。保存成功を実入力成功と扱わない。正本は[共通操作API](docs/automation.md#ジェスチャー編集02633以降)。
+
 - 正本は[マウスジェスチャー](docs/gestures.md)。本体管理InputHost、共通コマンド予約、条件判定、共有設定draftを使い、Appletへフックを重複登録しない。WebBrowserToolsはブラウザ操作と送信キーを担当する。
 - 旧設定はgestures未指定時だけ取り込み、空配列/解除済み割り当てを復活させない。初期値はApplet manifestのdefaultGestureBindingsから初回だけ追加する。WebBrowserToolsの対象exeは本体側と一致させる。
 - 開始対象HWNDとページ文脈を固定し、対象/設定変更や取消後に次のアプリへ送らない。command.executeのinvocationとcommand.cancel/.NET CancellationTokenを保つ。キーとジェスチャーのコマンド予約は共用し、再入防止のためにジェスチャーの連続操作全体へ固定待機を追加しない。

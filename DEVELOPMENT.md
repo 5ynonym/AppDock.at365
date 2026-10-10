@@ -1,6 +1,6 @@
 # AppDock.at365 開発ガイド
 
-0.26.32のショートカット外部編集は[共通操作API](docs/automation.md#ショートカット編集02632以降)を参照してください。`ShortcutCommands`は既存keybindingsの検証・保存形式とSettingsCommandsのrevisionを共有します。回帰は`tests/shortcut-commands.test.cjs`、GUI/実キー/MCPは`scripts/automation-ui-test.cjs`です。
+0.26.32のショートカット外部編集と0.26.33のジェスチャー外部編集は[共通操作API](docs/automation.md)を参照してください。`ShortcutCommands`/`GestureCommands`は既存の割当検証・保存形式とSettingsCommandsのrevisionを共有します。回帰は`tests/shortcut-commands.test.cjs`/`tests/gesture-commands.test.cjs`、GUI/実キー/MCPは`scripts/automation-ui-test.cjs`（ジェスチャー編集は`automation-gesture-checks.cjs`）です。ジェスチャー物理入力の試験とは区別します。
 
 0.26.31のApplet管理コマンドは[共通操作API](docs/automation.md#applet管理02631以降)を参照してください。共通処理は`src/main/core/applet-management.ts`、登録は`src/shared/applet-management.ts`、回帰は`tests/applet-management.test.cjs`と`tests/automation.test.cjs`、実プロセス/UI/MCPは`scripts/automation-ui-test.cjs`で確認します。
 
