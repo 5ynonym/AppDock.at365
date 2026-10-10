@@ -228,6 +228,40 @@ export function appendKeybinding(rows: Keybinding[], binding: Keybinding) {
   return [...rows.slice(0, index), { ...binding, key }, ...rows.slice(index)];
 }
 
+/** Apply only reordered key groups, preserving newer edits to unrelated keys. */
+export function applyKeybindingOrder(
+  current: Keybinding[],
+  original: Keybinding[],
+  ordered: Keybinding[],
+) {
+  const replacements = new Map<string, Keybinding[]>();
+  for (const [key, before] of keybindingGroups(original)) {
+    const after = ordered.filter((row) => normalizeShortcut(row.key) === key);
+    if (before.map((row) => row.id).join('\n') === after.map((row) => row.id).join('\n')) continue;
+    const live = current.filter((row) => normalizeShortcut(row.key) === key);
+    if (
+      JSON.stringify(live) !== JSON.stringify(before) ||
+      after.length !== before.length ||
+      new Set(after.map((row) => row.id)).size !== before.length ||
+      after.some((row) => !before.some((old) => old.id === row.id))
+    )
+      throw Error(`${key}の割り当てが変更されました。キャンセルして開き直してください。`);
+    replacements.set(
+      key,
+      after.map((row) => live.find((item) => item.id === row.id)!),
+    );
+  }
+  const offsets = new Map<string, number>();
+  return current.map((row) => {
+    const key = normalizeShortcut(row.key);
+    const group = replacements.get(key);
+    if (!group) return row;
+    const index = offsets.get(key) ?? 0;
+    offsets.set(key, index + 1);
+    return group[index];
+  });
+}
+
 export function changeKeybindingKey(rows: Keybinding[], id: string, value: string) {
   const row = rows.find((row) => row.id === id);
   if (!row) return rows;

@@ -80,11 +80,11 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 ## 条件付きショートカットの維持事項
 
-- 0.26.22の[画面設計](docs/shortcut-ui-redesign.md)を正本とする。設定ページは全コマンドの平坦な一覧で未割り当ても表示し、グループ分け/実行順操作/コマンド変更を置かない。検索/状態フィルター/表示件数を上部にまとめ、ShortcutCommandListとAppletShortcutDialogをApplet詳細と共用する。追加時は絞り込み・表示位置を保持し、自動スクロールしない。
+- 0.26.23の[画面設計](docs/shortcut-ui-redesign.md)を正本とする。設定ページは全コマンドの平坦な一覧で未割り当ても表示し、一覧内にグループ分け/実行順操作/コマンド変更を置かない。実行順は専用ShortcutOrderDialogで変更する。検索/状態フィルター/表示件数を上部にまとめ、ShortcutCommandListとAppletShortcutDialogをApplet詳細と共用する。追加時は絞り込み・表示位置を保持し、自動スクロールしない。
 
 - 設定ページ/通常Appletのショートカット削除は確認なしで共有draftへ反映する（BindingActionsのconfirmDelete=false）。保存前は全体の変更破棄で戻せる。ジェスチャーの確認は維持する。未割り当てとキーの左端を揃える。
 
-- 0.26.20からApplet詳細は一覧の＋とキー/条件ペアから小さな編集dialogを開く。順番操作・実行順画面への導線は置かない。入力中だけの一時フォームを追加/適用で共有draftへ反映し、全体保存を維持する。dialog表示中はグローバル登録と画面ショートカットを抑止し、取消/閉じる/破棄時に復帰する。Tabは移動、Escapeは取消、Enterは記録欄ではキー入力として扱い、特殊キーからCtrl/Alt/Shift付きTab/Escape等を選べる。実測はscripts/shortcuts-ui-test.cjsとapplet-shortcut-edit-checks.cjs。
+- 0.26.20からApplet詳細は一覧の＋とキー/条件ペアから小さな編集dialogを開く。割り当てメニューの「このキーの実行順…」から、他Appletを含む全割り当ての専用パネルを開く。入力中だけの一時フォームを追加/適用で共有draftへ反映し、全体保存を維持する。dialog表示中はグローバル登録と画面ショートカットを抑止し、取消/閉じる/破棄時に復帰する。Tabは移動、Escapeは取消、Enterは記録欄ではキー入力として扱い、特殊キーからCtrl/Alt/Shift付きTab/Escape等を選べる。実測はscripts/shortcuts-ui-test.cjsとapplet-shortcut-edit-checks.cjs。
 
 - 正本は[条件付きショートカット](docs/keybindings.md)。割り当てごとのkeybindingsを使い、旧shortcuts/globalShortcutCommandsへ条件を押し込まない。新形式が存在すれば旧フィールドは表示用の派生値。
 - 本体・localページ・Gmail UI/本文・WebApplet・Windowsホットキーは共通resolver/dispatcherへ渡す。押下時の条件で実行対象を固定し、保存順・同一コマンド1回・再入防止・終了時打切りを保つ。
@@ -109,11 +109,11 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 - Applet設定は詳細ページへ集約し、設定ページにApplet別設定一覧/本体専用キー入口を戻さない。全コマンド一覧はカタログ順でappletOrderには連動しない。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、起動順/keybindingsの実行順/ribbon.orderを変更しない。回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。
 
-- ショートカットの行末メニューは編集/即時削除のみ。追加/編集は小さなdialogで完成してから共有draftへ反映する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は保存位置を保持する。ジェスチャーのCommandPalette選択/複製/確認付き削除/ドラッグは維持する。
+- ショートカットの行末メニューは編集/このキーの実行順/即時削除。追加/編集は小さなdialogで完成してから共有draftへ反映する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は保存位置を保持する。ジェスチャーのCommandPalette選択/複製/確認付き削除/ドラッグは維持する。
 
 - ジェスチャー表のグループは共通colgroup/固定レイアウトで列境界を揃える。ショートカットはコマンド/割り当ての2列とし、狭幅・両テーマで検索/フィルターと一覧のoverflowを検証する。
 
-- ショートカットに実行順番号を表示しない。検索/状態フィルターに該当するコマンドの全割り当てを表示し、保存配列やdispatcherの実行順を表示のために並べ替えない。
+- コマンド一覧に実行順番号を表示しない。専用パネルだけに番号と順番操作を置き、適用は同キーのスロット内でのみ行う。変更したキーの内容や順序が外部更新された場合は適用を拒否し、他キーの更新は保持する。検索/状態フィルターに該当するコマンドの全割り当てを表示し、保存配列やdispatcherの実行順を表示のために並べ替えない。
 
 - ショートカットの解除はその他メニューの削除で選んだIDだけをdraftから除く。コマンド行は未割り当てとして残す。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは記録可能なキーとして維持する。
 

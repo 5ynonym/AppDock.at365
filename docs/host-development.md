@@ -203,7 +203,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 - `shared/applet-order.ts`は保存ID順に既存Appletを並べ、未登録の新規Appletは発見順で末尾へ置きます。不在IDを表示せず、新しい並べ替えでもそのIDは保存配列に保持します。WebAppletも同じ一覧に含みます。既存JSONのappletOrder未指定は空配列で補い、重複・不正ID・500件超を拒否します。
 - `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。共有draftを更新し、保存/破棄は他の未保存設定も含みます。不正JSON・revision競合・保存失敗時に下書きを上書きしません。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
-- rendererのApplet一覧・ホームカード・対象Applet候補に同じ順を使います。ショートカットのコマンド一覧はカタログ順で独立し、実行順操作を置きません。Applet表示順で実行順・起動順・ribbon.orderを変更しません。
+- rendererのApplet一覧・ホームカード・対象Applet候補に同じ順を使います。ショートカットのコマンド一覧はカタログ順で独立し、一覧内に実行順操作を置きません。専用ShortcutOrderDialogは全カタログを受け取り、提供元をまたいで同じキー内の順番を変更します。Applet表示順で実行順・起動順・ribbon.orderを変更しません。
 - 検証は`tests/applet-order.test.cjs`、`scripts/applet-order-ui-test.cjs`と既存navigation/default-shortcuts/WebApplet UI試験で行います。
 
 ## コマンドパレットの共用
@@ -214,6 +214,6 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 0.26.22から設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
 
-BindingActionsのショートカットメニューは編集と即時削除（confirmDelete=false）。ジェスチャーは引き続き複製と確認付き削除、同入力内の並べ替え、CommandPalette選択を使います。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を共用します。ジェスチャー表の固定colgroup/列幅と内部スクロールは維持します。
+BindingActionsのショートカットメニューは編集・このキーの実行順と即時削除（confirmDelete=false）。ジェスチャーは引き続き複製と確認付き削除、同入力内の並べ替え、CommandPalette選択を使います。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を共用します。ジェスチャー表の固定colgroup/列幅と内部スクロールは維持します。
 
 詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。

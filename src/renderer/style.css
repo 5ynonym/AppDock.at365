@@ -3791,3 +3791,119 @@ summary {
     font-size: 11px;
   }
 }
+
+.shortcut-order-open {
+  margin-left: auto;
+}
+.shortcut-order-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+.shortcut-order-key {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-weight: 600;
+}
+.shortcut-order-key select {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.shortcut-order-help {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.shortcut-order-list {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.shortcut-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.shortcut-order-row.drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.shortcut-order-handle {
+  cursor: grab;
+  padding: 4px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.shortcut-order-handle:active {
+  cursor: grabbing;
+}
+.shortcut-order-number {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  min-width: 22px;
+  text-align: center;
+}
+.shortcut-order-command {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.shortcut-order-command small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.shortcut-order-moves {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.shortcut-order-moves button {
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.shortcut-order-notice {
+  min-height: 32px;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 720px) {
+  .shortcut-order-dialog {
+    padding: 18px;
+  }
+  .shortcut-order-row {
+    gap: 6px;
+    padding: 10px 8px;
+  }
+  .shortcut-order-moves {
+    flex-direction: column;
+  }
+  .command-shortcut-summary {
+    flex-wrap: wrap;
+  }
+}
+.shortcut-order-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.shortcut-order-dialog > :not(.shortcut-order-list) {
+  flex-shrink: 0;
+}
+.shortcut-order-list {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}

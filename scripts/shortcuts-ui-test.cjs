@@ -175,6 +175,7 @@ const checks = [];
     assert(await command('test.a.new').getByText('未割り当て', { exact: true }).count());
     assert(await command('test.b.new').count());
     assert.deepEqual((await snapshot()).settings.value.keybindings, original);
+    await require('./shortcut-order-checks.cjs')({ page, snapshot, save, profile, checks });
     await status().selectOption('unassigned');
     assert.equal(await command('test.a.first').count(), 0);
     assert(await command('test.a.new').count());
@@ -220,7 +221,11 @@ const checks = [];
     await row('a2')
       .getByRole('button', { name: /その他の操作/ })
       .click();
-    assert.deepEqual(await page.getByRole('menuitem').allTextContents(), ['編集', '削除']);
+    assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
+      '編集',
+      'このキーの実行順…',
+      '削除',
+    ]);
     await page.getByRole('menuitem', { name: '削除', exact: true }).click();
     assert.equal(await page.getByRole('alertdialog').count(), 0);
     assert.equal(await command('test.a.second').count(), 0);
@@ -392,6 +397,26 @@ const checks = [];
       'settings header and catalog dark/light at 1280, 900, 700px / filters aligned / no horizontal overflow',
     );
     assert.deepEqual(errors, []);
+    await button('実行順…').click();
+    const orderPanel = page.locator('.shortcut-order-dialog');
+    await orderPanel.getByLabel('実行順を変更するキー').selectOption('Ctrl+F8');
+    const previousOrder = await orderPanel
+      .locator('[data-order-binding]')
+      .evaluateAll((items) => items.map((el) => el.dataset.orderBinding));
+    assert(previousOrder.length > 1);
+    await orderPanel
+      .locator('[data-order-binding]')
+      .last()
+      .getByRole('button', { name: /を上へ/ })
+      .click();
+    await orderPanel.getByRole('button', { name: '適用', exact: true }).click();
+    await save();
+    assert.notDeepEqual(
+      (await snapshot()).settings.value.keybindings
+        .filter((r) => r.key === 'Ctrl+F8')
+        .map((r) => r.id),
+      previousOrder,
+    );
     const persisted = (await snapshot()).settings.value.keybindings;
     await app.close();
     app = await launch();

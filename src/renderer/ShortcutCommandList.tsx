@@ -9,11 +9,13 @@ import {
 } from '../shared/keybindings';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { AppletShortcutDialog } from './AppletShortcutDialog';
+import { ShortcutOrderDialog } from './ShortcutOrderDialog';
 import { BindingActions } from './BindingActions';
 import type { UiCommand } from '../shared/commands';
 
 export function ShortcutCommandList({
   commands,
+  allCommands = commands,
   settings,
   applets,
   onChange,
@@ -22,6 +24,7 @@ export function ShortcutCommandList({
   onRetry,
 }: {
   commands: UiCommand[];
+  allCommands?: UiCommand[];
   settings: Settings;
   applets: { id: string; title: string }[];
   onChange(settings: Settings): void;
@@ -30,6 +33,7 @@ export function ShortcutCommandList({
   onRetry?(): void;
 }) {
   const bindings = getKeybindings(settings);
+  const [orderKey, setOrderKey] = useState<string | null>(null);
   const [editing, setEditing] = useState<{
     row: Keybinding;
     title: string;
@@ -73,11 +77,11 @@ export function ShortcutCommandList({
     });
   };
   useLayoutEffect(() => {
-    if (!editing && restore.current) {
+    if (!editing && !orderKey && restore.current) {
       restore.current();
       restore.current = null;
     }
-  }, [editing, bindings]);
+  }, [editing, orderKey, bindings]);
   const apply = (row: Keybinding) => {
     if (!editing) return;
     let next: Keybinding[];
@@ -163,7 +167,16 @@ export function ShortcutCommandList({
                         label={`${command.title}の${row.key}のその他の操作`}
                         removalKind="binding"
                         confirmDelete={false}
-                        extraActions={[{ title: '編集', onClick: () => open(command, row) }]}
+                        extraActions={[
+                          { title: '編集', onClick: () => open(command, row) },
+                          {
+                            title: 'このキーの実行順…',
+                            onClick: () => {
+                              rememberPosition();
+                              setOrderKey(row.key);
+                            },
+                          },
+                        ]}
                         onDelete={() => {
                           rememberPosition(
                             root.current?.querySelector<HTMLButtonElement>(
@@ -197,6 +210,16 @@ export function ShortcutCommandList({
         {notice || 'キーと条件をクリックして編集・＋で割り当てを追加'}
       </div>
       {commands.length ? table(commands) : <p className="muted">表示するコマンドはありません。</p>}
+      {orderKey !== null && (
+        <ShortcutOrderDialog
+          settings={settings}
+          commands={allCommands}
+          applets={applets}
+          initialKey={orderKey}
+          onChange={onChange}
+          onClose={() => setOrderKey(null)}
+        />
+      )}
       {editing && (
         <AppletShortcutDialog
           initial={editing.row}
