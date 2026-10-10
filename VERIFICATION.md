@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-10: 実装・コミット・リリースの共通手順と検証再利用
+
+- ユーザー依頼でdocs/development-workflow.mdへ本体/全Appletの段階別手順を集約。実装時は必要試験を選び版更新/publishまで、コミット時に必要回帰を全実行し修正/再発行後にcommit、リリース時に対象変更のコミット漏れと未pushを確認・解消する。
+- 再利用条件はtree/対応commit、依存/関連環境・兄弟repo・未管理入力、完全な成功ログ/終了コード/SHA256の一致。文書のみの差分は明示して検査する。新規配布物と公開後検証は再実行。標準Prepareは変更せず、既存preflight/sealを用いてtypecheck/regressionの証跡だけ再利用する作業手順をRELEASINGへ追加し、再利用情報はseal対象ログへ残す。
+- 30.PROJECT共通指示、本体AGENTS/DEVELOPMENT、6AppletのDEVELOPMENTと既存3AppletのAGENTSから参照。廃止された本体入口のALICE参照と親文書の誤った相対リンクを整理。変更前は本体/6AppletともGit作業ツリーcleanを確認。
+- 検証: 対象手順14ファイルの相対リンク等162件が存在、追加した相互参照見出しの存在、Release手順の8項目がrelease.cjsのCHECKSと順序込みで一致、preflight/seal CLIとrelease.ps1のコマンド/ログ/出力契約を読取り照合。全7repoのgit diff --check成功。
+- 文書だけのため製品回帰/GUI/ビルド/版更新/publish/Releaseの実行なし。証跡再利用経路の実Release試行は今回行っていない。スクリプトによる証跡自動判定を実装したものではなく、作業者が照合して既存準備処理を実行する手順。commit/push・実利用deploy・Codex内蔵メモリー更新なし。
+
 ## 2026-10-10: ポータブルEXEの実行時展開先の相談（変更なし）
 
 - ユーザーは自動展開物を同期不要と考え、LOCALAPPDATA配下へ展開可能か質問。scripts/portable.nsi/build-portable.cjsを読取確認。現展開先はTEMP/AppDock.at365-PortableId、IDはTEMP/外側EXE/test-profileに基づく。EXEの配置フォルダーへは展開しない。PORTABLE_EXECUTABLE_DIR/FILEは元のEXEを子へ渡し、共有設定や素材の配置はこの展開先とは別。最後のruntime lease終了後に専用の子フォルダーだけを削除する。
