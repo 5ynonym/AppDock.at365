@@ -275,7 +275,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 10);
+    assert.equal((await client.listTools()).tools.length, 11);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -671,6 +671,19 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     checks.push(
       'ribbon API dry run, placement/order/visibility/separators/reset, GUI roundtrip, disabled Applet preservation, revocation, atomic validation and audit',
     );
+    await require('./automation-tray-checks.cjs')({
+      page,
+      client,
+      call,
+      until,
+      section,
+      profile,
+      fixtureId,
+      fixtureRoot,
+    });
+    checks.push(
+      'tray menu/click API dry run, GUI roundtrip, move/reorder/ungroup, atomic validation, private assignment rejection, revocation and audit without command execution',
+    );
     const fixtureSettings = await call(client, 'appdock_get_settings', { appletId: fixtureId });
     assert.equal(fixtureSettings.values.feature, false);
     await call(client, 'appdock_execute_command', { id: `${fixtureId}.settings.feature.on` });
@@ -745,6 +758,13 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         operations: [{ kind: 'update', id: 'home', changes: { placement: 'bottom' } }],
       },
     });
+    await call(client, 'appdock_execute_command', {
+      id: 'appdock.tray.update',
+      args: {
+        expectedRevision: (await call(client, 'appdock_get_tray')).revision,
+        operations: [{ kind: 'configure', changes: { doubleClickCommand: null } }],
+      },
+    });
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () => (await page.locator('body').innerText()).includes('別の場所で変更'),
@@ -752,6 +772,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await page.getByRole('button', { name: '表示', exact: true }).click();
     assert.equal(JSON.parse(await json.inputValue()).host.closeToTray, false);
+    assert.equal(
+      JSON.parse(await json.inputValue()).host.trayDoubleClickCommand,
+      'appdock.settings.open',
+    );
+    assert.equal((await call(client, 'appdock_get_tray')).clicks.doubleClickCommand, null);
     assert.equal(JSON.parse(await json.inputValue()).ribbon.bottom.includes('home'), false);
     assert.equal((await call(client, 'appdock_get_ribbon')).layout.bottom.includes('home'), true);
     assert.equal(
@@ -791,6 +816,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     }
     checks.push('both themes at 1280/960/700 without horizontal overflow');
     const before = await call(client, 'appdock_get_settings');
+    const persistedTray = await call(client, 'appdock_get_tray');
     const persistedRibbon = await call(client, 'appdock_get_ribbon');
     const persistedGestures = await call(client, 'appdock_get_gestures');
     const persistedShortcuts = (await readShortcuts()).bindings;
@@ -820,6 +846,10 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal((await call(client, 'appdock_get_gestures')).gestureEditingAllowed, true);
     assert.deepEqual((await call(client, 'appdock_get_ribbon')).layout, persistedRibbon.layout);
     assert.equal((await call(client, 'appdock_get_ribbon')).ribbonEditingAllowed, true);
+    const restoredTray = await call(client, 'appdock_get_tray');
+    assert.deepEqual(restoredTray.menu, persistedTray.menu);
+    assert.deepEqual(restoredTray.clicks, persistedTray.clicks);
+    assert.equal(restoredTray.trayEditingAllowed, true);
     await page.locator('.ribbon-bottom [data-ribbon-id="separator:mcp-persistent"]').waitFor();
     assert.deepEqual((await readShortcuts()).bindings, persistedShortcuts);
     assert.equal((await readShortcuts()).shortcutEditingAllowed, true);

@@ -23,6 +23,7 @@ interface LocalConfig {
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
   allowEditRibbon: boolean;
+  allowEditTray: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -55,6 +56,7 @@ export class AutomationService {
         shortcutsEditable: () => boolean,
         gesturesEditable: () => boolean,
         ribbonEditable: () => boolean,
+        trayEditable: () => boolean,
       ): AutomationApi;
       changed(): void;
       audit?(level: string, message: string): void;
@@ -76,6 +78,7 @@ export class AutomationService {
       allowEditShortcuts: false,
       allowEditGestures: false,
       allowEditRibbon: false,
+      allowEditTray: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -95,6 +98,7 @@ export class AutomationService {
           typeof c.allowWrite !== 'boolean' ||
           (c.allowExecute !== undefined && typeof c.allowExecute !== 'boolean') ||
           (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
+          (c.allowEditTray !== undefined && typeof c.allowEditTray !== 'boolean') ||
           (c.allowEditRibbon !== undefined && typeof c.allowEditRibbon !== 'boolean') ||
           (c.allowEditGestures !== undefined && typeof c.allowEditGestures !== 'boolean') ||
           (c.allowEditShortcuts !== undefined && typeof c.allowEditShortcuts !== 'boolean') ||
@@ -114,6 +118,7 @@ export class AutomationService {
         c.allowEditShortcuts ??= false;
         c.allowEditGestures ??= false;
         c.allowEditRibbon ??= false;
+        c.allowEditTray ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -148,6 +153,7 @@ export class AutomationService {
       allowEditShortcuts: this.config.allowEditShortcuts,
       allowEditGestures: this.config.allowEditGestures,
       allowEditRibbon: this.config.allowEditRibbon,
+      allowEditTray: this.config.allowEditTray,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -194,6 +200,12 @@ export class AutomationService {
           this.config.allowExecute &&
           this.config.allowWrite &&
           this.config.allowEditRibbon &&
+          !this.closed,
+        () =>
+          this.config.enabled &&
+          this.config.allowExecute &&
+          this.config.allowWrite &&
+          this.config.allowEditTray &&
           !this.closed,
       ),
       () => this.token,
@@ -281,6 +293,12 @@ export class AutomationService {
           this.config.allowManageApplets = action.allowed;
           this.save();
           message = 'このPCのApplet管理許可を保存しました。';
+          break;
+        case 'setTrayEditing':
+          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          this.config.allowEditTray = action.allowed;
+          this.save();
+          message = 'このPCのタスクトレイ編集許可を保存しました。';
           break;
         case 'setRibbonEditing':
           if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');

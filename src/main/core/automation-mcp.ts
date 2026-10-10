@@ -16,6 +16,7 @@ const names = [
   'appdock_get_shortcuts',
   'appdock_get_gestures',
   'appdock_get_ribbon',
+  'appdock_get_tray',
 ];
 const descriptions = [
   'AppDockの版・接続先・対応APIを取得します。',
@@ -28,6 +29,7 @@ const descriptions = [
   'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
   'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
   'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。コマンド実行・設定変更・リボン編集の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
+  'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。実行・設定変更・タスクトレイ編集の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
 ];
 function tools() {
   return names.map((name, i) => ({

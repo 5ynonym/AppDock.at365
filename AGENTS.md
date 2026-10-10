@@ -133,3 +133,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 ## リボンの外部編集
 
 - `ribbon.get`/`appdock.ribbon.update`と既定OFFの`allowEditRibbon`を使用する。共有`parseRibbon`、revision、dryRun、原子的保存を維持し、非表示/無効Appletも配置一覧に含める。通常編集では未導入IDを保持し、明示resetだけ全配置を初期化する。編集でAppletを有効化したりページを開かない。正本は[共通操作API](docs/automation.md#リボン編集02634以降)、既存GUI仕様は[Appletページ](docs/applet-pages.md)。
+
+## タスクトレイの外部編集
+
+- `tray.get`/`appdock.tray.update`と既定OFFの`allowEditTray`を使う。メニューとクリック割当を共通revision/dryRunで原子的に保存し、新しい割当は公開済み引数なしコマンドへ限定する。既存の非公開/未知コマンドを保持し、移動/削除可能にする。固定の設定/終了、1段グループ、ungroupでの子保持、既存クリック判定を維持する。正本は[共通操作API](docs/automation.md#タスクトレイ編集02635以降)。

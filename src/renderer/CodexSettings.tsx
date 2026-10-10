@@ -158,6 +158,20 @@ export function CodexSettings() {
           onChange={(allowed) => void run({ kind: 'setRibbonEditing', allowed })}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <strong>タスクトレイ編集を許可する</strong>
+          <p>
+            メニューとクリック・ダブルクリックの割り当てを編集できます。設定変更とコマンド実行の許可も必要です。
+          </p>
+        </div>
+        <Toggle
+          label="Codexからのタスクトレイ編集を許可する"
+          checked={state.allowEditTray}
+          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
+          onChange={(allowed) => void run({ kind: 'setTrayEditing', allowed })}
+        />
+      </div>
       <p>
         APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
       </p>

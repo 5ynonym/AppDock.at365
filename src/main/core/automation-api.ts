@@ -3,6 +3,7 @@ import type { SettingsStore } from './settings';
 import type { AutomationApplet, AutomationCommand } from './automation-commands';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import { AppletManagement, AppletManagementError } from './applet-management';
+import { TrayEditingCommands } from './tray-editing-commands';
 import { RibbonCommands } from './ribbon-commands';
 import { GestureCommands } from './gesture-commands';
 import { ShortcutCommands } from './shortcut-commands';
@@ -29,12 +30,14 @@ export const automationMethods = [
   'shortcuts.get',
   'gestures.get',
   'ribbon.get',
+  'tray.get',
 ] as const;
 export class AutomationApi {
   private executing = false;
   private settingsCommands: SettingsCommands;
   private shortcuts: ShortcutCommands;
   private gestures: GestureCommands;
+  private tray: TrayEditingCommands;
   private ribbon: RibbonCommands;
   constructor(
     private options: {
@@ -46,6 +49,8 @@ export class AutomationApi {
       shortcutsEditable?(): boolean;
       gesturesEditable?(): boolean;
       ribbonEditable?(): boolean;
+      trayEditable?(): boolean;
+      trayApplets?(): ExtensionSnapshot[];
       ribbonApplets?(): ExtensionSnapshot[];
       shortcutStatus?(): GlobalHotKeyStatus[];
       applets(): AutomationApplet[];
@@ -60,6 +65,11 @@ export class AutomationApi {
   ) {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
+    this.tray = new TrayEditingCommands({
+      ...options,
+      settingsCommands: this.settingsCommands,
+      commands: () => this.commands(),
+    });
     this.ribbon = new RibbonCommands({ ...options, settingsCommands: this.settingsCommands });
     this.gestures = new GestureCommands({
       ...options,
@@ -83,6 +93,7 @@ export class AutomationApi {
           ...this.shortcuts.commands(),
           ...this.gestures.commands(),
           ...this.ribbon.commands(),
+          ...this.tray.commands(),
         ].map((c) => [
           c.id,
           {
@@ -121,6 +132,7 @@ export class AutomationApi {
       case 'system.getInfo':
         return {
           apiVersion: 2,
+          trayEditingAllowed: this.options.trayEditable?.() ?? false,
           ribbonEditingAllowed: this.options.ribbonEditable?.() ?? false,
           appletManagementAllowed: this.options.manageable?.() ?? false,
           gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
@@ -153,6 +165,7 @@ export class AutomationApi {
       }
       case 'commands.list':
         return {
+          trayEditingAllowed: this.options.trayEditable?.() ?? false,
           ribbonEditingAllowed: this.options.ribbonEditable?.() ?? false,
           gestureEditingAllowed: this.options.gesturesEditable?.() ?? false,
           shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
@@ -163,6 +176,13 @@ export class AutomationApi {
         };
       case 'commands.execute':
         return this.execute(this.id(params, true), params.args === undefined ? {} : params.args);
+      case 'tray.get':
+        return {
+          ...this.tray.get(),
+          writable: this.options.writable(),
+          executable: this.options.executable(),
+          trayEditingAllowed: this.options.trayEditable?.() ?? false,
+        };
       case 'ribbon.get':
         return {
           ...this.ribbon.get(),
@@ -240,9 +260,13 @@ export class AutomationApi {
       throw new AutomationError('UNAVAILABLE', 'このコマンドは現在利用できません。');
     if (
       !object(args) ||
-      (!['settings.write', 'shortcuts.write', 'gestures.write', 'ribbon.write'].includes(
-        command.permission ?? '',
-      ) &&
+      (![
+        'settings.write',
+        'shortcuts.write',
+        'gestures.write',
+        'ribbon.write',
+        'tray.write',
+      ].includes(command.permission ?? '') &&
         Object.keys(args).length)
     )
       throw new AutomationError(
@@ -250,9 +274,13 @@ export class AutomationApi {
         'コマンドのinputSchemaに合うargsを指定してください。',
       );
     if (
-      ['settings.write', 'shortcuts.write', 'gestures.write', 'ribbon.write'].includes(
-        command.permission ?? '',
-      ) &&
+      [
+        'settings.write',
+        'shortcuts.write',
+        'gestures.write',
+        'ribbon.write',
+        'tray.write',
+      ].includes(command.permission ?? '') &&
       !this.options.writable()
     )
       throw new AutomationError(
@@ -260,6 +288,11 @@ export class AutomationApi {
         'AppDockのCodex連携画面で設定変更を許可してください。',
       );
     if (this.executing) throw new AutomationError('BUSY', '別のAPIコマンドを実行中です。');
+    if (command.permission === 'tray.write' && !this.options.trayEditable?.())
+      throw new AutomationError(
+        'TRAY_EDITING_DISABLED',
+        'AppDockのCodex連携画面でタスクトレイ編集を許可してください。',
+      );
     if (command.permission === 'ribbon.write' && !this.options.ribbonEditable?.())
       throw new AutomationError(
         'RIBBON_EDITING_DISABLED',
@@ -282,6 +315,15 @@ export class AutomationApi {
       );
     this.executing = true;
     try {
+      if (command.permission === 'tray.write') {
+        const result = this.tray.execute(args);
+        return {
+          id,
+          completion: result.dryRun ? 'validated' : 'settingsSaved',
+          effectVerified: false,
+          ...result,
+        };
+      }
       if (command.permission === 'ribbon.write') {
         const result = this.ribbon.execute(args);
         return {

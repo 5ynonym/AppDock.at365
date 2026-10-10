@@ -68,13 +68,36 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       const status = await rpc('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly' });
       const entry = status.data?.find((x) => x.name === server);
       tools = Object.keys(entry?.tools ?? {});
-      if (tools.length === 10) break;
+      if (tools.length === 11) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 10, 'Codex discovers all ten MCP tools');
+    assert.equal(tools.length, 11, 'Codex discovers all eleven MCP tools');
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
+    const tray = await call('appdock_get_tray');
+    assert.equal(tray.isError ?? false, false);
+    assert.ok(Array.isArray(tray.structuredContent.menu));
+    if (tray.structuredContent.trayEditingAllowed) {
+      const preview = await call('appdock_execute_command', {
+        id: 'appdock.tray.update',
+        args: {
+          expectedRevision: tray.structuredContent.revision,
+          dryRun: true,
+          operations: [
+            {
+              kind: 'configure',
+              changes: { singleClickCommand: 'appdock.open', doubleClickCommand: null },
+            },
+          ],
+        },
+      });
+      assert.equal(preview.structuredContent.completion, 'validated');
+      assert.deepEqual(
+        (await call('appdock_get_tray')).structuredContent.clicks,
+        tray.structuredContent.clicks,
+      );
+    }
     const ribbon = await call('appdock_get_ribbon');
     assert.equal(ribbon.isError ?? false, false);
     assert.ok(Array.isArray(ribbon.structuredContent.items));
@@ -175,7 +198,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers ten MCP tools; reads shortcuts, gestures and ribbon with dry-run editing; lists commands and executes appdock.open',
+        'discovers eleven MCP tools; reads shortcuts, gestures, ribbon and tray with dry-run editing; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,
