@@ -5,6 +5,10 @@ import { EventEmitter } from 'node:events';
 import { JsonLinePeer } from './rpc';
 import { isObject, type SettingsStore } from './settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
+import {
+  generatedSettingCommands,
+  validateSettingCommandIds,
+} from '../../shared/settings-commands';
 import { parseSettingActions } from '../../shared/setting-actions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
@@ -36,6 +40,7 @@ function readManifest(folder: string): LoadedManifest {
     !isObject(m) ||
     m.apiVersion !== 1 ||
     !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(m.id) ||
+    m.id === 'appdock' ||
     String(m.id).startsWith('web.') ||
     typeof m.name !== 'string' ||
     !m.name ||
@@ -84,9 +89,20 @@ function readManifest(folder: string): LoadedManifest {
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
+  const settingDefinitions = parseSettingDefinitions(m.settings);
+  validateSettingCommandIds(m.id, settingDefinitions ?? [], commands ?? []);
+  if (
+    settingDefinitions?.some((s) => s.automation || s.generateCommands) &&
+    !m.capabilities?.includes('settings')
+  )
+    throw Error('設定コマンドにはsettings capabilityが必要です。');
+  const bindingCommands = [
+    ...(commands ?? []),
+    ...generatedSettingCommands(m.id, settingDefinitions ?? [], false),
+  ];
   const defaultKeybindings = parseKeybindingDefaults(
     m.defaultKeybindings,
-    (commands ?? []).map((command) => command.id),
+    bindingCommands.map((command) => command.id),
   );
   const defaultGestureBindings = parseGestures({
     ...defaultGestures(),
@@ -94,16 +110,16 @@ function readManifest(folder: string): LoadedManifest {
   }).bindings;
   if (
     defaultGestureBindings.length > 100 ||
-    defaultGestureBindings.some((r) => !commands?.some((c) => c.id === r.command))
+    defaultGestureBindings.some((r) => !bindingCommands.some((c) => c.id === r.command))
   )
     throw Error('既定ジェスチャーには自身の宣言コマンドだけを指定してください。');
   return {
     ...m,
-    settings: parseSettingDefinitions(m.settings),
+    settings: settingDefinitions,
     commands,
     defaultKeybindings,
     defaultGestureBindings,
-    settingActions: parseSettingActions(m.settingActions, commands ?? []),
+    settingActions: parseSettingActions(m.settingActions, bindingCommands),
     folder,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
@@ -255,7 +271,14 @@ class ExtensionManager extends EventEmitter {
           hidden: true,
         });
       }
-    return [...catalog.values()];
+    return [
+      ...catalog.values(),
+      ...generatedSettingCommands(
+        e.manifest.id,
+        e.manifest.settings ?? [],
+        e.state === 'running' && !!this.settings.value.extensions[e.manifest.id]?.enabled,
+      ),
+    ];
   }
   reconcile() {
     this.queue = this.queue
@@ -417,12 +440,15 @@ class ExtensionManager extends EventEmitter {
       )
         throw new Error('コマンド登録の形式が正しくありません。');
       e.commands = parseExtensionCommands(m.id, result.commands);
+      validateSettingCommandIds(m.id, m.settings ?? [], e.commands);
       e.tray = Array.isArray(result.tray)
         ? result.tray.filter(
             (t: any) =>
               isObject(t) &&
               typeof t.title === 'string' &&
-              e.commands.some((c) => c.id === t.command),
+              [...e.commands, ...generatedSettingCommands(m.id, m.settings ?? [], true)].some(
+                (c) => c.id === t.command,
+              ),
           )
         : [];
       e.state = 'running';

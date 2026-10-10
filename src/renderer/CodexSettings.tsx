@@ -83,7 +83,7 @@ export function CodexSettings() {
       <div className="setting-row">
         <div>
           <strong>設定変更を許可する</strong>
-          <p>テーマ、通知、閉じる動作、起動時の最小化を変更できます。</p>
+          <p>AppDockと各Appletが公開した設定を変更できます。コマンド実行の許可も必要です。</p>
         </div>
         <Toggle
           label="Codexからの設定変更を許可する"
@@ -95,9 +95,7 @@ export function CodexSettings() {
       <div className="setting-row">
         <div>
           <strong>コマンド実行を許可する</strong>
-          <p>
-            AppDock・Gmail・WebAppletを開く操作と、稼働中の壁紙スライドショーの操作を許可します。
-          </p>
+          <p>AppDockと稼働中のAppletが公開したコマンドを実行できます。</p>
         </div>
         <Toggle
           label="Codexからのコマンド実行を許可する"

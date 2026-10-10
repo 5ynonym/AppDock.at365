@@ -68,10 +68,10 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       const status = await rpc('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly' });
       const entry = status.data?.find((x) => x.name === server);
       tools = Object.keys(entry?.tools ?? {});
-      if (tools.length === 8) break;
+      if (tools.length === 7) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 8, 'Codex discovers all eight MCP tools');
+    assert.equal(tools.length, 7, 'Codex discovers all seven MCP tools');
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
@@ -84,17 +84,23 @@ module.exports = async function checkCodex({ executable, configFile, server, out
     const before = await call('appdock_get_settings');
     assert.equal(before.isError ?? false, false);
     const values = before.structuredContent;
-    const next = await call('appdock_patch_settings', {
-      expectedRevision: values.revision,
-      changes: { notifications: !values.values.notifications },
+    const next = await call('appdock_execute_command', {
+      id: 'appdock.settings.update',
+      args: {
+        expectedRevision: values.revision,
+        changes: { notifications: !values.values.notifications },
+      },
     });
     assert.equal(next.isError ?? false, false);
     assert.equal(next.structuredContent.values.notifications, !values.values.notifications);
     const after = await call('appdock_get_settings');
     assert.equal(after.structuredContent.values.notifications, !values.values.notifications);
-    const restore = await call('appdock_patch_settings', {
-      expectedRevision: after.structuredContent.revision,
-      changes: { notifications: values.values.notifications },
+    const restore = await call('appdock_execute_command', {
+      id: 'appdock.settings.update',
+      args: {
+        expectedRevision: after.structuredContent.revision,
+        changes: { notifications: values.values.notifications },
+      },
     });
     assert.equal(restore.isError ?? false, false);
     const result = {
@@ -103,7 +109,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers eight MCP tools; lists commands and executes appdock.open',
+        'discovers seven MCP tools; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,

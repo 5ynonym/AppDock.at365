@@ -90,7 +90,7 @@ function fixture(t) {
     applets: () => [],
     commands: () => [],
     execute: async () => {},
-    executable: () => false,
+    executable: () => true,
     version: 'test',
     instanceId: 'instance',
     writable: () => write,
@@ -99,69 +99,96 @@ function fixture(t) {
   const api = new AutomationApi(options);
   return { base, settings, api, options, setWrite: (v) => (write = v) };
 }
-test('basic patch preserves unrelated settings, validates atomically, dry run and stale/restart revisions', (t) => {
+test('basic patch preserves unrelated settings, validates atomically, dry run and stale/restart revisions', async (t) => {
   const f = fixture(t),
     initial = structuredClone(f.settings.value),
     rev = f.api.call('settings.get').revision;
-  const preview = f.api.call('settings.patch', {
-    changes: { theme: 'light', notifications: false },
-    expectedRevision: rev,
-    dryRun: true,
+  const preview = await f.api.call('commands.execute', {
+    id: 'appdock.settings.update',
+    args: {
+      changes: { theme: 'light', notifications: false },
+      expectedRevision: rev,
+      dryRun: true,
+    },
   });
   assert.equal(preview.values.theme, 'light');
   assert.deepEqual(f.settings.value, initial);
-  assert.throws(
+  await assert.rejects(
     () =>
-      f.api.call('settings.patch', {
-        changes: { theme: 'light', runAsAdministrator: true },
-        expectedRevision: rev,
+      f.api.call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: {
+          changes: { theme: 'light', runAsAdministrator: true },
+          expectedRevision: rev,
+        },
       }),
     { code: 'INVALID_ARGUMENT' },
   );
   assert.deepEqual(f.settings.value, initial);
-  const saved = f.api.call('settings.patch', {
-    changes: { theme: 'light' },
-    expectedRevision: rev,
+  const saved = await f.api.call('commands.execute', {
+    id: 'appdock.settings.update',
+    args: {
+      changes: { theme: 'light' },
+      expectedRevision: rev,
+    },
   });
   assert.deepEqual(f.settings.value, { ...initial, host: { ...initial.host, theme: 'light' } });
-  assert.throws(
-    () => f.api.call('settings.patch', { changes: { theme: 'dark' }, expectedRevision: rev }),
+  await assert.rejects(
+    () =>
+      f.api.call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: { changes: { theme: 'dark' }, expectedRevision: rev },
+      }),
     { code: 'REVISION_CONFLICT' },
   );
-  assert.throws(
+  await assert.rejects(
     () =>
-      new AutomationApi(f.options).call('settings.patch', {
-        changes: { theme: 'dark' },
-        expectedRevision: saved.revision,
+      new AutomationApi(f.options).call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: {
+          changes: { theme: 'dark' },
+          expectedRevision: saved.revision,
+        },
       }),
     { code: 'REVISION_CONFLICT' },
   );
   f.setWrite(false);
-  assert.throws(
+  await assert.rejects(
     () =>
-      f.api.call('settings.patch', {
-        changes: { theme: 'dark' },
-        expectedRevision: saved.revision,
+      f.api.call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: {
+          changes: { theme: 'dark' },
+          expectedRevision: saved.revision,
+        },
       }),
     { code: 'WRITE_DISABLED' },
   );
   assert.equal(f.api.call('settings.get').values.theme, 'light');
 });
-test('unobserved disk edit and malformed file never get overwritten', (t) => {
+test('unobserved disk edit and malformed file never get overwritten', async (t) => {
   const f = fixture(t),
     rev = f.api.call('settings.get').revision;
   const incoming = structuredClone(f.settings.value);
   incoming.host.notifications = false;
   fs.writeFileSync(f.settings.file, JSON.stringify(incoming));
-  assert.throws(
-    () => f.api.call('settings.patch', { changes: { theme: 'light' }, expectedRevision: rev }),
+  await assert.rejects(
+    () =>
+      f.api.call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: { changes: { theme: 'light' }, expectedRevision: rev },
+      }),
     { code: 'REVISION_CONFLICT' },
   );
   assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.theme, 'dark');
   const next = f.api.call('settings.get').revision;
   fs.writeFileSync(f.settings.file, '{broken');
-  assert.throws(
-    () => f.api.call('settings.patch', { changes: { theme: 'light' }, expectedRevision: next }),
+  await assert.rejects(
+    () =>
+      f.api.call('commands.execute', {
+        id: 'appdock.settings.update',
+        args: { changes: { theme: 'light' }, expectedRevision: next },
+      }),
     { code: 'REVISION_CONFLICT' },
   );
   assert.equal(fs.readFileSync(f.settings.file, 'utf8'), '{broken');
@@ -489,7 +516,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 8);
+  assert.equal(tools.length, 7);
   assert.equal(
     tools.find((t) => t.name === 'appdock_execute_command').annotations.idempotentHint,
     false,
@@ -532,14 +559,18 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
       .structuredContent.code,
     'INVALID_ARGUMENT',
   );
+  await service.action({ kind: 'setExecution', allowed: true });
   let get = await client.callTool({ name: 'appdock_get_settings', arguments: {} });
   assert.equal(
     (
       await client.callTool({
-        name: 'appdock_patch_settings',
+        name: 'appdock_execute_command',
         arguments: {
-          changes: { theme: 'light' },
-          expectedRevision: get.structuredContent.revision,
+          id: 'appdock.settings.update',
+          args: {
+            changes: { theme: 'light' },
+            expectedRevision: get.structuredContent.revision,
+          },
         },
       })
     ).structuredContent.code,
@@ -548,11 +579,15 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   await service.action({ kind: 'configure', enabled: true, allowWrite: true, port: s.port });
   get = await client.callTool({ name: 'appdock_get_settings', arguments: {} });
   const patch = await client.callTool({
-    name: 'appdock_patch_settings',
-    arguments: { changes: { theme: 'light' }, expectedRevision: get.structuredContent.revision },
+    name: 'appdock_execute_command',
+    arguments: {
+      id: 'appdock.settings.update',
+      args: { changes: { theme: 'light' }, expectedRevision: get.structuredContent.revision },
+    },
   });
   assert.equal(patch.structuredContent.values.theme, 'light');
   t.diagnostic('patched');
+  await service.action({ kind: 'setExecution', allowed: false });
   await service.action({ kind: 'rotateToken' });
   assert.equal((await fetch(s.endpoint, { method: 'POST', headers })).status, 401);
   await service.action({ kind: 'register' });

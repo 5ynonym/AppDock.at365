@@ -7,7 +7,9 @@ export interface AutomationCommand {
   appletId: string | null;
   available: boolean;
   unavailableReason: string | null;
-  completion: 'accepted' | 'handlerReturned';
+  completion: 'accepted' | 'handlerReturned' | 'settingsSaved';
+  permission?: 'settings.write';
+  inputSchema?: Record<string, unknown>;
 }
 export interface AutomationApplet {
   id: string;

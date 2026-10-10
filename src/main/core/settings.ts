@@ -12,10 +12,39 @@ const isObject = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 function atomicWrite(file: string, text: string | Uint8Array) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  const readPrevious = () => {
+    try {
+      return fs.readFileSync(file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw error;
+    }
+  };
+  const previous = readPrevious();
   const tmp = `${file}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-    fs.renameSync(tmp, file);
+    for (let attempt = 0; ; attempt++) {
+      if (attempt > 0) {
+        const current = readPrevious();
+        if (previous === undefined ? current !== undefined : !current?.equals(previous))
+          throw Error('保存先が別の場所で変更されました。再取得してください。');
+      }
+      try {
+        fs.renameSync(tmp, file);
+        break;
+      } catch (error) {
+        if (
+          process.platform !== 'win32' ||
+          attempt >= 3 ||
+          !['EPERM', 'EACCES', 'EBUSY'].includes((error as NodeJS.ErrnoException).code ?? '')
+        )
+          throw error;
+        // Retry only the same atomic replacement, never the setting operation or a toggle.
+        // Readers can briefly deny rename on Windows; preserve any intervening writer.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
+      }
+    }
   } finally {
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
   }

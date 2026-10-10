@@ -42,3 +42,7 @@ PC専用`settings-backups/`へ検証済み設定を保存し、`last-good.json`�
 `tests/settings-sync.test.cjs`と`tests/registered-sounds.test.cjs`、updaterのローカルjournal復旧回帰、`scripts/settings-sync-ui-test.cjs`で検証する。GUIスクリプトは2個の隔離配置にファイルを配達して実挙動を確認し、単一EXE引数でも同じ手順を使う。`--test-profile`の既存隔離テストは従来のrootを維持し、新仕様の検証には配置内の`--test-local-state=<絶対パス>`を追加する。EXE引数の後ろへ`--production-path`を付ける試験ではtest-profileを使わず、fixture内にLOCALAPPDATAを向けて通常起動のat365保存先を検証する。実利用LOCALAPPDATAへテスト用のログイン領域を作らない。
 
 この実装はファイル同期サービスを設定・代行しない。2台の未同期同時編集を自動mergeする保証はなく、受信した正常ファイルを適用する。2台で同名別素材を同時に登録するケースも同期サービスの競合になるため、別名での登録や競合コピーの確認が必要。バックアップでJSONの内容を回復できるが、PC間認証の移行・実Google認証・実同期サービスの動作保証とは別。
+
+## Windowsの一時的な置換拒否（0.26.30）
+
+atomicWriteは一時ファイルを書いた後、WindowsのEPERM/EACCES/EBUSYだけ同じrenameを最大3回、25/50/75ms待って再試行します。各再試行の直前に保存先のbytes/存在状態を最初の状態と比較し、外部更新・削除・新規作成を検出したら拒否します。設定操作やtoggleを再実行するものではなく、revision確認と変更内容は保持します。合計待機は最大150ms、他のエラーや読み取り失敗は即時に返し、一時ファイルは回収します。外部変更のABAや最終確認とrenameの間の別プロセス更新まで排他的に防ぐ仕組みではありません。

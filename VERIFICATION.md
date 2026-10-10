@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-11: 設定コマンドのコミット前確認
+
+- 対象26ファイルをstage後、型検査、標準回帰221/221、発行単一EXEのautomation GUI10群と実CodexによるMCP操作を再実行し、すべて終了0。検証前後treeは`71b1968dbde934b3a6c9cbe5ba93c1f121edd9de`。Gmailの標準21件/発行GUI、壁紙の標準.NET/RPC/発行ホストGUIも成功。
+- 発行済み3モジュールのEXE/ZIPとZIP収録10ファイルの入力hashは前回検証時と一致。製品変更・依存更新・再梱包は不要。実Google/メール/デスクトップ壁紙にはアクセスせず、オフライン/native fixtureで確認。
+- 証跡は`.artifacts/commit-validation-settings-commands-20261011/`。コマンド/終了コード/完全ログhash、tracked入力、兄弟tree、ツール/依存/発行物のhashを記録。検証後の変更は本記録の追加のみで、最終treeとcommit SHAも保存する。
+- 終了済みの古い成功profileを本体/Gmail各1件、絶対パス・再解析点・稼働プロセス検査後に整理。最新成功3件と失敗/不明/再利用資料を保持。今回の依頼範囲はローカルコミットまで。
+
+## 2026-10-11: 0.26.30 設定変更コマンドとboolean派生コマンド
+
+- API v2: 設定変更をcommands.executeのid/argsへ統一。旧settings.patch/appdock_patch_settingsを削除し、MCPは7ツール。読取りAPIは任意appletIdに対応。提供元ごとのsettings.updateと、明示したbooleanのon/off/toggleを生成する。外部公開とローカル生成は独立し、設定変更は実行/書込の両許可を必要とする。未知項目・型/範囲/選択肢・revision・ディスク競合・dryRun・無変更時の保存抑止を維持。
+- manifest/runtime/aliasの生成ID重複を拒否。生成コマンドを通常カタログ、キー/ジェスチャー候補、初期割当参照、設定アクション、Appletページ/トレイ登録へ統合。引数付きsettings.updateは引数なしの割当候補へ追加しない。本体はApplet固有の設定名・コマンド一覧を持たない。
+- Windowsで高速連続置換のEPERMが通常実行でも再現。atomicWriteの同じrenameだけ最大3回/合計150ms再試行し、毎回保存先bytes/存在状態を比較して外部変更時は中断。一時ロック/介入更新/上限/一時ファイル回収を専用回帰で確認。設定操作・toggle自体は再実行しない。失敗した途中試験のログを保持。
+- 最終型検査成功。本体標準回帰221/221成功（regression-final.log）。固定Node24.21.0/pnpm12.10.1、lockfile/供給元チェックを維持し、依存追加なし。制限環境のHTTP/CIM拒否は同じ検証を承認付き通常実行で実施。テストやセキュリティ検査の無効化なし。
+- source GUI9群成功（automation-source-1791665699836）、最終単一EXE GUI10群成功（automation-portable-1791665838640）。公開設定のMCP/ローカル更新、生成トレイ登録、ショートカット一覧と実キー反転、Applet settingsChangedへの到達、dirty draft保持/古い保存拒否、両テーマ1280/960/700、再起動/登録解除/監査ログを確認。狭幅の表示を画像で確認。
+- 実Codex Desktop0.162.0-alpha.17.2で、隔離configから7ツールを発見し、本体表示/設定コマンドの更新・再取得・復元に成功。モデル推論/実アカウント認証なし。App Serverの製品組込みは行っていない。
+- 最終publish終了0。単一EXE144035497bytes、SHA256 b97240c72d3f1eaa3ce815d55906b023c1ae49c2ea53d502c7da207e6f4369d7。feed/GUIコピー一致。Gmail0.9.4/壁紙0.4.5のZIP全10ファイルと発行フォルダーのhash一致。変更した3モジュールだけ自身のpublishへ発行。
+- 証跡は.artifacts/settings-commands-20261011と各GUI profile。Gmailの公開設定・実稼働停止/復帰はオフラインの発行物で確認。壁紙はnative fixtureのGUI/RPCと発行実EXEの不正設定拒否/終了を確認し、実壁紙・実Googleログイン・実メールは操作していない。全機能の無関係なGUI回帰、実OSの終了/更新適用は今回対象外。
+- 古い成功profile4件をroot/再解析点/稼働プロセス検査後に整理し、方式ごとの最新成功3件、失敗/不明/再利用証跡を保持（cleanup.json）。commit/push/Release/deploy/全体ZIP作成なし。
+
 ## 2026-10-11: 0.26.28 Applet詳細・公開コマンド・API監査ログ
 
 - applets.get/commands.list/commands.executeを追加して全8 APIに拡張。外部公開は本体の表示/設定/検索、Gmail/WebAppletのopen、壁紙next/start/stopだけ。実行直前に公開一覧と有効/running/availableを確認し、既存executeCommandを共用する。停止中AppletのactivateOnExecuteによる有効化を避け、PC専用allowExecuteを設定変更許可から分離（初期false）。同時実行拒否と受付/処理応答/効果未確認の結果を追加。

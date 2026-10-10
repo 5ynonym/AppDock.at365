@@ -140,6 +140,23 @@ export function parseSettingDefinitions(
       throw new Error('settings の項目定義を確認してください。');
     keys.add(s.key);
     if (
+      (s.automation !== undefined && typeof s.automation !== 'boolean') ||
+      ((s.automation === true || s.generateCommands !== undefined) &&
+        (depth !== 0 ||
+          !['boolean', 'number', 'string', 'select'].includes(s.type) ||
+          s.dynamic === true)) ||
+      (s.generateCommands !== undefined &&
+        (s.type !== 'boolean' ||
+          typeof s.default !== 'boolean' ||
+          !Array.isArray(s.generateCommands) ||
+          !s.generateCommands.length ||
+          s.generateCommands.some(
+            (v: unknown) => typeof v !== 'string' || !['on', 'off', 'toggle'].includes(v),
+          ) ||
+          new Set(s.generateCommands).size !== s.generateCommands.length))
+    )
+      throw new Error('外部公開・生成コマンドの設定宣言を確認してください。');
+    if (
       (s.type === 'object-list' && (depth > 0 || !Array.isArray(s.fields) || !s.fields.length)) ||
       (depth === 0 && s.type === 'string-list') ||
       (depth > 0 && ['object-list', 'shortcut-list', 'json'].includes(s.type)) ||
