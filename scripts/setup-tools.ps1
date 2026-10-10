@@ -1,8 +1,10 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path $PSScriptRoot -Parent
 $toolchain = Get-Content -LiteralPath (Join-Path $projectDirectory 'toolchain.json') -Raw | ConvertFrom-Json
 $nodeVersion = $toolchain.node
 $pnpmVersion = $toolchain.pnpm
+. (Join-Path $PSScriptRoot 'toolchain-policy.ps1')
+Assert-ToolchainPolicy $toolchain (Get-Content -LiteralPath (Join-Path $projectDirectory 'pnpm-workspace.yaml') -Raw)
 foreach ($version in @($nodeVersion, $pnpmVersion)) {
     if ($version -isnot [string] -or $version -notmatch '^\d+\.\d+\.\d+$') {
         throw 'toolchain.json must specify exact node and pnpm versions, such as 24.21.0.'
@@ -19,6 +21,9 @@ if (-not (Test-Path -LiteralPath $nodeExecutable -PathType Leaf)) {
     if (Test-Path -LiteralPath $nodeDirectory) {
         throw "The local Node folder is incomplete. Rename .tools\node\$nodeVersion and run setup again."
     }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $approvedNode = Get-ApprovedNodeRelease $toolchain $nodeVersion
+    Write-Output "Approved Node.js $nodeVersion LTS ($($approvedNode.lts))."
     $archiveName = "node-v$nodeVersion-win-x64.zip"
     $downloadDirectory = Join-Path $toolsDirectory 'downloads'
     New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
@@ -61,6 +66,10 @@ $actualNode = & $nodeExecutable --version
 if ($LASTEXITCODE -ne 0 -or $actualNode -ne "v$nodeVersion") {
     throw "Expected local Node.js v$nodeVersion; found $actualNode."
 }
+$actualLts = & $nodeExecutable -p 'process.release.lts || String()'
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($actualLts)) {
+    throw "Local Node.js $nodeVersion is not an LTS build."
+}
 
 $originalPath = $env:Path
 $originalCache = $env:npm_config_cache
@@ -68,8 +77,10 @@ try {
     $env:Path = "$nodeDirectory;$originalPath"
     $env:npm_config_cache = Join-Path $toolsDirectory 'npm-cache'
     if (-not (Test-Path -LiteralPath $pnpmCommand -PathType Leaf)) {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $ageArguments = @(Get-ApprovedPnpmInstallArguments $toolchain $pnpmVersion)
         Write-Output "Installing pnpm $pnpmVersion inside .tools\pnpm\$pnpmVersion..."
-        & (Join-Path $nodeDirectory 'npm.cmd') install --prefix $pnpmDirectory --no-audit --no-fund --no-update-notifier --ignore-scripts --save-exact "pnpm@$pnpmVersion"
+        & (Join-Path $nodeDirectory 'npm.cmd') install --prefix $pnpmDirectory --no-audit --no-fund --no-update-notifier --ignore-scripts --save-exact @ageArguments "pnpm@$pnpmVersion"
         if ($LASTEXITCODE -ne 0) { throw "Local pnpm installation failed ($LASTEXITCODE)." }
     }
     # pnpm 12 ships a native executable. Our initial npm install intentionally
@@ -100,11 +111,21 @@ set "APPDOCK_PNPM_DIR=%~dp0pnpm\$pnpmVersion\node_modules\.bin"
 $environmentPath = Join-Path $toolsDirectory 'environment.bat'
 $environmentTemp = Join-Path $toolsDirectory ('.environment-' + [guid]::NewGuid().ToString('N') + '.tmp')
 $environmentText = ($environment -replace '\r?\n', "`r`n") + "`r`n"
-[IO.File]::WriteAllText($environmentTemp, $environmentText, [Text.Encoding]::GetEncoding(932))
-if (Test-Path -LiteralPath $environmentPath -PathType Leaf) {
-    [IO.File]::Replace($environmentTemp, $environmentPath, [System.Management.Automation.Language.NullString]::Value)
-} else {
-    [IO.File]::Move($environmentTemp, $environmentPath)
+$environmentEncoding = [Text.Encoding]::GetEncoding(932)
+if (-not (Test-Path -LiteralPath $environmentPath -PathType Leaf) -or
+    [IO.File]::ReadAllText($environmentPath, $environmentEncoding) -cne $environmentText) {
+    try {
+        [IO.File]::WriteAllText($environmentTemp, $environmentText, $environmentEncoding)
+        if (Test-Path -LiteralPath $environmentPath -PathType Leaf) {
+            [IO.File]::Replace($environmentTemp, $environmentPath, [System.Management.Automation.Language.NullString]::Value)
+        } else {
+            [IO.File]::Move($environmentTemp, $environmentPath)
+        }
+    } finally {
+        if (Test-Path -LiteralPath $environmentTemp -PathType Leaf) {
+            Remove-Item -LiteralPath $environmentTemp
+        }
+    }
 }
 Write-Output "Ready: Node.js $nodeVersion and pnpm $pnpmVersion in $toolsDirectory"
 Write-Output 'Next: dev.bat install --frozen-lockfile, then publish.bat'

@@ -1200,3 +1200,20 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 配布物試験で確認結果のsummary追加により更新元設定のlocatorが曖昧になったため、portable-updates-ui-testの2箇所を`.applet-update-source > summary`へ限定。製品コード変更なし。単一EXE更新/再起動11群、更新進捗/取消4群、更新復旧、全6Applet入りZIPの整合/展開起動が成功。新配布版のGmail UIとWallpaperのfixture/実nativeログ表示も成功。
 - テスト修正後に型検査と標準回帰198/198を再実行して成功。完全ログと入力tree/hashは`.artifacts/commit-release-0.26.25-20261011/test-fix-evidence.json`。最終記録の追加だけを後続差分として保存し、新planで配布物を生成・再検証する。最初の失敗planとログは保持。
 - テストフォルダーの候補を3repoで列挙し、成功275件と成功未確定408件を記録。今回の直近成功分、失敗/不明、固定配布物、過去の再利用/Release証跡は保持。過去分は方式/再利用依存を確定できないものを削除せず、今回の追加削除は0。候補監査は同証跡のcleanup-audit.json。最終配布物の確認結果・終了確認もRelease記録へ追記する。
+
+## 2026-10-11: 開発依存・ツールの公開後7日待機とNode LTS制約
+
+- pnpm-workspaceへ7日（10080分）/strict/公開日時欠落時の拒否を追加。ビルド前の依存確認はerrorとし、自動インストールによる変更を防ぐ。更新コマンドdev.bat update --latestを維持し、直接・間接・開発依存およびlockfile復元へ適用する。
+- toolchain.jsonはNode24.21.0/pnpm12.10.1を維持し、LTS/7日/版限定の理由付き例外形式を追加。新規Node取得前は公式indexのLTS/公開日を検証、pnpm取得前はwrapperとWindows x64バイナリの公開日を検証しnpmにもmin-release-ageを渡す。導入済みツールは再利用する。setup環境BATの同内容書換えを省略し、失敗時の自身の一時ファイルを回収する。
+- 公式Node indexでv24.21.0/date2026-09-07/ltsKryptonを確認し、実ローカルNodeもKryptonと一致。pnpm12.10.1の新規取得は2026-10-13 17:35:56 UTC（14日02:35:56 JST）まで拒否されることを確認。Nodeの新規ZIP取得・新pnpmの実インストールは行っていない（現pnpm版は待機中であるため）。取得前ガードとnpm引数はfixtureで確認。
+- 導入時の既存lockfileには7日未満の6件があり、最初のstrict frozen installで各公開時刻を示して拒否した。既存0.26.25の版・lockfileを維持する移行例外として、plugin-react6.1.2/Electron44.6.0/http-cache-semantics4.3.0/nanoid3.3.20/postcss8.5.29/Vite8.3.3だけを完全な版で除外した。全6件は2026-10-14 07:39:15 JST以降に除外を外せる。新版には適用せず、lockfileから消えた版はExcludePruneで整理する。ツール用例外は空。
+- 最終確認: PowerShell5.1の境界/日時欠落・不正/版とpackage限定例外/非LTS/ネイティブ版公開日/npm引数など18チェック成功。実pnpmの隔離レジストリで成熟版選択、若い直接依存拒否、若い間接依存拒否、日時欠落拒否、若い版を含むlockfileのfrozen復元拒否の5項目が成功。最終node:testは2/2。setup2回、型検査、本体build、Prettier、diff --check成功。
+- sandboxではローカル通信が拒否されたため、実pnpmのレジストリ試験は通常Windows権限で実行。初期のpnpm runは自動install中にstack overflowとなりnode_modulesのリンクを外したが、通常Windowsでstrictと移行例外を適用したfrozen installが338entryのポリシー確認を通過、294package全て既存storeから復元（ダウンロード0）して成功。製品のpnpm-lock.yaml/package.jsonのGit blobはHEADと同一。PS5.1のNode式引用問題を修正し、setupの同内容BAT置換による共有違反を上記の書換え省略で修正、再実行成功。
+- 証跡は.artifacts/release-age-policy-20261011（result.json/ログhash/最終試験・setup・型検査・build・公式情報）。隔離fixtureの失敗/中断資料を保持し、成功資料は3件以内。自身の失敗時.environment一時ファイル1件のみ内容照合して削除、既存の古い一時ファイルは保持。
+- 開発取得ポリシーと試験/開発文書の変更のみ。製品ソース・依存版・lockfile・製品0.26.25・publishを変更せず、版更新/製品再発行は不要。標準製品全回帰/GUI/実サービスは今回は未実行。commit/push/Release/deployなし。
+
+## 2026-10-11: 公開後待機ポリシーのコミット前確認
+
+- 依頼対象の9ファイルだけをstageし、型検査・標準回帰200/200（新規公開後待機2テスト、実pnpm5項目、PSガード18チェックを含む）・setup2回・Prettier・diff確認に成功。Updaterの発行とDemoのReleaseビルドを含み、Demoは警告0/エラー0。検証前後のstage treeは一致し、未stageの入力変更なし。
+- 証跡は.artifacts/commit-validation-release-age-20261011（tree前後/environment/inputs/完全ログとSHA256）。検証後の追加は本コミット前記録だけで、最終stage treeとcommitは同証跡へ保存する。公開後待機fixtureの成功3件、失敗/中断、前回検証・今回commit証跡を保持し、追加削除0。
+- 開発取得ポリシーのみのため製品GUI・兄弟Applet回帰・製品版更新/再発行は対象外。製品のpackage.json/pnpm-lock.yamlとpublishを変更せず、既存0.26.25を維持。ローカルコミットまででpush/Release/deployなし。
