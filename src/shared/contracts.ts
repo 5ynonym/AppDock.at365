@@ -3,6 +3,8 @@ export interface HostSettings {
   closeToTray: boolean;
   notifications: boolean;
   startMinimized: boolean;
+  startAtLogon: boolean;
+  runAsAdministrator: boolean;
   hardwareAcceleration: boolean;
   trayClickCommand: string;
   trayDoubleClickCommand: string | null;
@@ -151,6 +153,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  launch: LaunchState;
   webAccounts: import('./web-applets').WebProfile[];
   webPages: Record<string, import('./web-applets').WebPageState>;
   startupReady: boolean;
@@ -173,6 +176,8 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  refreshLaunchState(): Promise<LaunchState>;
+  restartAsAdministrator(): Promise<void>;
   settingsNotice(state: SettingsNoticeState): Promise<void>;
   confirmDiscardSettings(): Promise<boolean>;
   onSettingsNoticeAction(callback: (action: 'save' | 'discard' | 'edit') => void): () => void;
@@ -213,6 +218,14 @@ export interface DockApi {
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   onChanged(callback: () => void): () => void;
+}
+export interface LaunchState {
+  supported: boolean;
+  elevated: boolean;
+  registered: boolean;
+  taskElevated: boolean;
+  taskName: string;
+  error?: string;
 }
 export interface SettingsNoticeState {
   visible: boolean;

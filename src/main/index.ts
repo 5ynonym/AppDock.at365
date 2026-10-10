@@ -18,6 +18,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
+import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
 import { PortableUpdates, type UpdateTarget } from './core/portable-updates';
@@ -113,6 +114,11 @@ if (locked)
     ],
   );
 const settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
+const launch = new WindowsLaunch(
+  app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
+  baseDirectory,
+  testDirectory ? [`--test-profile=${baseDirectory}`] : [],
+);
 let settingsLoadError: Error | undefined;
 if (locked) {
   try {
@@ -298,6 +304,7 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    launch: launch.state,
     startupReady,
     windowVisible: !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
@@ -441,13 +448,30 @@ function registerIpc() {
     shortcutRecording = recording && !!window?.isFocused();
     await syncHotKeys();
   });
-  handle('dock:saveSettings', (value: Settings, revision: number, avatar?: Uint8Array | null) => {
-    let next = parseSettings(value);
-    webApplets.validateAccounts(next.webApplets.items);
-    validateAppletSettings(next, manager.snapshot());
-    next = initializeWebAppletDefaults(next, settings.value);
-    return saveUserSettings(settings, baseDirectory, next, revision, avatar);
+  handle('dock:refreshLaunchState', async () => {
+    const state = await launch.refresh();
+    changed();
+    return state;
   });
+  handle('dock:restartAsAdministrator', async () => {
+    await launch.restartElevated([...launch.args, '--restore-view', '--appdock-elevation-attempt']);
+    quitHost();
+  });
+  handle(
+    'dock:saveSettings',
+    async (value: Settings, revision: number, avatar?: Uint8Array | null) => {
+      let next = parseSettings(value);
+      webApplets.validateAccounts(next.webApplets.items);
+      validateAppletSettings(next, manager.snapshot());
+      next = initializeWebAppletDefaults(next, settings.value);
+      return launch.save(
+        next.host,
+        settings.value.host,
+        () => settings.assertRevision(revision),
+        () => saveUserSettings(settings, baseDirectory, next, revision, avatar),
+      );
+    },
+  );
   handle('dock:setPinnedCommands', (ids: string[]) =>
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
@@ -1161,7 +1185,33 @@ if (!locked) app.quit();
 else
   void app
     .whenReady()
-    .then(initialize)
+    .then(async () => {
+      await launch.refresh();
+      if (
+        !settingsLoadError &&
+        launch.state.supported &&
+        !launch.state.elevated &&
+        settings.value.host.runAsAdministrator &&
+        !smoke &&
+        !process.argv.includes('--appdock-elevation-attempt')
+      ) {
+        try {
+          await launch.restartElevated([
+            ...process.argv.slice(1).filter((arg) => !arg.startsWith('--inspect')),
+            '--appdock-elevation-attempt',
+          ]);
+          quitHost();
+          return;
+        } catch {
+          launch.state = {
+            ...launch.state,
+            error:
+              '管理者起動がキャンセルされたか、許可されませんでした。現在は通常権限で動作しています。',
+          };
+        }
+      }
+      await initialize();
+    })
     .catch((e) => {
       dialog.showErrorBox('AppDock', String(e));
       quitting = true;

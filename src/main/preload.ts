@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
+  restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),
   settingsNotice: (state) => ipcRenderer.invoke('dock:settingsNotice', state),
   confirmDiscardSettings: () => ipcRenderer.invoke('dock:confirmDiscardSettings'),
   onSettingsNoticeAction: (callback) => {

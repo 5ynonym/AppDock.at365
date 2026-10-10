@@ -24,6 +24,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 ## ホスト・UI・Webアカウントの維持事項
 
+- 起動設定は[専用仕様](docs/launch-settings.md)を正本とする。一般設定の共有draft/JSON/revision/saveを使用し、OS登録は明示保存時だけ変更する。タスクは元のportable EXE・配置先・ユーザーに固定し、他配置や手動登録へ干渉しない。UACキャンセル/権限不足では保存せず、保存競合/失敗時は以前のタスクXMLを復元する。実権限と登録状態は保存された希望値と区別する。検証用のタスクは確実に解除し、UAC承認を自動化しない。
+
 - Windows通知のクリックは配置専用protocol activationを使い、元のportable EXE/保存先へ戻す。Electronの共有製品名shortcut/COM登録に起動先を依存させない。URIから任意commandを実行せず、一度限りのトークンと稼働中子プロセスのガードを維持する。通知変更ではtests/notification-routing.test.cjsとscripts/notification-portable-test.cjsを確認し、Windows ShellによるURI起動と物理toastクリックの検証範囲を区別する。
 
 - メインWindowと共有sessionのスペルチェック無効化を維持する。起動遅延とminimumHostVersion照合はホスト共通で管理し、停止/無効化/終了で予約を取り消す。削除済みウィジェット基盤は互換性のために復活させない。

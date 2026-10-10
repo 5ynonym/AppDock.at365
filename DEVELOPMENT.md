@@ -38,6 +38,8 @@
 
 ## 開発環境・ビルド・テスト
 
+スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行した単一EXEの専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs publish/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
+
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
 初回は次の手順で準備します。公式Node.js ZIPのSHA256を照合し、npmでpnpmをプロジェクト内にインストールします。
