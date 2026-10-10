@@ -1,5 +1,9 @@
 # AppletのためにAppDockへ機能を追加する
 
+0.26.26以降の共通操作API・MCP・Codex登録は[専用仕様](automation.md)を参照してください。Applet向けJSON-RPCとは別の入口です。
+
+0.26.29以降の外部コマンド公開は各Appletのmanifest宣言を使います。ホストへApplet固有IDの許可一覧を追加せず、runtimeの登録と宣言を照合して、実行権限・稼働状態・監査ログを共通管理します。[公開宣言](automation.md#appletによる公開宣言)を参照してください。
+
 0.26.17以降、ホスト画面のdock:* IPC操作失敗は共通handleでerrorログに記録する。同期throwと非同期rejectの両方を捕捉して元のエラーを返し、ログページとPC専用host.logへ操作名・エラーメッセージを残す。IPCの引数（設定・認証値・入力内容）は追加しない。送信元/Frame/URL検証はcallback呼び出し前に維持する。
 
 0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。

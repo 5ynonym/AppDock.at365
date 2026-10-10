@@ -21,6 +21,7 @@
 0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
 - [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。
+- [共通操作APIとCodex連携](docs/automation.md): MCP、PC専用接続設定、Codex登録、基本設定の外部操作と検証。
 - [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
 - [Applet API](docs/extensions.md): APIと通信の契約。
 - [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）、テーマ同期・音声コピー（0.15.0）、通常起動の描画（0.15.1）、準備完了後の背景同期再開・操作中の自然なフォーカス（0.15.2）。
@@ -135,6 +136,8 @@ scripts/                   ビルドと実機UI/portable検証
 テストは専用の一時フォルダ／`.artifacts` を使い、実利用の設定・メール認証・クリップボード・壁紙に触れません。Node・C#の検証用拡張は `build:test-extensions` で `.artifacts/test-extensions` に生成し、UIテストの専用プロファイルにだけ配置します。通常のビルド・発行・起動では読み込みません。Windowsの実行制限がある環境では、通常のWindows実行環境でElectronの起動テストを行ってください。アプリ側ではChromiumのサンドボックスを有効にしています。
 
 ### 作業完了時のテストフォルダー整理
+
+制限付きエージェント環境での実行権限については[共通手順](docs/development-workflow.md#制限付き実行環境)を参照してください。
 
 実装・修正に必要なテストと、発行した固定EXEの動作確認がすべて成功した後、作業者が以下を行います。リリースまで待たず、各作業の完了手順として実施します。調査・手順書だけの変更でテストを行っていない場合は、整理対象なしで構いません。
 

@@ -30,6 +30,10 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 ## ホスト・UI・Webアカウントの維持事項
 
+- 外部コマンドの公開範囲は各Appletのmanifest commands[].automationで宣言する。本体にApplet固有の許可一覧を置かず、別名や接尾辞から推測しない。runtime登録/置換から公開権限を受け取らない。設定変更と実行の許可を分離し、停止中Appletの自動有効化を避ける。受付/処理応答/操作先の効果確認を区別する。MCPの全API呼出しは既存automationログへ成功/失敗を記録し、引数・認証・生の例外を載せない。詳しくは[共通操作API](docs/automation.md)。
+
+- 共通操作API/MCP/Codex登録は[専用仕様](docs/automation.md)を正本とする。外部APIの許可項目・revision・既存保存経路を維持し、任意コマンドや全設定JSONを公開しない。127.0.0.1限定とHost/Origin/token検査、PC専用認証、登録範囲外のTOML保持を保つ。共通API変更はtests/automation.test.cjs、GUI/発行版はscripts/automation-ui-test.cjsで確認する。App Serverは検証用クライアントにだけ使い、会話UIへの組込みとは区別する。
+
 - 起動設定は[専用仕様](docs/launch-settings.md)を正本とする。一般設定の共有draft/JSON/revision/saveを使用し、OS登録は明示保存時だけ変更する。タスクは元のportable EXE・配置先・ユーザーに固定し、他配置や手動登録へ干渉しない。UACキャンセル/権限不足では保存せず、保存競合/失敗時は以前のタスクXMLを復元する。実権限と登録状態は保存された希望値と区別する。検証用のタスクは確実に解除し、UAC承認を自動化しない。
 
 - Windows通知のクリックは配置専用protocol activationを使い、元のportable EXE/保存先へ戻す。Electronの共有製品名shortcut/COM登録に起動先を依存させない。URIから任意commandを実行せず、一度限りのトークンと稼働中子プロセスのガードを維持する。通知変更ではtests/notification-routing.test.cjsとscripts/notification-portable-test.cjsを確認し、Windows ShellによるURI起動と物理toastクリックの検証範囲を区別する。

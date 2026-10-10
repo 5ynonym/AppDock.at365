@@ -15,6 +15,18 @@ test('declared command activation and aliases validate before discovery', () => 
     parseDeclaredCommands('test', [{ ...commands[0], activateOnExecute: 'true' }]),
   );
 });
+test('external access requires a boolean manifest declaration and cannot be granted at runtime', () => {
+  const command = { id: 'test.run', title: 'Run', automation: true };
+  assert.deepEqual(parseDeclaredCommands('test', [command]), [command]);
+  assert.deepEqual(parseDeclaredCommands('test', [{ ...command, automation: false }]), [
+    { ...command, automation: false },
+  ]);
+  for (const automation of ['true', 1, null, {}, []])
+    assert.throws(() => parseDeclaredCommands('test', [{ ...command, automation }]));
+  for (const id of ['other.run', 'test.run\n', 'test.*'])
+    assert.throws(() => parseDeclaredCommands('test', [{ ...command, id }]));
+  assert.deepEqual(parseExtensionCommands('test', [command]), [{ id: 'test.run', title: 'Run' }]);
+});
 const {
   parseSettingDefinitions,
   validateSettingValue,

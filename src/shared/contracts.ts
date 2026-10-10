@@ -47,6 +47,7 @@ export interface Command {
   title: string;
 }
 export interface DeclaredCommand extends Command {
+  automation?: boolean;
   activateOnExecute?: boolean;
   aliases?: string[];
 }
@@ -180,6 +181,9 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  automation(
+    action: import('./automation').AutomationAction,
+  ): Promise<import('./automation').AutomationReply>;
   restoreSettingsBackup(revision: number): Promise<SettingsSnapshot | null>;
   refreshLaunchState(): Promise<LaunchState>;
   restartAsAdministrator(): Promise<void>;

@@ -207,3 +207,6 @@ WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の�
 manifestのdefaultGestureBindingsに、自身のcommandsに宣言したコマンドの割り当て（id/command/gesture/enabled/when、最大100行）を宣言できる。初回だけ設定へコピーする。詳細は[マウスジェスチャー](gestures.md)。
 
 command.executeは任意のinvocation（session/window/process/source）を受け取る。.NETハンドラーはCommandExecution.Currentから読み取れる。source=gestureの場合のwindowは開始対象HWNDの10進文字列。command.cancelのsessionが一致すればハンドラーのCancellationTokenを取り消す。引数なしの既存ハンドラーは変更不要。対象固定や取消を実操作まで反映するかはAppletの実装による。
+## v0.26.29: 外部コマンド公開
+
+manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣言できます。省略/falseは非公開、runtime登録や別名だけでは公開しません。形式・動的コマンドとの照合・権限は[共通操作API](automation.md#appletによる公開宣言)を参照してください。利用するAppletは`minimumHostVersion: "0.26.29"`以上を指定します。

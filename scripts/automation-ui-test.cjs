@@ -1,0 +1,471 @@
+const fs = require('node:fs'),
+  path = require('node:path'),
+  net = require('node:net');
+const { spawn } = require('node:child_process');
+const { createHash } = require('node:crypto');
+const assert = require('node:assert/strict');
+const { chromium } = require('playwright');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+const {
+  StreamableHTTPClientTransport,
+} = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const { parse } = require('smol-toml');
+const http = require('node:http');
+const root = path.resolve(__dirname, '..'),
+  portable = process.argv[2] && path.resolve(process.argv[2]);
+const profile = path.join(
+  root,
+  '.artifacts',
+  `automation-${portable ? 'portable' : 'source'}-${Date.now()}`,
+);
+const checks = [],
+  states = [];
+fs.mkdirSync(profile, { recursive: true });
+const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.host.hardwareAcceleration = false;
+settings.host.notifications = false;
+settings.keybindings = [];
+settings.globalShortcutCommands = [];
+settings.gestures.enabled = false;
+const fixtureId = 'test.automation-provider';
+const fixtureRoot = path.join(profile, 'extensions', 'automation-fixture');
+fs.mkdirSync(fixtureRoot, { recursive: true });
+const fixtureCommands = ['next', 'start', 'stop', 'prepare-background'].map((name) => ({
+  id: `${fixtureId}.${name}`,
+  title: name,
+  automation: name !== 'prepare-background',
+}));
+fs.writeFileSync(
+  path.join(fixtureRoot, 'extension.json'),
+  JSON.stringify({
+    apiVersion: 1,
+    id: fixtureId,
+    name: 'Automation command fixture',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'index.cjs',
+    commands: fixtureCommands,
+    capabilities: [],
+  }),
+);
+fs.writeFileSync(
+  path.join(fixtureRoot, 'index.cjs'),
+  `
+const fs=require('node:fs'),path=require('node:path');
+exports.activate=async(context)=>{
+ for(const name of ['next','start','stop','prepare-background']) context.commands.register('test.automation-provider.'+name,name,async()=>{
+  if(name==='stop') throw Error('SECRET_COMMAND_FAILURE');
+  const file=path.join(__dirname,'calls.json');
+  const calls=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):[];
+  calls.push(name);fs.writeFileSync(file,JSON.stringify(calls));
+  return {secret:'SECRET_COMMAND_RESULT'};
+ });
+};
+`,
+);
+settings.extensions[fixtureId] = { enabled: true, settings: {} };
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+const local = path.join(profile, 'local'),
+  configFile = path.join(profile, 'codex', 'config.toml');
+fs.mkdirSync(path.dirname(configFile), { recursive: true });
+const original = '# Existing configuration must survive\npersonality = "friendly"\n';
+fs.writeFileSync(configFile, original);
+const portableHash = portable ? hash(portable) : undefined;
+if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(fn, label) {
+  const start = Date.now();
+  while (Date.now() - start < 30000) {
+    try {
+      const v = await fn();
+      if (v) return v;
+    } catch {}
+    await wait(100);
+  }
+  throw Error(label);
+}
+async function freePort() {
+  const s = net.createServer();
+  await new Promise((r) => s.listen(0, '127.0.0.1', r));
+  const p = s.address().port;
+  await new Promise((r) => s.close(r));
+  return p;
+}
+async function start() {
+  const port = await freePort(),
+    env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const child = spawn(
+    portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+    [
+      ...(portable ? [] : [root]),
+      `--test-profile=${profile}`,
+      `--test-local-state=${local}`,
+      `--remote-debugging-port=${port}`,
+    ],
+    { cwd: profile, env, windowsHide: true, stdio: 'ignore' },
+  );
+  const state = { child };
+  states.push(state);
+  state.browser = await until(
+    () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
+    'CDP',
+  );
+  state.page = await until(
+    () =>
+      state.browser
+        .contexts()
+        .flatMap((c) => c.pages())
+        .find((p) => p.url().startsWith('appdock://host/')),
+    'host page',
+  );
+  state.page.setDefaultTimeout(15000);
+  await state.page.waitForFunction(
+    async () =>
+      (await window.dock?.snapshot())?.startupReady &&
+      (await window.dock.automation({ kind: 'status' })).state,
+  );
+  return state;
+}
+async function stop(state) {
+  if (!state.browser) return;
+  await state.page.evaluate(() => window.dock.executeCommand('appdock.quit')).catch(() => {});
+  await until(() => state.child.exitCode !== null, 'quit');
+  await state.browser.close();
+  state.browser = null;
+}
+async function connect(state) {
+  const s = await state.page.evaluate(
+    async () => (await window.dock.automation({ kind: 'status' })).state,
+  );
+  const headers = parse(fs.readFileSync(configFile, 'utf8')).mcp_servers[s.serverId].http_headers;
+  const client = new Client({ name: 'AppDock GUI regression', version: '1' });
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(s.endpoint), { requestInit: { headers } }),
+  );
+  return client;
+}
+async function call(client, name, args = {}) {
+  const r = await client.callTool({ name, arguments: args });
+  if (r.isError) throw Error(JSON.stringify(r.structuredContent));
+  return r.structuredContent;
+}
+async function patch(client, changes) {
+  const s = await call(client, 'appdock_get_settings');
+  return call(client, 'appdock_patch_settings', { changes, expectedRevision: s.revision });
+}
+let client;
+const webServer = http.createServer((_req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.end('<h1>Automation Web fixture</h1>');
+});
+const webId = 'web.11111111-2222-3333-4444-555555555555';
+(async () => {
+  try {
+    await new Promise((r) => webServer.listen(0, '127.0.0.1', r));
+    let s = await start(),
+      page = s.page;
+    const account = await page.evaluate(() => window.dock.createWebAccount('Automation fixture'));
+    await page.evaluate(
+      async ({ webId, account, port }) => {
+        const snap = await window.dock.snapshot();
+        snap.settings.value.webApplets.items.push({
+          id: webId,
+          name: 'Automation Web fixture',
+          url: `http://127.0.0.1:${port}/`,
+          accountId: account.id,
+          enabled: true,
+          display: 'page',
+          navigation: 'same-origin',
+          allowedOrigins: [],
+          icon: '',
+        });
+        await window.dock.saveSettings(snap.settings.value, snap.settings.revision);
+      },
+      { webId, account, port: webServer.address().port },
+    );
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    const section = page.getByRole('region', { name: 'Codex連携' });
+    await section.getByRole('textbox', { name: 'Codexの設定ファイル' }).fill(configFile);
+    await section.getByRole('button', { name: '設定先を変更', exact: true }).click();
+    await until(
+      async () =>
+        (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
+          .configFile === configFile,
+      'config selection',
+    );
+    await section.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
+    await section.locator('summary').click();
+    await section
+      .getByRole('textbox', { name: 'Codexへの登録名', exact: true })
+      .fill('AppDock_Test');
+    await section.getByRole('button', { name: '登録名を保存', exact: true }).click();
+    await until(
+      async () =>
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.serverId ===
+        'AppDock_Test',
+      'custom name saved',
+    );
+    await section.getByRole('button', { name: '登録・修復' }).click();
+    await until(
+      () => parse(fs.readFileSync(configFile, 'utf8')).mcp_servers?.AppDock_Test,
+      'custom registration',
+    );
+    await section.getByRole('button', { name: '登録を解除', exact: true }).click();
+    await until(() => fs.readFileSync(configFile, 'utf8') === original, 'custom unregister');
+    await section.getByRole('textbox', { name: 'Codexへの登録名', exact: true }).fill('AppDock');
+    await section.getByRole('button', { name: '登録名を保存', exact: true }).click();
+    await until(
+      async () =>
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.serverId ===
+        'AppDock',
+      'default name saved',
+    );
+    await section.locator('summary').click();
+    checks.push('custom short name registers/unregisters via GUI; default AppDock restored');
+    await section.getByRole('button', { name: '登録・修復' }).click();
+    await until(
+      () => fs.readFileSync(configFile, 'utf8').includes('BEGIN AppDock MCP'),
+      'registration',
+    );
+    assert.ok(fs.readFileSync(configFile, 'utf8').startsWith(original));
+    assert.deepEqual(Object.keys(parse(fs.readFileSync(configFile, 'utf8')).mcp_servers), [
+      'AppDock',
+    ]);
+    await section.getByRole('button', { name: '接続テスト', exact: true }).click();
+    await until(
+      async () => (await section.innerText()).includes('AppDock内の疎通に成功'),
+      'self test',
+    );
+    assert.equal(
+      (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
+        .lastClientAt,
+      undefined,
+    );
+    client = await connect(s);
+    assert.equal((await client.listTools()).tools.length, 8);
+    assert.equal(
+      (await call(client, 'appdock_get_info')).version,
+      require('../package.json').version,
+    );
+    checks.push(
+      'GUI register and self test; real SDK initialize/list/read; unrelated TOML retained',
+    );
+    await until(
+      async () =>
+        (await call(client, 'appdock_get_applet', { id: fixtureId })).applet.state === 'running',
+      'fixture running',
+    );
+    const catalog = await call(client, 'appdock_list_commands');
+    assert.ok(catalog.commands.some((c) => c.id === `${fixtureId}.next` && c.available));
+    assert.ok(
+      !catalog.commands.some((c) => c.id === 'appdock.quit' || c.id.endsWith('prepare-background')),
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: `${fixtureId}.next` },
+        })
+      ).structuredContent.code,
+      'EXECUTION_DISABLED',
+    );
+    assert.equal(fs.existsSync(path.join(fixtureRoot, 'calls.json')), false);
+    await section.getByRole('switch', { name: 'Codexからのコマンド実行を許可する' }).click();
+    await until(
+      async () => (await call(client, 'appdock_get_info')).executable,
+      'command permission',
+    );
+    const executed = await call(client, 'appdock_execute_command', { id: `${fixtureId}.next` });
+    assert.equal(executed.completion, 'handlerReturned');
+    assert.equal(executed.effectVerified, false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'calls.json'))), ['next']);
+    assert.ok(!JSON.stringify(executed).includes('SECRET_COMMAND_RESULT'));
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: `${fixtureId}.stop` },
+        })
+      ).structuredContent.code,
+      'COMMAND_FAILED',
+    );
+    await call(client, 'appdock_execute_command', { id: `${webId}.open` });
+    await until(
+      () =>
+        s.browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .find((p) => p.url() === `http://127.0.0.1:${webServer.address().port}/`),
+      'web opened',
+    );
+    await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });
+    await section.waitFor({ state: 'visible' });
+    const logs = (await page.evaluate(() => window.dock.snapshot())).logs.filter(
+      (l) => l.source === 'automation',
+    );
+    assert.ok(
+      logs.some(
+        (l) =>
+          l.message.includes('API=commands.execute') &&
+          l.message.includes(`target=${fixtureId}.next`) &&
+          l.message.includes('result=success'),
+      ),
+    );
+    assert.ok(logs.some((l) => l.message.includes('code=COMMAND_FAILED')));
+    assert.ok(
+      logs.some(
+        (l) => l.message.includes('API=applets.get') && l.message.includes('result=success'),
+      ),
+    );
+    assert.ok(!JSON.stringify(logs).includes('SECRET_'));
+    const persisted = fs.readFileSync(path.join(local, 'logs', 'host.log'), 'utf8');
+    assert.ok(persisted.includes('API=commands.execute'));
+    await page.getByRole('button', { name: 'ログ', exact: true }).click();
+    await page.getByRole('combobox', { name: 'ログのApplet' }).selectOption('automation');
+    await page.getByRole('textbox', { name: 'ログを検索' }).fill('API=commands.execute');
+    await page
+      .getByText(/result=success/)
+      .first()
+      .waitFor();
+    await page.screenshot({ path: path.join(profile, 'api-audit-log.png') });
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    checks.push(
+      'explicit execution permission; real fixture command and WebApplet open; API outcomes in log UI and host.log without secret values',
+    );
+    await section.getByRole('switch', { name: 'Codexからの設定変更を許可する' }).click();
+    await until(
+      async () =>
+        (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
+          .allowWrite,
+      'allow write',
+    );
+    await patch(client, { theme: 'light' });
+    await until(
+      async () =>
+        (await page.evaluate(() => window.dock.snapshot())).settings.value.host.theme === 'light',
+      'patch reflected',
+    );
+    checks.push('MCP settings write, runtime snapshot and disk');
+    if (process.env.APPDOCK_TEST_CODEX_EXE) {
+      const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+      await require('./automation-codex-check.cjs')({
+        executable: process.env.APPDOCK_TEST_CODEX_EXE,
+        configFile,
+        server: state.serverId,
+        output: profile,
+      });
+      checks.push(
+        'installed Codex discovers and calls MCP tools with isolated config, without model inference',
+      );
+    }
+    await page.getByRole('button', { name: '表示', exact: true }).click();
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    const json = page.getByRole('textbox', { name: '設定JSON' });
+    const draft = JSON.parse(await json.inputValue());
+    draft.host.closeToTray = false;
+    await json.fill(JSON.stringify(draft, null, 2));
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    await patch(client, { notifications: true });
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await until(
+      async () => (await page.locator('body').innerText()).includes('別の場所で変更'),
+      'revision conflict',
+    );
+    await page.getByRole('button', { name: '表示', exact: true }).click();
+    assert.equal(JSON.parse(await json.inputValue()).host.closeToTray, false);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.closeToTray,
+      true,
+    );
+    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    checks.push('dirty GUI draft retained; old save refused; explicit reload adopts API state');
+    const closeError = page.getByRole('button', { name: 'エラーを閉じる' });
+    if (await closeError.isVisible()) await closeError.click();
+    for (const theme of ['dark', 'light']) {
+      await patch(client, { theme });
+      for (const width of [1280, 960, 700]) {
+        await page.setViewportSize({ width, height: 900 });
+        await wait(180);
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+          true,
+        );
+        await page.screenshot({ path: path.join(profile, `codex-${theme}-${width}.png`) });
+        await page.getByText('接続の詳細', { exact: true }).click();
+        await page
+          .getByRole('button', { name: '認証情報を再発行', exact: true })
+          .scrollIntoViewIfNeeded();
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+          true,
+        );
+        await page.screenshot({ path: path.join(profile, `codex-details-${theme}-${width}.png`) });
+        await page.getByText('接続の詳細', { exact: true }).click();
+        await page.locator('.settings-body').evaluate((el) => {
+          el.scrollTop = 0;
+        });
+      }
+    }
+    checks.push('both themes at 1280/960/700 without horizontal overflow');
+    const before = await call(client, 'appdock_get_settings');
+    await client.close();
+    client = null;
+    await stop(s);
+    s = await start();
+    page = s.page;
+    assert.equal(
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.allowExecute,
+      true,
+    );
+    client = await connect(s);
+    const after = await call(client, 'appdock_get_settings');
+    assert.deepEqual(after.values, before.values);
+    assert.notEqual(after.revision, before.revision);
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_patch_settings',
+          arguments: { changes: { theme: 'dark' }, expectedRevision: before.revision },
+        })
+      ).structuredContent.code,
+      'REVISION_CONFLICT',
+    );
+    checks.push(
+      'real process restart retains settings/endpoint/registration and invalidates old revision',
+    );
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    await page.getByRole('button', { name: '登録を解除', exact: true }).click();
+    await until(() => fs.readFileSync(configFile, 'utf8') === original, 'unregister');
+    await page.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
+    await until(
+      async () =>
+        (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
+          .running === false,
+      'disable',
+    );
+    checks.push('GUI unregister preserves original TOML; disable closes endpoint');
+    await client.close();
+    client = null;
+    await stop(s);
+    if (portable) assert.equal(hash(portable), portableHash);
+    const result = { ok: true, checks, profile, portable, sha256: portableHash };
+    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    await client?.close().catch(() => {});
+    for (const s of states) await stop(s).catch(() => {});
+    webServer.closeAllConnections();
+    await new Promise((r) => webServer.close(r));
+  }
+})().catch((e) => {
+  fs.writeFileSync(path.join(profile, 'failure.txt'), String(e.stack));
+  console.error(e);
+  process.exitCode = 1;
+});

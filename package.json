@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.26.25",
+  "version": "0.26.29",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -84,7 +84,9 @@
     }
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "smol-toml": "1.9.0"
   }
 }
