@@ -1,5 +1,33 @@
 # 検証記録
 
+## 2026-10-11: 0.26.28 Applet詳細・公開コマンド・API監査ログ
+
+- applets.get/commands.list/commands.executeを追加して全8 APIに拡張。外部公開は本体の表示/設定/検索、Gmail/WebAppletのopen、壁紙next/start/stopだけ。実行直前に公開一覧と有効/running/availableを確認し、既存executeCommandを共用する。停止中AppletのactivateOnExecuteによる有効化を避け、PC専用allowExecuteを設定変更許可から分離（初期false）。同時実行拒否と受付/処理応答/効果未確認の結果を追加。
+- 全MCP API呼出しを既存HostLogのautomationへ記録。API名/ホスト生成requestId/公開対象ID/成功失敗/時間と、実行の受付を記録し、未知ツール名・引数・認証・戻り値・生の例外は出さない。Applet詳細も生の起動エラー/Web URL/全設定を公開しない。ログの画面検索とhost.logのローテーションを共用。正本docs/automation.md、README/AGENTS更新。
+- 型検査/build/最終整形成功。automation/loggingの関連回帰9/9成功（`.artifacts/automation-commands-20261011`）。明示許可/未公開ID/別提供元/動的availability/停止中/無効/同時実行/権限取消/保存再起動、戻り値や例外の非公開、MCP監査ログの成功・失敗と秘密値非収録を確認。前回のAドライブrenameの切り分け結果に基づきautomation fixtureは既定Windows TEMPを使用。
+- source GUI9群成功: `.artifacts/automation-source-1791660784529/result.json`。実Node fixtureのnext呼出しと意図したstop失敗、loopback WebAppletのopen、本体設定画面表示、権限スイッチ、ログのautomation検索とhost.log、両テーマ3幅、再起動保持、旧設定競合/登録解除/停止を確認。実デスクトップ壁紙や実Gmailは操作せず、検証用Appletを使用。fixtureのWeb ID/アイコン形式とテスト変数重複を修正して成功。
+- 実Codex Desktop0.162.0-alpha.17.2で隔離configから8ツールを発見し、commands.list/commands.execute(appdock.open)、設定取得/変更/再取得/復元成功（codex-result.json）。モデル推論/実アカウント認証なし。標準全回帰・実サービスでの効果確認は今回対象外。
+- 最終publish終了0。0.26.28単一EXE144,043,104 bytes/SHA256 `0aefa4a2eaa300d48a2916d65dd6294dca883fad3db896e0df06ffe44e29c1be`、feed/検証コピー一致、梱包out66ファイル/文書リンク124件確認、旧全体ZIP不変。固定EXEでもGUI9群と実Codexの追加API呼出しが成功（`.artifacts/automation-portable-1791661019475/result.json`）。発行版の権限画面とsourceのログ画像を目視確認。
+- 終了済み検証プロセス0。TEMP専用試験の111ファイルをリポジトリ内へhash一致確認して保管後に元領域を削除。古いsource成功1件automation-source-1791658701307を絶対root/再解析点/ロック確認後に整理（6,531,844 bytes）、source/portable各最新成功3件と失敗/固定/再利用資料を保持。証跡`.artifacts/automation-commands-20261011/cleanup.json`。未変更Applet再発行・commit/push/Release/deployなし。
+
+## 2026-10-11: 0.26.27 Codex登録名をAppDockへ変更
+
+- 配置IDを内部識別/管理コメントに残し、Codexへの登録名を既定AppDockへ分離。「接続の詳細」でAppDock_Test等の別名を設定可能。同名の他配置/手動登録は上書きせず案内。利用者指定により自動移行なし。旧名/名前変更前の登録は所有hash照合付きの「登録を解除」後に登録し直す。製品の実利用設定は変更していない。
+- 型検査/build/整形成功。automation回帰7/7成功。旧名の自動変更拒否と明示解除、別配置の同名衝突/非破壊、別名の独立登録/解除、登録名保存と内部ID不変を追加確認。Aドライブの高速連続置換でEPERMが異なる箇所に出た4回は失敗記録を保持。原因は未断定、同じ最終ソースを既定Windows TEMPの隔離rootで実行して全7件成功。試験root上書き用APPDOCK_AUTOMATION_TEST_ROOTを追加し、34証跡ファイルを`.artifacts/automation-name-20261011/temp-test-evidence`へ一致確認して保管。
+- source GUI8群成功（`.artifacts/automation-source-1791659914753/result.json`）。AppDock_TestのGUI登録/解除からAppDockの登録へ切替、他TOML保持、実Codexの5ツール発見/取得/変更/復元、再起動保持/解除/停止を確認。両テーマ3幅の詳細欄も確認。実Codexは隔離configを使いモデル推論なし。版更新直後のpnpm整合検査エラーはfrozen installで解消して型検査/buildを再成功、依存版/lockfile追加変更なし。
+- 最終publish終了0。0.26.27単一EXE144,030,404 bytes/SHA256 `a6d4667f20e8c1197f092de28cd5ac9d8e0484ffa70c20cb101701db5289c1c4`、feed/隔離コピー一致、梱包out65ファイル/文書リンク123件確認、旧全体ZIP不変。固定EXE GUI8群と実Codex検証も成功（`.artifacts/automation-portable-1791660107886/result.json`）。発行版の詳細画面を目視確認。
+- 終了済み検証プロセス0を確認。source成功の古い1件automation-source-1791658570417を絶対root/再解析点/ロック検査後に整理（3,614,797 bytes）、最新成功3件とportable成功2件、失敗/固定/再利用資料を保持。TEMPの専用領域は全34ファイルを保管先とhash照合して削除。証跡`.artifacts/automation-name-20261011/cleanup.json`。標準全回帰/実利用deploy/commit/push/Releaseなし。
+
+## 2026-10-11: 0.26.26 共通操作API・MCP・Codex登録画面
+
+- 通信非依存の5 API（本体情報、Applet基本一覧、設定schema、設定取得、設定patch）、公式SDKのloopback Streamable HTTP、設定内のCodex連携ページを追加。初期無効/読取り専用、変更可能項目はtheme/notifications/closeToTray/startMinimized。既存の検証・保存・通知を共用し、OS起動登録を実行しない。正本は[共通操作API](docs/automation.md)。App Serverの会話UI組込みとCLIは後続範囲。
+- 型検査/build/変更コード整形成功。関連回帰38/38成功（automation、settings-sync、core、windows-launch、applet-settings）。許可項目・型・dryRun・未指定値保持・競合/再起動revision・破損設定保護、HTTP認証/Origin/サイズ/プロトコル、読取り専用、認証再発行、ポート競合/配置分離、登録/修復/解除と他TOML保持、破損認証情報の非上書きを確認。標準全回帰は今回の範囲外。ログは`.artifacts/automation-20261011/`。
+- source GUI最終7群成功: `.artifacts/automation-source-1791658880032/result.json`。GUI登録/疎通、実MCPによる保存、dirty draftの保持と古い保存拒否、両テーマ1280/960/700幅と詳細表示、実プロセス再起動後の設定/endpoint/登録保持、解除/停止を確認。既存ナビゲーション17群も成功（`.artifacts/navigation-1791658884153`）。画像を目視確認し横overflowなし。
+- インストール済みCodex Desktop/0.162.0-alpha.17.2で、GUIが生成した隔離config.tomlから5ツールを発見し、情報/設定取得→設定変更→再取得→復元まで成功。検証専用にapp-serverのMCP呼出しを使用し、モデル推論や実利用アカウントの認証情報は使っていない。自己疎通とCodexからのinitialize観測は別に検査。実利用config.tomlは変更していない。
+- sandboxでのloopback/rename拒否は通常Windows環境で再実行して成功。実装途中のTOML null-prototype比較と書込許可切替時の接続切断を修正。Codex検証のsandbox enum誤りを試験側で修正し再成功。破損認証情報の表示を最後に補強し関連回帰を再成功後、同じ0.26.26を再発行。梱包out65ファイルが最終buildと一致、文書の相対リンク123件が存在。
+- 最終publish.bat終了0。単一EXE144,035,839 bytes/SHA256 `898d5a069fcc0d309ed112c9a832b74e68728472bd5864dc61c2d2af8f55ef6b`、update.jsonと隔離コピー一致。固定EXEでも上記7群と実Codexによる取得/変更/復元が成功: `.artifacts/automation-portable-1791659206593/result.json`と`codex-result.json`。両テーマの発行版画像も目視確認。ASAR検査スクリプトのWindows区切りを直し、最終内容の一致を確認。既存0.26.25全体ZIPはsize/hash不変、未変更Applet再発行なし。
+- 検証専用AppDock/Electron/Codexプロセスの終了を確認。今回のsource成功3件とportable成功1件を保持し、失敗1件・固定出力・再利用記録・状態不明の資料も保持。安全に整理すべき成功4件目以降がなく、削除0。実利用Codexチャットでのモデル推論、WSL/別PC、実利用先へのdeployは未実施。commit/push/Releaseなし。
+
 ## 2026-10-10: 0.26.18 コミット前の全回帰確認
 
 - 共通ログ/WallpaperSlideshow終了対応のコミット依頼により、対象9ファイルをstageしてから標準回帰を実行。型検査、`dev.bat test`の192/192、変更コードのPrettier確認が成功。検証開始/終了のtreeは`14440020ff282971282d0b335478149d14175581`で一致し、未stage/未追跡の入力なし。
@@ -1217,3 +1245,21 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 依頼対象の9ファイルだけをstageし、型検査・標準回帰200/200（新規公開後待機2テスト、実pnpm5項目、PSガード18チェックを含む）・setup2回・Prettier・diff確認に成功。Updaterの発行とDemoのReleaseビルドを含み、Demoは警告0/エラー0。検証前後のstage treeは一致し、未stageの入力変更なし。
 - 証跡は.artifacts/commit-validation-release-age-20261011（tree前後/environment/inputs/完全ログとSHA256）。検証後の追加は本コミット前記録だけで、最終stage treeとcommitは同証跡へ保存する。公開後待機fixtureの成功3件、失敗/中断、前回検証・今回commit証跡を保持し、追加削除0。
 - 開発取得ポリシーのみのため製品GUI・兄弟Applet回帰・製品版更新/再発行は対象外。製品のpackage.json/pnpm-lock.yamlとpublishを変更せず、既存0.26.25を維持。ローカルコミットまででpush/Release/deployなし。
+
+## 2026-10-11: 0.26.29 Applet自身による外部公開宣言
+
+- commands[].automation（boolean、未指定/falseは非公開）をmanifestで検証。公開IDの形式と所有名前空間を検証し、runtime登録/動的置換から公開権限を受け取らない。現在の登録と宣言を照合し、未登録/削除/停止中は利用不可。別名は公開しない。本体からGmail/壁紙のID一覧とWeb IDの特別判定を削除し、WebApplet提供元も同じフラグを付ける。src内のGmail/壁紙固有IDは0件。
+- Gmail0.9.3/壁紙0.4.4のmanifestへ従来の公開対象だけを宣言。最低本体0.26.29。旧Appletを互換一覧で公開しない。許可/既存実行経路/同時実行拒否/監査ログは継続。
+- 型検査/build/整形成功。automation/dynamic-commands/lifecycle/logging/core回帰28/28、供給元ポリシー回帰2/2（PowerShell境界と実pnpmの直接/間接/frozen依存）、dev launcher1/1成功。起動スクリプトは成功/通常失敗/STATUS_STACK_OVERFLOWの終了コードを保持し、異常終了時の承認付き再実行案内だけを追加。自動昇格/自動再試行/検査省略なし。
+- 制限環境ではpnpm installがSTATUS_STACK_OVERFLOW、回帰が設定atomic renameのEPERMで失敗。通常環境の同一lockfile install/同一テストは成功。制限環境のtypecheck/build自体は成功。dotnet --infoはService Control Managerアクセス拒否でexit1、msbuildの実project評価はexit0。通常環境の全3repo publishはexit0。制限の原因を製品不具合と断定せず記録し、依存追加/更新、待機期間緩和、lockfile削除は行っていない。
+- 固定EXEのautomation GUI9群成功（.artifacts/automation-portable-1791662917715/result.json）。本体にないtest.automation-providerの宣言→実登録→MCP実行、WebApplet open、ログ/host.log、権限、両テーマ3幅、再起動、登録解除を検証。実Codex0.162.0-alpha.17.2で8ツール発見/操作成功、モデル推論なし。Gmail側の固定本体+公開Applet試験でMCP経由open→オフラインGmail画面表示→監査ログまで成功。壁紙実EXEは不正設定拒否と正常終了を確認し、操作はfake背景APIで検証。実Google認証/メール送信/実壁紙変更は行っていない。標準全回帰は未実施。
+- publish/AppDock.at365.exe: 144038249bytes / SHA256 545d04678da11cf6e79290f0015b471c6f4af741199b37e0132e901ebef32d3e。feedと2つのGUI検証コピー一致。Appletのsource/publish manifest一致、更新ZIP全10ファイルとpublish一致。証跡.artifacts/automation-declarations-20261011。単一EXE維持、全体ZIP作成/未変更Applet発行なし。
+- 終了済み旧成功automation-portable-1791659206593とGmail portable-1791456361645をパス/リンク/使用中検査後に整理し、各方式の最新成功3件を保持。最初は検査自身のプロセス一致により安全停止し、検査自身だけを除外して確認。通常TEMP40ファイルをhash照合してrepoへ保管し元を削除。制限環境TEMPは既に存在せず、失敗ログを保持。その他の失敗/不明/固定/再利用資料は保持。commit/push/Release/実利用deployなし。
+- 最終確認: 関係文書のローカルリンク208件、整形、3repoのdiff --check成功。dev.batはCP932互換ASCII/CRLFを保持。隔離試験の残存プロセス0。
+
+## 2026-10-11: Automation変更のコミット前検証
+
+- 明示依頼により、本体の共通API/MCP/Codex登録画面/公開宣言/監査ログと関連文書・試験・制限環境の案内をコミット対象に確定。検証開始stage treeはa7034eceac6373d736ed384ca3757519d29ca745。Gmailのtreeはde5c3a43d153c683ebccb4f61733c9180dda7bb8、壁紙は6bd877aec997504e3eb49f58d46ffda26c727a91。検証後もstageと作業ファイル一致、製品の追加変更なし。
+- 今回typecheckと標準dev.bat testを実行し211/211成功（供給元ポリシー/起動スクリプト回帰を含む）。固定発行版GUI9群と実Codex8ツール操作成功: .artifacts/automation-portable-1791663497295。Gmail21/21とMCP表示GUI、壁紙標準回帰と実EXE/RPC試験も成功。実サービス認証/実壁紙変更/モデル推論なし。
+- 証跡.artifacts/commit-validation-automation-20261011。全Git追跡入力299件、各ログ、lockfile/toolchain、既存配布物をハッシュ記録。検証版0.26.29 EXE/feedのsize/hash不変。検証後の追記は各repoのVERIFICATIONだけ、最終tree/commitは証跡へ保存。再発行/追加版更新なし。
+- 旧成功本体automation-portable-1791660107886/Gmail portable-1791458903951を使用中/境界/再解析検査後整理、各最新3件を保持。TEMP40ファイルをhash照合して証跡へ移し元を削除。失敗/不明/固定/再利用資料保持、試験プロセス残存0。push/Release/deployなし。

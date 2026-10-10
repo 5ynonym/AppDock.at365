@@ -152,6 +152,7 @@ export class WebAppletManager {
           } as Record<string, string>
         )[key],
         activateOnExecute: key === 'open',
+        automation: key === 'open',
         available: a.enabled,
       })),
       pages: [

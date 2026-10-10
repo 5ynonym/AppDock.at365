@@ -4025,3 +4025,63 @@ summary {
   overflow: auto;
   overscroll-behavior: contain;
 }
+/* PC-local integration controls are independent of the shared settings draft. */
+.codex-settings {
+  min-width: 0;
+}
+.settings-form .codex-settings h3 {
+  font-size: 16px;
+  color: var(--text);
+}
+.codex-settings > p,
+.codex-settings details > p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.codex-status {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 12px 20px;
+  margin: 24px 0;
+  font-size: 13px;
+}
+.codex-status dt {
+  color: var(--muted);
+}
+.codex-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.codex-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0;
+  font-size: 13px;
+}
+.codex-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.codex-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.codex-settings .codex-error {
+  color: #c35d6c;
+  overflow-wrap: anywhere;
+}
+.codex-settings .codex-message {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.codex-settings details {
+  margin-top: 28px;
+}
+.codex-settings summary {
+  cursor: pointer;
+}

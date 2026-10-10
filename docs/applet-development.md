@@ -206,3 +206,7 @@ HTML/Reactで独自画面を作り、リボンから本体ページまたは独�
 AppDock 0.19.0ではページボタンを上寄せ/下寄せへ利用者が配置し、間にセパレーターを置けます。Appletのページ宣言やopen APIは0.18.0から変わらず、配置はホストが管理します。
 
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。
+
+## 外部操作へ公開するコマンド
+
+既存のコマンドを外部API/MCPから呼び出せるようにする場合は、Applet自身のmanifestで公開を宣言します。本体へ個別IDを追加しません。形式と条件は[共通操作API](automation.md#appletによる公開宣言)を参照してください。

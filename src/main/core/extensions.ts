@@ -238,7 +238,13 @@ class ExtensionManager extends EventEmitter {
         available: this.canActivateForCommand(e, command.id),
       });
     for (const command of e.commands)
-      catalog.set(command.id, { ...command, available: e.state === 'running' });
+      catalog.set(command.id, {
+        ...command,
+        // Runtime registration (including replace) cannot grant external access.
+        automation:
+          e.manifest.commands?.some((c) => c.id === command.id && c.automation === true) ?? false,
+        available: e.state === 'running',
+      });
     for (const command of e.manifest.commands ?? [])
       for (const alias of command.aliases ?? []) {
         const target = catalog.get(command.id)!;

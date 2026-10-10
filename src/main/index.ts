@@ -12,6 +12,7 @@ import {
   protocol,
   net,
   screen,
+  safeStorage,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,6 +75,10 @@ import { pageDisplay, pageKey } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
 import { SettingsNotice } from './core/settings-notice';
 import { webId } from '../shared/web-applets';
+import { AutomationService } from './core/automation';
+import { AutomationApi } from './core/automation-api';
+import { automationApplets, automationCommands } from './core/automation-commands';
+import type { AutomationAction } from '../shared/automation';
 
 configureWindowRendering(app);
 
@@ -163,6 +168,7 @@ let notifyTimer: ReturnType<typeof setTimeout> | undefined;
 let avatarPoll: ReturnType<typeof setInterval> | undefined;
 let updater: PortableUpdates;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
+let automation: AutomationService | undefined;
 const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
@@ -387,6 +393,20 @@ function syncHotKeys(retry = false) {
   ];
   return hotKeys.sync(settings.value, available, shortcutRecording, retry);
 }
+function prepareSettings(value: Settings) {
+  let next = parseSettings(value);
+  webApplets.validateAccounts(next.webApplets.items);
+  validateAppletSettings(next, manager.snapshot());
+  return initializeWebAppletDefaults(next, settings.value);
+}
+function commitSettings(
+  value: Settings,
+  revision: number,
+  avatar?: Uint8Array | null,
+  avatarName?: string,
+) {
+  return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
+}
 function registerIpc() {
   const updateTarget = (id?: string) => {
     if (id === undefined) return { version: app.getVersion(), repository: '5ynonym/AppDock.at365' };
@@ -417,6 +437,10 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:automation', (action: AutomationAction) => {
+    if (!automation || quitting) throw Error('連携機能の準備中です。');
+    return automation.action(action);
+  });
   handle('dock:settingsNotice', (state) => settingsNotice?.update(state));
   handle('dock:confirmDiscardSettings', async () => {
     const answer = await dialog.showMessageBox(window!, {
@@ -521,15 +545,12 @@ function registerIpc() {
   handle(
     'dock:saveSettings',
     async (value: Settings, revision: number, avatar?: Uint8Array | null, avatarName?: string) => {
-      let next = parseSettings(value);
-      webApplets.validateAccounts(next.webApplets.items);
-      validateAppletSettings(next, manager.snapshot());
-      next = initializeWebAppletDefaults(next, settings.value);
+      const next = prepareSettings(value);
       return launch.save(
         next.host,
         settings.value.host,
         () => settings.assertRevision(revision),
-        () => saveUserSettings(settings, baseDirectory, next, revision, avatar, avatarName),
+        () => commitSettings(next, revision, avatar, avatarName),
       );
     },
   );
@@ -1009,6 +1030,40 @@ async function initialize() {
   await syncHotKeys();
   await gestures.start();
   startupReady = true;
+  automation = new AutomationService({
+    localDirectory: dataDirectory,
+    baseDirectory,
+    version: app.getVersion(),
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw Error('Windowsの認証情報保護を利用できません。');
+      return safeStorage.encryptString(value).toString('base64');
+    },
+    decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+    changed,
+    audit: (level, message) => log.write(level, 'automation', message),
+    createApi: (writable, instanceId, executable) =>
+      new AutomationApi({
+        settings,
+        save: (value, revision) => {
+          try {
+            return commitSettings(prepareSettings(value), revision);
+          } catch {
+            log.write('error', 'automation', '基本設定を保存できませんでした。');
+            throw Error('設定保存失敗');
+          }
+        },
+        applets: () => automationApplets(allApplets()),
+        commands: () => automationCommands(allApplets()),
+        execute: executeCommand,
+        executable,
+        version: app.getVersion(),
+        instanceId,
+        writable,
+        ready: () => startupReady && !quitting,
+      }),
+  });
+  await automation.initialize();
   changed();
   log.write('info', 'host', 'AppDockを起動しました。');
   const updateResultFile = path.join(dataDirectory, 'update-result.json');
@@ -1243,6 +1298,7 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   void (async () => {
     for (const stop of [
+      () => automation?.close(),
       () => gestures?.close(),
       () => hotKeys?.close(),
       () => webApplets.close(),

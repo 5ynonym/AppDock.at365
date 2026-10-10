@@ -35,6 +35,7 @@ import { visibleRibbonItems, orderRibbon, type RibbonItem } from '../shared/appl
 import { RibbonSettings } from './RibbonSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { WebAccountSettings } from './WebAccountSettings';
+import { CodexSettings } from './CodexSettings';
 declare global {
   interface Window {
     dock: DockApi;
@@ -1268,6 +1269,7 @@ function SettingsPage({
     | 'about'
     | 'ribbon'
     | 'web-accounts'
+    | 'codex'
   >('category', 'appearance', [
     'appearance',
     'tray',
@@ -1278,6 +1280,7 @@ function SettingsPage({
     'about',
     'ribbon',
     'web-accounts',
+    'codex',
   ]);
   const settingsBody = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -1345,7 +1348,8 @@ function SettingsPage({
   useEffect(() => {
     if (webAccountsRequest) setCategory('web-accounts');
   }, [webAccountsRequest]);
-  const navigateSettings = () => (category === 'web-accounts' && mode === 'json') || switchToForm();
+  const navigateSettings = () =>
+    (['web-accounts', 'codex'].includes(category) && mode === 'json') || switchToForm();
   if (!active) return null;
   return (
     <>
@@ -1364,6 +1368,7 @@ function SettingsPage({
                   ['shortcuts', 'ショートカット'],
                   ['gestures', 'マウスジェスチャー'],
                   ['web-accounts', 'Webアカウント'],
+                  ['codex', 'Codex連携'],
                   ['profile', 'プロフィール'],
                   ['about', 'バージョン情報・更新'],
                 ] as const
@@ -1373,7 +1378,8 @@ function SettingsPage({
                   className={category === id ? 'selected' : ''}
                   key={id}
                   onClick={() => {
-                    if (id === 'web-accounts' || navigateSettings()) setCategory(id);
+                    if (id === 'web-accounts' || id === 'codex' || navigateSettings())
+                      setCategory(id);
                   }}
                 >
                   <span title={label}>{label}</span>
@@ -1396,7 +1402,7 @@ function SettingsPage({
       <PageHeading
         title="設定"
         action={
-          category === 'web-accounts' ? undefined : (
+          ['web-accounts', 'codex'].includes(category) ? undefined : (
             <button
               className="secondary"
               onClick={() => void run(() => window.dock.openPath('settings'))}
@@ -1408,7 +1414,7 @@ function SettingsPage({
         }
       />
       <SettingsToolbar editor={editor} busy={busy}>
-        {category !== 'web-accounts' && (
+        {!['web-accounts', 'codex'].includes(category) && (
           <div className="tabs">
             <button
               className={mode === 'form' ? 'selected' : ''}
@@ -1434,7 +1440,13 @@ function SettingsPage({
       </SettingsToolbar>
       <div className="settings-body" ref={settingsBody}>
         <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
-        {category === 'web-accounts' ? (
+        {category === 'codex' ? (
+          <div className="settings-layout">
+            <div className="settings-form">
+              <CodexSettings />
+            </div>
+          </div>
+        ) : category === 'web-accounts' ? (
           <div className="settings-layout">
             <div className="settings-form">
               <WebAccountSettings

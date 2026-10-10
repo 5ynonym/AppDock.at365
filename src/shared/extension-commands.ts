@@ -6,6 +6,12 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
   const ids = new Set(commands.map((command) => command.id));
   return commands.map((command, index) => {
     const declaration = (value as Record<string, unknown>[])[index];
+    if (declaration.automation !== undefined && typeof declaration.automation !== 'boolean')
+      throw new Error('automation はtrue / falseで指定してください。');
+    if (declaration.automation === true && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(command.id))
+      throw new Error(
+        '外部公開コマンドのIDは英数字・ピリオド・ハイフン・アンダースコアで指定してください。',
+      );
     if (
       declaration.activateOnExecute !== undefined &&
       typeof declaration.activateOnExecute !== 'boolean'
@@ -28,6 +34,9 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
     }
     return {
       ...command,
+      ...(declaration.automation !== undefined
+        ? { automation: declaration.automation as boolean }
+        : {}),
       ...(aliases !== undefined ? { aliases: aliases as string[] } : {}),
       ...(declaration.activateOnExecute !== undefined
         ? { activateOnExecute: declaration.activateOnExecute as boolean }
