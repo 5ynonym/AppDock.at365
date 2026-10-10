@@ -41,7 +41,7 @@ class SettingsStore extends EventEmitter {
   snapshot(): SettingsSnapshot {
     return { value: structuredClone(this.value), revision: this.revision, path: this.file };
   }
-  save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
+  assertRevision(revision: number) {
     // Also detect a manual edit before the file watcher has delivered it.
     const disk = validate(JSON.parse(fs.readFileSync(this.file, 'utf8').replace(/^\uFEFF/, '')));
     if (JSON.stringify(disk) !== JSON.stringify(this.value)) {
@@ -51,6 +51,9 @@ class SettingsStore extends EventEmitter {
     }
     if (revision !== this.revision)
       throw new Error('設定が別の場所で変更されました。再読み込みしてから保存してください。');
+  }
+  save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
+    this.assertRevision(revision);
     const next = validate(value);
     try {
       asset?.commit();

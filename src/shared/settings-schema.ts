@@ -24,6 +24,8 @@ export const createDefaultSettings = (): Settings => ({
     closeToTray: true,
     notifications: true,
     startMinimized: false,
+    startAtLogon: false,
+    runAsAdministrator: false,
     hardwareAcceleration: true,
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
@@ -63,6 +65,11 @@ export function parseSettings(value: unknown): Settings {
     value.host.hardwareAcceleration === undefined ? true : value.host.hardwareAcceleration;
   if (typeof hardwareAcceleration !== 'boolean')
     throw new Error('host.hardwareAcceleration は true / false です。');
+  const startAtLogon = value.host.startAtLogon ?? false;
+  const runAsAdministrator = value.host.runAsAdministrator ?? false;
+  for (const key of ['startAtLogon', 'runAsAdministrator'])
+    if (value.host[key] !== undefined && typeof value.host[key] !== 'boolean')
+      throw new Error(`host.${key} は true / false です。`);
   const trayClickCommand =
     value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
   if (!validCommandId(trayClickCommand))
@@ -233,7 +240,14 @@ export function parseSettings(value: unknown): Settings {
     updates,
     schemaVersion: value.schemaVersion,
     extensions: value.extensions,
-    host: { ...value.host, trayClickCommand, trayDoubleClickCommand, hardwareAcceleration },
+    host: {
+      ...value.host,
+      trayClickCommand,
+      trayDoubleClickCommand,
+      hardwareAcceleration,
+      startAtLogon,
+      runAsAdministrator,
+    },
     trayCommands,
     ...(trayMenu === undefined ? {} : { trayMenu }),
     shortcuts,

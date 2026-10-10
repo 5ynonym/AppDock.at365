@@ -1,5 +1,7 @@
 # AppletのためにAppDockへ機能を追加する
 
+一般設定のスタートアップ登録と管理者起動は[起動設定](launch-settings.md)を参照してください。ホスト・UIの共有設定とWindowsタスクの保存処理、UACを伴う再起動をこの仕様で管理します。
+
 AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
 
 条件付きショートカットの現行設計は[保存形式・入力判定・逐次実行](keybindings.md)を参照してください。以下の版別説明は導入時の経緯です。

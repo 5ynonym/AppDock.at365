@@ -812,6 +812,7 @@ function App() {
             <div className="settings-page" hidden={page !== 'settings'}>
               <SettingsPage
                 snapshot={snapshot.settings}
+                launch={snapshot.launch}
                 version={snapshot.version}
                 runtime={snapshot.runtime}
                 extensions={orderedApplets}
@@ -1178,6 +1179,7 @@ function ExtensionDetail({
 }
 function SettingsPage({
   snapshot,
+  launch,
   version,
   runtime,
   extensions,
@@ -1197,6 +1199,7 @@ function SettingsPage({
   active,
 }: {
   snapshot: SettingsSnapshot;
+  launch: HostSnapshot['launch'];
   version: string;
   runtime: HostSnapshot['runtime'];
   extensions: ExtensionSnapshot[];
@@ -1571,6 +1574,59 @@ function SettingsPage({
               {category === 'general' && (
                 <>
                   <h3>一般</h3>
+                  <SettingRow
+                    title="スタートアップに登録"
+                    description="Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。"
+                  >
+                    <Toggle
+                      label="スタートアップに登録"
+                      checked={draft.host.startAtLogon}
+                      disabled={!launch.supported}
+                      onChange={(v) => edit({ ...draft, host: { ...draft.host, startAtLogon: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow
+                    title="常に管理者として起動"
+                    description="次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。"
+                  >
+                    <Toggle
+                      label="常に管理者として起動"
+                      checked={draft.host.runAsAdministrator}
+                      disabled={!launch.supported}
+                      onChange={(v) =>
+                        edit({ ...draft, host: { ...draft.host, runAsAdministrator: v } })
+                      }
+                    />
+                  </SettingRow>
+                  <SettingRow
+                    title="現在の起動状態"
+                    description={
+                      launch.supported
+                        ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
+                        : '起動設定はWindowsの発行版AppDockで使用できます。'
+                    }
+                  >
+                    <div className="button-row">
+                      <button
+                        disabled={!launch.supported || busy}
+                        onClick={() => void run(() => window.dock.refreshLaunchState())}
+                      >
+                        状態を確認
+                      </button>
+                      <button
+                        disabled={!launch.supported || launch.elevated || dirty || busy}
+                        onClick={() => void run(() => window.dock.restartAsAdministrator())}
+                      >
+                        管理者として再起動
+                      </button>
+                    </div>
+                  </SettingRow>
+                  {launch.error && <p role="alert">{launch.error}</p>}
+                  {launch.supported && (
+                    <p className="muted">
+                      起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。再起動する前に、編集中の設定を保存してください。
+                    </p>
+                  )}
                   {(
                     [
                       [

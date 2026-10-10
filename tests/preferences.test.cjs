@@ -20,6 +20,8 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
     hardwareAcceleration: true,
+    startAtLogon: false,
+    runAsAdministrator: false,
   });
   assert.equal(result.shortcuts['appdock.commands.search'][0], 'Ctrl+P');
   assert.deepEqual(result.pinnedCommands, []);
