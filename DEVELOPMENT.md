@@ -1,5 +1,7 @@
 # AppDock.at365 開発ガイド
 
+0.26.34のリボン外部編集は`RibbonCommands`と共有`parseRibbon`を使います。`ribbon.get`と`appdock.ribbon.update`、独立した編集許可、無効/未導入Appletの保持は[共通操作API](docs/automation.md#リボン編集02634以降)が正本です。単体回帰は`tests/ribbon-commands.test.cjs`、GUI/MCP/Codex/再起動は`automation-ui-test.cjs`から`automation-ribbon-checks.cjs`を実行し、既存の編集画面は`ribbon-layout-ui-test.cjs`で確認します。
+
 0.26.32のショートカット外部編集と0.26.33のジェスチャー外部編集は[共通操作API](docs/automation.md)を参照してください。`ShortcutCommands`/`GestureCommands`は既存の割当検証・保存形式とSettingsCommandsのrevisionを共有します。回帰は`tests/shortcut-commands.test.cjs`/`tests/gesture-commands.test.cjs`、GUI/実キー/MCPは`scripts/automation-ui-test.cjs`（ジェスチャー編集は`automation-gesture-checks.cjs`）です。ジェスチャー物理入力の試験とは区別します。
 
 0.26.31のApplet管理コマンドは[共通操作API](docs/automation.md#applet管理02631以降)を参照してください。共通処理は`src/main/core/applet-management.ts`、登録は`src/shared/applet-management.ts`、回帰は`tests/applet-management.test.cjs`と`tests/automation.test.cjs`、実プロセス/UI/MCPは`scripts/automation-ui-test.cjs`で確認します。

@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-11: リボン外部編集のコミット前確認
+
+- 対象22ファイル・依存状態・発行物を前回証跡と照合してstage。型検査、標準255/255、固定単一EXEのMCP/GUI14群と既存リボンGUI3群を再実行し全終了0。後者はオフラインGmail fixtureを使用し、実サービス/物理マウス入力は対象外。
+- 証跡は.artifacts/commit-validation-ribbon-editing-20261011/。発行GUIはautomation-portable-1791673070574、既存GUIはribbon-layout-1791673095978。検証tree/入力/完全ログ/コマンド/終了コードとfixtureのhashを保存。検証後の変更は本記録のみ、文書差分/最終tree/commitを記録。製品・発行物は不変、ローカルコミットのみ。
+
+## 2026-10-11: リボンの外部編集（0.26.34）
+
+- 前回ジェスチャー編集をf4e4a6a5eda11d602316e6952c05e152e088992dへコミット後に実装。ribbon.get/appdock_get_ribbonとappdock.ribbon.updateで表示/非表示・上下配置・同じ配置内の順序・区切り線追加/削除・明示resetを公開。GUIの検証をparseRibbonへ抽出して共有し、保存形式と既存GUI操作は維持。
+- PC専用allowEditRibbonは初期OFF、旧設定の省略もfalse。実行/設定変更/リボン編集の3許可が必要。無効Appletも配置一覧に含め、有効化やページ表示を行わない。未導入ページIDとローカル追加フィールドは保持し、明示resetだけ未導入配置も初期化。公開結果は限定した項目だけを返す。共通revision/dryRun/原子的保存/GUI未保存draft保持/automation監査ログを継続。
+- 型検査・標準255/255成功（新規9テスト）。配置・非表示・区切り線・順序、無効/未導入ID、既存設定保持、no-op、dryRun、途中エラー時無保存、許可取消、共有revision/ディスク/再起動競合、保存失敗を検証。依存版/lockfile/toolchain不変。版更新後の依存確認は制限環境でpnpm STATUS_STACK_OVERFLOW、通常環境で同じfrozen-lockfileと供給元ポリシーを維持して成功。失敗ログも保存。
+- source GUI/MCP14群（automation-source-1791672414537）と既存リボンGUI3群（ribbon-layout-1791672435169）成功。後者は上下配置/ドラッグ/区切り線/再起動保持とオフラインGmailページを確認。前者の初回は無効化直後に描画を待たず判定して失敗したため、表示から除去されるまで待つ試験へ修正。失敗profile1791672389511保持。
+- 最終単一EXEのGUI/MCP14群成功（automation-portable-1791672743163）。実SDKによる編集/拒否/ログ、GUIからの保存をAPIで再取得、無効Appletの状態保持、dirty draftとAPIリボン変更の競合、実再起動後の配置/許可保持を確認。実Codex Desktopの隔離設定で10ツール取得とリボンdryRun成功、モデル推論なし。両テーマ1280/960/700のoverflowと画像を確認。既存ショートカット実キー順序・OS登録も成功。
+- publish終了0。0.26.34単一EXEは144051108bytes、SHA256 b1d350cfba4f22c658194bed0ad48987362e14a1a7d5894fd9e7ae2f38f3ddf1。update.json/隔離コピーと照合。証跡は.artifacts/ribbon-editing-20261011/validation.json、整形・ローカル文書リンク89件・diff確認成功。
+- 古い成功portable1791671479501のみ、成功/参照保護/最新3件/パス境界/再解析点/使用中プロセスを確認して整理。コミット証跡参照、各方式最新3件、失敗/不明資料、実行方式を記録していない旧ribbon-layout、固定出力・Release記録は保持。隔離試験プロセス残存0。
+- マウス物理入力、実サービス/認証、App Server製品組込みは今回の対象外。今回リボン実装は未コミット、push/Release/実利用deploy/全体ZIP作成なし。
+
 ## 2026-10-11: ジェスチャー外部編集のコミット前確認
 
 - 対象21ファイル・依存状態・発行物を前回証跡と照合してstage。型検査、標準246/246、固定単一EXEのMCP13群とジェスチャー編集GUI7群を再実行し全終了0。GUIはAPPDOCK_GESTURE_UI_ONLY=1で、今回変更していない物理入力フックの実入力試験は対象外。

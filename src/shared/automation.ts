@@ -5,6 +5,7 @@ export interface AutomationState {
   allowManageApplets: boolean;
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
+  allowEditRibbon: boolean;
   port: number;
   running: boolean;
   endpoint: string;
@@ -25,7 +26,8 @@ export type AutomationAction =
   | { kind: 'setExecution'; allowed: boolean }
   | { kind: 'setAppletManagement'; allowed: boolean }
   | { kind: 'setShortcutEditing'; allowed: boolean }
-  | { kind: 'setGestureEditing'; allowed: boolean };
+  | { kind: 'setGestureEditing'; allowed: boolean }
+  | { kind: 'setRibbonEditing'; allowed: boolean };
 
 export interface AutomationReply {
   state: AutomationState;

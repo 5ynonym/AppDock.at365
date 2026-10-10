@@ -50,6 +50,8 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の設定下書き/revision/全保存に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。0.18.0の既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
 
+0.26.34以降は同じ配置を外部から取得・編集できます。許可と操作形式は[共通操作APIのリボン編集](automation.md#リボン編集02634以降)を参照してください。GUIとAPIは同じ検証と設定revisionを使います。
+
 ## 検証
 
 `scripts/applet-pages-ui-test.cjs [win-unpackedのEXE]`は隔離profile・ローカルページfixture・GmailのオフラインHTTPS fixtureを使います。画面の実幅、UI/入力/remote WebContentsの同一性、ページ/Window切替、コマンド検索、背景/最小化監視、Cookie再起動保持、リボンの保存/復帰、停止時破棄を確認します。実GmailのOAuth/実受信とは区別します。単一EXEのラッパーへElectron.launchを直接使用せず、Gmailのscripts/test-portable.cjsによる通常起動後のCDP接続を使います。

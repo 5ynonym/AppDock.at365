@@ -129,3 +129,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 - ショートカットの解除はその他メニューの削除で選んだIDだけをdraftから除く。コマンド行は未割り当てとして残す。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは記録可能なキーとして維持する。
 
 - タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。
+
+## リボンの外部編集
+
+- `ribbon.get`/`appdock.ribbon.update`と既定OFFの`allowEditRibbon`を使用する。共有`parseRibbon`、revision、dryRun、原子的保存を維持し、非表示/無効Appletも配置一覧に含める。通常編集では未導入IDを保持し、明示resetだけ全配置を初期化する。編集でAppletを有効化したりページを開かない。正本は[共通操作API](docs/automation.md#リボン編集02634以降)、既存GUI仕様は[Appletページ](docs/applet-pages.md)。

@@ -5,7 +5,7 @@ import type { Settings } from './contracts';
 import { avatarReference } from './asset-names';
 import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
-import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
+import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -135,35 +135,7 @@ export function parseSettings(value: unknown): Settings {
     new Set(appletOrder).size !== appletOrder.length
   )
     throw Error('appletOrder は重複のないApplet IDの配列です。');
-  const rawRibbon = value.ribbon === undefined ? defaultRibbon() : value.ribbon;
-  const ribbon = object(rawRibbon)
-    ? {
-        ...rawRibbon,
-        bottom: rawRibbon.bottom === undefined ? [] : rawRibbon.bottom,
-        separators: rawRibbon.separators === undefined ? [] : rawRibbon.separators,
-      }
-    : rawRibbon;
-  if (
-    !object(ribbon) ||
-    ['order', 'hidden', 'bottom', 'separators'].some((key) => {
-      const ids = ribbon[key];
-      return (
-        !Array.isArray(ids) ||
-        ids.length > (key === 'separators' ? 50 : 500) ||
-        ids.some((id) => !validRibbonId(id)) ||
-        (key === 'separators' && ids.some((id) => !validSeparatorId(id))) ||
-        new Set(ids).size !== ids.length
-      );
-    })
-  )
-    throw Error('ribbon.order / hidden / bottom / separators は重複のないリボンIDの配列です。');
-  for (const key of ['order', 'hidden', 'bottom'])
-    if (
-      (ribbon[key] as string[]).some(
-        (id) => validSeparatorId(id) && !(ribbon.separators as string[]).includes(id),
-      )
-    )
-      throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
+  const ribbon = parseRibbon(value.ribbon);
   const keybindings =
     value.keybindings === undefined ? undefined : parseKeybindings(value.keybindings);
   const keybindingDefaultsInitialized =

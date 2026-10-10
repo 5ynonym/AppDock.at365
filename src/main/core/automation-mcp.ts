@@ -15,6 +15,7 @@ const names = [
   'appdock_execute_command',
   'appdock_get_shortcuts',
   'appdock_get_gestures',
+  'appdock_get_ribbon',
 ];
 const descriptions = [
   'AppDockの版・接続先・対応APIを取得します。',
@@ -26,6 +27,7 @@ const descriptions = [
   'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可、Appletの有効・無効・再起動はApplet管理許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
   'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
   'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
+  'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。コマンド実行・設定変更・リボン編集の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
 ];
 function tools() {
   return names.map((name, i) => ({
@@ -123,7 +125,7 @@ export class AutomationMcp {
         {
           capabilities: { tools: {} },
           instructions:
-            'Read settings and their revision before changing them. List public commands before executing an exact id. Setting commands require both command and settings permissions. Applet lifecycle commands require command and Applet management permissions; enable/disable persist the enabled setting, restart never enables a disabled Applet. Read shortcuts.get before editing shortcuts with appdock.shortcuts.update; command, settings and shortcut editing permissions are required. Use only assignableCommands for new assignments. Keep unrelated bindings; use stable binding IDs, expectedRevision and dryRun. A shared key executes all matching bindings in their saved order; OS registration is asynchronous and must be checked separately. Use commands.execute with args following the listed inputSchema. A settingsSaved response confirms persistence, not completion of Applet settingsChanged. lifecycleApplied reports the current enabled/state; waiting means startup is scheduled. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
+            'Read settings and their revision before changing them. List public commands before executing an exact id. Setting commands require both command and settings permissions. Applet lifecycle commands require command and Applet management permissions; enable/disable persist the enabled setting, restart never enables a disabled Applet. Read shortcuts.get before editing shortcuts with appdock.shortcuts.update; command, settings and shortcut editing permissions are required. Use only assignableCommands for new assignments. Keep unrelated bindings; use stable binding IDs, expectedRevision and dryRun. A shared key executes all matching bindings in their saved order; OS registration is asynchronous and must be checked separately. Read ribbon.get before editing with appdock.ribbon.update; command, settings and ribbon editing permissions are required. Ribbon IDs are not command IDs; disabled Applet pages retain layout without activation. Reorder includes every item in the chosen placement, including hidden and disabled pages. Reset clears retained missing-page layout too. Use commands.execute with args following the listed inputSchema. A settingsSaved response confirms persistence, not completion of Applet settingsChanged. lifecycleApplied reports the current enabled/state; waiting means startup is scheduled. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
         },
       );
       this.requests.add(sdk);

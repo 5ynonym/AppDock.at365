@@ -8,6 +8,7 @@
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
 - `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
 - `shortcut-commands.ts`: ショートカットの限定読取り、操作列の検証・原子的保存。共有keybindingsとSettingsCommandsのrevisionを使用。
+- `ribbon-commands.ts`: リボンの公開項目・配置の読取りと原子的編集。共有parseRibbonとSettingsCommandsのrevisionを使用。
 - `gesture-commands.ts`: ジェスチャーの読取り、割当操作・動作設定の一括検証と保存。共有gesturesとSettingsCommandsのrevisionを使用。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
 - `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
@@ -30,6 +31,7 @@
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
 | shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。0.26.32以降 |
+| ribbon.get | appdock_get_ribbon | 引数なし。layout/items/retainedIds/revision/warning/各許可。0.26.34以降 |
 | gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。0.26.33以降 |
 
 旧settings.patch/appdock_patch_settingsは削除しました。設定変更はすべてcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
@@ -47,11 +49,11 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
-未公開コマンドの実行/一般設定、アカウント/認証、リボン編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+未公開コマンドの実行/一般設定、アカウント/認証、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
 
 ## ジェスチャー編集（0.26.33以降）
 
-取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。MCPは計9ツールになりました。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
+取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。0.26.34ではリボン取得も含めMCPは計10ツールです。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
@@ -94,7 +96,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 ## ショートカット編集（0.26.32以降）
 
-取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.33ではジェスチャー取得を含め9件です。更新後はCodexを再読み込みしてください。
+取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.34ではジェスチャー・リボン取得を含め10件です。更新後はCodexを再読み込みしてください。
 
 読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
@@ -247,3 +249,41 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 証跡は.artifacts/automation-source-* / automation-portable-*とVERIFICATIONに記録します。ビルドをGUI検証と同時実行しません。
 
 参考: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)、[Codex設定](https://learn.chatgpt.com/docs/config-file/config-reference)、[MCP transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)。
+
+## リボン編集（0.26.34以降）
+
+取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。MCP全10ツール。更新後はCodexを再読み込みしてください。
+
+編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。Codex連携画面で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
+
+取得結果のlayoutはorder/hidden/bottom/separatorsだけ、itemsはid/title/kind（builtin/page/separator）/appletId/pageId/placement/visible/enabled/displayedです。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
+
+```json
+{
+  "id": "appdock.ribbon.update",
+  "args": {
+    "expectedRevision": "<ribbon.getで取得したrevision>",
+    "dryRun": true,
+    "operations": [
+      { "kind": "update", "id": "logs", "changes": { "visible": true, "placement": "bottom" } },
+      { "kind": "addSeparator", "id": "separator:work", "placement": "top" }
+    ]
+  }
+}
+```
+
+| kind | 引数 | 動作 |
+| --- | --- | --- |
+| update | id, changes | visible（boolean）/placement（topまたはbottom）の指定分を変更。配置変更時は移動先グループ末尾へ。現在itemsにあるIDが対象 |
+| reorder | placement, ids | 指定グループの全itemsを希望順で指定。非表示・無効ページ・区切り線も含み、retainedIdsは含めない。他グループの順序を保持 |
+| addSeparator | id, placement | 一意のseparator:stable-idを追加。英小文字/数字で開始し、その後は英小文字/数字/ハイフン、接尾部80文字まで。指定グループ末尾へ |
+| removeSeparator | id | 登録済み区切り線だけを削除し、4配列の参照も削除 |
+| reset | なし | 未導入項目の保存配置も含め初期化。order/hidden/separatorsは空、bottomはtheme/profile |
+
+operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、各配列500件、区切り線50件まで。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
+
+revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未保存draftは上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
+
+結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやリボン右クリックから戻れます。
+
+エラーはRIBBON_EDITING_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。

@@ -1063,6 +1063,7 @@ async function initialize() {
       manageable,
       shortcutsEditable,
       gesturesEditable,
+      ribbonEditable,
     ) =>
       new AutomationApi({
         settings,
@@ -1071,6 +1072,8 @@ async function initialize() {
         manageable,
         shortcutsEditable,
         gesturesEditable,
+        ribbonEditable,
+        ribbonApplets: allApplets,
         shortcutStatus: () => hotKeys?.statuses ?? [],
         save: (value, revision) => {
           try {

@@ -144,6 +144,20 @@ export function CodexSettings() {
           onChange={(allowed) => void run({ kind: 'setGestureEditing', allowed })}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <strong>リボン編集を許可する</strong>
+          <p>
+            表示・上下配置・並び順・区切り線を編集できます。設定変更とコマンド実行の許可も必要です。
+          </p>
+        </div>
+        <Toggle
+          label="Codexからのリボン編集を許可する"
+          checked={state.allowEditRibbon}
+          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
+          onChange={(allowed) => void run({ kind: 'setRibbonEditing', allowed })}
+        />
+      </div>
       <p>
         APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
       </p>
