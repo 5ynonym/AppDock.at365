@@ -249,7 +249,7 @@ async function restarted(inspectPort, predicate) {
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
     // Both source resets use the shared settings draft and preserve unrelated settings.
     const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
-    await appletCard.locator('summary').click();
+    await appletCard.locator('.applet-update-source > summary').click();
     await appletCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
     assert.equal(
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
@@ -260,7 +260,7 @@ async function restarted(inspectPort, predicate) {
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
       path.join(profile, 'sources/test.disabled'),
     );
-    await appletCard.locator('summary').click();
+    await appletCard.locator('.applet-update-source > summary').click();
     await page.getByText('更新の設定', { exact: true }).click();
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
     assert.equal(
