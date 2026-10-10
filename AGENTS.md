@@ -5,7 +5,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 ## 情報の保存先と更新
 
 - AppDock固有の作業ルール・運用上の注意・未実装の合意事項はこのファイルで管理し、共通のALICE/TOOLS.mdへ戻さない。仕様・運用・検証・発行方法に影響する変更では、このファイルと参照文書の更新要否を同じ作業で確認する。
-- 詳細仕様の入口は[DEVELOPMENT.md](DEVELOPMENT.md)。過去のTOOLS.mdにあった版別の実装経緯・検証範囲は[実装履歴](docs/implementation-history.md)に保存している。関係箇所の調査時に参照し、当時の「未実装」「未確認」を現在の状態と混同しない。
+- 詳細仕様の入口は[DEVELOPMENT.md](DEVELOPMENT.md)。版別の実装経緯・検証範囲は[実装履歴](docs/implementation-history.md)に保存している。関係箇所の調査時に参照し、当時の「未実装」「未確認」を現在の状態と混同しない。
 - 新しい実測結果・一時調査はVERIFICATION.mdへ記録する。古い版・ハッシュ・branch・権限を固定の現状として扱わず、現ソース・Git・配布物を確認する。兄弟Appletを編集するときは、そのrepoの指示と開発文書も読む。
 
 ## 開発・発行・配置の注意
@@ -108,22 +108,3 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - ショートカットの解除はその他メニューの「キーのクリア…」から確認後に選んだ行だけをdraftから除く。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは割り当て可能なキーとして残す。共通BindingActionsのremovalKindで文言を切り替え、ジェスチャーの削除確認は保持する。
 
 - タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。
-
-## PC間設定同期と登録素材（2026-10-10、0.26.14実装）
-
-- 0.26.16以降の共有フォルダー名は小文字のdata。extensionsと同じEXE隣へ置く。旧.appdockの自動改名・移行・削除は行わず、古いアバター参照の読み取り互換だけ残す。登録・新規作成・隔離fixtureはdataを使う。
-
-- 新規Appletにも同じ保存境界を適用する。共有設定はホストSettings、共有する登録原素材はEXE隣のApplet別assets、端末固有のStorage/Secrets/認証/生成キャッシュはLOCALAPPDATAのホスト管理領域を使う。追加の共有保存が必要ならホスト側の専用領域/契約で扱い、PC専用Storageの保存先を共有rootへ変更しない。プロフィール登録画像はdata/assets/profileへ置く。
-
-- 0.26.15以降のPC専用rootは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`。ユーザーの全アプリでAPPDATA/LOCALAPPDATAにはat365を挟む。hostのdataPathsとnative updaterの許可rootを同時に更新し、共有データの配置や隔離test-profileの互換性を変えない。
-
-- 正本は[設定同期](docs/settings-sync.md)。EXE隣のsettings.jsonとdata内のWebApplet枠名簿・登録素材だけを共有し、全認証/session、Gmail専用枠/選択/枠別監視/音声割当、secrets/storage/Chromium/更新journal/backup等はLOCALAPPDATA内の配置別rootへ置く。Gmail全体のsettings.json設定とは区別する。旧.appdockの自動移行・削除はユーザー指定で追加しない。旧PC専用データが残る場合は警告する。
-- ファイル名を登録元/用途別フォルダー内のIDにする。対応表/インデックスを持たず、Windowsの大文字小文字を無視した同名同内容は再利用、同名別内容は拒否する。上書き・連番生成をしない。枠削除・停止・割当解除で共有素材を自動pruneしない。Gmailの登録済み音声一覧はホストAPIから供給する。
-- 設定/名簿受信は安定bytesの検証とpollを使い、壊れた受信で直近正常値を消さない。受信を書き戻さず、dirty draft/revision保護を維持する。名簿未到着時に空の共有ファイルを自動作成しない。0.26.17以降、0枠からの明示追加は許可し、旧WebApplet参照はユーザーが選び直して保存する。直前に届いた名簿・破損ファイル・既存枠のある一時欠落は上書きしない。外部の枠削除で他PCのCookieを回収予約しない。正常設定backupはPC内20世代、復元は明示確認後に異常bytesを保管して行う。
-- ホスト画面のdock:* IPC callbackが失敗したら、同期throw/非同期rejectを共通のhandleでerrorログへ記録してから元のエラーを返す。操作名とエラーメッセージだけをログに含め、設定/認証/入力の引数を追加しない。未許可の送信元の拒否と、信頼済みホスト操作の失敗を区別する。scripts/web-account-recovery-ui-test.cjsで0枠からの再割当・再起動・画面/ファイルのログを確認する。
-- tests/settings-sync.test.cjs、registered-sounds.test.cjs、updater復旧回帰とsettings-sync-ui-test.cjsを確認する。GUIは直列で隔離し、固定単一EXEでも検証する。--test-local-stateはtest-profile専用。fixtureの2配置へのファイル配達と、実2PC/同期サービス/実Google認証の検証を区別する。実装前の調査記録はVERIFICATIONの履歴として保持する。
-
-## パスキー認証の調査時の注意（2026-10-10、未実装）
-
-- WebApplet/Gmailの通常PermissionRequest/Check全拒否だけをWebAuthn失敗の原因と断定しない。Electron 44.6.0の隔離WebContentsViewで全拒否のまま仮想resident credentialの作成/取得を実証。select-webauthn-accountが必要な経路はlistenerなしでNotAllowedError、fixture選択listenerありで成功。製品には選択処理がないが、Windows標準UIで選択済みならこのeventを通らない場合もあり、今回のWindows Hello失敗原因と断定しない。
-- ユーザーは製品変更なしの再押下と新しいアカウント枠でauth.openai.comの指紋パスキー認証成功を確認。初回は指紋画面が表示されないまま失敗画面へ遷移しており、指紋照合中の失敗と区別する。認証要求準備/WebAuthn/OS画面表示のどこで失敗したかはログなしで未特定。Gmail実認証とChrome保存パスキーの利用は別検証。Windows 24H2以降のアプリ許可、保存先、認証遷移/フォーカス/期限を切り分ける。修正する場合はホスト共通処理を検討し、通常権限の全許可や認証データの共有を追加しない。根拠/仮想試験と実認証の境界はVERIFICATIONの同日パスキー調査を参照する。
