@@ -20,6 +20,7 @@ interface LocalConfig {
   allowWrite: boolean;
   allowExecute: boolean;
   allowManageApplets: boolean;
+  allowEditShortcuts: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -49,6 +50,7 @@ export class AutomationService {
         id: string,
         executable: () => boolean,
         manageable: () => boolean,
+        shortcutsEditable: () => boolean,
       ): AutomationApi;
       changed(): void;
       audit?(level: string, message: string): void;
@@ -67,6 +69,7 @@ export class AutomationService {
       allowWrite: false,
       allowExecute: false,
       allowManageApplets: false,
+      allowEditShortcuts: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -86,6 +89,7 @@ export class AutomationService {
           typeof c.allowWrite !== 'boolean' ||
           (c.allowExecute !== undefined && typeof c.allowExecute !== 'boolean') ||
           (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
+          (c.allowEditShortcuts !== undefined && typeof c.allowEditShortcuts !== 'boolean') ||
           !Number.isInteger(c.port) ||
           c.port < 0 ||
           c.port > 65535 ||
@@ -99,6 +103,7 @@ export class AutomationService {
         c.configFile = codexConfigPath(c.configFile);
         c.allowExecute ??= false;
         c.allowManageApplets ??= false;
+        c.allowEditShortcuts ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -130,6 +135,7 @@ export class AutomationService {
       allowWrite: this.config.allowWrite,
       allowExecute: this.config.allowExecute,
       allowManageApplets: this.config.allowManageApplets,
+      allowEditShortcuts: this.config.allowEditShortcuts,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -158,6 +164,12 @@ export class AutomationService {
           this.config.enabled &&
           this.config.allowExecute &&
           this.config.allowManageApplets &&
+          !this.closed,
+        () =>
+          this.config.enabled &&
+          this.config.allowExecute &&
+          this.config.allowWrite &&
+          this.config.allowEditShortcuts &&
           !this.closed,
       ),
       () => this.token,
@@ -245,6 +257,13 @@ export class AutomationService {
           this.config.allowManageApplets = action.allowed;
           this.save();
           message = 'このPCのApplet管理許可を保存しました。';
+          break;
+        case 'setShortcutEditing':
+          if (typeof action.allowed !== 'boolean')
+            throw Error('ショートカット編集の許可が不正です。');
+          this.config.allowEditShortcuts = action.allowed;
+          this.save();
+          message = 'このPCのショートカット編集許可を保存しました。';
           break;
         case 'register':
           if (!this.server) throw Error('先に連携を有効にしてMCPを起動してください。');

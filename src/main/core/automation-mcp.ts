@@ -13,6 +13,7 @@ const names = [
   'appdock_get_applet',
   'appdock_list_commands',
   'appdock_execute_command',
+  'appdock_get_shortcuts',
 ];
 const descriptions = [
   'AppDockの版・接続先・対応APIを取得します。',
@@ -22,6 +23,7 @@ const descriptions = [
   '指定したAppletの説明・状態・エラー概要・外部公開コマンドを取得します。認証情報や全設定は含みません。',
   '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
   'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可、Appletの有効・無効・再起動はApplet管理許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
+  'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
 ];
 function tools() {
   return names.map((name, i) => ({
@@ -119,7 +121,7 @@ export class AutomationMcp {
         {
           capabilities: { tools: {} },
           instructions:
-            'Read settings and their revision before changing them. List public commands before executing an exact id. Setting commands require both command and settings permissions. Applet lifecycle commands require command and Applet management permissions; enable/disable persist the enabled setting, restart never enables a disabled Applet. Use commands.execute with args following the listed inputSchema. A settingsSaved response confirms persistence, not completion of Applet settingsChanged. lifecycleApplied reports the current enabled/state; waiting means startup is scheduled. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
+            'Read settings and their revision before changing them. List public commands before executing an exact id. Setting commands require both command and settings permissions. Applet lifecycle commands require command and Applet management permissions; enable/disable persist the enabled setting, restart never enables a disabled Applet. Read shortcuts.get before editing shortcuts with appdock.shortcuts.update; command, settings and shortcut editing permissions are required. Use only assignableCommands for new assignments. Keep unrelated bindings; use stable binding IDs, expectedRevision and dryRun. A shared key executes all matching bindings in their saved order; OS registration is asynchronous and must be checked separately. Use commands.execute with args following the listed inputSchema. A settingsSaved response confirms persistence, not completion of Applet settingsChanged. lifecycleApplied reports the current enabled/state; waiting means startup is scheduled. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
         },
       );
       this.requests.add(sdk);

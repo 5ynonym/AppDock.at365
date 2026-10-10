@@ -68,13 +68,43 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       const status = await rpc('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly' });
       const entry = status.data?.find((x) => x.name === server);
       tools = Object.keys(entry?.tools ?? {});
-      if (tools.length === 7) break;
+      if (tools.length === 8) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 7, 'Codex discovers all seven MCP tools');
+    assert.equal(tools.length, 8, 'Codex discovers all eight MCP tools');
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
+    const shortcuts = await call('appdock_get_shortcuts');
+    assert.equal(shortcuts.isError ?? false, false);
+    assert.ok(Array.isArray(shortcuts.structuredContent.bindings));
+    if (shortcuts.structuredContent.shortcutEditingAllowed) {
+      const preview = await call('appdock_execute_command', {
+        id: 'appdock.shortcuts.update',
+        args: {
+          expectedRevision: shortcuts.structuredContent.revision,
+          dryRun: true,
+          operations: [
+            {
+              kind: 'add',
+              binding: {
+                id: 'codex-validation',
+                command: 'appdock.open',
+                key: 'Ctrl+Alt+F9',
+                enabled: false,
+                when: { scope: 'app', appletIds: [] },
+              },
+            },
+          ],
+        },
+      });
+      assert.equal(preview.isError ?? false, false);
+      assert.equal(preview.structuredContent.completion, 'validated');
+      assert.deepEqual(
+        (await call('appdock_get_shortcuts')).structuredContent.bindings,
+        shortcuts.structuredContent.bindings,
+      );
+    }
     assert.equal(info.isError ?? false, false);
     const catalog = await call('appdock_list_commands');
     assert.ok(catalog.structuredContent.commands.some((c) => c.id === 'appdock.open'));
@@ -109,7 +139,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers seven MCP tools; lists commands and executes appdock.open',
+        'discovers eight MCP tools; reads shortcuts; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,

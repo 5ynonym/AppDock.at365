@@ -7,6 +7,7 @@
 - `src/main/core/automation-api.ts`: 通信に依存しない操作、公開カタログ、実行権限、引数、受付状態。
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
 - `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
+- `shortcut-commands.ts`: ショートカットの限定読取り、操作列の検証・原子的保存。共有keybindingsとSettingsCommandsのrevisionを使用。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
 - `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
@@ -27,6 +28,7 @@
 | applets.get | appdock_get_applet | id。applet（基本情報/description/runtime/errorSummary）と公開commands/executable/writable |
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
+| shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。0.26.32以降 |
 
 旧settings.patch/appdock_patch_settingsは削除しました。設定変更はすべてcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
@@ -43,7 +45,52 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
-未公開コマンド/設定、アカウント/認証、キー/ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+未公開コマンドの実行/一般設定、アカウント/認証、ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+
+## ショートカット編集（0.26.32以降）
+
+取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。MCPの読取りツールが1件増え、計8件です。更新後はCodexを再読み込みしてください。
+
+読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
+
+既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
+
+編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。allowEditShortcutsはPC専用automation.jsonに保存し、初期値/旧設定での省略時はfalse。「Codex連携」の「ショートカット編集を許可する」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
+
+```json
+{
+  "id": "appdock.shortcuts.update",
+  "args": {
+    "expectedRevision": "<shortcuts.getで取得したrevision>",
+    "dryRun": true,
+    "operations": [
+      {
+        "kind": "add",
+        "binding": {
+          "id": "custom.open-appdock",
+          "command": "appdock.open",
+          "key": "Ctrl+Alt+D",
+          "enabled": true,
+          "when": { "scope": "app", "appletIds": [] }
+        }
+      }
+    ]
+  }
+}
+```
+
+- `add`: bindingを全項目指定。IDは既存と重複しない安定ID。割当は同じキーの末尾へ追加します。
+- `update`: idとchanges。command/key/enabled/whenの一部を指定します。whenはscopeとappletIdsを一緒に指定。キーを変えると変更先キーの末尾へ移動します。
+- `remove`: idを指定。存在しないIDは拒否します。
+- `reorder`: keyとidsを指定。同じキーの全行IDを、無効な行も含めて実行順に指定します。他のキーは保持します。
+
+scopeはglobal/app/pages/owner/appletsです。appletsだけは登録済みApplet IDを1件以上指定し、他は空配列。既存の未導入対象は変更しない限り保持します。同じキーの複数割当を一律に競合扱いせず、既存の条件・実行順を使用します。同じコマンドが複数の条件で一致しても1回の押下では1回だけ実行します。
+
+operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
+
+revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未保存入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。OSへのグローバル登録は非同期なので、保存成功だけで登録成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。登録エラーは限定した説明へ置き換えます。
+
+追加エラーはSHORTCUT_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
 
 ## Applet管理（0.26.31以降）
 
