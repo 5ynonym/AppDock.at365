@@ -1196,3 +1196,7 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 同梱未公開版はGmail0.9.2とWallpaperSlideshow0.4.3。他4Appletは公開済み同版。Gmail回帰21/21とUI、Wallpaper回帰8群・RPC・限定HWNDの終了処理が成功。実認証・実メール・実壁紙・PC終了は行わない。
 - Gmail GUIの更新確認locatorを現行の共通通知/開閉詳細へ修正。途中の隔離accounts.json置換EPERMと案内待ち失敗の資料を保持し、失敗時のalert/status診断を追加。同一製品コードの最終全GUIは成功。一過性のファイル競合の原因は未特定で、製品への試験用回避は追加していない。
 - 新リリースノートに前回公開0.26.11以降の入力UI/起動/保存先/ログ変更をまとめ、最低ホスト版を含むAppletノートも確認。公開操作・新配布物の検証結果はRelease planへ記録する。
+
+- 配布物試験で確認結果のsummary追加により更新元設定のlocatorが曖昧になったため、portable-updates-ui-testの2箇所を`.applet-update-source > summary`へ限定。製品コード変更なし。単一EXE更新/再起動11群、更新進捗/取消4群、更新復旧、全6Applet入りZIPの整合/展開起動が成功。新配布版のGmail UIとWallpaperのfixture/実nativeログ表示も成功。
+- テスト修正後に型検査と標準回帰198/198を再実行して成功。完全ログと入力tree/hashは`.artifacts/commit-release-0.26.25-20261011/test-fix-evidence.json`。最終記録の追加だけを後続差分として保存し、新planで配布物を生成・再検証する。最初の失敗planとログは保持。
+- テストフォルダーの候補を3repoで列挙し、成功292件と成功未確定408件を記録。今回の直近成功分、失敗/不明、固定配布物、過去の再利用/Release証跡は保持。過去分は方式/再利用依存を確定できないものを削除せず、今回の追加削除は0。候補監査は同証跡のcleanup-audit.json。最終配布物の確認結果・終了確認もRelease記録へ追記する。
