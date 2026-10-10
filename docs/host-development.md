@@ -1,5 +1,7 @@
 # AppletのためにAppDockへ機能を追加する
 
+0.26.17以降、ホスト画面のdock:* IPC操作失敗は共通handleでerrorログに記録する。同期throwと非同期rejectの両方を捕捉して元のエラーを返し、ログページとPC専用host.logへ操作名・エラーメッセージを残す。IPCの引数（設定・認証値・入力内容）は追加しない。送信元/Frame/URL検証はcallback呼び出し前に維持する。
+
 0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 一般設定のスタートアップ登録と管理者起動は[起動設定](launch-settings.md)を参照してください。ホスト・UIの共有設定とWindowsタスクの保存処理、UACを伴う再起動をこの仕様で管理します。

@@ -396,7 +396,7 @@ function registerIpc() {
     return { version: manifest.version, repository: manifest.updateRepository };
   };
   const handle = (channel: string, callback: (...args: any[]) => unknown) =>
-    ipcMain.handle(channel, (event, ...args) => {
+    ipcMain.handle(channel, async (event, ...args) => {
       if (
         !window ||
         event.sender !== window.webContents ||
@@ -404,7 +404,17 @@ function registerIpc() {
         event.senderFrame?.url !== hostDocumentUrl
       )
         throw new Error('許可されていない画面からの要求です。');
-      return callback(...args);
+      try {
+        return await callback(...args);
+      } catch (error) {
+        // Record the operation and error, never its settings/authentication arguments.
+        log.write(
+          'error',
+          'host',
+          `${channel}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
     });
   handle('dock:snapshot', snapshot);
   handle('dock:settingsNotice', (state) => settingsNotice?.update(state));

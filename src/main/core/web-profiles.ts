@@ -95,8 +95,12 @@ export class WebProfileStore {
     if (!result) throw Error('Webアカウント枠がありません。');
     return { ...result };
   }
-  private unchanged() {
-    if (!fs.existsSync(this.file) && this.settings?.value.webApplets.items.length)
+  private unchanged(allowEmptyInitialization = false) {
+    if (
+      !allowEmptyInitialization &&
+      !fs.existsSync(this.file) &&
+      this.settings?.value.webApplets.items.length
+    )
       throw Error('Webアカウント一覧の同期を待っています。枠が届いてから操作してください。');
     if (
       JSON.stringify(this.read()) !==
@@ -106,8 +110,8 @@ export class WebProfileStore {
         'Webアカウントが別の場所で変更されました。一覧の同期を待ってから操作してください。',
       );
   }
-  private save(next: WebProfile[], pending = this.pending) {
-    this.unchanged();
+  private save(next: WebProfile[], pending = this.pending, allowEmptyInitialization = false) {
+    this.unchanged(allowEmptyInitialization);
     const validated = parseWebProfiles(next);
     const text =
       JSON.stringify(
@@ -132,7 +136,9 @@ export class WebProfileStore {
   }
   add(rawName: unknown) {
     const account = { id: `account.${randomUUID()}`, name: webProfileName(rawName) };
-    this.save([...this.value, account]);
+    // A deliberate add can recover an empty roster left behind by old settings.
+    // Still re-read any delivered file before saving; never initialize at startup.
+    this.save([...this.value, account], this.pending, this.value.length === 0);
     return { ...account };
   }
   rename(id: unknown, rawName: unknown) {
