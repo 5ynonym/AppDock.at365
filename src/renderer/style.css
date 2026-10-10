@@ -3595,6 +3595,110 @@ summary {
 .applet-shortcut-dialog::backdrop {
   background: #080b1266;
 }
+.gesture-settings-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  background: var(--panel);
+}
+.gesture-settings-state {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.gesture-settings-state p,
+.gesture-input-hint,
+.gesture-condition-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.gesture-settings-state p {
+  margin: 5px 0 0;
+}
+.gesture-settings-card .gesture-options {
+  padding: 14px 0 0;
+  margin: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.gesture-settings-card summary small {
+  color: var(--muted);
+  font-weight: normal;
+  margin-left: 10px;
+}
+.gesture-family-picker,
+.gesture-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+.gesture-family-picker button,
+.gesture-choice-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+}
+.gesture-family-picker button {
+  font-size: 12px;
+}
+.gesture-family-picker button > span {
+  font-size: 20px;
+}
+.gesture-choice-grid button {
+  min-height: 92px;
+}
+.gesture-choice-grid button > span {
+  font-size: 30px;
+  line-height: 1;
+}
+.gesture-choice-click,
+.gesture-choice-wheel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.gesture-family-picker button[aria-pressed='true'],
+.gesture-choice-grid button[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.gesture-condition-hint {
+  display: block;
+  margin-top: 8px;
+}
+.gesture-processes {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.gesture-processes textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  border-radius: 8px;
+}
+.gesture-processes small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.gesture-binding-dialog .shortcut-capture-label {
+  margin-top: 18px;
+}
 .applet-shortcut-dialog header {
   display: flex;
   align-items: flex-start;

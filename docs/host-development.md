@@ -214,6 +214,6 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 0.26.22から設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
 
-BindingActionsのショートカットメニューは編集・このキーの実行順と即時削除（confirmDelete=false）。ジェスチャーは引き続き複製と確認付き削除、同入力内の並べ替え、CommandPalette選択を使います。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を共用します。ジェスチャー表の固定colgroup/列幅と内部スクロールは維持します。
+0.26.24から設定ジェスチャーも全コマンド一覧へ統一し、CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用します。ShortcutCommandList/ShortcutOrderDialogはキー用、GesturesEditor/GestureOrderDialogはジェスチャー用の保存処理と表示を渡します。AppletShortcutDialogとGestureBindingDialogは入力と条件を構成し、キー記録はShortcutCaptureFieldを共用します。両方のメニューは編集・同入力の実行順・即時削除（confirmDelete=false）。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を維持します。条件の差異と全体設定は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル02624)を参照してください。
 
 詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。
