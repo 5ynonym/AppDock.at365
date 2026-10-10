@@ -8,7 +8,8 @@ export interface AutomationCommand {
   available: boolean;
   unavailableReason: string | null;
   completion: 'accepted' | 'handlerReturned' | 'settingsSaved' | 'lifecycleApplied';
-  permission?: 'settings.write' | 'applets.manage' | 'shortcuts.write' | 'gestures.write';
+  permission?:
+    'settings.write' | 'applets.manage' | 'shortcuts.write' | 'gestures.write' | 'ribbon.write';
   inputSchema?: Record<string, unknown>;
 }
 export interface AutomationApplet {

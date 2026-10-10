@@ -22,6 +22,7 @@ interface LocalConfig {
   allowManageApplets: boolean;
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
+  allowEditRibbon: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -53,6 +54,7 @@ export class AutomationService {
         manageable: () => boolean,
         shortcutsEditable: () => boolean,
         gesturesEditable: () => boolean,
+        ribbonEditable: () => boolean,
       ): AutomationApi;
       changed(): void;
       audit?(level: string, message: string): void;
@@ -73,6 +75,7 @@ export class AutomationService {
       allowManageApplets: false,
       allowEditShortcuts: false,
       allowEditGestures: false,
+      allowEditRibbon: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -92,6 +95,7 @@ export class AutomationService {
           typeof c.allowWrite !== 'boolean' ||
           (c.allowExecute !== undefined && typeof c.allowExecute !== 'boolean') ||
           (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
+          (c.allowEditRibbon !== undefined && typeof c.allowEditRibbon !== 'boolean') ||
           (c.allowEditGestures !== undefined && typeof c.allowEditGestures !== 'boolean') ||
           (c.allowEditShortcuts !== undefined && typeof c.allowEditShortcuts !== 'boolean') ||
           !Number.isInteger(c.port) ||
@@ -109,6 +113,7 @@ export class AutomationService {
         c.allowManageApplets ??= false;
         c.allowEditShortcuts ??= false;
         c.allowEditGestures ??= false;
+        c.allowEditRibbon ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -142,6 +147,7 @@ export class AutomationService {
       allowManageApplets: this.config.allowManageApplets,
       allowEditShortcuts: this.config.allowEditShortcuts,
       allowEditGestures: this.config.allowEditGestures,
+      allowEditRibbon: this.config.allowEditRibbon,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -182,6 +188,12 @@ export class AutomationService {
           this.config.allowExecute &&
           this.config.allowWrite &&
           this.config.allowEditGestures &&
+          !this.closed,
+        () =>
+          this.config.enabled &&
+          this.config.allowExecute &&
+          this.config.allowWrite &&
+          this.config.allowEditRibbon &&
           !this.closed,
       ),
       () => this.token,
@@ -269,6 +281,12 @@ export class AutomationService {
           this.config.allowManageApplets = action.allowed;
           this.save();
           message = 'このPCのApplet管理許可を保存しました。';
+          break;
+        case 'setRibbonEditing':
+          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          this.config.allowEditRibbon = action.allowed;
+          this.save();
+          message = 'このPCのリボン編集許可を保存しました。';
           break;
         case 'setGestureEditing':
           if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');

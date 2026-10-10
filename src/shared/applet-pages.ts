@@ -142,3 +142,39 @@ export function pageDisplay(
     settings.extensions[extensionId]?.pages?.[page.id]?.display ?? page.defaultDisplay ?? 'page'
   );
 }
+
+/** Shared validation for GUI settings saves and external ribbon edits. */
+export function parseRibbon(value: unknown): Settings['ribbon'] {
+  const object = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === 'object' && !Array.isArray(v);
+  const rawRibbon = value === undefined ? defaultRibbon() : value;
+  const ribbon = object(rawRibbon)
+    ? {
+        ...rawRibbon,
+        bottom: rawRibbon.bottom === undefined ? [] : rawRibbon.bottom,
+        separators: rawRibbon.separators === undefined ? [] : rawRibbon.separators,
+      }
+    : rawRibbon;
+  if (
+    !object(ribbon) ||
+    ['order', 'hidden', 'bottom', 'separators'].some((key) => {
+      const ids = ribbon[key];
+      return (
+        !Array.isArray(ids) ||
+        ids.length > (key === 'separators' ? 50 : 500) ||
+        ids.some((id) => !validRibbonId(id)) ||
+        (key === 'separators' && ids.some((id) => !validSeparatorId(id))) ||
+        new Set(ids).size !== ids.length
+      );
+    })
+  )
+    throw Error('ribbon.order / hidden / bottom / separators は重複のないリボンIDの配列です。');
+  for (const key of ['order', 'hidden', 'bottom'])
+    if (
+      (ribbon[key] as string[]).some(
+        (id) => validSeparatorId(id) && !(ribbon.separators as string[]).includes(id),
+      )
+    )
+      throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
+  return ribbon as Settings['ribbon'];
+}

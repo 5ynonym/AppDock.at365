@@ -451,6 +451,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
       manageable,
       shortcutsEditable,
       gesturesEditable,
+      ribbonEditable,
     ) =>
       new AutomationApi({
         ...f.options,
@@ -460,6 +461,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
         manageable,
         shortcutsEditable,
         gesturesEditable,
+        ribbonEditable,
       }),
   };
   const service = new AutomationService(options);
@@ -469,6 +471,8 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(service.state().allowManageApplets, false);
   assert.equal(service.state().allowEditShortcuts, false);
   assert.equal(service.state().allowEditGestures, false);
+  assert.equal(service.state().allowEditRibbon, false);
+  await service.action({ kind: 'setRibbonEditing', allowed: true });
   await service.action({ kind: 'setGestureEditing', allowed: true });
   await service.action({ kind: 'setShortcutEditing', allowed: true });
   await service.action({ kind: 'setAppletManagement', allowed: true });
@@ -482,11 +486,13 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   delete legacyConfig.allowManageApplets;
   delete legacyConfig.allowEditShortcuts;
   delete legacyConfig.allowEditGestures;
+  delete legacyConfig.allowEditRibbon;
   fs.writeFileSync(localConfigFile, JSON.stringify(legacyConfig));
   const legacyService = new AutomationService(options);
   assert.equal(legacyService.state().allowManageApplets, false);
   assert.equal(legacyService.state().allowEditShortcuts, false);
   assert.equal(legacyService.state().allowEditGestures, false);
+  assert.equal(legacyService.state().allowEditRibbon, false);
   await legacyService.close();
   await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
   let s = service.state();
@@ -548,7 +554,14 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 10);
+  assert.equal(tools.find((t) => t.name === 'appdock_get_ribbon').annotations.readOnlyHint, true);
+  assert.ok(
+    Array.isArray(
+      (await client.callTool({ name: 'appdock_get_ribbon', arguments: {} })).structuredContent
+        .items,
+    ),
+  );
   assert.equal(tools.find((t) => t.name === 'appdock_get_gestures').annotations.readOnlyHint, true);
   assert.ok(
     Array.isArray(
@@ -654,6 +667,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(restarted.state().allowManageApplets, true);
   assert.equal(restarted.state().allowEditShortcuts, true);
   assert.equal(restarted.state().allowEditGestures, true);
+  assert.equal(restarted.state().allowEditRibbon, true);
   const conflict = new AutomationService({
     ...options,
     localDirectory: path.join(f.base, 'other-local'),
