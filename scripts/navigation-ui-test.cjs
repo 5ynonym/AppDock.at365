@@ -320,65 +320,48 @@ const checks = [];
     await detailTab('設定').click();
     await button('ショートカットキー').click();
     await page.getByRole('heading', { name: 'ショートカットキー', exact: true }).waitFor();
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 0);
+    assert.equal(await page.locator('.applet-shortcuts tbody tr').count(), 0);
     checks.push('no settings / no commands / inline shortcuts');
     await button('設定').click();
     await chooseApplet('検証Applet 00');
     await button('ショートカットキー').click();
 
     await chooseApplet('Welcome to your Dock');
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
-    await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).press('Control+p');
-    assert.equal(
-      await page.getByText('同じキーの割り当てあり（条件一致時に実行）', { exact: true }).count(),
-      0,
-    );
-    await page
-      .getByRole('group', { name: 'ショートカットの絞り込み' })
-      .getByRole('button', { name: '登録エラー', exact: true })
-      .click();
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 0);
-    await page
-      .getByRole('group', { name: 'ショートカットの絞り込み' })
-      .getByRole('button', { name: 'すべて', exact: true })
-      .click();
-    await page
-      .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
-      .press('Control+Alt+r');
-    await page
-      .getByRole('group', { name: 'ショートカットの絞り込み' })
-      .getByRole('button', { name: '割り当て済み', exact: true })
-      .click();
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 1);
-    const statusButtons = page.getByRole('group', { name: 'ショートカットの絞り込み' });
-    const unassigned = statusButtons.getByRole('button', { name: '未設定', exact: true });
-    await unassigned.focus();
-    await unassigned.press('Space');
-    assert.equal(await unassigned.getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 2);
-    await statusButtons.getByRole('button', { name: 'すべて', exact: true }).click();
-    assert.equal(await page.locator('.keybindings-table tbody tr').count(), 3);
-    await save();
+    await detailTab('ショートカット').click();
+    assert.equal(await page.locator('.applet-shortcuts tbody tr').count(), 3);
+    assert.equal(await page.locator('.applet-shortcuts input').count(), 0);
     await button('設定').click();
     await button('ショートカット').click();
-    await page.locator('.command-id[title="未確認のコマンド"]').first().waitFor();
+    await page
+      .getByRole('button', { name: 'ウェルカムを更新に割り当てを追加', exact: true })
+      .click();
+    const shortcutDialog = page.locator('.applet-shortcut-dialog');
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog
+      .getByRole('button', { name: 'ショートカットキーを入力', exact: true })
+      .press('Control+Alt+r');
+    await shortcutDialog.getByRole('button', { name: '追加', exact: true }).click();
+    await save();
     assert.equal(await page.locator('.settings-applet-list').count(), 0);
-    assert.equal(
-      await page.locator('.shortcut-group-heading h3').first().textContent(),
-      'AppDock7件',
-    );
-    assert.equal(
-      await page.locator('[data-shortcut-owner="appdock"] .keybindings-table tbody tr').count(),
-      7,
-    );
+    assert(await page.locator('.shortcuts-editor kbd').filter({ hasText: 'Ctrl+Alt+R' }).count());
+    await page.getByLabel('ショートカットの絞り込み').selectOption('conflict');
+    assert.equal(await page.locator('.shortcuts-editor tbody tr').count(), 0);
+    await page.getByLabel('ショートカットの絞り込み').selectOption('all');
+    assert(await page.locator('[data-shortcut-command^="appdock."]').count());
     checks.push(
-      'owner scope / cross-applet shared keys / status filters / unknown commands / host keys',
+      'Applet overview / command-first addition / flat catalog / error filter / host keys',
     );
     await page.evaluate(() => window.dock.toggleExtension('appdock.welcome', false));
     await chooseApplet('Welcome to your Dock');
+    await detailTab('ショートカット').click();
+    await button('設定').click();
+    await button('ショートカット').click();
     await page.getByText('現在利用できません', { exact: false }).first().waitFor();
     assert.equal(
-      await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).inputValue(),
+      await page
+        .getByRole('button', { name: 'ウェルカムを更新のCtrl+Alt+Rを編集', exact: true })
+        .locator('kbd')
+        .innerText(),
       'Ctrl+Alt+R',
     );
     await page.evaluate(() => window.dock.toggleExtension('appdock.welcome', true));
@@ -428,27 +411,30 @@ const checks = [];
       'JSONから共通編集',
     );
     await button('変更を破棄して再読み込み').click();
-    await chooseApplet('Welcome to your Dock');
-    await button('Appletに戻る').click();
-    await detailTab('設定').click();
-    await button('ショートカットキー').click();
-    await page
-      .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
-      .press('Control+Alt+w');
     await button('設定').click();
+    await button('ショートカット').click();
+    await page
+      .getByRole('button', { name: 'ウェルカムを更新のCtrl+Alt+Rを編集', exact: true })
+      .click();
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog
+      .getByRole('button', { name: 'ショートカットキーを入力', exact: true })
+      .press('Control+Alt+w');
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await chooseApplet('Welcome to your Dock');
-    await button('ショートカットキー').click();
-    assert.equal(
-      await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).inputValue(),
-      'Ctrl+Alt+W',
+    await detailTab('ショートカット').click();
+    assert(
+      await page
+        .locator('.applet-shortcuts kbd')
+        .allTextContents()
+        .then((keys) => keys.includes('Ctrl+Alt+W')),
     );
     await button('変更を破棄して再読み込み').click();
-    await button('Appletに戻る').click();
-    await detailTab('設定').click();
-    await button('ショートカットキー').click();
-    assert.equal(
-      await page.getByLabel('ウェルカムを更新のショートカット 1', { exact: true }).inputValue(),
-      'Ctrl+Alt+R',
+    assert(
+      await page
+        .locator('.applet-shortcuts kbd')
+        .allTextContents()
+        .then((keys) => keys.includes('Ctrl+Alt+R')),
     );
     await button('設定').click();
     checks.push(
@@ -658,12 +644,14 @@ const checks = [];
       );
       await button('ショートカットキー').click();
       await chooseApplet('Welcome to your Dock');
+      await button('設定').click();
+      await button('ショートカット').click();
       for (const width of [1280, 900, 700]) {
         await page.setViewportSize({ width, height: 620 });
-        const search = await page.getByLabel('ショートカットのコマンドを検索').boundingBox();
-        const statusGroup = page.getByRole('group', { name: 'ショートカットの絞り込み' });
+        const search = await page.locator('.command-shortcut-search').boundingBox();
+        const statusGroup = page.getByLabel('ショートカットの絞り込み');
         const status = await statusGroup.boundingBox();
-        assert.equal(await statusGroup.locator('[aria-pressed="true"]').count(), 1);
+        assert.equal(await statusGroup.inputValue(), 'all');
         assert.equal(search.y, status.y, 'search and status filter share one row');
         assert.equal(search.height, status.height, 'filter controls have equal height');
         assert(search.x + search.width < status.x, 'filter controls do not overlap');

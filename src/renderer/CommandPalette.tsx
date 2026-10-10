@@ -13,6 +13,7 @@ export function CommandPalette({
   mode = 'execute',
   onChoose,
   onClose,
+  selectionDescription,
 }: {
   commands: UiCommand[];
   pins?: string[];
@@ -22,6 +23,7 @@ export function CommandPalette({
   mode?: 'execute' | 'select';
   onChoose(command: UiCommand): void;
   onClose(): void;
+  selectionDescription?(command: UiCommand): string;
 }) {
   const [query, setQuery] = useState(''),
     [index, setIndex] = useState(0),
@@ -46,7 +48,7 @@ export function CommandPalette({
       void window.dock.setShortcutRecording(true).catch((e) => setError(String(e)));
     return () => {
       if (mode === 'select') void window.dock.setShortcutRecording(false);
-      if (previous?.isConnected) previous.focus();
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, [mode]);
   useEffect(() => {
@@ -157,6 +159,7 @@ export function CommandPalette({
                       {!c.available && <span> · Applet起動後に利用できます</span>}
                       {pinned && <span className="pin-badge">PINNED</span>}
                     </small>
+                    {selectionDescription && <small>{selectionDescription(c)}</small>}
                   </div>
                   {shortcuts[c.id]?.[0] && <kbd>{shortcuts[c.id][0]}</kbd>}
                 </button>

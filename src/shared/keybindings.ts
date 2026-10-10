@@ -187,27 +187,85 @@ export function getKeybindings(
     settings.keybindings ?? migrateKeybindings(settings.shortcuts, settings.globalShortcutCommands)
   );
 }
-/** Reorder the visible provider's slots, preserving other providers' dispatch positions. */
-export function moveKeybindingInGroup(
-  rows: Keybinding[],
-  id: string,
-  target: string,
-  groupForCommand: (command: string) => string,
-) {
-  const row = rows.find((row) => row.id === id),
-    to = rows.find((row) => row.id === target);
-  if (!row || !to || groupForCommand(row.command) !== groupForCommand(to.command)) return rows;
-  const group = groupForCommand(row.command);
-  const members = rows.filter((item) => groupForCommand(item.command) === group);
-  const fromIndex = members.indexOf(row),
-    toIndex = members.indexOf(to);
-  members.splice(fromIndex, 1);
-  members.splice(toIndex, 0, row);
-  let index = 0;
-  return rows.map((item) => (groupForCommand(item.command) === group ? members[index++] : item));
-}
 export function defaultKeybindings() {
   return migrateKeybindings(defaultShortcuts, defaultGlobalShortcutCommands);
+}
+
+/** Group display is derived; never sort the stored dispatch array to render it. */
+export function keybindingGroups(rows: Keybinding[]) {
+  const groups = new Map<string, Keybinding[]>();
+  for (const row of rows) {
+    const key = normalizeShortcut(row.key);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+  return [...groups].sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }));
+}
+
+export function moveKeybindingWithinKey(rows: Keybinding[], id: string, target: string) {
+  const source = rows.find((row) => row.id === id);
+  const destination = rows.find((row) => row.id === target);
+  if (!source || !destination) return rows;
+  const key = normalizeShortcut(source.key);
+  if (normalizeShortcut(destination.key) !== key) return rows;
+  const members = rows.filter((row) => normalizeShortcut(row.key) === key);
+  const from = members.indexOf(source),
+    to = members.indexOf(destination);
+  if (from === to) return rows;
+  members.splice(from, 1);
+  members.splice(to, 0, source);
+  let index = 0;
+  return rows.map((row) => (normalizeShortcut(row.key) === key ? members[index++] : row));
+}
+
+export function appendKeybinding(rows: Keybinding[], binding: Keybinding) {
+  const key = normalizeShortcut(binding.key);
+  const last = rows.reduce(
+    (index, row, current) => (normalizeShortcut(row.key) === key ? current : index),
+    -1,
+  );
+  const index = last < 0 ? rows.length : last + 1;
+  return [...rows.slice(0, index), { ...binding, key }, ...rows.slice(index)];
+}
+
+export function changeKeybindingKey(rows: Keybinding[], id: string, value: string) {
+  const row = rows.find((row) => row.id === id);
+  if (!row) return rows;
+  const key = normalizeShortcut(value);
+  if (normalizeShortcut(row.key) === key) return rows;
+  return appendKeybinding(
+    rows.filter((item) => item.id !== id),
+    { ...row, key },
+  );
+}
+
+export function changeKeybindingCommand(
+  row: Keybinding,
+  command: { id: string; extensionId?: string | null },
+): Keybinding {
+  return {
+    ...row,
+    command: command.id,
+    when:
+      row.when.scope === 'owner' && !command.extensionId
+        ? { scope: 'app', appletIds: [] }
+        : row.when,
+  };
+}
+
+export function keybindingConditionLabel(
+  when: Keybinding['when'],
+  ownerTitle: string | undefined,
+  applets: { id: string; title: string }[],
+) {
+  if (when.scope === 'owner') return ownerTitle ?? '提供元不明';
+  if (when.scope === 'applets')
+    return (
+      when.appletIds
+        .map((id) => applets.find((applet) => applet.id === id)?.title ?? `未導入: ${id}`)
+        .join(' / ') || 'Applet未選択'
+    );
+  return shortcutScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
 }
 /** Legacy fields are derived display/compatibility data once keybindings exists. */
 export function withKeybindings(settings: Settings, rows: Keybinding[]): Settings {

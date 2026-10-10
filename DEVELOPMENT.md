@@ -171,7 +171,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 トレイの設定・再起動後の保持・実Trayのメニューとイベント・停止時の扱いは`dev.bat run test:tray`、GPU設定のON→OFF→ONと再起動後のElectron実状態は`dev.bat run test:hardware-acceleration`で検証します。GPU無効化はElectronの初期化前に行います。
 
-リボンの上寄せ/下寄せ・セパレーターと既存設定の移行は[Appletページとリボン](docs/applet-pages.md)を参照してください。隔離GUIは`scripts/ribbon-layout-ui-test.cjs`、本体ショートカットは「設定 → ショートカット」の先頭のAppDockグループで編集します。Applet個別設定/キー編集は詳細上部の独立したタブへ集約します。表示順・共有編集は[ホスト開発ガイド](docs/host-development.md#appletの表示順)、隔離GUIは`scripts/applet-order-ui-test.cjs`を参照してください。
+リボンの上寄せ/下寄せ・セパレーターと既存設定の移行は[Appletページとリボン](docs/applet-pages.md)を参照してください。隔離GUIは`scripts/ribbon-layout-ui-test.cjs`、本体ショートカットは「設定 → ショートカット」のコマンド一覧で編集します。Applet個別設定/キー編集は詳細上部の独立したタブへ集約します。表示順・共有編集は[ホスト開発ガイド](docs/host-development.md#appletの表示順)、隔離GUIは`scripts/applet-order-ui-test.cjs`を参照してください。
 
 0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
@@ -191,16 +191,20 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 0.25.0の[保存形式・判定・検証](docs/keybindings.md)を参照してください。全画面の入力とWindowsホットキーをホスト共通の条件判定/逐次実行へ集約します。新規割り当ては提供元条件を既定にし、本体コマンドはapp条件にします。
 
+0.26.22の[ショートカット画面の設計](docs/shortcut-ui-redesign.md)を参照してください。設定ページの全コマンド一覧とApplet詳細で一覧・小さな編集パネルを共用し、検索/状態フィルターと追加時の表示位置を保持します。
+
 ## マウスジェスチャー
 
 本体の入力プロセス、設定移行、コマンド文脈・取消、試験は[マウスジェスチャー](docs/gestures.md)を参照してください。
 
-ショートカット/マウスジェスチャーの共通操作UIは[割り当て操作UI](docs/host-development.md#割り当て操作uiの共用)を参照してください。scripts/shortcuts-ui-test.cjsはメニュー/保存/ドラッグ/両方の列幅とdark/light全3幅を検証し、単一EXEのパスを引数で渡すと隔離コピーをCDPで検証します。
+ショートカット/マウスジェスチャーの共通操作UIは[割り当て操作UI](docs/host-development.md#割り当て操作uiの共用)を参照してください。scripts/shortcuts-ui-test.cjsは全コマンド/フィルター/メニュー/保存/登録エラー/両画面のdark/light全3幅を検証し、単一EXEのパスを引数で渡すと隔離コピーをCDPで検証します。
 
-同じGUIで、長短のグループ名を含む全表の列位置/幅と、ショートカットのグループ内採番・検索中の番号保持も照合します。
+同じGUIで、未割り当てとキーの左端、複数割り当て、検索中のコマンド一覧、保存済みの実行順が変わらないことも照合します。
 
-正常時の表示抑制とfocus/blur前後の行高/行位置、隔離した2つの実ホストによるWindows登録競合、記録中のエラー絞り込み/表示保持と再試行成功後の解消も確認します。
+隔離した2つの実ホストによるWindows登録競合、記録中のエラー絞り込み/表示保持と再試行成功後の解消も確認します。
 
-ショートカットのクリア確認/キャンセル、停止中Appletの無効行を解除して保存/再起動後も解除を保つこと、他の割り当ての保持、Deleteキーを記録できることも同じGUIで確認します。
+`scripts/hotkeys-ui-test.cjs`は実Windows入力で登録・競合・解除とnative Appletの実行を確認します。実利用中のPause/F23/F24を避ける場合は`APPDOCK_HOTKEY_TEST_ISOLATED=1`で隔離fixtureだけをF16/F20/Ctrl+Alt+F9へ変更します。試験キーが空いていることを事前に確認し、実利用設定を変更しません。
+
+ショートカットの即時削除と保存前の破棄による復元、停止中Appletの無効行を解除して保存/再起動後も解除を保つこと、他の割り当ての保持、Deleteキーを記録できることも同じGUIで確認します。
 
 タスクトレイの保存形式・移行・編集UI・一時停止コマンドと検証は[タスクトレイ仕様](docs/tray-menu.md)を参照してください。

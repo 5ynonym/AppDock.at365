@@ -74,23 +74,29 @@ async function waitPins(page, pins) {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+,');
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    await page
-      .getByLabel('コマンドを検索のショートカット 1', { exact: true })
-      .press('Control+Alt+p');
-    await page
-      .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
-      .press('Control+Alt+p');
+    const setShortcut = async (commandId, key) => {
+      const row = page.locator(`.shortcuts-editor [data-shortcut-command="${commandId}"]`);
+      const existing = row.locator('.applet-shortcut-edit').first();
+      const adding = !(await existing.count());
+      if (adding) await row.getByRole('button', { name: /に割り当てを追加/ }).click();
+      else await existing.click();
+      const panel = page.locator('.applet-shortcut-dialog');
+      await panel.getByText('押して入力', { exact: true }).waitFor();
+      await panel.getByRole('button', { name: 'ショートカットキーを入力', exact: true }).press(key);
+      await panel.getByLabel('割り当てのいつ・どこで').selectOption('app');
+      await panel.getByRole('button', { name: adding ? '追加' : '適用', exact: true }).click();
+    };
+    await setShortcut('appdock.commands.search', 'Control+Alt+p');
+    await setShortcut('appdock.welcome.refresh', 'Control+Alt+p');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByText('すべて保存されています', { exact: true }).waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
         'appdock.commands.search'
-      ][0],
-      'Ctrl+Alt+P',
+      ].includes('Ctrl+Alt+P'),
+      true,
     );
-    await page
-      .getByLabel('ウェルカムを更新のショートカット 1', { exact: true })
-      .press('Control+Alt+r');
+    await setShortcut('appdock.welcome.refresh', 'Control+Alt+r');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByRole('status').filter({ hasText: '設定を保存' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
@@ -111,9 +117,7 @@ async function waitPins(page, pins) {
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.keyboard.press('Control+,');
-    await page
-      .getByLabel('.NET拡張の状態を更新のショートカット 1', { exact: true })
-      .press('Control+Alt+d');
+    await setShortcut('appdock.dotnet-demo.refresh', 'Control+Alt+d');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     const before = (await page.evaluate(() => window.dock.snapshot())).extensions
       .find((e) => e.id === 'appdock.dotnet-demo')

@@ -1099,3 +1099,53 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 固定EXEの従来2配置同期GUI11項目も成功（settings-sync-ui-1791617905884/result.json）。ログ記録によるdirty保存拒否・正常backup/破損起動・共有枠/素材・Gmail個別枠等の挙動を維持。実2PC/同期サービス/実ログインは未確認、LOCALAPPDATAをfixture内へ隔離。
 - publish.bat終了0。最終EXE0.26.17は142527632bytes、SHA256 ee7ad7302691926e801b686eb190ff7f8e901fba3a7776c3cdb2f8d05a2cf1c8。feed/梱包59ファイル/updater一致、182ローカルリンク確認（web-account-recovery-final-check.json）。旧全体ZIP不変、未変更Appletの再発行なし。
 - 完了時整理: recovery成功はsource/portable各1回、従来2配置portable-production-path成功3回を保持。失敗/方式不明/認証・再利用資料/固定ビルド/Release記録を保持し削除0。前の継続依頼の範囲で本修正をAppDockへコミットする。push/Release/実利用deploy/同期設定変更なし。
+
+## 2026-10-10 ショートカット画面の再設計（0.26.19）
+
+- 設定ページをキー別グループへ変更。同キー内の保存順を表示番号・上下操作・ドラッグに揃え、他キーの保存位置を保持。未割り当てのコマンド行を撤去し、未知/無効/停止中の保存済み割り当てを保持。検索/登録エラーはグループ全行表示。
+- 上部はキー/特殊キー/条件の入力後にコマンドを選択し、同キー末尾へ追加。グループ追加はコマンドの既定条件を使用。追加後は入力・絞り込み・表示位置を保持し、元ボタンへpreventScrollでfocusを戻す。4項目メニュー、条件プレビュー付きコマンド変更、確認付き削除を実装。
+- Applet詳細は独立した表示専用一覧。宣言/動的カタログ順、キーと条件の組、未割り当て/無効/利用不可、互換別名の割り当てを表示。共有draftへ追従し、一括初期化を含む編集操作を撤去。組み込みWebApplet管理のテンプレートは維持。
+- 型検査/build/変更コードのPrettier/差分検査成功。関連回帰25/25（keybindings、dynamic-commands、applet-order、gestures）。標準回帰全体は今回の実装段階では未実行。文書ローカルリンク125件の存在を確認。
+- ソースGUI成功: shortcuts-ui-1791642534882（7群）、applet-order-1791642624600（4群）、applet-default-shortcuts-1791642627712（3項目）、keybindings-1791642639367（10群）、navigation-1791642774093（17群）、gestures-ui-1791642873291（編集UI4群）、ribbon-layout-1791642875831（3群）。Windowsグローバル実入力/登録競合・再試行、Applet Web/Gmailオフライン本文、共有draft/JSON/競合/破棄、両テーマ/3幅を含む。実メール認証・全IME/キーボード配列は未検証。
+- 初回Electronはsandbox内のプロセス起動拒否で停止し、通常権限の隔離profileで成功。旧試験の再起動期待値と停止中の非宣言コマンドの表示先を新仕様に修正して最終成功。通常ジェスチャー試験gestures-ui-1791642840196は入力先HWNDを前面化できず停止。製品の入力処理は変更せず、既存APPDOCK_GESTURE_UI_ONLY=1で今回影響する編集UIを確認。物理ジェスチャー入力は今回未確認として区別する。
+- publish.bat終了0。本体単一EXEは142522091 bytes、SHA256 `e11b923b947f86d1ae2dc97a96d3be2242f542f29da179ca3312438302dfc41f`。update.jsonの0.26.19/size/hashと一致。既存all-in-one-0.26.11.zipはsize/hash不変、未変更Applet再発行/新全体ZIP/commit/push/Release/deployなし。
+- 固定発行単一EXEの隔離コピーでshortcuts-ui-1791643039848の7群成功。同キーの跨提供元移動、上部/グループから連続追加して表示位置とfocus保持、条件変更プレビュー、キー移動とDelete記録、空グループ消去、Appletの複数ペア/無効/互換別名、両テーマ/1280・900・700px、保存/再起動を確認。EXEコピーのSHA256は発行物と一致。追加フォームとApplet一覧のスクリーンショットを目視確認。
+- 発行/型検査/関連回帰/固定EXEのログと成果物照合は`.artifacts/shortcut-redesign-20261010/`、各GUIのresult.jsonは上記profile内。旧試験の失敗/起動不明資料は保持。
+- 完了時整理: 方式と成功が確認できるsource/UI-onlyの古いgestures-ui-1791555815134だけ削除（3891583 bytes）。絶対パス/配下reparseなし/現旧パスprocess参照なし/関連processのcommandline取得/全ファイル排他openを確認。直近成功3回を保持。他方式の不明資料・過去配布版/再利用資料・Release/固定ビルドは保持。cleanup-audit.json/cleanup-result.jsonに記録。
+
+## 2026-10-11 Appletショートカットの編集パネル（0.26.20）
+
+- 既存の提供元コマンド順一覧へ＋、キー/条件ペアの編集、編集/確認付き削除メニューを追加。小さなnative dialogでキーキャップ表示、Ctrl/Alt/Shiftと特殊キーの選択、条件、有効状態を編集する。適用は共有draftへ反映、保存は既存toolbar。Applet画面に実行順操作/導線は追加しない。
+- 新規はowner/有効、追加とキー変更は同キー末尾。空キー/対象0件の適用を拒否、元行が外部更新されたら上書きしない。取消で変更を残さず、追加後の表示位置と操作元focusを保持。dialog中はglobal登録と画面ショートカットを抑止し、終了時に復帰する。Tabは移動、Escapeは取消、Enter/Delete等は記録欄ではキー入力として扱う。
+- 型検査/build/変更コードPrettier/git diff --check、文書ローカルリンク124件成功。関連回帰19/19（keybindings/dynamic-commands/applet-order）成功。標準全回帰は未実行。
+- ソースGUI: shortcuts-ui-1791644537426の10群、navigation-1791644544867の17群、applet-default-shortcuts-1791644871267の3項目、applet-order-1791644872131の4群成功。キー記録/特殊キー/対象選択/無効状態/取消/外部更新拒否/共有draft保存/削除確認/連続追加/実行順保持/再起動、両テーマ3幅、既存設定とジェスチャー編集の列境界を確認。
+- 初回sandbox Electron起動失敗は通常Windowsの隔離profileで解消。版更新後のsandbox pnpm自動依存確認がstack overflowしリンク生成が中断、通常Windowsでdev.bat install --frozen-lockfileを実行して固定依存を復元。lockfile/依存版を変更せず、型検査/整形/通常publishを再実行し成功。失敗ログも保持。
+- publish.bat終了0、単一EXE0.26.20は142534752 bytes、SHA256 b309ca51e3dcf13d5b734c5d062a01e60c776cdf24e87a7bd019921dc5f12fcd。update.jsonと一致。固定EXEコピーのshortcuts-ui-1791644835150の10群成功、コピーhash一致。最終EXEの編集パネルを目視確認。旧all-in-one-0.26.11.zipはsize/hash不変、未変更Applet再発行なし。
+- 全IME/キーボード配列、実サイト認証、物理ジェスチャーは今回未検証。製品の保存形式/dispatcher/入力フックは変更しない。commit/push/Release/実利用deployなし。
+- 証跡は.artifacts/applet-shortcut-edit-20261010（開始時の日付）に型検査/回帰/publish/GUIログ/成果物照合/文書リンク/整理監査を保存。試験プロセス終了確認済み、既知のソースshortcuts最新3件を保持。旧版/再利用検証・方式不明・失敗・固定ビルド/Release記録を保護し、追加の安全な削除候補はなく削除0。
+
+## 2026-10-11 Applet一覧の左寄せと即時削除（0.26.21）
+
+- 割り当てペアのbuttonに残っていた共通justify-content:centerをflex-startへ上書きし、左右paddingを揃えて未割り当てとキーの左端を統一。
+- AppletShortcutOverviewのBindingActionsだけconfirmDelete=falseを指定し、削除を選ぶと対象IDを共有draftから直接除く。保存前は全体破棄で復元できる。設定ページとジェスチャーの確認動作は既定値trueで保持。
+- 型検査/build/整形/差分検査成功、文書リンク43件成功。低影響のUI変更のため標準単体全回帰は再実行せず、発行した固定EXEのshortcuts-ui-1791645381775で10群を検証。左端座標の一致、確認dialogなしの削除、保存前の破棄による復元、連続削除・保存再起動、既存の設定ページ確認、両テーマ3幅が成功。Applet一覧のスクリーンショットを目視確認。
+- publish.bat終了0。単一EXE0.26.21は142518132 bytes、SHA256 72785c150c80343f124db51595a74d69550ce5e453b8c72e2d90ee673ded5fa6。feedと検証コピー一致、旧全体ZIP hash不変。証跡は.artifacts/applet-shortcut-polish-20261011。
+- 完了時整理は試験終了を確認しportable最新3件（1791645381775/1791644835150/1791643039848）を保持。旧版/再利用/方式不明/失敗資料を保護して削除0。未変更Applet再発行/commit/push/Release/deployなし。
+
+## 2026-10-11 設定ショートカットを全コマンド一覧へ統一（0.26.22）
+
+- 設定ページを未割り当ても含むフラットなコマンド一覧へ変更。AppletとShortcutCommandList/編集dialogを共用し、提供元・ID・複数のキー/条件・無効状態を表示。停止中/未確認の保存済みコマンドと割り当て済み互換別名も保持。キー別グループ、上部追加フォーム、実行順操作を撤去した。
+- 検索/割り当て状態/件数/解除を一覧の見た目に揃えた。＋から追加、ペアから編集、確認なしの削除を共有draftへ反映し、既存toolbarで保存する。追加後の自動スクロールなし。条件変更は既存順序を維持、追加/キー変更は同キー末尾。フィルターで削除行が消えた場合は一覧へfocusを戻す。登録エラーの表示・再試行と入力中の表示キャッシュを維持。
+- 型検査/build/整形/差分検査成功。keybindings/dynamic-commands/applet-orderの関連回帰19/19成功。標準全回帰は今回未実行。従来UIセレクターを更新したhotkeys/preferencesのスクリプトは構文・整形確認のみで、実GUIは今回未実行。文書ローカルリンク126件の存在を確認。
+- ソースGUI: shortcuts-ui-1791646130507の7群、navigation-1791645939592の17群、applet-order-1791645882978の4群、keybindings-1791645886142の10群、ribbon-layout-1791645896744の3群が成功。全コマンド/未割り当て/検索/複数ペア/既定条件/追加・変更・即時削除/共有draft・破棄/実行順の保持/保存再起動、Windows実入力と登録競合・再試行、Applet Web/Gmailオフライン本文を確認。実サービス認証、全IME/キーボード配列、物理ジェスチャーは今回未検証。
+- publish.bat終了0。固定単一EXE 0.26.22は142531222 bytes、SHA256 `ba07c8fdd84549614e2538f2ad50e567c15d035f2ea75ae2c079a2d22ca63817`。update.jsonの版/size/hashと一致。固定EXEの隔離コピーshortcuts-ui-1791646515381の7群成功、コピーhash一致。設定一覧とApplet編集を両テーマ/1280・900・700pxで確認し、最終EXEのdark900/light700画像を目視確認。既存all-in-one-0.26.11.zipはsize/hash不変。
+- 初回固定EXE試験shortcuts-ui-1791646427423は、競合用の別hostを閉じた後に対象Windowが非アクティブのままCDPで編集を開き、一時停止assertが失敗。hostは非アクティブ時のキー記録を意図的に拒否する。試験で既存appdock.openから対象を前面へ戻すよう修正し、同一hashのEXEで再実行成功。製品のfocus/入力ガードを変更せず、失敗記録も保持。ソース試験の曖昧な検索語と旧UIラベルのassertも新仕様へ修正して成功。
+- 証跡: `.artifacts/shortcut-command-list-20261011/`に型検査/回帰/GUI/publishログ、成果物照合、文書リンク、整理監査を保存。完了時整理では成功済み中間sourceのshortcuts-ui-1791644461438だけ削除（12244169 bytes）。絶対パス/配下reparseなし/process参照なし/全ファイル排他openを確認。source/portable各直近成功3件を保持し、旧版再利用・方式不明・失敗・固定ビルド・Release記録は保護。未変更Applet再発行/commit/push/Release/実利用deployなし。
+## 2026-10-11 ショートカット再設計のコミット前検証（0.26.22）
+
+- 対象は0.26.19〜0.26.22の設定/Appletショートカット再設計と関連仕様・試験（33ファイル）。本体/SDK/保存領域/依存版への追加変更なし。型検査、標準dev.bat testの194/194、変更コードのPrettier、差分検査が最終ステージ済みtree `5cafdb13f22e250f8dd27c47e72aca06b49bc76b`で成功。検証後の追加差分は本記録のみ。
+- GUIは直列・隔離profileでpreferences7群、hotkeys9群、navigation17群、applet-order4群、applet-default-shortcuts3項目、keybindings10群、ribbon-layout3群、gestures編集4群、固定EXE shortcuts7群を確認。各結果と全ログは`.artifacts/commit-validation-shortcuts-20261011/`。標準回帰の再ビルド前後でGUI対象のout内容は同一。初期値試験の整形修正後は当該GUIも再確認した。
+- hotkeysの旧fixtureはApplet状態を先に保存したため初期割り当てが追加されなかった。初回インストールの初期化を適用してから有効状態を設定するよう試験だけ修正。実利用中のPause等と競合するため、既存登録を維持したまま隔離fixtureをF16/F20/Ctrl+Alt+F9へ変更する明示モードを追加。実Windows入力、native Watch実行、登録競合と再試行、記録中停止、条件切替、Applet停止/再開、終了後解放が成功。Pauseそのものの実入力試験は実施せず、初回/競合失敗ログを保持。
+- ジェスチャーは共通メニュー/パレットのUI変更範囲をAPPDOCK_GESTURE_UI_ONLY=1で確認。入力フックは変更しておらず、物理ジェスチャーは今回のコミット検証対象外。実サイト認証・全IME/キーボード配列も未検証として区別。
+- 確認済みpublishの0.26.22を再梱包せず、固定EXEのshortcuts-ui-1791646977579で編集/保存再起動/両テーマ3幅を再確認。142531222bytes、SHA256 `ba07c8fdd84549614e2538f2ad50e567c15d035f2ea75ae2c079a2d22ca63817`はfeedとコピーに一致。製品ソース/配布物は動作確認後の内容を維持。
+- Node24.21.0/pnpm12.10.1、OS/.NET、検証tree、コマンド・終了コード・ログhash、Watch/Gmailの依存commitと使用fixture hashを上記証跡へ記録。現在の検証を将来再利用する際は最終treeと証跡を照合する。試験プロセス終了を確認し、最新3件/今回の再利用証跡/旧版・不明・失敗資料を保持、追加削除0。commitのみ実施し、push/Release/deployなし。

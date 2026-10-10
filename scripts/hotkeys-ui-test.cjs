@@ -12,7 +12,19 @@ for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
     path.join(root, '../Applet.Watch.at365/publish/Applet.Watch.at365', name),
     path.join(clockFolder, name),
   );
-const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+const isolatedKeys = process.env.APPDOCK_HOTKEY_TEST_ISOLATED === '1';
+const initialKey = isolatedKeys ? 'F16' : 'Pause';
+const remapKey = isolatedKeys ? 'F20' : 'F24';
+const backgroundKey = isolatedKeys ? 'Ctrl+Alt+F9' : 'F23';
+const manifestPath = path.join(clockFolder, 'extension.json');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+manifest.defaultKeybindings[0].key = initialKey;
+fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+// Initialize a new installation before adding its enabled state to settings.
+const settings = require('../out/main/shared/keybindings.js').initializeExtensionDefaults(
+  require('../out/main/shared/settings-schema.js').createDefaultSettings(),
+  [manifest],
+);
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: true } };
 settings.host.notifications = false;
 require('../tests/fixtures/install.cjs')(profile, settings);
@@ -22,6 +34,9 @@ const checks = [];
 let application;
 let contender;
 function send(key) {
+  const parts = key.split('+');
+  const base = parts.at(-1);
+  const virtualKey = base === 'Pause' ? 0x13 : 0x6f + Number(base.slice(1));
   const result = spawnSync(
     'powershell.exe',
     [
@@ -31,7 +46,9 @@ function send(key) {
       '-File',
       path.join(root, 'scripts/send-test-hotkey.ps1'),
       '-VirtualKey',
-      String(key),
+      String(virtualKey),
+      ...(parts.includes('Ctrl') ? ['-Control'] : []),
+      ...(parts.includes('Alt') ? ['-Alt'] : []),
     ],
     { windowsHide: true, encoding: 'utf8' },
   );
@@ -60,8 +77,8 @@ async function until(check, message) {
         (status) => status.shortcut === key && status.registered,
       );
     await until(
-      () => registered('Pause'),
-      'Pause registration failed; check whether another app owns Pause.',
+      () => registered(initialKey),
+      `Registration failed for ${initialKey}; check whether another app owns the test key.`,
     );
     const visible = async () =>
       (await snapshot()).settings.value.extensions['at365.watch'].settings.visible;
@@ -71,7 +88,7 @@ async function until(check, message) {
       assert.fail,
       () => {},
     );
-    assert.equal((await contender.sync(['Pause']))[0].registered, false);
+    assert.equal((await contender.sync([initialKey]))[0].registered, false);
     checks.push('second Windows host cannot register an occupied Pause');
 
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
@@ -81,12 +98,12 @@ async function until(check, message) {
       ),
       false,
     );
-    send(0x13);
+    send(initialKey);
     await until(
       async () => (await visible()) === false,
       'Hidden AppDock did not toggle Watch off.',
     );
-    send(0x13);
+    send(initialKey);
     await until(async () => (await visible()) === true, 'Hidden AppDock did not toggle Watch on.');
     checks.push('Windows Pause toggles Watch both ways while AppDock is hidden');
     await application.evaluate(({ BrowserWindow }) => {
@@ -98,34 +115,43 @@ async function until(check, message) {
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
     await page.getByLabel('ショートカットのコマンドを検索').fill('at365.watch.toggle');
     const row = page.locator('[data-shortcut-command="at365.watch.toggle"]');
-    const input = row.locator('[data-shortcut-recorder]');
-    assert.equal(await input.inputValue(), 'Pause');
+    await row.locator('.applet-shortcut-edit').click();
+    const shortcutDialog = page.locator('.applet-shortcut-dialog');
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    const input = shortcutDialog.getByRole('button', {
+      name: 'ショートカットキーを入力',
+      exact: true,
+    });
+    assert.equal(await input.innerText(), initialKey);
     assert.equal(
-      (await row.getByRole('switch', { name: /割り当てを有効/ }).getAttribute('aria-checked')) ===
-        'true',
+      (await shortcutDialog.getByRole('switch').getAttribute('aria-checked')) === 'true',
       true,
     );
     await input.focus();
-    await until(async () => !(await registered('Pause')), 'Recorder did not release Pause.');
-    send(0x13);
+    await until(async () => !(await registered(initialKey)), 'Recorder did not release Pause.');
+    send(initialKey);
     assert.equal(await visible(), true);
-    send(0x87);
+    send(remapKey);
     await until(
-      async () => (await input.inputValue()) === 'F24',
+      async () => (await input.innerText()) === remapKey,
       'Recorder did not capture single F24.',
     );
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(() => registered('F24'), 'F24 remapping did not register.');
-    assert.equal((await contender.sync(['Pause']))[0].registered, true);
+    await until(() => registered(remapKey), 'F24 remapping did not register.');
+    assert.equal((await contender.sync([initialKey]))[0].registered, true);
     checks.push('recording suspends Pause; single F24 remapping releases Pause');
 
-    await row.getByRole('button', { name: /その他の操作/ }).click();
-    await page.getByRole('menuitem', { name: '既定に戻す', exact: true }).click();
+    await row.locator('.applet-shortcut-edit').click();
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog.getByRole('button', { name: '特殊キーから選ぶ' }).click();
+    await shortcutDialog.getByRole('button', { name: initialKey, exact: true }).click();
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
         (await snapshot()).globalHotKeys.some(
-          (status) => status.shortcut === 'Pause' && !!status.error,
+          (status) => status.shortcut === initialKey && !!status.error,
         ),
       'Conflict status not displayed.',
     );
@@ -133,62 +159,73 @@ async function until(check, message) {
     await page.screenshot({ path: path.join(profile, 'conflict.png') });
     await contender.sync([]);
     await row.getByRole('button', { name: '登録を再試行', exact: true }).click();
-    await until(() => registered('Pause'), 'Pause retry after conflict failed.');
+    await until(() => registered(initialKey), 'Pause retry after conflict failed.');
     checks.push('conflict appears in settings; retry button registers after release');
-    send(0x13);
+    send(initialKey);
     await until(async () => (await visible()) === false, 'Focused AppDock did not toggle Watch.');
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(await visible(), false);
     checks.push('focused AppDock executes global key once');
 
-    await row.locator('select[aria-label*="いつ・どこで"]').selectOption('app');
+    await row.locator('.applet-shortcut-edit').click();
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog.getByLabel('割り当てのいつ・どこで').selectOption('app');
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(async () => !(await registered('Pause')), 'Global opt-out did not release Pause.');
-    assert.equal((await contender.sync(['Pause']))[0].registered, true);
+    await until(
+      async () => !(await registered(initialKey)),
+      'Global opt-out did not release Pause.',
+    );
+    assert.equal((await contender.sync([initialKey]))[0].registered, true);
     await contender.sync([]);
-    await row.getByRole('button', { name: /その他の操作/ }).click();
-    await page.getByRole('menuitem', { name: '既定に戻す', exact: true }).click();
+    await row.locator('.applet-shortcut-edit').click();
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog.getByLabel('割り当てのいつ・どこで').selectOption('global');
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(() => registered('Pause'), 'Default restore did not restore global Pause.');
+    await until(() => registered(initialKey), 'Global scope did not restore Pause.');
     await page.screenshot({ path: path.join(profile, 'registered.png') });
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', false));
-    await until(async () => !(await registered('Pause')), 'Applet stop did not release Pause.');
-    assert.equal((await contender.sync(['Pause']))[0].registered, true);
+    await until(async () => !(await registered(initialKey)), 'Applet stop did not release Pause.');
+    assert.equal((await contender.sync([initialKey]))[0].registered, true);
     await contender.sync([]);
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', true));
-    await until(() => registered('Pause'), 'Applet reactivation did not register Pause.');
-    checks.push('global opt-out/default restore and Applet stop/restart update registration');
-    await page.evaluate(async () => {
-      const snapshot = await window.dock.snapshot();
-      const value = snapshot.settings.value;
-      value.keybindings = value.keybindings.filter(
-        (row) =>
-          !['appdock.commands.search', 'appdock.welcome.verify-storage'].includes(row.command),
-      );
-      value.keybindings.push(
-        ...[
-          ['appdock.commands.search', 'F24'],
-          ['appdock.welcome.verify-storage', 'F23'],
-        ].map(([command, key]) => ({
-          id: crypto.randomUUID(),
-          command,
-          key,
-          enabled: true,
-          when: { scope: 'global', appletIds: [] },
-        })),
-      );
-      await window.dock.saveSettings(value, snapshot.settings.revision);
-    });
-    await until(() => registered('F24'), 'Host command did not register globally.');
-    await until(() => registered('F23'), 'TypeScript command did not register globally.');
+    await until(() => registered(initialKey), 'Applet reactivation did not register Pause.');
+    checks.push('global opt-out/scope restore and Applet stop/restart update registration');
+    await page.evaluate(
+      async ([remapKey, backgroundKey]) => {
+        const snapshot = await window.dock.snapshot();
+        const value = snapshot.settings.value;
+        value.keybindings = value.keybindings.filter(
+          (row) =>
+            !['appdock.commands.search', 'appdock.welcome.verify-storage'].includes(row.command),
+        );
+        value.keybindings.push(
+          ...[
+            ['appdock.commands.search', remapKey],
+            ['appdock.welcome.verify-storage', backgroundKey],
+          ].map(([command, key]) => ({
+            id: crypto.randomUUID(),
+            command,
+            key,
+            enabled: true,
+            when: { scope: 'global', appletIds: [] },
+          })),
+        );
+        await window.dock.saveSettings(value, snapshot.settings.revision);
+      },
+      [remapKey, backgroundKey],
+    );
+    await until(() => registered(remapKey), 'Host command did not register globally.');
+    await until(() => registered(backgroundKey), 'TypeScript command did not register globally.');
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
-    send(0x86);
+    send(backgroundKey);
     await until(
       async () =>
         (await snapshot()).logs.some((entry) => entry.message.includes('Storage / Secrets API')),
       'Background TypeScript command did not execute.',
     );
-    send(0x87);
+    send(remapKey);
     await page.getByRole('dialog', { name: 'コマンドパレット' }).waitFor();
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
@@ -200,11 +237,20 @@ async function until(check, message) {
     await application.close();
     application = undefined;
     await until(
-      async () => (await contender.sync(['Pause']))[0].registered,
+      async () => (await contender.sync([initialKey]))[0].registered,
       'Shutdown did not release Pause.',
     );
     checks.push('AppDock shutdown releases Windows registration');
-    const result = { ok: true, profile, checks };
+    const result = {
+      ok: true,
+      profile,
+      initialKey,
+      remapKey,
+      backgroundKey,
+      checks: checks.map((check) =>
+        check.replaceAll('Pause', initialKey).replaceAll('F24', remapKey),
+      ),
+    };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } finally {

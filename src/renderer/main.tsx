@@ -793,15 +793,12 @@ function App() {
                             </div>
                           ) : (
                             <AppletSettingsPanel
-                              extensions={orderedApplets}
                               applets={orderedApplets.map((e) => ({
                                 id: e.id,
                                 title: e.displayName,
                               }))}
                               applet={selectedApplet}
                               editor={editor}
-                              commands={shortcutCommands}
-                              globalHotKeys={snapshot.globalHotKeys}
                               tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
                               webAccounts={snapshot.webAccounts}
                               onWebAccounts={() => {
@@ -1536,7 +1533,6 @@ function SettingsPage({
               )}
               {category === 'shortcuts' && (
                 <ShortcutsEditor
-                  extensions={extensions}
                   key={category}
                   commands={commands}
                   settings={draft}

@@ -7,12 +7,14 @@ export function BindingActions({
   onDuplicate,
   onDelete,
   removalKind = 'delete',
+  confirmDelete = true,
   extraActions = [],
 }: {
   label: string;
   onDuplicate?(): void;
   onDelete?(): void;
-  removalKind?: 'delete' | 'clear-key';
+  removalKind?: 'delete' | 'clear-key' | 'binding';
+  confirmDelete?: boolean;
   extraActions?: { title: string; onClick(): void; disabled?: boolean }[];
 }) {
   const [stage, setStage] = useState<'menu' | 'confirm' | null>(null);
@@ -151,8 +153,22 @@ export function BindingActions({
                   </button>
                 )}
                 {onDelete && (
-                  <button role="menuitem" className="danger" onClick={() => setStage('confirm')}>
-                    {removalKind === 'clear-key' ? 'キーのクリア…' : '削除…'}
+                  <button
+                    role="menuitem"
+                    className="danger"
+                    onClick={() => {
+                      if (confirmDelete) setStage('confirm');
+                      else {
+                        close(false);
+                        onDelete();
+                      }
+                    }}
+                  >
+                    {removalKind === 'clear-key'
+                      ? 'キーのクリア…'
+                      : removalKind === 'binding'
+                        ? '削除'
+                        : '削除…'}
                   </button>
                 )}
               </>
@@ -161,7 +177,9 @@ export function BindingActions({
                 <p id={`${id}-message`}>
                   {removalKind === 'clear-key'
                     ? 'このキーの割り当てをクリアしますか？'
-                    : 'この割り当てを削除しますか？'}
+                    : removalKind === 'binding'
+                      ? 'このキーの割り当てを削除しますか？ コマンド自体は削除されません。'
+                      : 'この割り当てを削除しますか？'}
                 </p>
                 <button onClick={() => setStage('menu')}>キャンセル</button>
                 <button

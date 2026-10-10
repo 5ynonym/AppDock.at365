@@ -60,7 +60,7 @@ window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
-Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイルを使います。幅はAppで一度だけ呼ぶ`useAppletSidebar`の状態と既存の`appdock.applet-sidebar-width`で共有し、各画面で独立した幅を持たせません。設定一覧はportalでshellの左パネルへ表示しますが、SettingsPage自体は画面移動時も保持して未保存のdraftを失わないようにします。ショートカットの検索と状態フィルターは`.shortcut-filters`で一行にそろえ、表示領域不足時のみ折り返します。状態フィルターは排他的な4つのボタンで、選択状態を`aria-pressed`へ反映します。`scripts/applet-sidebar-ui-test.cjs`と`scripts/navigation-ui-test.cjs`で共通幅・再起動・編集保持・絞り込みとキーボード操作・両テーマと狭い画面の配置を確認できます。
+Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイルを使います。幅はAppで一度だけ呼ぶ`useAppletSidebar`の状態と既存の`appdock.applet-sidebar-width`で共有し、各画面で独立した幅を持たせません。設定一覧はportalでshellの左パネルへ表示しますが、SettingsPage自体は画面移動時も保持して未保存のdraftを失わないようにします。ショートカットの検索と状態フィルターは`.shortcut-filters`で一行にそろえ、表示領域不足時のみ折り返します。状態フィルターは「すべて／登録エラー」の排他的な2つのボタンで、選択状態を`aria-pressed`へ反映します。`scripts/applet-sidebar-ui-test.cjs`と`scripts/navigation-ui-test.cjs`で共通幅・再起動・編集保持・絞り込みとキーボード操作・両テーマと狭い画面の配置を確認できます。
 
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
@@ -194,7 +194,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 - `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
 
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
-- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて既存`AppletSettings`/`ShortcutsEditor`を描画します。設定ページのApplet別一覧と本体専用ショートカット入口は削除し、全体一覧にグループを表示します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
+- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて`AppletSettings`/`AppletShortcutOverview`（専用のAppletShortcutDialogで追加・編集）を描画します。設定ページはShortcutsEditorで全コマンドを平坦に表示します。両方がShortcutCommandListとAppletShortcutDialogを共用します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
 - `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
 - JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
 - 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
@@ -203,7 +203,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 - `shared/applet-order.ts`は保存ID順に既存Appletを並べ、未登録の新規Appletは発見順で末尾へ置きます。不在IDを表示せず、新しい並べ替えでもそのIDは保存配列に保持します。WebAppletも同じ一覧に含みます。既存JSONのappletOrder未指定は空配列で補い、重複・不正ID・500件超を拒否します。
 - `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。共有draftを更新し、保存/破棄は他の未保存設定も含みます。不正JSON・revision競合・保存失敗時に下書きを上書きしません。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
-- rendererのApplet一覧・ホームカード・設定ページのショートカットグループと対象Applet候補に同じ順を使います。グループはAppDock→Applet順→未確認コマンド。検索/割り当て状態で絞り込みます。実行順の番号と上下操作は元keybindings配列を使い、表示順で実行順・起動順・ribbon.orderを変更しません。
+- rendererのApplet一覧・ホームカード・対象Applet候補に同じ順を使います。ショートカットのコマンド一覧はカタログ順で独立し、実行順操作を置きません。Applet表示順で実行順・起動順・ribbon.orderを変更しません。
 - 検証は`tests/applet-order.test.cjs`、`scripts/applet-order-ui-test.cjs`と既存navigation/default-shortcuts/WebApplet UI試験で行います。
 
 ## コマンドパレットの共用
@@ -212,6 +212,8 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 ## 割り当て操作UIの共用
 
-各グループの表は共通colgroupと固定レイアウトを使い、順番64px/有効52px/入力180px/条件200px/その他48px、コマンド列は残り幅とします。グループ名は表の外で折り返し、長いコマンド表示で列幅を変えません。最小720pxの表を内部スクロールさせ、設定ページ全体の横方向overflowを防ぎます。GUIでは短い/長いグループ名を含む全表の列座標と幅を照合します。
+0.26.22から設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
 
-ShortcutsEditor/GesturesEditorは共通Toggle・CommandPaletteのselectモード・BindingActions.tsxとgesture-table系スタイルを使います。BindingActionsは任意の追加操作と複製/削除コールバックを受け取り、portal位置補正・外側クリック/スクロール/Escape・無効項目を除くキーボード移動・削除確認を共用します。両方の末尾列を細く固定し、入力列が使える幅を確保します。行頭ハンドルのショートカット並べ替えは保存配列の同じ提供元の位置だけを入れ替え、Applet表示順と分けます。共有draft/JSON/revision/saveの所有者はuseSettingsEditorのままです。詳細は[keybindings](keybindings.md#マウスジェスチャーと共通の編集ui)、専用GUIはscripts/shortcuts-ui-test.cjsを参照してください。
+BindingActionsのショートカットメニューは編集と即時削除（confirmDelete=false）。ジェスチャーは引き続き複製と確認付き削除、同入力内の並べ替え、CommandPalette選択を使います。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を共用します。ジェスチャー表の固定colgroup/列幅と内部スクロールは維持します。
+
+詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。
