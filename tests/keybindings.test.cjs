@@ -11,7 +11,11 @@ const {
   initializeExtensionDefaults,
   initializeWebAppletDefaults,
   resetAppletKeybindings,
-  moveKeybindingInGroup,
+  moveKeybindingWithinKey,
+  keybindingGroups,
+  appendKeybinding,
+  changeKeybindingKey,
+  changeKeybindingCommand,
 } = require('../out/main/shared/keybindings');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
 const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys');
@@ -23,31 +27,24 @@ const row = (id, command, scope = 'app', appletIds = []) => ({
   when: { scope, appletIds },
 });
 
-test('provider drag changes dispatch order within its slots and rejects cross-provider drops', () => {
+test('same-key moves cross providers, retain other-key slots and control dispatch order', () => {
   const rows = [
     row('a1', 'a.first'),
+    { ...row('other', 'b.other'), key: 'F2' },
     row('b1', 'b.first'),
     row('a2', 'a.second'),
-    row('b2', 'b.second'),
   ];
-  const owners = new Map([
-    ['a.first', 'a'],
-    ['a.second', 'a'],
-    ['b.first', 'b'],
-    ['b.second', 'b'],
-  ]);
-  const group = (command) => owners.get(command);
-  const moved = moveKeybindingInGroup(rows, 'a2', 'a1', group);
+  const moved = moveKeybindingWithinKey(rows, 'a2', 'a1');
   assert.deepEqual(
     moved.map((r) => r.id),
-    ['a2', 'b1', 'a1', 'b2'],
+    ['a2', 'other', 'a1', 'b1'],
   );
   assert.deepEqual(
     rows.map((r) => r.id),
-    ['a1', 'b1', 'a2', 'b2'],
+    ['a1', 'other', 'b1', 'a2'],
   );
-  assert.equal(moveKeybindingInGroup(rows, 'a1', 'b1', group), rows);
-  assert.equal(moveKeybindingInGroup(rows, 'absent', 'a1', group), rows);
+  assert.equal(moveKeybindingWithinKey(rows, 'a1', 'other'), rows);
+  assert.equal(moveKeybindingWithinKey(rows, 'missing', 'a1'), rows);
   assert.deepEqual(
     resolveKeybindings(
       moved,
@@ -55,9 +52,58 @@ test('provider drag changes dispatch order within its slots and rejects cross-pr
       { appFocused: true },
       rows.map((r) => ({ id: r.command })),
     ),
-    ['a.second', 'b.first', 'a.first', 'b.second'],
+    ['a.second', 'a.first', 'b.first'],
   );
   assert.deepEqual(parseKeybindings(moved), moved);
+});
+test('group rendering and key changes preserve IDs, dispatch order, conditions and other keys', () => {
+  const rows = [
+    row('a', 'test.a', 'owner'),
+    { ...row('b', 'test.b'), key: 'F10' },
+    row('c', 'test.c'),
+    { ...row('d', 'test.d'), key: 'F2' },
+  ];
+  assert.deepEqual(
+    keybindingGroups(rows).map(([key, members]) => [key, members.map((r) => r.id)]),
+    [
+      ['Ctrl+F12', ['a', 'c']],
+      ['F2', ['d']],
+      ['F10', ['b']],
+    ],
+  );
+  const added = appendKeybinding(rows, row('e', 'test.e'));
+  assert.deepEqual(
+    added.map((r) => r.id),
+    ['a', 'b', 'c', 'e', 'd'],
+  );
+  const changed = changeKeybindingKey(rows, 'a', 'f2');
+  assert.deepEqual(
+    changed.map((r) => r.id),
+    ['b', 'c', 'd', 'a'],
+  );
+  assert.deepEqual(changed[3], { ...rows[0], key: 'F2' });
+  assert.equal(changeKeybindingKey(rows, 'a', 'ctrl+f12'), rows);
+  assert.equal(changeKeybindingKey(rows, 'missing', 'F1'), rows);
+  assert.deepEqual(appendKeybinding(rows, { ...row('new', 'test.n'), key: 'F1' }).at(-1).id, 'new');
+});
+test('changing a command preserves binding identity and explicit conditions, resolves owner for host', () => {
+  const binding = row('stable', 'test.a', 'owner');
+  assert.deepEqual(changeKeybindingCommand(binding, { id: 'test.b', extensionId: 'test' }), {
+    ...binding,
+    command: 'test.b',
+  });
+  assert.deepEqual(changeKeybindingCommand(binding, { id: 'appdock.open', extensionId: null }), {
+    ...binding,
+    command: 'appdock.open',
+    when: { scope: 'app', appletIds: [] },
+  });
+  for (const scope of ['global', 'app', 'pages', 'applets']) {
+    const source = row('stable', 'test.a', scope, scope === 'applets' ? ['test.other'] : []);
+    assert.deepEqual(
+      changeKeybindingCommand(source, { id: 'appdock.open', extensionId: null }).when,
+      source.when,
+    );
+  }
 });
 test('new settings round-trip beyond legacy limits and include bindings in the size limit', () => {
   const keybindings = Array.from({ length: 501 }, (_, i) =>

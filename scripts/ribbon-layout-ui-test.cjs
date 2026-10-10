@@ -80,12 +80,9 @@ async function launch() {
       .locator('.settings-categories')
       .getByRole('button', { name: 'ショートカット', exact: true })
       .click();
-    assert.equal(
-      await dock.locator('.shortcut-group').first().getAttribute('data-shortcut-owner'),
-      'appdock',
-    );
+    assert.equal(await dock.locator('.shortcut-group').count(), 0);
     assert.ok(
-      (await dock.locator('[data-shortcut-owner="appdock"] [data-shortcut-command]').count()) > 0,
+      (await dock.locator('.shortcuts-editor [data-shortcut-command^="appdock."]').count()) > 0,
     );
     await dock
       .locator('.settings-categories')

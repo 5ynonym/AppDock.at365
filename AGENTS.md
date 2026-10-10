@@ -80,12 +80,18 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 ## 条件付きショートカットの維持事項
 
+- 0.26.22の[画面設計](docs/shortcut-ui-redesign.md)を正本とする。設定ページは全コマンドの平坦な一覧で未割り当ても表示し、グループ分け/実行順操作/コマンド変更を置かない。検索/状態フィルター/表示件数を上部にまとめ、ShortcutCommandListとAppletShortcutDialogをApplet詳細と共用する。追加時は絞り込み・表示位置を保持し、自動スクロールしない。
+
+- 設定ページ/通常Appletのショートカット削除は確認なしで共有draftへ反映する（BindingActionsのconfirmDelete=false）。保存前は全体の変更破棄で戻せる。ジェスチャーの確認は維持する。未割り当てとキーの左端を揃える。
+
+- 0.26.20からApplet詳細は一覧の＋とキー/条件ペアから小さな編集dialogを開く。順番操作・実行順画面への導線は置かない。入力中だけの一時フォームを追加/適用で共有draftへ反映し、全体保存を維持する。dialog表示中はグローバル登録と画面ショートカットを抑止し、取消/閉じる/破棄時に復帰する。Tabは移動、Escapeは取消、Enterは記録欄ではキー入力として扱い、特殊キーからCtrl/Alt/Shift付きTab/Escape等を選べる。実測はscripts/shortcuts-ui-test.cjsとapplet-shortcut-edit-checks.cjs。
+
 - 正本は[条件付きショートカット](docs/keybindings.md)。割り当てごとのkeybindingsを使い、旧shortcuts/globalShortcutCommandsへ条件を押し込まない。新形式が存在すれば旧フィールドは表示用の派生値。
 - 本体・localページ・Gmail UI/本文・WebApplet・Windowsホットキーは共通resolver/dispatcherへ渡す。押下時の条件で実行対象を固定し、保存順・同一コマンド1回・再入防止・終了時打切りを保つ。
 - Applet条件は実Windowフォーカスと表示中のSurfaceから判定する。非選択/背景/トレイのページ選択をアクティブと扱わず、リモートページへホストIPCを公開しない。
 - owner条件は現在のコマンド登録元extensionIdと表示中ページを照合し、ID接頭辞から推測しない。選択肢は「すべてのApplet → 提供元名だけ → 指定したApplet」の順。本体コマンドには提供元項目を出さない。
 - 未割り当てのAppletコマンドへキーを追加する時はowner、本体/提供元不明はappを既定にする。既存条件の編集/複製を上書きしない。コマンド一覧の補助表示は完全なIDを見せ、提供元表示名とIDの双方で検索できることを保つ。
-- Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細の一括初期化は対象Appletの行だけを置き換える。正本の形式と検証境界はdocs/keybindings.mdを参照する。
+- Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細に一括初期化は置かない。正本の形式と検証境界はdocs/keybindings.mdを参照する。
 - UIはuseSettingsEditorのdraft/JSON/revision/saveを共用。条件のない旧設定への完全互換のために新設計を複雑化しない（2026-10-09ユーザー指定）。
 - グローバルキーの登録ステータスはWindowsの受付状態であり、設定の保存状態とは別。キー記録中は全登録を一時解除しstatusesが空になる。表示の調査時はこの一時停止/復帰を区別する。詳細はdocs/keybindings.md。
 - 正常時の登録済み/未登録と、正常な同キー割り当ての注意文は行に表示しない。登録エラーは記録中も直近の再検査結果を保持し、行高とエラー絞り込みを安定させる。表示用キャッシュをbackendの受付や共有draftへ使わない。全体順のメニューは操作範囲を明記する。
@@ -101,14 +107,14 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 - 行の操作メニューはスクロール表の外へ浮かべ、行の高さを変えない。画面端の位置補正、外側クリック/Escapeで閉じる操作、キーボード移動、削除確認を維持する。
 
-- Applet設定は詳細ページへ集約し、設定ページにApplet別一覧/本体専用キー入口を戻さない。全体キー一覧はAppDock→appletOrderによるApplet順→未確認コマンドのグループ表示。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、保存/破棄は全編集内容を対象にする。起動順・keybindingsの実行順・独立したribbon.orderを表示順で変更しない。仕様はdocs/host-development.mdとdocs/keybindings.md、回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。
+- Applet設定は詳細ページへ集約し、設定ページにApplet別設定一覧/本体専用キー入口を戻さない。全コマンド一覧はカタログ順でappletOrderには連動しない。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、起動順/keybindingsの実行順/ribbon.orderを変更しない。回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。
 
-- ShortcutsEditor/GesturesEditorの行末メニューはBindingActions.tsxで共用する。共通Toggle/選択専用CommandPalette/ドラッグハンドルと細いその他列を維持。ショートカットのグループ内並べ替えは他提供元の保存位置を保持し、全体の実行順操作はメニューで残す。新規キー未指定はdraftとして保持し、保存時に拒否する。複製で既存条件を変更せず、削除は確認を通す。仕様はdocs/keybindings.md、検証はscripts/shortcuts-ui-test.cjsと既存キー/ジェスチャーGUI。
+- ショートカットの行末メニューは編集/即時削除のみ。追加/編集は小さなdialogで完成してから共有draftへ反映する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は保存位置を保持する。ジェスチャーのCommandPalette選択/複製/確認付き削除/ドラッグは維持する。
 
-- 割り当て表の全グループは同じcolgroup/固定レイアウトで列境界を揃える。順番など操作列は共通の固定幅、コマンド列は残り幅、グループ見出しは表の外。内容依存の自動列幅へ戻さず、狭幅は表内スクロールで扱う。GUIでは両テーマ/全3幅で全グループの列座標・幅と細いその他列を照合する。
+- ジェスチャー表のグループは共通colgroup/固定レイアウトで列境界を揃える。ショートカットはコマンド/割り当ての2列とし、狭幅・両テーマで検索/フィルターと一覧のoverflowを検証する。
 
-- ショートカットの表示番号は提供元グループ内で1から採番し、検索/状態フィルターで番号を振り直さない。表示用番号で保存配列やdispatcherの実行順を変更しない。
+- ショートカットに実行順番号を表示しない。検索/状態フィルターに該当するコマンドの全割り当てを表示し、保存配列やdispatcherの実行順を表示のために並べ替えない。
 
-- ショートカットの解除はその他メニューの「キーのクリア…」から確認後に選んだ行だけをdraftから除く。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは割り当て可能なキーとして残す。共通BindingActionsのremovalKindで文言を切り替え、ジェスチャーの削除確認は保持する。
+- ショートカットの解除はその他メニューの削除で選んだIDだけをdraftから除く。コマンド行は未割り当てとして残す。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは記録可能なキーとして維持する。
 
 - タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。

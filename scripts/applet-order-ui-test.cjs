@@ -218,27 +218,22 @@ async function launch() {
       .locator('.settings-categories')
       .getByRole('button', { name: 'ショートカット', exact: true })
       .click();
-    const owners = () =>
-      page
-        .locator('.shortcut-group')
-        .evaluateAll((groups) => groups.map((g) => g.dataset.shortcutOwner));
-    assert.deepEqual(await owners(), [
-      'appdock',
-      'web.11111111-1111-1111-1111-111111111111',
-      'test.b',
-      'test.c',
-      'test.a',
-    ]);
-    await page
-      .locator('[data-shortcut-owner="test.a"] [data-shortcut-recorder]')
+    assert.equal(await page.locator('[data-shortcut-key]').count(), 0);
+    await page.locator('[data-binding-id="first"] .applet-shortcut-edit').click();
+    const shortcutDialog = page.locator('.applet-shortcut-dialog');
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
+    await shortcutDialog
+      .getByRole('button', { name: 'ショートカットキーを入力', exact: true })
       .press('Control+F9');
+    await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await button('Applet').click();
     await tab('ショートカット').click();
-    assert.equal(await page.locator('[data-shortcut-recorder]').inputValue(), 'Ctrl+F9');
+    assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F9');
+    assert.equal(await page.locator('.applet-shortcuts input').count(), 0);
     await button('変更を破棄して再読み込み').click();
-    assert.equal(await page.locator('[data-shortcut-recorder]').inputValue(), 'Ctrl+F8');
+    assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F8');
     checks.push(
-      'AppDock-first grouped shortcuts / same Applet order / shared key draft and discard across pages',
+      'flat commands independent of Applet order / shared draft displayed and discarded in Applet overview',
     );
     for (const theme of ['dark', 'light']) {
       await button('設定').click();

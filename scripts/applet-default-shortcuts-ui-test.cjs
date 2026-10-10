@@ -75,25 +75,18 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       .getByRole('button', { name: /初期値テスト/ })
       .click();
     await dock.getByRole('tab', { name: 'ショートカット', exact: true }).click();
-    await dock.getByRole('button', { name: 'このAppletのショートカットを初期値に戻す' }).click();
+    assert.equal(await dock.locator('.applet-shortcuts kbd').innerText(), 'Alt+F9');
     assert.equal(
-      (await snapshot()).settings.value.keybindings.find(
-        (row) => row.command === 'test.defaults.run',
-      ).key,
-      'Alt+F9',
+      await dock.locator('.applet-shortcuts input, .applet-shortcuts select').count(),
+      0,
     );
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await dock.waitForFunction(async () =>
-      (await window.dock.snapshot()).settings.value.keybindings.some(
-        (row) => row.command === 'test.defaults.run' && row.key === 'Ctrl+F8',
-      ),
-    );
+    assert(await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled());
     const result = await snapshot();
     assert.deepEqual(
       result.settings.value.keybindings
         .filter((row) => row.command === 'test.defaults.run')
         .map((row) => [row.key, row.when.scope]),
-      [['Ctrl+F8', 'owner']],
+      [['Alt+F9', 'global']],
     );
     assert.equal(
       result.settings.value.keybindings.find((row) => row.id === 'other.binding').key,
@@ -106,8 +99,8 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
           profile,
           checks: [
             'manifest first-install default',
-            'Applet tab reset stays draft until save',
-            'save restores only that Applet',
+            'Applet overview keeps input fields closed until editing',
+            'opening overview preserves customized defaults',
           ],
         },
         null,

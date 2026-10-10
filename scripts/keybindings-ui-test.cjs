@@ -330,18 +330,37 @@ const expectCalls = async (before, expected) => {
     await dock.getByRole('button', { name: 'ショートカット', exact: true }).click();
     await dock.getByLabel('ショートカットのコマンドを検索').fill('test.keys.c');
     const row = dock.locator('[data-binding-id="selected"]');
-    await row.getByRole('button', { name: /キー検証/ }).click();
+    const editDialog = dock.locator('.applet-shortcut-dialog');
+    const keyRecorder = editDialog.getByRole('button', {
+      name: 'ショートカットキーを入力',
+      exact: true,
+    });
+    const openEdit = async (entry = row) => {
+      await entry.locator('.applet-shortcut-edit').click();
+      await editDialog.getByText('押して入力', { exact: true }).waitFor();
+    };
+    const applyEdit = () => editDialog.getByRole('button', { name: '適用', exact: true }).click();
+    await openEdit();
+    await editDialog.getByRole('button', { name: /キー検証/ }).click();
     assert.equal(
-      await row
-        .getByRole('group', { name: '対象Applet' })
+      await editDialog
+        .getByRole('group', { name: /対象Applet$/ })
         .getByRole('checkbox', { checked: true })
         .count(),
       2,
     );
-    await row.getByRole('button', { name: '閉じる', exact: true }).click();
-    await row.getByRole('button', { name: /その他の操作/ }).click();
-    await dock.getByRole('menuitem', { name: '複製', exact: true }).click();
-    assert.equal(await dock.locator('[data-shortcut-command="test.keys.c"]').count(), 2);
+    await editDialog.getByRole('button', { name: '編集をキャンセル', exact: true }).click();
+    await dock
+      .locator('[data-shortcut-command="test.keys.c"]')
+      .getByRole('button', { name: /に割り当てを追加/ })
+      .click();
+    await editDialog.getByText('押して入力', { exact: true }).waitFor();
+    await keyRecorder.press('Control+F8');
+    await editDialog.getByRole('button', { name: '追加', exact: true }).click();
+    assert.equal(
+      await dock.locator('[data-shortcut-command="test.keys.c"] [data-binding-id]').count(),
+      2,
+    );
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -350,8 +369,7 @@ const expectCalls = async (before, expected) => {
         ).length === 2,
       'Saved extra binding',
     );
-    const recorder = row.locator('[data-shortcut-recorder]');
-    await recorder.focus();
+    await openEdit();
     await until(
       async () =>
         !(await dock.evaluate(() => window.dock.snapshot())).globalHotKeys.some(
@@ -359,8 +377,8 @@ const expectCalls = async (before, expected) => {
         ),
       'Recorder suspends OS keys',
     );
-    await recorder.press('Control+Shift+F11');
-    await recorder.press('Escape');
+    await keyRecorder.press('Control+Shift+F11');
+    await applyEdit();
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -370,8 +388,11 @@ const expectCalls = async (before, expected) => {
       'Recorded key saved',
     );
     await row.getByRole('button', { name: /その他の操作/ }).click();
-    await dock.getByRole('menuitem', { name: '全体の実行順を上げる', exact: true }).click();
-    await row.getByRole('switch', { name: /割り当てを有効/ }).click();
+    assert.deepEqual(await dock.getByRole('menuitem').allTextContents(), ['編集', '削除']);
+    await dock.keyboard.press('Escape');
+    await openEdit();
+    await editDialog.getByRole('switch').click();
+    await applyEdit();
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -381,15 +402,16 @@ const expectCalls = async (before, expected) => {
       'Disabled state saved',
     );
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
-    assert.equal(saved.keybindings[1].id, 'selected');
-    assert.equal(saved.keybindings[1].enabled, false);
-    assert.equal(saved.keybindings[1].key, 'Ctrl+Shift+F11');
-    assert.equal(saved.keybindings[1].when.scope, 'applets');
+    assert.equal(saved.keybindings.find((r) => r.id === 'selected').enabled, false);
+    assert.equal(saved.keybindings.find((r) => r.id === 'selected').key, 'Ctrl+Shift+F11');
+    assert.equal(saved.keybindings.find((r) => r.id === 'selected').when.scope, 'applets');
+    await openEdit();
     assert.deepEqual(
-      await row.locator('select[aria-label*="いつ・どこで"] option').allTextContents(),
+      await editDialog.locator('select[aria-label*="いつ・どこで"] option').allTextContents(),
       ['グローバル', 'AppDock全体', 'すべてのApplet', 'キー検証', '指定したApplet'],
     );
-    await row.locator('select[aria-label*="いつ・どこで"]').selectOption('owner');
+    await editDialog.getByLabel('割り当てのいつ・どこで').selectOption('owner');
+    await applyEdit();
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
@@ -405,27 +427,28 @@ const expectCalls = async (before, expected) => {
     });
     await save([...ownerSaved.keybindings, make('gmail-owner', 'at365.gmail.open', 'owner')]);
     await dock.getByLabel('ショートカットのコマンドを検索').fill('at365.gmail.open');
-    assert.equal(
-      await dock.locator('[data-binding-id="gmail-owner"] option[value="owner"]').textContent(),
-      'Gmail',
-    );
+    await openEdit(dock.locator('[data-binding-id="gmail-owner"]'));
+    assert.equal(await editDialog.locator('option[value="owner"]').textContent(), 'Gmail');
+    await keyRecorder.press('Escape');
     await dock.getByLabel('ショートカットのコマンドを検索').fill('appdock.commands.search');
-    assert.equal(await dock.locator('[data-binding-id="search"] option[value="owner"]').count(), 0);
-    await dock.getByLabel('ショートカットのコマンドを検索').fill('test.keys.c');
+    await openEdit(dock.locator('[data-binding-id="search"]'));
+    assert.equal(await editDialog.locator('option[value="owner"]').count(), 0);
+    await keyRecorder.press('Escape');
     checks.push(
       'scope options ordered with provider name only, host exclusion and owner persistence',
     );
-    assert.equal(await row.locator('.command-id').textContent(), 'test.keys.c');
     for (const [command, key, scope] of [
       ['test.keys.open', 'Control+Shift+F9', 'owner'],
       ['appdock.restart', 'Control+Shift+F8', 'app'],
     ]) {
       await dock.getByLabel('ショートカットのコマンドを検索').fill(command);
       const entry = dock.locator(`[data-shortcut-command="${command}"]`);
-      await entry.locator('[data-shortcut-recorder]').focus();
-      await entry.locator('[data-shortcut-recorder]').press(key);
-      assert.equal(await entry.locator('select[aria-label*="いつ・どこで"]').inputValue(), scope);
       assert.equal(await entry.locator('.command-id').textContent(), command);
+      await entry.getByRole('button', { name: /に割り当てを追加/ }).click();
+      await editDialog.getByText('押して入力', { exact: true }).waitFor();
+      assert.equal(await editDialog.getByLabel('割り当てのいつ・どこで').inputValue(), scope);
+      await keyRecorder.press(key);
+      await editDialog.getByRole('button', { name: '追加', exact: true }).click();
       await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
       await until(
         async () =>
@@ -445,7 +468,7 @@ const expectCalls = async (before, expected) => {
     await new Promise((r) => setTimeout(r, 300));
     await dock.screenshot({ path: path.join(profile, 'shortcuts-light.png') });
     checks.push(
-      'table, multi-select, duplicate binding, recording suspension, order, disable, persistence and themes',
+      'flat command list, multi-select, additional binding, recording suspension, disable, persistence and themes',
     );
     await dock.evaluate(async () => {
       const s = await window.dock.snapshot();

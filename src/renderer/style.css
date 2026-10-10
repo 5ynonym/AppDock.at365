@@ -3351,6 +3351,419 @@ summary {
   border-radius: 10px;
   min-width: 0;
 }
+.shortcut-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+.shortcut-create .shortcut-key-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.shortcut-create .shortcut-key-field input,
+.shortcut-create .shortcut-key-field select {
+  width: 180px;
+}
+.shortcut-create .shortcut-condition-field {
+  width: 200px;
+}
+.shortcut-key-field input,
+.shortcut-key-field select,
+.shortcut-condition-field select {
+  width: 100%;
+}
+.shortcut-add-notice {
+  height: 24px;
+  line-height: 24px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shortcut-search-match > td {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.applet-shortcut-overview {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.applet-shortcut-overview th,
+.applet-shortcut-overview td {
+  text-align: left;
+  vertical-align: top;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.applet-shortcut-overview th:first-child {
+  width: 42%;
+}
+.applet-shortcut-overview td > small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.applet-shortcut-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.applet-shortcut-command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.applet-shortcut-add {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 18px;
+}
+.applet-shortcut-pair {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.applet-shortcut-edit {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+  padding: 7px 0;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 9px;
+}
+.applet-shortcut-edit > span,
+.applet-shortcut-edit > small {
+  color: var(--muted);
+}
+.command-shortcuts-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.command-shortcuts-heading h2 {
+  margin: 0 0 8px;
+}
+.command-shortcuts-heading p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.command-count {
+  flex: none;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.command-shortcut-tools {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+.command-shortcut-search {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 14px;
+  background: var(--panel);
+  gap: 10px;
+}
+.command-shortcut-search:focus-within {
+  border-color: var(--accent);
+}
+.command-shortcut-search > span {
+  color: var(--muted);
+  font-size: 24px;
+}
+.command-shortcut-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+.command-shortcut-tools .shortcut-status-filter {
+  width: 155px;
+  flex: none;
+  margin: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.command-shortcut-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.command-shortcuts .applet-shortcut-overview {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+.command-shortcuts .applet-shortcut-overview th {
+  padding: 14px 18px;
+  color: var(--muted);
+  font-size: 12px;
+  background: var(--raised);
+}
+.command-shortcuts .applet-shortcut-overview td {
+  padding: 16px 18px;
+}
+.command-shortcuts .applet-shortcut-overview tr:last-child td {
+  border-bottom: 0;
+}
+.command-shortcuts .applet-shortcut-overview th:first-child {
+  width: 46%;
+}
+.shortcut-command-list {
+  min-width: 0;
+}
+.shortcut-command-list .shortcut-conflict {
+  flex-basis: 100%;
+  color: var(--text);
+  font-size: 11px;
+}
+.shortcut-command-list .applet-shortcut-pair > .text-button {
+  font-size: 11px;
+  flex: none;
+}
+@media (max-width: 800px) {
+  .command-shortcuts-heading {
+    flex-wrap: wrap;
+  }
+  .command-shortcut-tools {
+    gap: 8px;
+  }
+  .command-shortcut-tools .shortcut-status-filter {
+    width: 125px;
+    padding: 8px;
+  }
+  .command-shortcuts .applet-shortcut-overview th,
+  .command-shortcuts .applet-shortcut-overview td {
+    padding: 12px;
+  }
+}
+.applet-shortcut-notice {
+  min-height: 28px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.applet-shortcut-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  box-sizing: border-box;
+  padding: 24px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.applet-shortcut-dialog::backdrop {
+  background: #080b1266;
+}
+.applet-shortcut-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.applet-shortcut-dialog header small {
+  color: var(--accent);
+}
+.applet-shortcut-dialog h2 {
+  font-size: 18px;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.shortcut-dialog-close {
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  padding: 0 6px;
+}
+.shortcut-capture-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.shortcut-capture-label small {
+  color: var(--muted);
+}
+.shortcut-capture {
+  width: 100%;
+  min-height: 88px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.shortcut-capture:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+.shortcut-capture kbd {
+  color: var(--text);
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-bottom-width: 3px;
+  border-radius: 7px;
+  background: var(--raised);
+  font:
+    600 20px 'Segoe UI',
+    sans-serif;
+}
+.shortcut-capture > span,
+.shortcut-capture-hint {
+  color: var(--muted);
+}
+.shortcut-capture-hint {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 10px 0;
+}
+.shortcut-special-trigger {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 9px 0;
+  color: var(--accent);
+  text-align: left;
+}
+.shortcut-special-picker {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 14px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.shortcut-modifiers,
+.shortcut-special-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.shortcut-modifiers button[aria-pressed='true'],
+.shortcut-special-group button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.shortcut-modifiers small,
+.shortcut-special-group > small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.shortcut-special-group > small {
+  display: block;
+  margin: 14px 0 7px;
+}
+.shortcut-special-group button {
+  min-width: 40px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.shortcut-dialog-condition {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin: 22px 0;
+}
+.shortcut-dialog-condition > span {
+  padding-top: 9px;
+}
+.shortcut-dialog-condition select {
+  width: 100%;
+  border-radius: 8px;
+  padding: 9px;
+}
+.shortcut-dialog-condition .keybinding-picker {
+  width: auto;
+  max-width: 100%;
+}
+.shortcut-dialog-enabled {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.applet-shortcut-dialog footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.applet-shortcut-dialog footer small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.applet-shortcut-dialog footer > div {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.applet-shortcut-dialog footer button {
+  border-radius: 8px;
+  padding: 9px 16px;
+}
+.shortcut-dialog-error {
+  color: var(--text);
+  background: var(--raised);
+  padding: 10px;
+  border-radius: 8px;
+}
 .shortcut-group-heading {
   display: flex;
   align-items: center;

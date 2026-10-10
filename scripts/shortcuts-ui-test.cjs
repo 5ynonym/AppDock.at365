@@ -27,6 +27,7 @@ for (const owner of ['a', 'b']) {
       commands: ['first', 'second', 'new'].map((command) => ({
         id: `${id}.${command}`,
         title: `${owner.toUpperCase()} ${command}`,
+        ...(command === 'first' ? { aliases: [`${id}.legacy`] } : {}),
       })),
     }),
   );
@@ -135,8 +136,6 @@ async function launch(testProfile = profile) {
   };
 }
 const checks = [];
-const columnWidths = [];
-const groupColumns = [];
 (async () => {
   let app = await launch();
   try {
@@ -148,45 +147,16 @@ const groupColumns = [];
     const snapshot = () => page.evaluate(() => window.dock.snapshot());
     const original = (await snapshot()).settings.value.keybindings;
     const button = (name) => page.getByRole('button', { name, exact: true });
+    const command = (id) => page.locator(`.shortcuts-editor [data-shortcut-command="${id}"]`);
     const row = (id) => page.locator(`[data-binding-id="${id}"]`);
-    const menu = (id) => row(id).getByRole('button', { name: /その他の操作/ });
-    const openMenu = async (id) => {
-      await menu(id).scrollIntoViewIfNeeded();
-      await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-      );
-      await menu(id).click();
-      await page.getByRole('menu').waitFor();
-    };
-    const nav = (name) =>
-      page.locator('.settings-categories').getByRole('button', { name, exact: true });
-    const checkColumns = async (editor) => {
-      const tables = await page.locator(`${editor} .gesture-table`).evaluateAll((tables) =>
-        tables.map((table) => ({
-          group: table.closest('section').getAttribute('aria-label'),
-          columns: [...table.querySelectorAll('thead th')].map((cell) => {
-            const bounds = cell.getBoundingClientRect();
-            return { left: bounds.left, width: bounds.width };
-          }),
-        })),
-      );
-      assert(tables.length >= 2, 'compare multiple groups');
-      fs.writeFileSync(
-        path.join(profile, 'group-columns-latest.json'),
-        JSON.stringify(tables, null, 2),
-      );
-      for (const table of tables)
-        for (let index = 0; index < 6; index++) {
-          assert(
-            Math.abs(table.columns[index].left - tables[0].columns[index].left) < 0.5,
-            `${editor}: ${table.group} column ${index + 1} position differs`,
-          );
-          assert(
-            Math.abs(table.columns[index].width - tables[0].columns[index].width) < 0.5,
-            `${editor}: ${table.group} column ${index + 1} width differs`,
-          );
-        }
-      return tables;
+    const filter = () => page.getByLabel('ショートカットのコマンドを検索');
+    const status = () => page.getByLabel('ショートカットの絞り込み', { exact: true });
+    const dialog = () => page.locator('.applet-shortcut-dialog');
+    const recorder = () =>
+      dialog().getByRole('button', { name: 'ショートカットキーを入力', exact: true });
+    const ready = async () => {
+      await dialog().getByText('押して入力', { exact: true }).waitFor();
+      assert(await recorder().evaluate((el) => document.activeElement === el));
     };
     const save = async () => {
       await button('変更をすべて保存').click();
@@ -195,48 +165,116 @@ const groupColumns = [];
         .getByText('すべて保存されています', { exact: true })
         .waitFor();
     };
-    const reset = () => button('変更を破棄して再読み込み').click();
     await button('設定').click();
-    await nav('ショートカット').click();
-    await checkColumns('.shortcuts-editor');
-    await until(
-      async () =>
-        (await snapshot()).globalHotKeys.some(
-          (s) => s.commandId === 'test.a.first' && s.registered,
-        ),
-      'fixture global key registered',
+    await page
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'ショートカット', exact: true })
+      .click();
+    assert.equal(await page.locator('[data-shortcut-key], .gesture-drag-handle').count(), 0);
+    assert(await command('appdock.restart').count());
+    assert(await command('test.a.new').getByText('未割り当て', { exact: true }).count());
+    assert(await command('test.b.new').count());
+    assert.deepEqual((await snapshot()).settings.value.keybindings, original);
+    await status().selectOption('unassigned');
+    assert.equal(await command('test.a.first').count(), 0);
+    assert(await command('test.a.new').count());
+    await status().selectOption('assigned');
+    assert.equal(await command('test.a.new').count(), 0);
+    assert(await command('test.a.first').count());
+    await status().selectOption('all');
+    await filter().fill('test.a.new');
+    assert.equal(await page.locator('.shortcuts-editor [data-shortcut-command]').count(), 1);
+    await command('test.a.new')
+      .getByRole('button', { name: /に割り当てを追加/ })
+      .click();
+    await ready();
+    assert.equal(await dialog().getByLabel('割り当てのいつ・どこで').inputValue(), 'owner');
+    await recorder().press('Control+F7');
+    await dialog().getByRole('button', { name: '追加', exact: true }).click();
+    assert.equal(await filter().inputValue(), 'test.a.new');
+    await save();
+    await filter().fill('');
+    const added = (await snapshot()).settings.value.keybindings.find(
+      (r) => r.command === 'test.a.new',
     );
-    const rowGeometry = () =>
-      page.locator('.shortcuts-editor tbody tr').evaluateAll((rows) =>
-        rows.map((row) => ({
-          height: row.getBoundingClientRect().height,
-          top: row.getBoundingClientRect().top - row.closest('table').getBoundingClientRect().top,
-        })),
-      );
-    const beforeRecording = await rowGeometry();
-    const assertStableRows = async () => {
-      const after = await rowGeometry();
-      assert.equal(after.length, beforeRecording.length);
-      for (let index = 0; index < after.length; index++) {
-        assert(Math.abs(after[index].height - beforeRecording[index].height) < 0.5);
-        assert(Math.abs(after[index].top - beforeRecording[index].top) < 0.5);
-      }
-    };
-    assert.equal(await page.getByText('登録済み', { exact: true }).count(), 0);
-    assert.equal(await page.getByText('未登録', { exact: true }).count(), 0);
-    await page.evaluate(() => window.dock.executeCommand('appdock.open'));
-    await row('a2').locator('[data-shortcut-recorder]').focus();
-    await until(
-      async () => !(await snapshot()).globalHotKeys.length,
-      'recording releases global registration',
+    assert.deepEqual(
+      (await snapshot()).settings.value.keybindings.filter((r) => r.id !== added.id),
+      original,
     );
-    await assertStableRows();
-    await row('a2').locator('[data-shortcut-recorder]').press('Escape');
-    await until(
-      async () => (await snapshot()).globalHotKeys.some((s) => s.registered),
-      'global registration restored',
+    await row(added.id).locator('.applet-shortcut-edit').click();
+    await ready();
+    await dialog().getByLabel('割り当てのいつ・どこで').selectOption('app');
+    await dialog().getByRole('button', { name: '適用', exact: true }).click();
+    await save();
+    const beforeEdit = (await snapshot()).settings.value.keybindings.map((r) => r.id);
+    await row('a2').locator('.applet-shortcut-edit').click();
+    await ready();
+    await dialog().getByRole('switch').click();
+    await dialog().getByRole('button', { name: '適用', exact: true }).click();
+    await save();
+    assert.deepEqual(
+      (await snapshot()).settings.value.keybindings.map((r) => r.id),
+      beforeEdit,
     );
-    await assertStableRows();
+    await status().selectOption('assigned');
+    await row('a2')
+      .getByRole('button', { name: /その他の操作/ })
+      .click();
+    assert.deepEqual(await page.getByRole('menuitem').allTextContents(), ['編集', '削除']);
+    await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+    assert.equal(await page.getByRole('alertdialog').count(), 0);
+    assert.equal(await command('test.a.second').count(), 0);
+    assert(
+      await page
+        .locator('.shortcuts-editor .shortcut-command-list')
+        .evaluate((el) => el === document.activeElement),
+    );
+    await status().selectOption('all');
+    assert(await command('test.a.second').getByText('未割り当て', { exact: true }).count());
+    await save();
+    checks.push(
+      'flat full catalog / host and Applet unassigned commands / search and assignment filters / direct addition / condition and disabled edit preserve order / immediate deletion keeps command',
+    );
+    await command('appdock.restart')
+      .getByRole('button', { name: /に割り当てを追加/ })
+      .click();
+    await ready();
+    assert.equal(await dialog().getByLabel('割り当てのいつ・どこで').inputValue(), 'app');
+    assert.equal(await dialog().locator('option[value="owner"]').count(), 0);
+    await recorder().press('Escape');
+    assert(await button('変更をすべて保存').isDisabled());
+    await filter().fill('not-a-command-here');
+    await page.getByText('表示するコマンドはありません。').waitFor();
+    await button('絞り込みを解除').click();
+    assert.equal(await filter().inputValue(), '');
+    await page.evaluate(async () => {
+      const state = await window.dock.snapshot();
+      for (const [id, command, key] of [
+        ['overview.extra', 'test.a.new', 'Shift+F6'],
+        ['overview.alias', 'test.a.legacy', 'Ctrl+F6'],
+        ['unknown', 'missing.command', 'Alt+F9'],
+      ])
+        state.settings.value.keybindings.push({
+          id,
+          command,
+          key,
+          enabled: false,
+          when: { scope: 'owner', appletIds: [] },
+        });
+      await window.dock.saveSettings(state.settings.value, state.settings.revision);
+    });
+    await command('missing.command').waitFor();
+    assert.match(await command('missing.command').innerText(), /未確認のコマンド/);
+    assert.match(await command('test.a.legacy').innerText(), /互換コマンド/);
+    await filter().fill('Ctrl+F7');
+    assert.equal(await page.locator('.shortcuts-editor [data-shortcut-command]').count(), 1);
+    assert.equal(await command('test.a.new').locator('[data-binding-id]').count(), 2);
+    await filter().fill('');
+    checks.push(
+      'host default app scope / cancel leaves clean state / empty search and reset / unknown and bound aliases retained / key search retains all command assignments',
+    );
+
+    // A second isolated host verifies actual Windows registration errors and their stable display.
     const conflictProfile = path.join(profile, 'conflict');
     fs.mkdirSync(conflictProfile);
     const conflictSettings = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -251,340 +289,119 @@ const groupColumns = [];
     fs.writeFileSync(path.join(conflictProfile, 'settings.json'), JSON.stringify(conflictSettings));
     const conflictApp = await launch(conflictProfile);
     try {
-      const conflictPage = await conflictApp.firstWindow();
-      await conflictPage.evaluate(() => window.dock.executeCommand('appdock.open'));
+      const cp = await conflictApp.firstWindow();
+      await cp.evaluate(() => window.dock.executeCommand('appdock.open'));
       await until(
         async () =>
-          (await conflictPage.evaluate(() => window.dock.snapshot())).globalHotKeys.some(
-            (s) => s.error,
-          ),
-        'real Windows registration conflict',
+          (await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.some((s) => s.error),
+        'Windows registration conflict',
       );
-      await conflictPage.getByRole('button', { name: '設定', exact: true }).click();
-      await conflictPage
+      await cp.getByRole('button', { name: '設定', exact: true }).click();
+      await cp
         .locator('.settings-categories')
         .getByRole('button', { name: 'ショートカット', exact: true })
         .click();
-      const conflictRow = conflictPage.locator('[data-binding-id="conflict"]');
-      await conflictRow.getByRole('alert').waitFor();
-      assert.match(await conflictRow.getByRole('alert').innerText(), /Windowsエラー/);
-      await conflictPage.getByRole('button', { name: '登録エラー', exact: true }).click();
-      const conflictHeight = (await conflictRow.boundingBox()).height;
-      await conflictRow.locator('[data-shortcut-recorder]').focus();
+      await cp.getByLabel('ショートカットの絞り込み').selectOption('conflict');
+      const cr = cp.locator('[data-binding-id="conflict"]');
+      await cr.getByRole('alert').waitFor();
+      await cr.locator('.applet-shortcut-edit').click();
+      await cp
+        .locator('.applet-shortcut-dialog')
+        .getByText('押して入力', { exact: true })
+        .waitFor();
       await until(
-        async () =>
-          !(await conflictPage.evaluate(() => window.dock.snapshot())).globalHotKeys.length,
-        'conflict recorder suspension',
+        async () => !(await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.length,
+        'recorder releases registrations',
       );
-      assert.equal(await conflictRow.getByRole('alert').isVisible(), true);
-      assert.equal((await conflictRow.boundingBox()).height, conflictHeight);
-      await conflictRow.locator('[data-shortcut-recorder]').press('Escape');
+      assert.equal(await cr.locator('[role=alert]').count(), 1);
+      await cp
+        .locator('.applet-shortcut-dialog')
+        .getByRole('button', { name: '編集をキャンセル', exact: true })
+        .click();
       await page.evaluate(async () => {
-        const snapshot = await window.dock.snapshot();
-        snapshot.settings.value.keybindings.find((row) => row.id === 'a1').enabled = false;
-        await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+        const state = await window.dock.snapshot();
+        state.settings.value.keybindings.find((r) => r.id === 'a1').enabled = false;
+        await window.dock.saveSettings(state.settings.value, state.settings.revision);
       });
-      await until(
-        async () => !(await snapshot()).globalHotKeys.length,
-        'release occupied key for retry',
-      );
-      await conflictRow.getByRole('button', { name: '登録を再試行', exact: true }).click();
+      await until(async () => !(await snapshot()).globalHotKeys.length, 'release occupied key');
+      await cr.getByRole('button', { name: '登録を再試行', exact: true }).click();
       await until(
         async () =>
-          (await conflictPage.evaluate(() => window.dock.snapshot())).globalHotKeys.some(
-            (s) => s.registered,
-          ),
-        'retry succeeds after owner releases key',
+          (await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.some((s) => s.registered),
+        'retry registration',
       );
-      await conflictRow.getByRole('alert').waitFor({ state: 'hidden' });
-      assert.equal(await conflictPage.getByText('登録済み', { exact: true }).count(), 0);
+      await cr.waitFor({ state: 'hidden' });
     } finally {
       await conflictApp.close();
-      await page.evaluate(async () => {
-        const snapshot = await window.dock.snapshot();
-        snapshot.settings.value.keybindings.find((row) => row.id === 'a1').enabled = true;
-        await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
-      });
     }
-    await until(
-      async () => (await row('a1').getByRole('switch').getAttribute('aria-checked')) === 'true',
-      'restored fixture is reflected in the renderer',
-    );
-    checks.push(
-      'normal status hidden / focus-blur preserves all row geometry / real Windows conflict stays visible while recording / retry clears resolved error',
-    );
-    const order = (id) => row(id).locator('.gesture-drag-handle').innerText();
-    assert.match(await order('a1'), /1$/);
-    assert.match(await order('b1'), /1$/);
-    assert.match(await order('a2'), /2$/);
-    await page.getByLabel('ショートカットのコマンドを検索').fill('A second');
-    assert.match(await order('a2'), /2$/);
-    await page.getByLabel('ショートカットのコマンドを検索').fill('');
-    assert.deepEqual(await page.locator('[data-shortcut-owner="test.a"] th').allTextContents(), [
-      '順番',
-      '有効',
-      'コマンド',
-      'キーバインド',
-      'いつ・どこで',
-      'その他',
-    ]);
-    const enabled = row('a1').getByRole('switch');
-    await enabled.click();
-    assert.equal(await enabled.getAttribute('aria-checked'), 'false');
-    assert.deepEqual((await snapshot()).settings.value.keybindings, original);
-    await reset();
-    assert.equal(await enabled.getAttribute('aria-checked'), 'true');
-    await row('a2')
-      .getByRole('button', { name: /並べ替え/ })
-      .dragTo(row('a1'));
-    assert.deepEqual(
-      await page
-        .locator('[data-shortcut-owner="test.a"] [data-binding-id]')
-        .evaluateAll((rows) => rows.map((r) => r.dataset.bindingId)),
-      ['a2', 'a1'],
-    );
-    assert.match(await order('a2'), /1$/);
-    assert.match(await order('a1'), /2$/);
-    await save();
-    assert.deepEqual(
-      (await snapshot()).settings.value.keybindings.map((r) => r.id),
-      ['a2', 'b1', 'a1'],
-    );
-    await row('a2')
-      .getByRole('button', { name: /並べ替え/ })
-      .press('ArrowDown');
-    await save();
-    assert.deepEqual(
-      (await snapshot()).settings.value.keybindings.map((r) => r.id),
-      ['a1', 'b1', 'a2'],
-    );
-    await row('a1')
-      .getByRole('button', { name: /並べ替え/ })
-      .dragTo(row('b1'));
-    assert.equal(await button('変更をすべて保存').isDisabled(), true);
-    checks.push(
-      'common six-column layout / group-local numbering retained during search / Toggle drafts / drag and arrows / other-provider slots preserved / cross-provider drop rejected',
-    );
-    await menu('a1').scrollIntoViewIfNeeded();
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    const before = await row('a1').boundingBox();
-    await openMenu('a1');
-    const popup = page.getByRole('menu');
-    await popup.waitFor();
-    assert(
-      await popup
-        .getByRole('menuitem')
-        .evaluateAll((items) => items.every((item) => item.scrollWidth <= item.clientWidth)),
-      'all menu captions fit without truncation',
-    );
-    assert(Math.abs((await row('a1').boundingBox()).height - before.height) < 0.5);
-    assert.equal(await popup.evaluate((el) => !el.closest('table')), true);
-    const bounds = await popup.boundingBox(),
-      viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
-    assert(
-      bounds.x >= 0 &&
-        bounds.x + bounds.width <= viewport.width &&
-        bounds.y >= 0 &&
-        bounds.y + bounds.height <= viewport.height,
-    );
-    await page.keyboard.press('End');
-    assert.equal(
-      await page
-        .getByRole('menuitem', { name: 'キーのクリア…', exact: true })
-        .evaluate((el) => el === document.activeElement),
-      true,
-    );
-    await page.keyboard.press('Escape');
-    assert.equal(await popup.count(), 0);
-    await openMenu('a1');
-    await page.getByRole('menuitem', { name: '複製', exact: true }).click();
-    assert.equal(
-      await page.locator('[data-shortcut-command="test.a.first"][data-binding-id]').count(),
-      2,
-    );
-    const cloneId = await page
-      .locator('[data-shortcut-command="test.a.first"][data-binding-id]')
-      .last()
-      .getAttribute('data-binding-id');
-    await openMenu(cloneId);
-    await page.getByRole('menuitem', { name: 'キーのクリア…', exact: true }).click();
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'キャンセル', exact: true })
-      .click();
-    await page.keyboard.press('Escape');
-    assert.equal(await row(cloneId).count(), 1);
-    await openMenu(cloneId);
-    await page.getByRole('menuitem', { name: 'キーのクリア…', exact: true }).click();
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'クリアする', exact: true })
-      .click();
-    assert.equal(await row(cloneId).count(), 0);
-    await reset();
-    checks.push(
-      'portal menu / stable row height / viewport bounds / keyboard navigation / duplicate / delete cancellation and confirmation',
-    );
+    // CDP clicks do not restore native Windows focus after the second host exits.
+    await page.evaluate(() => window.dock.executeCommand('appdock.open'));
     await page.evaluate(async () => {
-      const snapshot = await window.dock.snapshot();
-      snapshot.settings.value.keybindings.find((row) => row.id === 'b1').enabled = false;
-      snapshot.settings.value.extensions['test.b'].enabled = false;
-      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+      const state = await window.dock.snapshot();
+      state.settings.value.keybindings.find((r) => r.id === 'a1').enabled = true;
+      await window.dock.saveSettings(state.settings.value, state.settings.revision);
     });
-    await row('b1').getByText('現在利用できません', { exact: true }).waitFor();
-    await until(
-      async () => (await row('b1').getByRole('switch').getAttribute('aria-checked')) === 'false',
-      'disabled binding visible',
+    checks.push(
+      'real Windows registration conflict / error filter / recorder status cache / retry clears error',
     );
-    await openMenu('b1');
-    await page.getByRole('menuitem', { name: 'キーのクリア…', exact: true }).click();
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'クリアする', exact: true })
-      .click();
-    await row('b1').waitFor({ state: 'detached' });
-    assert.equal(
-      await page
-        .locator('[data-shortcut-command="test.b.first"] [data-shortcut-recorder]')
-        .inputValue(),
-      '',
-    );
-    assert.equal(
-      (await snapshot()).settings.value.keybindings.some((row) => row.id === 'b1'),
-      true,
-    );
-    await save();
+    await button('Applet').click();
+    await page.locator('[data-applet-id="test.a"] .applet-select').click();
+    await page.getByRole('tab', { name: 'ショートカット', exact: true }).click();
     assert.deepEqual(
-      (await snapshot()).settings.value.keybindings,
-      original.filter((row) => row.id !== 'b1'),
+      await page
+        .locator('.applet-shortcuts .shortcut-command-list')
+        .first()
+        .locator('[data-shortcut-command]')
+        .evaluateAll((rows) => rows.map((r) => r.dataset.shortcutCommand)),
+      ['test.a.first', 'test.a.second', 'test.a.new'],
     );
-    await app.close();
-    app = await launch();
-    page = await app.firstWindow();
-    await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
-    assert.equal(
-      (await snapshot()).settings.value.keybindings.some((row) => row.id === 'b1'),
-      false,
-    );
-    await page.evaluate(async (keybindings) => {
-      const snapshot = await window.dock.snapshot();
-      snapshot.settings.value.keybindings = keybindings;
-      snapshot.settings.value.extensions['test.b'].enabled = true;
-      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
-    }, original);
+    await page.screenshot({ path: path.join(profile, 'applet-overview.png') });
+    await require('./applet-shortcut-edit-checks.cjs')({
+      page,
+      snapshot,
+      save,
+      until,
+      profile,
+      checks,
+    });
     await button('設定').click();
-    await nav('ショートカット').click();
-    await row('b1').waitFor();
-    checks.push(
-      'disabled binding in stopped Applet clears only the selected assignment / valid save / other bindings preserved / restart stays cleared',
-    );
-    await page.getByRole('button', { name: 'UI Aに割り当てを追加', exact: true }).click();
     await page
-      .getByRole('dialog', { name: 'コマンドを選択' })
-      .getByRole('combobox')
-      .fill('test.a.new');
-    await page.getByRole('dialog', { name: 'コマンドを選択' }).getByRole('combobox').press('Enter');
-    const added = page.locator('[data-shortcut-command="test.a.new"][data-binding-id]');
-    await added.waitFor();
-    assert.equal(await added.locator('select[aria-label*="いつ・どこで"]').inputValue(), 'owner');
-    assert.equal(await added.locator('[data-shortcut-recorder]').inputValue(), '');
-    await button('変更をすべて保存').click();
-    await page.locator('.error-text[role="alert"]').waitFor();
-    assert.equal(
-      (await snapshot()).settings.value.keybindings.some((r) => r.command === 'test.a.new'),
-      false,
-    );
-    await added.locator('[data-shortcut-recorder]').focus();
-    await added.locator('[data-shortcut-recorder]').press('Delete');
-    assert.equal(await added.locator('[data-shortcut-recorder]').inputValue(), 'Delete');
-    await added.locator('select[aria-label*="特殊キー"]').selectOption('Ctrl+Tab');
-    await save();
-    assert.equal(
-      (await snapshot()).settings.value.keybindings.find((r) => r.command === 'test.a.new').key,
-      'Ctrl+Tab',
-    );
-    for (const owner of ['a', 'b'])
-      assert.equal(
-        fs.existsSync(path.join(profile, 'data', 'storage', `test.${owner}`, 'calls.json')),
-        false,
-      );
-    checks.push(
-      'provider-limited command picker never executes / new binding starts owner-scoped / special key selection and save',
-    );
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'ショートカット', exact: true })
+      .click();
     for (const theme of ['dark', 'light']) {
-      await nav('表示').click();
-      await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
-      await save();
-      await nav('ショートカット').click();
+      await page.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+      }, theme);
       for (const width of [1280, 900, 700]) {
         await page.setViewportSize({ width, height: 760 });
+        const search = await page.locator('.command-shortcut-search').boundingBox();
+        const select = await status().boundingBox();
+        assert(Math.abs(search.y - select.y) < 1 && Math.abs(search.height - select.height) < 1);
+        assert(search.x + search.width < select.x);
         assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
-        const shortcuts = await checkColumns('.shortcuts-editor');
-        await page.getByLabel('ショートカットのコマンドを検索').fill('A first');
-        await row('a1').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-        await openMenu('a1');
-        const menuBounds = await page.getByRole('menu').boundingBox();
         assert(
-          menuBounds.x >= 0 &&
-            menuBounds.x + menuBounds.width <= width &&
-            menuBounds.y + menuBounds.height <= 760,
+          await page
+            .locator('.applet-shortcut-overview')
+            .evaluate((el) => el.scrollWidth <= el.clientWidth),
         );
-        await page.screenshot({ path: path.join(profile, `${theme}-${width}-shortcuts.png`) });
-        const shortcutWidth = (await row('a1').locator('td').last().boundingBox()).width;
-        assert(shortcutWidth <= 64);
-        await page.keyboard.press('Escape');
-        await page.getByLabel('ショートカットのコマンドを検索').fill('');
-        await nav('マウスジェスチャー').click();
-        const gestures = await checkColumns('.gestures-editor');
-        groupColumns.push({ theme, viewport: width, shortcuts, gestures });
-        await page
-          .locator('[data-gesture-row="gesture.first"]')
-          .evaluate((el) => el.scrollIntoView({ block: 'center' }));
-        await page
-          .locator('[data-gesture-row="gesture.first"] .gesture-menu-trigger')
-          .scrollIntoViewIfNeeded();
-        const gestureWidth = (
-          await page.locator('[data-gesture-row="gesture.first"] td').last().boundingBox()
-        ).width;
-        assert(gestureWidth <= 64);
-        columnWidths.push({
-          theme,
-          viewport: width,
-          shortcut: shortcutWidth,
-          gesture: gestureWidth,
-        });
-        await page.screenshot({ path: path.join(profile, `${theme}-${width}-gestures.png`) });
-        await nav('ショートカット').click();
+        await page.screenshot({ path: path.join(profile, `${theme}-${width}-settings.png`) });
       }
     }
     checks.push(
-      'dark/light / 1280, 900, 700px / all group column positions match / table scrolling and bounded menu without main overflow',
+      'settings header and catalog dark/light at 1280, 900, 700px / filters aligned / no horizontal overflow',
     );
     assert.deepEqual(errors, []);
+    const persisted = (await snapshot()).settings.value.keybindings;
     await app.close();
     app = await launch();
     page = await app.firstWindow();
     await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
-    assert.equal(
-      (await snapshot()).settings.value.keybindings.find((r) => r.command === 'test.a.new').key,
-      'Ctrl+Tab',
-    );
-    assert.deepEqual(
-      (await snapshot()).settings.value.keybindings.find((r) => r.command === 'test.a.new').when,
-      { scope: 'owner', appletIds: [] },
-    );
-    checks.push('restart retains the selected special key and binding condition');
-    const result = {
-      ok: true,
-      checks,
-      columnWidths,
-      groupColumns,
-      ...(portable ? { sha256: hash(portable) } : {}),
-    };
+    assert.deepEqual((await snapshot()).settings.value.keybindings, persisted);
+    checks.push('restart preserves all assignments and their execution order');
+    const result = { ok: true, checks, ...(portable ? { sha256: hash(portable) } : {}) };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
-    console.log(JSON.stringify({ profile, ...result, groupColumns: undefined }));
+    console.log(JSON.stringify({ profile, ...result }));
   } finally {
     await app.close();
   }
