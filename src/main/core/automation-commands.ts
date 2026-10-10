@@ -9,7 +9,12 @@ export interface AutomationCommand {
   unavailableReason: string | null;
   completion: 'accepted' | 'handlerReturned' | 'settingsSaved' | 'lifecycleApplied';
   permission?:
-    'settings.write' | 'applets.manage' | 'shortcuts.write' | 'gestures.write' | 'ribbon.write';
+    | 'settings.write'
+    | 'applets.manage'
+    | 'shortcuts.write'
+    | 'gestures.write'
+    | 'ribbon.write'
+    | 'tray.write';
   inputSchema?: Record<string, unknown>;
 }
 export interface AutomationApplet {

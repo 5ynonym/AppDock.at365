@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-11: タスクトレイ外部編集のコミット前確認
+
+- 対象20ファイル・依存状態・発行物を前回証跡と照合してstage。型検査、標準264/264、固定単一EXEのMCP/GUI15群、既存トレイsource GUI5群・portable GUI4群を再実行し全終了0。sourceでは実Electron Trayイベントとsingle/double dispatchを検査し、物理通知領域のクリックは対象外。
+- 証跡は.artifacts/commit-validation-tray-editing-20261011/。GUI profileはautomation-portable-1791674304703、tray-menu-ui-1791674330980、tray-menu-ui-1791674336857。検証tree/入力/完全ログ/コマンド/終了コードを保存。検証後の変更は本記録のみ、文書差分/最終tree/commitを記録。製品・発行物は不変、ローカルコミットのみ。
+
+## 2026-10-11: タスクトレイの外部編集（0.26.35）
+
+- tray.get/appdock_get_trayとappdock.tray.updateでメニューとシングル/ダブルクリック割当をまとめて公開。configure/add/update/remove/ungroup/move/reorderに対応し、既存parseTrayMenu/getTrayMenu/設定保存/TrayClickDispatcherを使用。グループ1段・固定設定/終了・解除時の子保持・空メニュー尊重を維持。
+- PC専用allowEditTrayは旧省略を含め初期OFF、実行/設定変更の両許可も必要。新規割当は公開済み引数なしコマンドのみ、既存非公開/未知項目の保持・移動・削除は可能。クリック変更でコマンドを実行しない。共通revision/dryRun/no-op/原子的保存/未保存GUI draftの競合保護とautomation監査ログを継続。
+- 型検査・標準264/264成功（新規9テスト）。階層・順序・重複/上限/固定項目・不正クリック・未公開割当・途中失敗・空/旧形式・関連外設定保持・許可取消・共有revision/ディスク/再起動競合・保存失敗を検証。依存/lockfile/toolchain不変。版更新後は固定依存をfrozen-lockfileと既存サプライチェーン検査で確認。
+- source MCP/GUI15群（automation-source-1791673740359）と既存トレイsource GUI5群（tray-menu-ui-1791673747844）成功。実Electron Tray callback、single/double dispatch、一時停止チェック、配置・移動・固定末尾・再起動保持を確認。初回MCP試験で権限状態のmain→API接続漏れを検出して修正し、最終検証を再実行。失敗profile1791673668159とログは保持。
+- 発行済み単一EXEでMCP/GUI15群（automation-portable-1791674013533）と既存トレイGUI4群（tray-menu-ui-1791674039951）成功。GUI/API相互反映、dryRun、権限拒否/取消、メニューとクリック設定の再起動保持、dirty draft競合、編集でfixtureコマンド未実行、API監査ログを確認。実Codex Desktopの隔離設定で11ツールとトレイdryRun成功、モデル推論なし。両テーマ/3幅の画面と画像を確認。
+- 物理的なWindows通知領域のマウスクリックは未実施。source版の実Trayイベント検査と、renderer CDPによる単一EXE試験を区別する。実サービス/認証やApp Server製品組込みも今回対象外。
+- publish終了0、0.26.35単一EXEは144056445bytes、SHA256 3e85f954ba769bb02a5a1c86431b10ec84a91096148783ae343b5944570d95bf。feedと両隔離コピー一致。証跡.artifacts/tray-editing-20261011/validation.json、文書リンク93件/整形/diff確認成功。
+- 終了/成功/参照保護/境界/再解析点/実行中プロセスを確認後、古い成功automation-source-1791671195183とtray-menu-ui-1791558326093だけ整理。各方式最新3件、コミット/Release参照、失敗/不明/旧移行資料、固定出力を保持。残存試験プロセス0。今回実装は未コミット、push/Release/実利用deploy/全体ZIP作成なし。
+
 ## 2026-10-11: リボン外部編集のコミット前確認
 
 - 対象22ファイル・依存状態・発行物を前回証跡と照合してstage。型検査、標準255/255、固定単一EXEのMCP/GUI14群と既存リボンGUI3群を再実行し全終了0。後者はオフラインGmail fixtureを使用し、実サービス/物理マウス入力は対象外。

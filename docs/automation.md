@@ -8,6 +8,7 @@
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
 - `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
 - `shortcut-commands.ts`: ショートカットの限定読取り、操作列の検証・原子的保存。共有keybindingsとSettingsCommandsのrevisionを使用。
+- `tray-editing-commands.ts`: メニューとクリック割当をまとめて検証・保存。既存tray-menu/クリック判定/SettingsCommandsのrevisionを使用。
 - `ribbon-commands.ts`: リボンの公開項目・配置の読取りと原子的編集。共有parseRibbonとSettingsCommandsのrevisionを使用。
 - `gesture-commands.ts`: ジェスチャーの読取り、割当操作・動作設定の一括検証と保存。共有gesturesとSettingsCommandsのrevisionを使用。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
@@ -31,6 +32,7 @@
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
 | shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。0.26.32以降 |
+| tray.get | appdock_get_tray | 引数なし。menu/clicks/fixedCommands/assignableCommands/revision/warning/各許可。0.26.35以降 |
 | ribbon.get | appdock_get_ribbon | 引数なし。layout/items/retainedIds/revision/warning/各許可。0.26.34以降 |
 | gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。0.26.33以降 |
 
@@ -53,7 +55,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 ## ジェスチャー編集（0.26.33以降）
 
-取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。0.26.34ではリボン取得も含めMCPは計10ツールです。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
+取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。0.26.35ではリボン・トレイ取得も含めMCPは計11ツールです。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
@@ -96,7 +98,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 ## ショートカット編集（0.26.32以降）
 
-取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.34ではジェスチャー・リボン取得を含め10件です。更新後はCodexを再読み込みしてください。
+取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.35ではジェスチャー・リボン・トレイ取得を含め11件です。更新後はCodexを再読み込みしてください。
 
 読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
@@ -252,7 +254,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 ## リボン編集（0.26.34以降）
 
-取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。MCP全10ツール。更新後はCodexを再読み込みしてください。
+取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。0.26.35ではトレイ取得を含めMCP全11ツール。更新後はCodexを再読み込みしてください。
 
 編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。Codex連携画面で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
@@ -287,3 +289,46 @@ revisionは全設定で共通です。古いrevision、プロセス再起動前�
 結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやリボン右クリックから戻れます。
 
 エラーはRIBBON_EDITING_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。
+
+## タスクトレイ編集（0.26.35以降）
+
+取得は`tray.get`（MCP `appdock_get_tray`）、変更は`commands.execute`の`appdock.tray.update`です。MCPは11ツール。更新後はCodexを再読み込みしてください。
+
+編集にはallowExecute・allowWrite・allowEditTrayの3許可が必要です。PC専用automation.jsonのallowEditTrayは新規/旧省略ともfalse。Codex連携画面で即時変更し、MCPから許可自体は変更できません。permissionはtray.write、実効許可はgetInfo/commands.list/tray.getのtrayEditingAllowed。他の編集許可とは独立しています。
+
+取得結果はmenu（保存対象ツリー）、clicks（singleClickCommand/doubleClickCommand）、fixedCommands、assignableCommands、revision、warning、各許可。menuはid/typeと、command・groupのtitle/childrenだけを投影し、全設定や認証情報は返しません。固定の設定/終了はmenuの外にあり、末尾へ自動付加します。assignableCommandsは公開済み引数なしコマンドのid/title/available/menuAllowedです。停止中も候補を返しますが、編集で起動・コマンド実行はしません。実表示では空グループや先頭/末尾/連続区切り線を既存ルールで省略します。
+
+```json
+{
+  "id": "appdock.tray.update",
+  "args": {
+    "expectedRevision": "<tray.getで取得したrevision>",
+    "dryRun": true,
+    "operations": [
+      { "kind": "add", "parentId": null, "item": { "id": "tray.work", "type": "group", "title": "よく使う操作" } },
+      { "kind": "add", "parentId": "tray.work", "item": { "id": "tray.open", "type": "command", "command": "appdock.open" } },
+      { "kind": "configure", "changes": { "singleClickCommand": "appdock.open", "doubleClickCommand": "appdock.settings.open" } }
+    ]
+  }
+}
+```
+
+| kind | 引数 | 動作 |
+| --- | --- | --- |
+| configure | changes | singleClickCommand/doubleClickCommandの指定分だけ更新。シングルはコマンドID必須、ダブルはnullで解除 |
+| add | parentId, item | 指定階層の末尾へ追加。itemは{id,type:command,command}、{id,type:separator}、{id,type:group,title}のいずれか。groupはトップレベルに空で作成 |
+| update | id, changes | command項目のcommand、またはgroupのtitleを変更。項目のtype変更は不可 |
+| remove | id | command/separator項目を削除。groupへは使用不可 |
+| ungroup | id | グループを解除し、中の項目を同じ位置のトップレベルへ戻す |
+| move | id, parentId, beforeId | 指定階層のbeforeIdの直前へ移動。beforeId=nullは末尾。グループを別グループに入れる操作は不可 |
+| reorder | parentId, ids | 指定階層の全項目IDを希望順に指定。他階層の順序を維持 |
+
+parentId=nullはトップレベル、それ以外はグループ項目のID。項目IDとコマンドIDは別です。同じコマンドは異なる項目IDで複数箇所へ置けます。グループは1段、名前は前後空白除去後1〜80文字で制御文字不可、全項目1500件以下、IDは全体で一意。operationsは1〜100件、全操作を順に検証後1回だけ保存します。reorderは対象階層の未知/非公開コマンドの項目も含め、欠落・重複・別階層混入を拒否します。不明フィールド・ネストしたグループ・固定メニュー項目の追加も拒否します。
+
+新規/変更先のコマンドはassignableCommandsから指定します。メニューではmenuAllowed=trueだけを使用し、固定「設定」「終了」の重複を防ぎます。クリック割当はmenuAllowedに制約されません。既存の未知/非公開コマンドは保持・移動・並べ替え・削除が可能で、同じ値の再指定は許可しますが、別の項目やクリック先への新規コピーは許可しません。groupのremoveは拒否し、中身を消したい場合も項目ごとに明示削除します。
+
+共有revision/dryRun/no-op/競合拒否/GUI未保存draft保持は他の編集コマンドと同じです。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値として更新します。旧形式は読取り時に既存getTrayMenuで投影し、変更保存時に移行します。リボン/キー/ジェスチャー/Applet設定などは保持します。
+
+結果はmenu/clicks/dryRun/changed/revision/warning/applies=trayChanged。completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後のトレイ反映は既存applySettingsが行い、保留中のクリックを取消します。編集自体はコマンド実行ではなく、実クリックの成功を保証しません。ダブル未設定ならシングルを即実行、ダブル設定時はWindowsの判定時間を待ち、ダブル成立時に先行シングルを取消す既存仕様を維持します。
+
+エラーはTRAY_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLE、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否です。automationログへAPI名・コマンドID・結果を記録し、グループ名/項目ID/クリック割当などの引数は記録しません。

@@ -1,5 +1,7 @@
 # AppDock.at365 開発ガイド
 
+0.26.35のタスクトレイ外部編集は`TrayEditingCommands`が`parseTrayMenu`と既存設定保存・クリック判定を使用します。[共通操作API](docs/automation.md#タスクトレイ編集02635以降)と[トレイ仕様](docs/tray-menu.md)を参照してください。回帰は`tests/tray-editing-commands.test.cjs`、MCP/GUIは`automation-ui-test.cjs`内の`automation-tray-checks.cjs`、実Trayイベントはsource版`tray-menu-ui-test.cjs`です。
+
 0.26.34のリボン外部編集は`RibbonCommands`と共有`parseRibbon`を使います。`ribbon.get`と`appdock.ribbon.update`、独立した編集許可、無効/未導入Appletの保持は[共通操作API](docs/automation.md#リボン編集02634以降)が正本です。単体回帰は`tests/ribbon-commands.test.cjs`、GUI/MCP/Codex/再起動は`automation-ui-test.cjs`から`automation-ribbon-checks.cjs`を実行し、既存の編集画面は`ribbon-layout-ui-test.cjs`で確認します。
 
 0.26.32のショートカット外部編集と0.26.33のジェスチャー外部編集は[共通操作API](docs/automation.md)を参照してください。`ShortcutCommands`/`GestureCommands`は既存の割当検証・保存形式とSettingsCommandsのrevisionを共有します。回帰は`tests/shortcut-commands.test.cjs`/`tests/gesture-commands.test.cjs`、GUI/実キー/MCPは`scripts/automation-ui-test.cjs`（ジェスチャー編集は`automation-gesture-checks.cjs`）です。ジェスチャー物理入力の試験とは区別します。
