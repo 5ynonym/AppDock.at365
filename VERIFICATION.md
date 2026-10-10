@@ -1176,3 +1176,23 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 証跡は`.artifacts/gesture-command-list-20261011/`。文書ローカルリンク117件確認。旧全体ZIPのsize/hash不変、未変更Applet再発行なし。今回の成功/失敗試験プロセスの終了を確認。方式別最新3件/固定発行版/過去コミット再利用/旧版/不明/失敗資料を保持して追加削除0、一時編集スクリプト2件を除去。commit/push/Release/実利用deployなし。
 
 - 利用者の動作確認後、2026-10-11の明示指定により追加のコミット前回帰は実行せず、0.26.24を作業の区切りとしてコミット。上記は実装時の検証範囲であり、標準全回帰成功/リリース再利用済みとは扱わない。続くアバター・WebView言語・更新通知の対応は別の未コミット変更として進める。
+
+## 2026-10-11: 0.26.25 アバター・更新通知の調整とWebView言語確認
+
+- 先に利用者確認済み0.26.24を716e04772c5d3ca7c11af27ce74e9e390c34a846へコミット。今回の依頼により追加回帰は保留したチェックポイントであり、必要回帰完了/Release用証跡とは扱わない。続けて今回の小修正を未コミットで作成。
+- リボンの中間コンテナーにより外れていたアバターCSSを修正。30×30、padding 0、正円、画像28.667×28.667を直接計測。既存のcover表示は維持。
+- 更新確認/進捗/取消/適用完了を固定フッターの共通通知へ統合。通常結果は実Windowの表示時間で6秒、ホバー/フォーカス中は停止、失敗は明示閉じまで保持。IDで同一結果の再確認も表示する。結果文は確認結果の開閉へ移し、確認日時の領域を未確認時から確保。
+- Windows優先言語ja、システム地域ja-JP。実際のWebAppletManager.account/WebAccountController.accountSessionで作った隔離sessionをWebContentsViewに渡し、ローカルHTTPページで両方のnavigator.language=ja、languages=[ja]、Accept-Language=jaを実測。言語コードの変更なし。実ログイン済みGmailや各サイト独自のアカウント言語設定は調べていない。
+- 回帰スイートは明示依頼により未実行。型チェック/build/変更ソースのPrettier検査成功。今回の変更箇所だけを直接確認し、sourceで画像/更新ありなし/本文と更新画面の領域不変/連続確認/6秒消去/両テーマを確認。初回の直接確認でフォーカス状態が次の通知に残る点を見つけ、DOMの現在状態へ同期する修正後に成功。
+- publish.bat終了0。0.26.25 EXEは142531899 bytes、SHA256 6c49973767b254ce8cd46b21b18320e71b59afccd67db8c74db64ab49a6fa692。feed・隔離コピーと一致。旧全体ZIP0.26.11は317652957 bytes/hash7e62a121ce13efbd7bbc8428777cf5021b4fbc692b792ed0aa142fb3983b363bを維持。
+- 固定EXEの直接確認8項目成功: .artifacts/ui-polish-20261011/portable-profile-1791651342969/inspection.json、portable-inspection-final.log。画像/通常・更新あり通知/本文・更新画面の領域不変/再確認と消去/詳細と狭幅の位置/両テーマ/失敗保持/最小化中の表示時間停止。1280pxと900px相当を確認。発行物での900pxはrenderer viewport指定であり、source側は実Window幅900pxで確認。取得/実インストール/実サービス/既存機能回帰は未確認。
+- 初回portable確認はelectron.launchの起動待ちタイムアウト、2回目はElectron未対応のBrowser.getWindowForTargetで停止。確認用の接続を既存と同じCDP、Window操作を既存IPCへ変更し、同一EXEで成功。製品側の再変更・再発行はしていない。失敗ログ/隔離profileを保持。
+- 完了時整理: 今回の成功source1/portable1、失敗・接続不成立profile、固定EXE、旧版/再利用/Release資料を保持。最新3件を超える削除可能な今回の成功資料なし。不要な調査補助cjs3件のみ削除。未変更Appletの再発行、全体ZIP生成、push/Release/実利用deployなし。小修正は次の依頼まで未コミット。
+
+## 2026-10-11: 0.26.25 コミット・リリース前確認
+
+- 前回保留した回帰を実行。本体型検査と標準回帰198/198、ショートカット・ナビゲーション・条件付きキー・ジェスチャー編集・プロフィール・WebApplet・設定通知・Webアカウント復旧の関連GUIが成功。ジェスチャーはUIモードであり物理フック回帰とは区別する。
+- 検証時のstage tree e639fccf14ab63c5da7b1c069fb10b784d3e9efcとソースが一致。後続差分は本VERIFICATIONの記録だけ。証跡.artifacts/commit-release-0.26.25-20261011。Release準備でtypecheck/regressionの完全ログと入力一致を照合して再利用し、再発行した配布物・更新/復旧/全体ZIPは新しく検証する。
+- 同梱未公開版はGmail0.9.2とWallpaperSlideshow0.4.3。他4Appletは公開済み同版。Gmail回帰21/21とUI、Wallpaper回帰8群・RPC・限定HWNDの終了処理が成功。実認証・実メール・実壁紙・PC終了は行わない。
+- Gmail GUIの更新確認locatorを現行の共通通知/開閉詳細へ修正。途中の隔離accounts.json置換EPERMと案内待ち失敗の資料を保持し、失敗時のalert/status診断を追加。同一製品コードの最終全GUIは成功。一過性のファイル競合の原因は未特定で、製品への試験用回避は追加していない。
+- 新リリースノートに前回公開0.26.11以降の入力UI/起動/保存先/ログ変更をまとめ、最低ホスト版を含むAppletノートも確認。公開操作・新配布物の検証結果はRelease planへ記録する。

@@ -98,3 +98,7 @@ Appletは通常のNodeプロセスと同じ権限を持つ信頼済みコード�
 公式仕様: [WebContentsView](https://www.electronjs.org/docs/latest/api/web-contents-view)、[session.fromPath](https://www.electronjs.org/docs/latest/api/session#sessionfrompathpath-options)、[webContents](https://www.electronjs.org/docs/latest/api/web-contents)。
 
 0.20.0のsnapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。ローカルUIは変更を見て受信トレイ表示へ戻せます。Web履歴の移動可否は従来のcanGoBack/canGoForwardを使用し、履歴の端では移動しません。navigateはWindowを開く操作を含まず、表示はopenで制御します。Gmailの通知は既存のnotifications.show(...,{command:"at365.gmail.open",silent:true})を使い、クリック時はホストが同じ起動世代の実行中Appletか確認してからコマンドを実行します。
+
+## WebViewの言語
+
+Webアカウントのsession/表示WebContentsView/背景Windowは、ChromiumがWindowsから取得する優先言語を使います。ホストでAccept-Languageやnavigator.languageの独自上書きを行いません。サイト側のアカウント設定やURLによる表示言語は別です。0.26.25作業時の隔離セッションでの実測は[検証記録](../VERIFICATION.md)を参照してください。

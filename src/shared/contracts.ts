@@ -265,6 +265,7 @@ export interface UpdateSettings {
   allowSameVersion: boolean;
 }
 export interface UpdateState {
+  notice?: { id: string; kind: 'info' | 'available' | 'error'; message: string };
   completion?: { ok: boolean; message: string };
   cancellable?: boolean;
   progress?: {

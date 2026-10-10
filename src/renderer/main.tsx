@@ -28,7 +28,6 @@ import { SettingsNotice } from './SettingsNotice';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
-import { UpdateCompletionNotice } from './UpdateCompletionNotice';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
@@ -532,7 +531,6 @@ function App() {
                 : undefined
         }
       >
-        {snapshot && <UpdateProgress state={snapshot.updates} />}
         {snapshot?.legacyLocalData && (
           <div className="error-banner" role="alert">
             旧保存領域にPC専用データが残っています。同期する前にAppDockを終了して旧データを整理してください。自動移行・削除は行いません。
@@ -864,13 +862,10 @@ function App() {
         )}
       </main>
       <footer className="statusbar">
-        <UpdateCompletionNotice
-          completion={snapshot?.updates.completion}
-          visible={snapshot?.windowVisible ?? false}
-        >
+        <span className="statusbar-activity">
           <i />
           実行中 {active} Applet
-        </UpdateCompletionNotice>
+        </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
           <VersionCheck compact disabled={editor.dirty} />
@@ -879,6 +874,13 @@ function App() {
           <Icon name="command" size={12} />
           コマンドパレット {paletteKey && <kbd>{paletteKey}</kbd>}
         </button>
+        {snapshot && (
+          <UpdateProgress
+            state={snapshot.updates}
+            visible={snapshot.windowVisible}
+            onDetails={() => void execute('appdock.updates.open')}
+          />
+        )}
       </footer>
       {toast && (
         <div className="toast" role="status">

@@ -72,7 +72,7 @@ export function UpdateSettings({
           >
             すべての更新を確認
           </button>
-          {checkedAt && <UpdateCheckTime checkedAt={checkedAt} />}
+          <UpdateCheckTime checkedAt={checkedAt} />
         </span>
       </div>
       <p className="muted">

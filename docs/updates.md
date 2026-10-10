@@ -4,7 +4,11 @@
 
 ## 設定と取得
 
-起動時の結果読取では`UpdateState.completion`へ成否とメッセージを渡す。成功だけを`UpdateCompletionNotice`でステータスバーへ表示し、`UpdateProgress`の上部進捗欄から外す。失敗・進行中・取消等は従来の進捗欄を使う。新しい更新操作の開始時にcompletionをクリアする。結果ファイルとログの保存形式は変えない。
+0.26.25から確認結果・取得中・取消・適用完了を共通の`UpdateProgress`でステータスバーへ表示する。固定のフッター領域内に重ねるため本文やWebContentsViewの領域を動かさない。通常結果は実Windowが表示されている時間で6秒後に消え、ホバー/フォーカス中は残り時間を停止する。失敗は明示的に閉じるまで残す。取得中の件数/bytes/進捗とキャンセルは同じ欄を使う。
+
+明示操作の結果は一意ID・種別・メッセージを持つ`UpdateState.notice`に渡し、同じ内容を続けて確認しても再表示する。確認時の失敗/未設定を「更新なし」と混同しない。起動時の自動チェックは従来のWindows通知設定を維持し、通常結果のバーを追加しない。再起動後の適用結果は既存の`completion`から同じUIへ渡す。新しい操作開始時にnotice/completionをクリアし、保存済みの結果ファイル・ログの形式は変えない。
+
+通知の「更新画面を開く」から設定へ移動できる。各確認ボタンの隣は未確認時から日時欄の幅を確保し、結果文やリリースへのリンクは「確認結果」を開いたときだけ表示する。本文へ恒常的な結果ラベルを追加しない。
 
 `settings.updates`はhostSource、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
 
