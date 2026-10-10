@@ -142,9 +142,56 @@ test('startup never writes an empty shared roster while metadata is still in tra
   empty.load(settings);
   assert.equal(fs.existsSync(file), false);
   settings.value.webApplets.items = [{ accountId: 'account.00000000-0000-0000-0000-000000000001' }];
-  assert.throws(() => empty.add('overwrite risk'), /同期を待って/);
-  assert.equal(fs.existsSync(file), false);
   fs.writeFileSync(file, '{in-progress');
   assert.throws(() => empty.add('overwrite risk'));
   assert.equal(fs.readFileSync(file, 'utf8'), '{in-progress');
+  fs.unlinkSync(file);
+  const added = empty.add('explicit recovery');
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)).accounts, [added]);
+  assert.equal(
+    settings.value.webApplets.items[0].accountId,
+    'account.00000000-0000-0000-0000-000000000001',
+  );
+  assert.equal(empty.get(added.id).name, 'explicit recovery');
+});
+
+test('empty-roster recovery preserves a newly delivered roster and retained local login data', async (t) => {
+  const root = fixture(t),
+    settings = new SettingsStore(path.join(root, 'settings.json'));
+  settings.load();
+  settings.value.webApplets.items = [{ accountId: 'account.00000000-0000-0000-0000-000000000001' }];
+  const file = path.join(root, 'shared', 'accounts.json'),
+    local = path.join(root, 'local');
+  const store = new WebProfileStore(file, local);
+  store.load(settings);
+  t.after(() => store.close());
+  const remote = { id: 'account.00000000-0000-0000-0000-000000000002', name: 'delivered' };
+  const bytes = JSON.stringify({ schemaVersion: 1, accounts: [remote] });
+  fs.writeFileSync(file, bytes);
+  assert.throws(() => store.add('recovery'), /別の場所/);
+  assert.equal(fs.readFileSync(file, 'utf8'), bytes);
+  store.watch(
+    () => {},
+    (e) => {
+      throw e;
+    },
+  );
+  await until(() => store.snapshot().length === 1);
+  const marker = path.join(
+    local,
+    'sessions',
+    settings.value.webApplets.items[0].accountId,
+    'cookie-marker',
+  );
+  fs.mkdirSync(path.dirname(marker), { recursive: true });
+  fs.writeFileSync(marker, 'old local login');
+  const added = store.add('second');
+  assert.deepEqual(store.snapshot(), [remote, added]);
+  const saved = fs.readFileSync(file, 'utf8');
+  fs.unlinkSync(file);
+  assert.throws(() => store.add('do not replace temporarily missing roster'), /同期を待って/);
+  assert.equal(fs.existsSync(file), false);
+  fs.writeFileSync(file, saved);
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'old local login');
+  assert.deepEqual(store.pendingDeletion(), []);
 });

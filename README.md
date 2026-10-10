@@ -8,7 +8,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-0.26.16はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.2は本体ページと別ウィンドウの両方に対応します。
+0.26.17はElectron 44.6.0を使用します。EXEと対応Appletを更新して再起動すると、Appletの画面を本体のページとして利用できます。Gmail 0.9.2は本体ページと別ウィンドウの両方に対応します。
 
 この配布版は未署名です。
 
@@ -223,6 +223,8 @@ JSONでは`host.hardwareAcceleration`に`true` / `false`を保存します。項
 | `data/assets/profile/` | 登録したアバター原画像 |
 | `data/assets/applets/<Applet ID>/sounds/` | 登録した通知音（Gmailはat365.gmail） |
 | `%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/` | Chromium、全ログイン状態、Gmail専用枠、Window状態、処理データ、秘密情報、ログ、更新記録、設定バックアップ |
+
+Webアカウント枠が空で以前のWebAppletが残っている場合は、設定 → Webアカウントで枠を追加し、WebAppletの設定でその枠を選んで保存できます。ホスト画面の操作エラーはログページにも記録します。
 
 配置IDはEXEの配置先から決まります。同じ場所で更新するとPC専用データを引き継ぎ、配置を変えると新しい保存先になります。WebApplet枠は同期できますが、ログインは各PCで行います。Gmailの枠は名前・ID・枠ごとの監視や通知音の割り当ても含めPC専用です。
 

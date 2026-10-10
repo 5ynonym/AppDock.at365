@@ -119,7 +119,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 - 正本は[設定同期](docs/settings-sync.md)。EXE隣のsettings.jsonとdata内のWebApplet枠名簿・登録素材だけを共有し、全認証/session、Gmail専用枠/選択/枠別監視/音声割当、secrets/storage/Chromium/更新journal/backup等はLOCALAPPDATA内の配置別rootへ置く。Gmail全体のsettings.json設定とは区別する。旧.appdockの自動移行・削除はユーザー指定で追加しない。旧PC専用データが残る場合は警告する。
 - ファイル名を登録元/用途別フォルダー内のIDにする。対応表/インデックスを持たず、Windowsの大文字小文字を無視した同名同内容は再利用、同名別内容は拒否する。上書き・連番生成をしない。枠削除・停止・割当解除で共有素材を自動pruneしない。Gmailの登録済み音声一覧はホストAPIから供給する。
-- 設定/名簿受信は安定bytesの検証とpollを使い、壊れた受信で直近正常値を消さない。受信を書き戻さず、dirty draft/revision保護を維持する。名簿未到着時に空の共有ファイルを書かず、枠操作を同期待ちにする。外部の枠削除で他PCのCookieを回収予約しない。正常設定backupはPC内20世代、復元は明示確認後に異常bytesを保管して行う。
+- 設定/名簿受信は安定bytesの検証とpollを使い、壊れた受信で直近正常値を消さない。受信を書き戻さず、dirty draft/revision保護を維持する。名簿未到着時に空の共有ファイルを自動作成しない。0.26.17以降、0枠からの明示追加は許可し、旧WebApplet参照はユーザーが選び直して保存する。直前に届いた名簿・破損ファイル・既存枠のある一時欠落は上書きしない。外部の枠削除で他PCのCookieを回収予約しない。正常設定backupはPC内20世代、復元は明示確認後に異常bytesを保管して行う。
+- ホスト画面のdock:* IPC callbackが失敗したら、同期throw/非同期rejectを共通のhandleでerrorログへ記録してから元のエラーを返す。操作名とエラーメッセージだけをログに含め、設定/認証/入力の引数を追加しない。未許可の送信元の拒否と、信頼済みホスト操作の失敗を区別する。scripts/web-account-recovery-ui-test.cjsで0枠からの再割当・再起動・画面/ファイルのログを確認する。
 - tests/settings-sync.test.cjs、registered-sounds.test.cjs、updater復旧回帰とsettings-sync-ui-test.cjsを確認する。GUIは直列で隔離し、固定単一EXEでも検証する。--test-local-stateはtest-profile専用。fixtureの2配置へのファイル配達と、実2PC/同期サービス/実Google認証の検証を区別する。実装前の調査記録はVERIFICATIONの履歴として保持する。
 
 ## パスキー認証の調査時の注意（2026-10-10、未実装）

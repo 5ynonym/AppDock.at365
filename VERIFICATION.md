@@ -1064,3 +1064,12 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 固定EXE smoke成功（smoke-1791615191737/smoke-result.json）、data/assets/profile/avatar.pngの保存と実表示を確認。publish.bat終了0。最終EXE142527588bytes、SHA256 456014e1295b6d3f8d66cafbcb359f60933195454b0399e534999c204485ac1e。feed/梱包59ファイル/updater一致、文書ローカルリンク182件確認（.artifacts/data-folder-final-check.json）。既存オールインワンZIPと未変更Gmail0.9.2配布ZIPは不変。
 - 完了時整理: source同期成功3回、portable-production-path成功2回、旧portable成功1回を保持。旧smoke/プロフィール/Gmailの実行方式不明、失敗・再利用・認証資料を保持し、今回削除0。Wallpaperのprotocol一時画像はランナー終了時に削除済み。固定ビルド/Release出力を整理対象にしない。
 - ユーザーの追加指定により今回対応したAppDock/Gmail/WallpaperSlideshowを各repoでコミットする。各モジュール自身のpublishへ発行済み。外部公開・push・実利用deploy・同期設定変更なし。
+## 2026-10-10: 0.26.17 空のWebアカウント枠からの復旧と操作エラーログ
+
+- 旧settings.jsonのWebApplet参照が残り共有accounts.jsonが未到着の場合、同期待ちガードが0件からの追加も拒否していた。WebProfileStore.addで0枠からの明示追加だけを許可し、起動時の空名簿自動生成・旧参照の自動置換は行わない。直前に届いた未反映名簿・破損名簿・既存枠がある一時欠落は上書きを拒否し、既存Cookie等を削除しない。
+- ホスト画面のdock:* callbackの同期throw/非同期rejectを共通handleでerrorログへ記録し、元のエラーも返す。操作名とエラーメッセージだけを追加し、IPC引数は記録しない。既存の送信元/Frame/URLガードを維持。
+- 型検査と191/191回帰成功（.artifacts/web-account-recovery-typecheck.log、web-account-recovery-regression.log）。一時欠落保護の追加assert後、設定同期6/6の対象回帰も成功。直接sandbox実行はTEMPのatomic renameでEPERMとなり、許可された通常Windows実行で成功。失敗ログをweb-account-recovery-sync-regression-sandbox-failed.logへ保持。
+- 新scripts/web-account-recovery-ui-test.cjsはsourceと固定EXEの両方で5項目成功。旧登録の保持、画面での0枠からの追加/再割当/保存、同期・非同期エラーのログページとPC専用host.logへの記録、再起動、既存の空名簿からの再追加、旧ログインmarkerの保持を確認。sourceはweb-account-recovery-1791617699286、通常起動EXEはweb-account-recovery-1791617848978。各errors-in-log-page.pngを保存しsource画像を目視確認。初回fixtureは起動時の既定値初期化を考慮しないraw settings不変assertで失敗し、旧items保持の検証へ修正。失敗フォルダーを保持。
+- 固定EXEの従来2配置同期GUI11項目も成功（settings-sync-ui-1791617905884/result.json）。ログ記録によるdirty保存拒否・正常backup/破損起動・共有枠/素材・Gmail個別枠等の挙動を維持。実2PC/同期サービス/実ログインは未確認、LOCALAPPDATAをfixture内へ隔離。
+- publish.bat終了0。最終EXE0.26.17は142527632bytes、SHA256 ee7ad7302691926e801b686eb190ff7f8e901fba3a7776c3cdb2f8d05a2cf1c8。feed/梱包59ファイル/updater一致、182ローカルリンク確認（web-account-recovery-final-check.json）。旧全体ZIP不変、未変更Appletの再発行なし。
+- 完了時整理: recovery成功はsource/portable各1回、従来2配置portable-production-path成功3回を保持。失敗/方式不明/認証・再利用資料/固定ビルド/Release記録を保持し削除0。前の継続依頼の範囲で本修正をAppDockへコミットする。push/Release/実利用deploy/同期設定変更なし。
