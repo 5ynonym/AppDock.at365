@@ -86,6 +86,22 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 
 依存更新は`.\dev.bat update --latest`、残りの確認は`.\dev.bat outdated --format json`です。安定版の直接依存と、それが要求する間接依存をlockfileに固定します。GmailはこのホストのTypeScript・Vite・Reactを共有し、他の5つの.NET Appletは外部NuGet参照を持ちません。各Appletの既存回帰テストも合わせて実行してください。
 
+### 依存とツールの公開後待機
+
+通常更新は各バージョンの公開から7日待機します。`pnpm-workspace.yaml`の`minimumReleaseAge: 10080`（分）、`minimumReleaseAgeStrict: true`、`minimumReleaseAgeIgnoreMissingTime: false`を使い、実行時・開発用・間接依存へ適用します。条件を満たす版がなければ停止し、公開日時がない場合も停止します。既存lockfileを使ったインストールにも適用するため、若い版を別環境から持ち込んでも待機を回避できません。`outdated`に新版が残っても、待機中なら無理に導入しません。日数を変える場合は`toolchain.json`の`minimumReleaseAgeDays`も揃えます。setupは両設定の一致を確認します。
+
+`verifyDepsBeforeRun: error`により、ビルド・試験前に依存の不整合があれば自動インストールせず停止します。導入・復元は明示的な`dev.bat install --frozen-lockfile`、版更新は`dev.bat update --latest`で行います。
+
+2026-10-11の導入時は、既存0.26.25で導入・検証済みのlockfileに7日未満の6件が含まれていました。版とlockfileを変えず現状を維持する移行例外として`@vitejs/plugin-react@6.1.2`、`electron@44.6.0`、`http-cache-semantics@4.3.0`、`nanoid@3.3.20`、`postcss@8.5.29`、`vite@8.3.3`だけを完全な版で除外しています。通常の新版には適用されません。全6件が成熟する2026-10-14 07:39:15 JST以降にこれらを取り除けます。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の除外は更新時に自動整理します。pnpm本体12.10.1は導入済みのものを再利用し、新規取得は成熟するまで拒否します（ツールの例外は追加していません）。
+
+Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.21.0はKrypton LTSです。自動でCurrentや新しいLTSへ移行しません。新規取得前に公式の`dist/index.json`で対象版のLTS表示と公開日を確認します。公開日が日単位なので、そのUTC日が終わってから7日待ちます。導入済みNodeは実行ファイル自身のLTS表示を確認して再利用します。
+
+pnpm本体はnpmで導入するため、workspace設定だけでは保護されません。setupは公式npmレジストリで固定版のpnpmとWindows x64ネイティブパッケージの公開日時を確認し、npmにも`--min-release-age=7`を渡します。新規取得でメタデータの取得・検証に失敗したら停止します。導入済みの固定ツールは再利用し、通常ビルドのたびにツール公開情報を取得しません。
+
+重大なセキュリティ修正を急いで導入する場合は、出所・告知・差分を確認し、対象の完全な版だけを例外にします。npm依存は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`へ`package-name@1.2.3`を追加し、理由をコメントとVERIFICATIONへ記録します。名前だけやワイルドカードで全バージョンを除外しません。ツールは`toolchain.json`の`releaseAgeExceptions`へ`{"package":"pnpm","version":"12.10.1","reason":"確認した修正内容"}`形式で記録します（これは書式例で、現在の例外は空です）。対象は`node`、`pnpm`、`@pnpm/exe.win32-x64`です。pnpmとそのバイナリはそれぞれ確認し、必要ならそれぞれ版指定で例外にします。Nodeの例外は待機日数だけを免除し、LTS要件や公開日時の確認は維持します。待機期間経過後や対象版の不使用時に例外を取り除きます。
+
+待機は不正コードの検出を保証する機能ではありません。lockfile固定、導入前の告知・差分確認、導入後の必要な回帰確認も継続します。仕組みの回帰は`node --test tests/release-age.test.cjs`（ローカルNodeを使用）で、公開時刻の境界、版限定例外、非LTS拒否、pnpm実体の直接・間接・日時欠落・lockfile復元時の拒否を隔離レジストリで確認します。
+
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
 `pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
