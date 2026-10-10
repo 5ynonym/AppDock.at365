@@ -42,7 +42,8 @@ export function createHostApi(
           action.actionId.startsWith(id + '.') &&
           action.actionId.length <= 200 &&
           !action.command));
-    if (['stopped', 'stopping', 'error'].includes(e.state))
+    const stoppingLog = e.state === 'stopping' && method === 'host.log';
+    if (['stopped', 'stopping', 'error'].includes(e.state) && !stoppingLog)
       throw new Error('拡張は停止しています。');
     const requireCapability = (cap: string) => {
       if (!e.manifest.capabilities?.includes(cap))

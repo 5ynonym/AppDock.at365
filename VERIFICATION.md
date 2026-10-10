@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-10: 0.26.18 コミット前の全回帰確認
+
+- 共通ログ/WallpaperSlideshow終了対応のコミット依頼により、対象9ファイルをstageしてから標準回帰を実行。型検査、`dev.bat test`の192/192、変更コードのPrettier確認が成功。検証開始/終了のtreeは`14440020ff282971282d0b335478149d14175581`で一致し、未stage/未追跡の入力なし。
+- 兄弟AppletのRelease回帰8グループ、RPC8項目と発行native EXE、実HWNDの終了通知3群、固定発行EXEのログGUI4群も今回再実行して成功。GUI証跡は`../Applet.WallpaperSlideshow.at365/.artifacts/host-logging-1791638884710/result.json`。停止時のApplet ID/errorレベル・全体/個別ログ・host.log・独自errors.logなしを確認。
+- 再利用用証跡は`.artifacts/commit-validation-20261010-logging-shutdown/`。各コマンド/終了コード/完全ログSHA256、tracked入力、SDK/Runtime、toolchain/lockfile/依存状態、兄弟repoと発行物を保存。検証後の変更は本VERIFICATIONへの記録追加のみで、最終treeとコミットSHAを同証跡に記録する。
+- 発行物は実装完了時の0.26.18/0.4.3から不変。feed/ZIP全2ファイル/文書リンク95件/既存全体ZIPの照合成功。新しい製品修正がなく再発行は不要。Applet側で終了済みの古い成功テスト2件だけを整理し、方式別最新成功3件・失敗・検証再利用資料を保持。
+- PC自体のshutdown/reboot/logoff・実デスクトップ壁紙APIは未試験。隔離した実Windowsメッセージとfake壁紙APIの確認範囲を維持する。今回の明示依頼は両repoのローカルコミットまで。
+
+## 2026-10-10: 0.26.18 Applet終了処理中の共通ログ
+
+- WallpaperSlideshowの独自errors.logを共通APIへ移す依頼で、IExtensionContext.Log/Node logとhost.logは既存と確認。停止処理中の共通API一律拒否により、クリーンアップエラーがstderrのWarningになる境界を修正。stoppingではhost.logだけを許可し、stopped/errorと他APIの拒否は保持。SDK/RPC形式・プロセス寿命・全体終了手順の変更なし。
+- 型検査/build成功（.artifacts/cleanup-logging-typecheck.log、cleanup-logging-build.log）。logging/notification-services/panel-images/lifecycleの関連回帰9/9成功（cleanup-logging-regression.log）。開始/稼働/停止中のログ、提供元IDのホスト付与、停止後拒否、停止中の設定/UI/通知拒否、実Node/.NETの起動/停止/再起動/異常終了分離を確認。
+- 本体publish.bat終了0。0.26.18単一EXEは142,521,087bytes/SHA256 2dcb4e32c960101d4541dab24bdc949a655dd453b928388d4fd816f815cf7085。feedと検証コピー一致。既存全体ZIP1個はhash/size/mtime不変。未変更Applet再発行や全体ZIP生成なし。別途変更したWallpaperSlideshowは自身のpublishへ0.4.3を発行し、最低host0.26.18を設定。
+- 固定単一EXEの隔離GUI4群成功: ../Applet.WallpaperSlideshow.at365/.artifacts/host-logging-1791637417933/result.json。実native Appletの起動失敗とfixtureの内部画像エラーを全体/個別ログ画面・ホストファイルで確認。普通の終了時のfixture cleanupログもApplet ID/errorレベルで保存。正常終了・重複抑制・独自errors.logなし・最終EXEコピーのhash一致を確認し、画像も目視。
+- WallpaperSlideshowのWM_ENDSESSION/優先度/同期黒BMP処理の変更と、実HWNDへ限定送信した確定/取消/logoff/通常deactivateの検証は[Appletの記録](../Applet.WallpaperSlideshow.at365/VERIFICATION.md)を参照。Windows終了時にbefore-quitが発火しない仕様に対し、Applet側で同期クリーンアップする。PC自体のシャットダウン/再起動・実壁紙変更は行っていない。
+- 2モジュールのmanifest/feed/ZIP全2ファイル、文書リンク95件、既存全体ZIPを照合（../Applet.WallpaperSlideshow.at365/.artifacts/logging-shutdown-final-check.json）。必要範囲を選択した実装時検証であり、全本体回帰・全GUI・実サービスを実行した記録ではない。
+- 完了時整理は今回のtest-host-logging-ui/test-session-shutdownの成功をそれぞれ直近3回保持。未知の旧記録・失敗profile・固定ビルド/Release資料は保持し、.artifacts追加削除0。Appletの旧GUIが残した自身のTemp画像3件だけを境界/内容/終了確認後に削除。commit/push/Release/実利用deployなし。
+
 ## 2026-10-10: 実装・コミット・リリースの共通手順と検証再利用
 
 - ユーザー依頼でdocs/development-workflow.mdへ本体/全Appletの段階別手順を集約。実装時は必要試験を選び版更新/publishまで、コミット時に必要回帰を全実行し修正/再発行後にcommit、リリース時に対象変更のコミット漏れと未pushを確認・解消する。

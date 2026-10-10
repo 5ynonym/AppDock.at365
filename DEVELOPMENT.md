@@ -135,6 +135,8 @@ scripts/                   ビルドと実機UI/portable検証
 
 ## 配置
 
+共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。0.26.18では停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行した単一EXEとnative fixtureで全体/個別ログ画面・終了時ログを確認します。
+
 `deploy.bat` はPowerShell 7（`pwsh.exe`）を使用します。
 
 `deploy.bat "配置先の既存フォルダ"` でEXEのみコピーします。引数省略時は `deploy.local.txt` の先頭行を使います。`deploy.local.txt.example` を参考にしてください。設定や追加拡張はコピーしません。配置先で実行中の場合は先に終了してください。既存EXEを置換する操作なので、配置はユーザーが必要な時に実行してください。
