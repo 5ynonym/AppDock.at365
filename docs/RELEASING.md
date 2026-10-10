@@ -2,6 +2,8 @@
 
 この文書をリリースの正本とします。ユーザーからAppDockのリリースを依頼されたら、本体とフルパッケージに同梱したAppletを下記の範囲でまとめて扱い、各repoの公開後検証と整理まで実施します（2026-10-10ユーザー指定）。単なるビルドや手順整備では公開しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
 
+実装中のテスト選択、コミット前の必要回帰、コミット漏れの解消と検証証跡の再利用は[共通手順](development-workflow.md)に従います。リリース時に同じソース回帰を重複実行する必要はありません。ただし、以下の新しい配布物と公開後の確認は省略しません。
+
 ## 本体と同梱Appletをまとめてリリース
 
 作業者が次の全工程を一つのリリース作業として実施します。`scripts/release.ps1`は本体用のPrepare/Draft/Publish/Verifyであり、同梱Appletの個別公開は[Applet個別Release](#applet個別release)の手順を併せて行います。単一のスクリプト呼出しで全repoが公開されると扱わないでください。
@@ -39,7 +41,8 @@
 - Windows x64、.NET 10 SDK、Git、認証済みGitHub CLIが必要です。実行ユーザーに対象repoのRelease作成権限が必要です。
 - `setup-tools.bat`で[toolchain.json](../toolchain.json)のローカルNode/pnpmを用意します。グローバルNode/pnpmは追加しません。ビルドは既存の`dev.bat`/`publish.bat`を使います。
 - PowerShellからrepoルートで実行します。以下の`$taskRepo`は実際のcheckoutへ合わせます。Gitの所有権例外はコマンド単位とし、global設定を変更しません。
-- hostと全対象Appletの作業ツリーはcleanにします。ユーザーの変更を破棄・勝手にstashしません。各Appletは意図した最新のローカルcommitか確認します。自動pullや自動branch切替はありません。
+- hostと全対象Appletの未コミット変更/未追跡ファイルと未プッシュcommitを別々に確認します。関連変更のコミット漏れは共通手順のコミット工程（必要回帰・修正・再発行）を経て解消します。別作業や帰属不明の変更を勝手にコミット・破棄・stashしません。準備開始時には全対象repoをcleanにし、各Appletが意図したcommitか確認します。自動pullや自動branch切替はありません。
+- fetch後にbranch/originとリモートとの差分を確認し、公開対象repoの未プッシュcommitを通常pushします。リモートが先行/分岐していたらforce pushせず解消方針を確認します。プッシュ先のSHAと検証対象を照合し、準備後もDraft前に再確認します。別作業の未コミット変更がなくても、必要な検証証跡がなければ再検証します。
 - 実利用フォルダーへdeployせず、GUI試験は隔離profileで直列実行します。ログイン情報やsettingsを配布物へコピーしません。
 
 ```powershell
@@ -55,11 +58,11 @@ git -c "safe.directory=$taskRepo" -C $taskRepo remote -v
 
 ## 1. バージョンとリリースノート
 
-1. 対象変更を実装し、必要な回帰試験を行います。安定版は`x.y.z`を使用し、公開済みの版・タグを再使用しません。
+1. 対象変更は共通手順に従って実装・発行し、コミット時に必要回帰を完了します。成功証跡がある場合は再利用条件を照合し、不足する検証だけ追加します。安定版は`x.y.z`を使用し、公開済みの版・タグを再使用しません。
 2. 実装時にまだ版を更新していなければ、`scripts/release.ps1 -Mode SetVersion -Version <次の版>`でpackage.jsonを更新します。現在より大きい正式版だけを受け付けます。同じ変更で更新済みの未公開版は、その版をリリースし、重ねて版を増やしません。コミット・タグ・公開はまだ行いません。
 3. READMEの利用者向け版/要件、関係する開発文書、検証記録を更新します。変更内容に応じた追加のGUI試験も行います。
 4. UTF-8のリリースノートを`docs/releases/v<版>.md`などに保存します。変更点、Windows/.NET要件、3配布物の用途、導入/更新方法、最低対応版、既知の制約、検証範囲を記載します。古い件数やハッシュをコピーしません。
-5. 変更をレビューしてコミットし、リリース対象をmainへ統合します。既存のユーザー変更・branch境界を守ります。通常のレビュー/承認フローがあれば従います。
+5. 未コミットの対象変更があれば共通手順のコミット工程を完了します。リリース対象mainと統合後の内容・証跡の一致を確認し、未プッシュcommitをプッシュします。既存のユーザー変更・branch境界を守り、別branchを無断で統合しません。既に検証・コミット・プッシュ済みなら重複操作は不要です。
 
 package.jsonは本体バージョンの正本です。pnpm-lock.yamlには本体版の重複フィールドはありません。更新UI試験はpackage.jsonの版を読みます。Appletを変更した場合はそのrepoのmanifest・プロジェクト/パッケージの版とノートを整合させ、各repoで検証/コミットします。
 
@@ -74,7 +77,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
 
 プレースホルダーは実際の版と新しい試行IDへ置き換えます。PlanPathを省略すると固有の.artifactsフォルダーを作ります。既存planの上書きは拒否します。
 
-Prepareはソース/ノートの事前記録後、次を順番に実行します。
+標準Prepareはソース/ノートの事前記録後、次を順番に実行します。これは証跡がない場合の経路です。条件を満たす成功証跡がある場合は、下記の「証跡を再利用した準備」を選びます。現行スクリプトに再利用用オプションはありません。
 
 1. `dev.bat run typecheck`
 2. `dev.bat test`（helper・本体・fixtureビルドと回帰テスト）
@@ -87,11 +90,44 @@ Prepareはソース/ノートの事前記録後、次を順番に実行します
 
 1件でも失敗するとそこで停止し、GitHubへ接続/公開しません。各ステップのログ、`checks.json`、`bundle-ui.json`をplan隣へ保存します。最後にsealでhost/Appletのcommitとclean状態、同梱一覧、元Applet ZIPハッシュ、3アセット、ノート、検証ログのハッシュを照合します。全検証成功後にpublish直下の旧版オールインワンZIPを削除し、削除名をplanの`removedOldBundles`へ保存して`prepared`にします。対象と失敗時の扱いは[旧版ZIP整理](all-in-one.md#publishの旧版zip整理)を参照してください。通常publishではこの整理を行いません。
 
-失敗したpublishの後には以前のZIPが残る場合があります。ファイルが存在するだけで成功扱いしません。修正後は新しいPlanPathでPrepareをやり直します。Prepare後のソース変更/コミット、ノート変更、再ビルド、Applet追加、証跡変更はplanを無効にするため、必ず再Prepareします。
+失敗したpublishの後には以前のZIPが残る場合があります。ファイルが存在するだけで成功扱いしません。修正後は新しいPlanPathで準備をやり直します。準備後のソース変更/コミット、ノート変更、再ビルド、Applet追加、証跡変更はplanを無効にするため、必ず新しいplanで準備します。その際も再利用条件が成立する項目だけは再利用できます。
+
+### 証跡を再利用した準備
+
+これは既存の`release.cjs preflight`/`seal`を使う作業者向けの個別実行手順です。照合は作業者が行います。スクリプトがコミット前証跡を自動検証する機能ではありません。証跡の不足・不一致を解消できなければ、該当試験を実行します。`release.ps1 -Mode Prepare`を併用すると全試験が再実行されるため、この経路では呼びません。
+
+1. [再利用条件](development-workflow.md#検証結果を再利用する条件)をrepoごとに照合します。本体で再利用できるステップは`typecheck`と`regression`です。`regression`には同じ`dev.bat test`の全成功ログが必要で、部分的な試験成功だけでは代用できません。再利用元のログ・記録が改変されていないことを保存済みSHA256で確認します。
+2. 新しい`$taskPlan`と確定済み`$taskNotes`を選び、次のpreflightで現在のcleanな本体/全Appletを記録します。外部コマンドの終了コードは直後に検査します。
+
+   ```powershell
+   $taskToolchain = Get-Content -LiteralPath (Join-Path $taskRepo 'toolchain.json') -Raw | ConvertFrom-Json
+   $taskNode = Join-Path $taskRepo ".tools\node\$($taskToolchain.node)\node.exe"
+   $taskCore = Join-Path $taskRepo 'scripts\release.cjs'
+   & $taskNode $taskCore preflight $taskPlan $taskNotes
+   if ($LASTEXITCODE -ne 0) { throw 'Release preflight failed.' }
+   $taskLogRoot = Split-Path $taskPlan -Parent
+   ```
+
+3. `typecheck`/`regression`それぞれについて、再利用できる場合は完全な元ログをplan隣の`typecheck.log`/`regression.log`へコピーします。各コピーの末尾へ「今回の実行ではなく再利用」である旨と、元記録/ログの絶対パス・元SHA256・実行日時・コマンド・終了コード・検証時tree/対応commit・今回のtree/commit・依存/環境照合結果を追記します。この末尾を含めてsealの証跡ハッシュに入ります。元ログ/元記録は変更しません。再利用できない項目は上記1/2のコマンドを実行して同名ログへ出力し、終了0を確認します。
+4. 上記3〜8の配布物生成・検証を同じ順序/引数で実行します。実行場所は`$taskRepo`、ローカルNodeは`$taskNode`です。ログ名は順に`publish.log`、`pack-all-in-one.log`、`portable-updates.log`、`update-progress.log`、`update-recovery.log`、`all-in-one.log`。最後の試験へ渡す出力先は`Join-Path $taskLogRoot 'bundle-ui.json'`です。各終了コードを確認し、非0/実行不能ならそこで停止します。PowerShellのnative stderr処理は`release.ps1`の実装と同じく終了コードで判定します。
+5. 全8項目が実行成功または上記条件で再利用成功となった場合だけ、以下の内容をUTF-8の`checks.json`へ保存します。各項目の実態とログを確認してから記入し、未確認項目を追加してsealを通す行為は禁止します。
+
+   ```json
+   ["typecheck", "regression", "publish", "pack-all-in-one", "portable-updates", "update-progress", "update-recovery", "all-in-one"]
+   ```
+
+6. 次のsealを実行し、標準経路と同じくcommit/clean状態、ノート、全ログ、bundle/配布物の照合と旧版ZIP整理を完了させます。成功後は下記Draft/Publish/Verifyへ進みます。seal後にログやノートを追記しません。
+
+   ```powershell
+   & $taskNode $taskCore seal $taskPlan
+   if ($LASTEXITCODE -ne 0) { throw 'Release seal failed.' }
+   ```
+
+Appletのソース回帰も共通の照合条件で再利用できます。全体ZIP生成による再発行後の個別ZIP/feed・同梱ファイルの一致、固定配布物の動作確認と公開後検証は今回の成果物で行います。再利用元の発行物試験を新しいバイナリの成功として流用しません。
 
 ## 3. mainのpush、下書きと添付
 
-リリースを依頼された範囲で、検証済みcommitをmainへpushします。スクリプトはpushやマージを自動実行せず、GitHub mainのSHAとplanのSHAが一致することを要求します。
+事前確認でpush済みの対象commitについて、GitHub mainのSHAとplanのSHAの一致を再確認します。未pushが残っていた場合のみ、リリースを依頼された範囲の検証済みcommitを通常pushします。スクリプトはpushやマージを自動実行しません。準備後に別commitへ変わった場合は、古いplanで公開せず準備からやり直します。
 
 ```powershell
 git -c "safe.directory=$taskRepo" -C $taskRepo push origin main
