@@ -24,7 +24,7 @@ test('attention and file/audio APIs require capability and validate parameters',
   await assert.rejects(api(e, 'host.ui.pickFile', { kind: 'exe' }), /JSON/);
   await assert.rejects(
     api(e, 'host.audio.play', { file: 'https://example.test/a.wav' }),
-    /絶対パス/,
+    /WAVファイル名/,
   );
   await api(e, 'host.tray.attention', { active: true });
   assert.equal(e.attention, true);

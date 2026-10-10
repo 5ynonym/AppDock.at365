@@ -74,12 +74,12 @@ child.on('exit', (code) => {
   }
   if (
     result.ok &&
-    (!fs.existsSync(path.join(profile, 'avatar.png')) ||
+    (!fs.existsSync(path.join(profile, 'data/assets/profile/avatar.png')) ||
       path.resolve(result.avatarPath).toLowerCase() !==
-        path.join(profile, 'avatar.png').toLowerCase())
+        path.join(profile, 'data/assets/profile/avatar.png').toLowerCase())
   ) {
     result.ok = false;
-    result.error = 'Avatar was not saved beside settings.json.';
+    result.error = 'Avatar was not saved under data/assets/profile.';
   }
   console.log(JSON.stringify({ profile, portable, ...result }, null, 2));
   if (!result.ok) {

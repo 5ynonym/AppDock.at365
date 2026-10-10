@@ -1,5 +1,7 @@
 # 新しいAppletを作る
 
+新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、端末固有データは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。認証・Storage・Secrets・生成キャッシュはPC専用、登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+
 AppDock v0.3.0 / API v1を基準にした実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
 新しいAppletにも[ドキュメント方針](documentation.md)を適用し、利用者向けの`README.md`と開発者向けの`DEVELOPMENT.md`を分けて作成します。最低ホスト版・導入・操作・設定・利用上の制約はREADME、ビルド・テスト・発行・内部構造はDEVELOPMENT、実測結果はVERIFICATIONへ記載してください。
@@ -109,7 +111,7 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 - boolean / number / string / selectを宣言し、説明・数値の上下限・刻み幅を付けます。フォームとHost API保存時は検証されますが、手動JSON編集の値をApplet側でも検証・補正します。
 - 設定変更は `Settings.OnChanged` / `settings.onChanged` で購読し、タイマー間隔や表示へ反映します。`SetAsync`は保存成功後に自分のキャッシュも更新しますが、自分の購読処理が必ず呼ばれることには依存せず、操作後に必要な表示更新を明示的に行います。
 - モニター等の動的なselectは、manifestに `dynamic: true` と初期optionsを宣言し、Activate時と構成変更時に `SetOptionsAsync` / `setOptions` を呼びます。選択肢は保存値を上書きしません。未接続時の代替先はApplet側で決めます。
-- 環境設定はSettings、処理データはStorage、認証トークンはSecretsへ分けます。ログへ秘密情報を出しません。必要なcapabilitiesだけを宣言します。
+- 同期する設定はSettingsへ保存し、端末固有の処理状態はStorage、認証トークンはSecretsへ分けます。Storage/SecretsはホストがPC専用root内でApplet IDごとに保存します。登録原素材はEXE隣の`data/assets/applets/<Applet ID>/`に置き、生成キャッシュと分けます。追加の共有ファイル保存が必要ならホストの専用領域/契約を整備します。ログへ秘密情報を出さず、必要なcapabilitiesだけを宣言します。
 - トレイ操作が不要なら `Tray.Add` を呼びません。時計Appletは3コマンドを登録し、トレイ項目は0件です。
 
 ## 4. native / WPF Appletを作る場合

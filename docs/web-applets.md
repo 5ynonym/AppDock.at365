@@ -1,5 +1,7 @@
 # WebApplet
 
+0.26.14の共有枠・PC専用sessionと旧保存先を移行しない方針は[設定同期](settings-sync.md)を参照してください。
+
 WebAppletはURLから追加する本体管理のAppletです。配布用のextension.jsonや別プロセスは不要で、Applet一覧・リボン・コマンド・ショートカットに表示します。1つのURLにつき1つの安定した`web.<UUID>`を発行し、最大64件を登録できます。ファイルとして導入するAppletにはこのID接頭辞を使いません。
 
 ## 設定と保存
@@ -16,17 +18,17 @@ Appletページで停止（無効化）すると、対象WebAppletのリボン�
 
 ## アカウント
 
-「設定 → Webアカウント」は設定保存と独立した管理ページです。追加・名前変更・削除は専用ファイル`.appdock/web-applets/accounts.json`（`{schemaVersion:1,accounts:[{id,name}],pendingDeletion:[id]}`）へ即時保存します。削除待ち記録がない既存ファイルは空の一覧として読み込みます。名前変更はフォーカスが外れた時・専用ボタン・Enterで確定し、確定前のEscapeは保存済みの名前へ戻します。空欄やIME変換中は確定せず、変換を終えてフォーカスが外れた場合に確定します。同じ名前の重複要求を避け、名前変更と直後の削除/クリアは順番に実行します。フォーム/JSON/保存バーを表示せず、ほかの設定の下書きやrevisionを変更しません。設定JSONが不正な編集中でも管理ページへ移動でき、戻ると元のJSONを保持します。
+「設定 → Webアカウント」は設定保存と独立した管理ページです。追加・名前変更・削除は専用ファイル`data/web-applets/accounts.json`（`{schemaVersion:1,accounts:[{id,name}]}`）へ即時保存します。削除待ちはPC専用のpending-deletion.jsonへ保存します。名簿の外部更新は自動再読み込みし、外部削除ではこのPCのログイン情報を消しません。名前変更はフォーカスが外れた時・専用ボタン・Enterで確定し、確定前のEscapeは保存済みの名前へ戻します。空欄やIME変換中は確定せず、変換を終えてフォーカスが外れた場合に確定します。同じ名前の重複要求を避け、名前変更と直後の削除/クリアは順番に実行します。フォーム/JSON/保存バーを表示せず、ほかの設定の下書きやrevisionを変更しません。設定JSONが不正な編集中でも管理ページへ移動でき、戻ると元のJSONを保持します。
 
-専用のログイン保存枠を最大32件作れます。WebApplet側には使用アカウントの選択と管理ページへのリンクを置きます。`account.<UUID>`ごとの永続sessionをEXE隣の`.appdock/web-applets/sessions/<id>`へ置きます。同じ枠を選んだWebApplet間でCookie/サイトデータを共有し、異なる枠では分離します。初回は各サイトでログインします。
+専用のログイン保存枠を最大32件作れます。WebApplet側には使用アカウントの選択と管理ページへのリンクを置きます。`account.<UUID>`ごとの永続sessionをPC専用rootの`web-applets/sessions/<id>`へ置きます。同じ枠を選んだWebApplet間でCookie/サイトデータを共有し、異なる枠では分離します。初回は各サイトでログインします。
 
 枠がない状態でWebAppletを追加すると、既定の「個人用」を即時作成します。WebAppletの下書きを破棄しても枠は残り、管理ページで削除できます。
 
-Gmailの`.appdock/web-accounts/at365.gmail`、アカウント一覧、認証情報、観測処理は参照・変更しません。既存Gmailのログイン移行/コピーも行いません。WebAppletの削除/無効化は対象画面を破棄し、ログイン枠は残します。
+GmailのPC専用root内`web-accounts/at365.gmail`、アカウント一覧、認証情報、観測処理は参照・変更しません。既存Gmailのログイン移行/コピーも行いません。WebAppletの削除/無効化は対象画面を破棄し、ログイン枠は残します。
 
 「ログイン情報をクリア」「枠を削除」はホストの警告dialog（default/cancelはキャンセル）で確認してから即時実行します。クリアは同じ枠の画面を閉じてCookie/サイトデータ/cache/HTTP認証cacheを消去し、接続を閉じます。枠は残します。削除は枠と保存データを消します。保存済みWebAppletで使用中なら拒否し、dialog中とデータ消去後に割り当てを再検査します。UIでは未保存の割り当ても削除ガードに含め、処理中の枠を参照する設定の保存も拒否します。設定の保存は不要、IDを再利用しません。
 
-枠の除去とpendingDeletionへのID記録を同じatomic writeで保存します。未生成のsessionディレクトリはその場で物理削除し、生成済みのsessionは先にデータを消去して、ディレクトリ回収を次回起動まで待ちます。終了時に削除済みsessionを再flushしません。起動時はsession生成前に削除待ちだけを回収します。ロック/権限等で消せなければ記録を保持して後続の起動でも再試行し、UIにも後処理待ちを表示します。
+このPCでの明示削除は、先にPC専用のpending-deletion.jsonへ記録してから共有名簿を原子的に更新します。名簿保存失敗時は削除待ち記録を戻し、登録中・設定で参照中の枠を回収しません。未生成のsessionディレクトリはその場で物理削除し、生成済みのsessionは先にデータを消去して、ディレクトリ回収を次回起動まで待ちます。終了時に削除済みsessionを再flushしません。起動時はsession生成前に削除待ちだけを回収します。ロック/権限等で消せなければ記録を保持して後続の起動でも再試行し、UIにも後処理待ちを表示します。
 
 回収対象はWebApplet専用sessions直下の検証済みaccount IDだけです。登録中/設定から参照中/同プロセスで生成済みのsessionは回収せず、転送されたroot/対象junctionを拒否して、外部へのパスをたどりません。削除記録のない旧版の残存ディレクトリは自動で削除しません。
 
@@ -44,7 +46,7 @@ Gmailの`.appdock/web-accounts/at365.gmail`、アカウント一覧、認証情�
 
 Webページにはpreload/Node/ホストIPCを公開せず、sandbox/contextIsolation/webSecurityを維持します。サイトのデバイス権限は拒否します。Electron内での認証可否は各サイトに依存します。許可されていない転送を偽装や証明書検証の解除で回避しません。
 
-画面は明示的に開いたときに作成し、同じWebContentsViewをpage/window間で再利用します。独立Windowの位置は`.appdock/web-applets/windows/<webId>.json`へ保存します。Windowの×は非表示です。非選択時の常時描画/新着監視は汎用WebAppletでは保証しません。Gmailの既存背景描画契約は継続します。
+画面は明示的に開いたときに作成し、同じWebContentsViewをpage/window間で再利用します。独立Windowの位置はPC専用rootの`web-applets/windows/<webId>.json`へ保存します。Windowの×は非表示です。非選択時の常時描画/新着監視は汎用WebAppletでは保証しません。Gmailの既存背景描画契約は継続します。
 
 本体ページの上部には戻る/進む/リロード/開始ページと状態を表示します。別Windowでも同じ操作をコマンド検索や割り当てたキーから実行できます。Webページにフォーカス中のローカルキーはCtrl/Alt付き、F1～F24、Pauseを扱い、通常の文字入力キーを取りません。URLのquery/fragmentをエラーログへ記録しません。
 

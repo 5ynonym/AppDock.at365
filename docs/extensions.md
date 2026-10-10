@@ -1,5 +1,7 @@
 # Applet API v1
 
+0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+
 ## v0.4.0: 動的コマンドとキー送信の一覧設定
 
 `dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大100件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。

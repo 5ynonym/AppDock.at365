@@ -32,6 +32,7 @@ export interface WebAccountSound {
   name?: string;
 }
 export interface WebAccountSnapshot {
+  registeredSounds?: string[];
   navigationRevision?: number;
   dark: boolean;
   settings?: Record<string, boolean | string>;

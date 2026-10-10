@@ -66,7 +66,7 @@ settings.gestures.bindings = [
 ];
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const calls = () => {
-  const dir = path.join(profile, '.appdock/storage/test.gestures');
+  const dir = path.join(profile, 'data/storage/test.gestures');
   try {
     return fs
       .readdirSync(dir)

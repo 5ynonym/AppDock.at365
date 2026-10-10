@@ -115,7 +115,7 @@ let output = '';
       );
       assert.equal(
         await page.evaluate(() => window.dock.snapshot().then((s) => s.dataDirectory)),
-        path.join(profile, '.appdock'),
+        path.join(profile, 'data'),
       );
       return page;
     }

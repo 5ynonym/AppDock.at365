@@ -1,5 +1,7 @@
 # AppletのためにAppDockへ機能を追加する
 
+0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+
 一般設定のスタートアップ登録と管理者起動は[起動設定](launch-settings.md)を参照してください。ホスト・UIの共有設定とWindowsタスクの保存処理、UACを伴う再起動をこの仕様で管理します。
 
 AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。

@@ -111,7 +111,7 @@ async function open(id) {
   settings.host.notifications = false;
   settings.globalShortcutCommands = [];
   fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-  const gmail = path.join(profile, '.appdock', 'web-accounts', 'at365.gmail', 'preserve.txt');
+  const gmail = path.join(profile, 'data', 'web-accounts', 'at365.gmail', 'preserve.txt');
   fs.mkdirSync(path.dirname(gmail), { recursive: true });
   fs.writeFileSync(gmail, 'untouched Gmail data');
   await start();

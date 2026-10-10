@@ -186,6 +186,7 @@ export class PortableUpdates {
       executable: string;
       restartArgs: string[];
       baseDirectory: string;
+      stateDirectory?: string;
       fetcher?: Fetcher;
       changed(): void;
       confirm(names: string[]): Promise<boolean>;
@@ -493,7 +494,11 @@ export class PortableUpdates {
         args: this.options.restartArgs,
         processIds: this.options.processIds(),
         items,
-        result: path.join(this.options.baseDirectory, '.appdock', 'update-result.json'),
+        stateDirectory: this.options.stateDirectory,
+        result: path.join(
+          this.options.stateDirectory || path.join(this.options.baseDirectory, 'data'),
+          'update-result.json',
+        ),
       };
       const jobPath = path.join(temporary, 'job.json');
       await fs.writeFile(jobPath, JSON.stringify(job));

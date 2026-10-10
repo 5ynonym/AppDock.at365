@@ -25,7 +25,7 @@ import type {
 import { AppletSurface } from './applet-pages';
 import { pageKey, type AppletPageDefinition } from '../../shared/applet-pages';
 import { queueSound } from './sounds';
-import { importSound, managedSound, pruneSounds } from './sound-assets';
+import { RegisteredSounds, soundFilename } from './registered-sounds';
 import { keepWebPageActive } from './web-page-activity';
 import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-avatar';
 
@@ -42,6 +42,7 @@ type Saved = {
 };
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
+  soundsDirectory?: string;
   capabilities: string[];
   page?: AppletPageDefinition;
   settings?(): Record<string, boolean | string>;
@@ -89,9 +90,10 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
         sound.name.length > 200 ||
         /[\u0000-\u001f\u007f]/.test(sound.name))) ||
     (sound.file &&
+      !soundFilename(sound.file) &&
       (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
   )
-    throw Error('通知音にはWAVの絶対パスを指定してください。');
+    throw Error('通知音にはWAVの絶対パスまたは登録済みファイル名を指定してください。');
   return {
     enabled: sound.enabled,
     file: sound.file,
@@ -208,6 +210,9 @@ export class WebAccountController {
   private file: string;
   private initializing?: Promise<void>;
   private soundFailures = new Map<string, string>();
+  private sounds: RegisteredSounds;
+  private registeredSounds: string[] = [];
+  private soundPoll?: ReturnType<typeof setInterval>;
   private avatars = new Map<
     string,
     { url: string; image: string; retryAt: number; abort?: AbortController }
@@ -232,6 +237,7 @@ export class WebAccountController {
       failed: () => {},
     },
   ) {
+    this.sounds = new RegisteredSounds(services.soundsDirectory || path.join(root, 'sounds'));
     this.definition = validateWebAccounts(folder, definition);
     this.uiURL = pathToFileURL(asset(folder, definition.ui)).href;
     this.source = fs.readFileSync(asset(folder, definition.observer), 'utf8');
@@ -421,15 +427,12 @@ export class WebAccountController {
     this.requireCapability('audio');
     const a = this.account(id);
     const parsed = parseWebAccountSound(sound);
-    if (parsed.file && (parsed.file !== a.sound?.file || !managedSound(this.root, parsed.file))) {
-      const original = parsed.file;
-      try {
-        parsed.file = await importSound(this.root, original);
-      } catch {
-        throw Error('通知音をコピーできませんでした。16MB以下のWAVファイルを確認してください。');
-      }
-      parsed.name = parsed.name || path.basename(original).slice(0, 200);
-    } else if (!parsed.file) delete parsed.name;
+    if (parsed.file) {
+      if (path.isAbsolute(parsed.file)) parsed.file = await this.sounds.add(parsed.file);
+      else parsed.file = path.basename(await this.sounds.resolve(parsed.file));
+    }
+    delete parsed.name;
+    await this.refreshSounds();
     if (this.disposed) return;
     this.account(a.id);
     this.soundFailures.delete(a.id);
@@ -439,6 +442,14 @@ export class WebAccountController {
         item.id === a.id ? { ...item, sound: parsed } : item,
       ),
     });
+  }
+  private async refreshSounds() {
+    const files = await this.sounds.list();
+    if (this.disposed) return;
+    if (JSON.stringify(files) !== JSON.stringify(this.registeredSounds)) {
+      this.registeredSounds = files;
+      this.changed();
+    }
   }
   async cycle(direction: unknown) {
     if (this.disposed) throw Error('Web accounts are closed');
@@ -503,6 +514,7 @@ export class WebAccountController {
     return {
       navigationRevision: this.navigationRevision ?? 0,
       dark: nativeTheme?.shouldUseDarkColors ?? true,
+      ...(includeData ? { registeredSounds: this.registeredSounds } : {}),
       ...(includeData && this.services?.settings ? { settings: this.services.settings() } : {}),
       selected: this.state.selected,
       accounts: this.state.accounts.map((a) => {
@@ -697,12 +709,15 @@ export class WebAccountController {
         const accounts = [] as Saved['accounts'];
         for (const a of this.state.accounts) {
           let next = a;
-          if (a.sound?.file && !managedSound(this.root, a.sound.file)) {
+          if (a.sound?.file && path.isAbsolute(a.sound.file)) {
             try {
-              const file = await importSound(this.root, a.sound.file);
+              const file = await this.sounds.add(
+                a.sound.file,
+                a.sound.name || path.basename(a.sound.file),
+              );
               next = {
                 ...a,
-                sound: { ...a.sound, file, name: path.basename(a.sound.file).slice(0, 200) },
+                sound: { enabled: a.sound.enabled, file },
               };
               changed = true;
             } catch {
@@ -721,6 +736,11 @@ export class WebAccountController {
       })();
     await this.initializing;
     if (this.disposed) return;
+    await this.refreshSounds();
+    if (!this.soundPoll)
+      this.soundPoll = setInterval(() => {
+        void this.refreshSounds().catch(() => {});
+      }, 2000);
     for (const a of this.state.accounts) this.view(a.id);
   }
   private layout() {
@@ -908,7 +928,7 @@ export class WebAccountController {
         this.requireCapability('audio');
         const a = this.account(args[0]);
         queueSound(
-          a.sound?.file ?? '',
+          a.sound?.file ? await this.sounds.resolve(a.sound.file) : '',
           () =>
             !this.disposed &&
             this.state.accounts.some((item) => item.id === a.id) &&
@@ -1096,6 +1116,7 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
+    clearInterval(this.soundPoll);
     this.unsubscribeSettings?.();
     nativeTheme.removeListener('updated', this.themeChanged);
     screen.removeListener('display-added', this.displaysChanged);
@@ -1115,10 +1136,7 @@ export class WebAccountController {
     this.background?.destroy();
     this.background = undefined;
     await this.initializing?.catch(() => {});
-    await pruneSounds(
-      this.root,
-      this.state.accounts.map((a) => a.sound?.file ?? ''),
-    );
+    // Registered assets outlive accounts and may be used on another PC.
     await Promise.allSettled(
       ids.map(async (id) => {
         const ses = this.accountSession(id);

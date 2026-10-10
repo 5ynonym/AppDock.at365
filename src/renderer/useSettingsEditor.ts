@@ -25,6 +25,7 @@ export function useSettingsEditor(
   const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
   const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarName, setAvatarName] = useState<string>();
   const [pending, setPending] = useState(false);
   const operation = useRef(false);
   const latest = useRef(snapshot);
@@ -63,6 +64,7 @@ export function useSettingsEditor(
     setParseError('');
     setSaveError('');
     setAvatarDraft(undefined);
+    setAvatarName(undefined);
     setAvatarPreview(undefined);
   };
   const discard = async () => {
@@ -96,7 +98,7 @@ export function useSettingsEditor(
       await run(async () => {
         let result: SettingsSnapshot;
         try {
-          result = await window.dock.saveSettings(value, revision, avatarDraft);
+          result = await window.dock.saveSettings(value, revision, avatarDraft, avatarName);
         } catch (error) {
           setSaveError(error instanceof Error ? error.message : String(error));
           throw error;
@@ -104,6 +106,7 @@ export function useSettingsEditor(
         setRevision(result.revision);
         setDirty(false);
         setAvatarDraft(undefined);
+        setAvatarName(undefined);
         setAvatarPreview(undefined);
       }, '設定を保存しました。');
     } finally {
@@ -126,6 +129,7 @@ export function useSettingsEditor(
     avatarDraft,
     avatarPreview,
     setAvatarDraft,
+    setAvatarName,
     setAvatarPreview,
     avatarLoading,
     setAvatarLoading,

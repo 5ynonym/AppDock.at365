@@ -126,7 +126,7 @@ async function stop(copy) {
   copy.browser = undefined;
 }
 const count = (copy) => {
-  const file = path.join(copy.folder, '.appdock/storage/test.notification/clicks.json');
+  const file = path.join(copy.folder, 'data/storage/test.notification/clicks.json');
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : 0;
 };
 function historyUri(copy) {
@@ -203,7 +203,7 @@ const checks = [];
   activate(copies[0], copies[0].uri);
   await until(
     () =>
-      fs.existsSync(path.join(copies[0].folder, '.appdock/chromium/SingletonLock')) ||
+      fs.existsSync(path.join(copies[0].folder, 'data/chromium/SingletonLock')) ||
       powershell(
         `@(Get-CimInstance Win32_Process | Where-Object {$_.CommandLine -like '*--test-profile=${copies[0].folder}*' -and $_.Name -eq 'AppDock.at365.exe'}).Count`,
       ) !== '0',

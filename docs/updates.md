@@ -31,9 +31,9 @@ PortableUpdatesが上限付き取得、SHA256/サイズ照合、ID/版/entry/最
 
 helperは範囲・リンク/ジャンクション・ZIP traversal/重複/サイズを検証する。ready→本体commit後、本体・外側ランチャー・AppletのPID終了を最大60秒待つ。manager.stopのタイムアウトを終了証拠にしない。同じvolumeへ準備を始める前に全対象のjournalを保存し、準備・再ハッシュ照合→旧版一時退避→新しい版を移動する。全交換後にcommitted=trueをjournalへ記録し、結果保存→backup整理→journal削除の順に完了する。JSONはFlush(true)後に一時ファイルから置換する。commit前の失敗は逆順に復元し、commit後の中断は新しい版を検証して保持する。これは論理的な中断からの回復であり、物理的な電源断やディスク故障に対する完全な永続性を保証する試験ではない。
 
-結果は.appdock/update-result.json、再起動後の画面・ログへ表示。TEMPは再起動後に専用パスを検証して整理。強制終了で残ったjournalは起動時にhelper --recoverで復旧を試す。復旧前に全対象の範囲・重複・退避名の対・リンクを検証し、commit済みならインストール先のハッシュも照合する。commit前は旧版へ復元、commit後は旧版/準備ファイルの整理を完了する。途中でロック等のエラーになった場合はjournalと必要なファイルを残し、同じ復旧を再試行できる。本体EXEが使用中で復元できない場合は起動を止める。完全終了後、journalのhelperが示す一時EXEへ`--recover <元の配置先>`を渡して復元してから起動する。復元前に一時EXE/journalを削除しない。
+結果はPC専用rootのupdate-result.json、再起動後の画面・ログへ表示。TEMPは再起動後に専用パスを検証して整理。強制終了で残ったjournalは起動時にhelper --recoverで復旧を試す。復旧前に全対象の範囲・重複・退避名の対・リンクを検証し、commit済みならインストール先のハッシュも照合する。commit前は旧版へ復元、commit後は旧版/準備ファイルの整理を完了する。途中でロック等のエラーになった場合はjournalと必要なファイルを残し、同じ復旧を再試行できる。本体EXEが使用中で復元できない場合は起動を止める。完全終了後、journalのhelperが示す一時EXEへ`--recover <元の配置先> <PC専用保存先>`を渡して復元してから起動する。復元前に一時EXE/journalを削除しない。
 
-Appletフォルダーは配布単位で交換。保存データはSDK/ホストの.appdockへ置く。一括は適用可能な候補だけをまとめ、失敗/未設定は各行へ残す。
+Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のsettings.json/dataへ、端末状態/認証はSDK/ホストのLOCALAPPDATA領域へ置く。一括は適用可能な候補だけをまとめ、失敗/未設定は各行へ残す。
 
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。本体が未設定/取得失敗/同版の再適用不可/旧版なら現行host版を使う。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 

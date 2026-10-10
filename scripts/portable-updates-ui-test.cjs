@@ -80,8 +80,8 @@ for (const [id, enabled] of [
   settings.extensions[id] = { enabled, settings: { preserved: 'user-data' }, updateSource: source };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings, null, 2));
-fs.mkdirSync(path.join(profile, '.appdock/web-accounts'), { recursive: true });
-fs.writeFileSync(path.join(profile, '.appdock/web-accounts/preserved.txt'), 'login-fixture');
+fs.mkdirSync(path.join(profile, 'data/web-accounts'), { recursive: true });
+fs.writeFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'login-fixture');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function connect(port) {
   let last;
@@ -220,7 +220,7 @@ async function restarted(inspectPort, predicate) {
     );
     assert.equal(initial.extensions.find((e) => e.id === 'appdock.dotnet-demo').version, '1.0.0');
     assert.equal(initial.updates.results.filter((r) => r.status === 'available').length, 2);
-    assert.equal(fs.existsSync(path.join(profile, '.appdock/update-result.json')), false);
+    assert.equal(fs.existsSync(path.join(profile, 'data/update-result.json')), false);
     checks.push('startup checks metadata only, includes disabled Applet, and never installs');
     assert.equal(
       await inspect(
@@ -320,7 +320,7 @@ async function restarted(inspectPort, predicate) {
         snapshot.extensions.find((e) => e.id === 'appdock.dotnet-demo')?.state === 'running',
     );
     assert.equal(updated.extensions.find((e) => e.id === 'test.disabled').enabled, false);
-    const combined = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
+    const combined = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(combined.ok, true);
     assert.deepEqual(combined.updated.map((item) => item.id).sort(), [
       'appdock.dotnet-demo',
@@ -337,7 +337,7 @@ async function restarted(inspectPort, predicate) {
       false,
     );
     assert.equal(
-      fs.readFileSync(path.join(profile, '.appdock/web-accounts/preserved.txt'), 'utf8'),
+      fs.readFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'utf8'),
       'login-fixture',
     );
     assert.equal(
@@ -360,7 +360,7 @@ async function restarted(inspectPort, predicate) {
     await renderer(inspectPort, "void window.dock.installUpdates('applets')");
     await wait(1500);
     await restarted(inspectPort, (s) => !s.updates.busy);
-    const batch = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
+    const batch = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(batch.ok, true);
     assert.deepEqual(batch.updated.map((item) => item.id).sort(), [
       'appdock.dotnet-demo',
@@ -371,11 +371,11 @@ async function restarted(inspectPort, predicate) {
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);
     await restarted(inspectPort, (s) => s.version === hostVersion && !s.updates.busy);
-    const result = JSON.parse(fs.readFileSync(path.join(profile, '.appdock/update-result.json')));
+    const result = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(result.ok, true);
     assert.equal(result.updated[0].id, 'host');
     assert.equal(
-      fs.readFileSync(path.join(profile, '.appdock/web-accounts/preserved.txt'), 'utf8'),
+      fs.readFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'utf8'),
       'login-fixture',
     );
     checks.push('real single-EXE host replacement and restart through the same helper');
@@ -396,9 +396,7 @@ async function restarted(inspectPort, predicate) {
     );
     await wait(1500);
     await restarted(inspectPort, (s) => !s.updates.busy);
-    const individual = JSON.parse(
-      fs.readFileSync(path.join(profile, '.appdock/update-result.json')),
-    );
+    const individual = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(individual.ok, true);
     assert.equal(individual.updated.length, 1);
     checks.push('individual Applet button with same-version reapply');

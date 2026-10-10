@@ -28,10 +28,23 @@ export class WebAppletManager {
     private root: string,
     private changed: () => void,
     private execute: (id: string) => Promise<unknown>,
+    sharedRoot = root,
+    failed: (error: Error) => void = () => {},
   ) {
-    this.profiles = new WebProfileStore(path.join(root, 'web-applets', 'accounts.json'));
-    this.profiles.load(settings);
+    this.profiles = new WebProfileStore(
+      path.join(sharedRoot, 'web-applets', 'accounts.json'),
+      sharedRoot !== root ? path.join(root, 'web-applets') : undefined,
+    );
+    try {
+      this.profiles.load(settings);
+    } catch (error) {
+      failed(error instanceof Error ? error : new Error(String(error)));
+    }
     this.profiles.cleanupSessions(settings.value.webApplets.items.map((a) => a.accountId));
+    this.profiles.watch(() => {
+      this.reconcile();
+      this.changed();
+    }, failed);
   }
   accounts() {
     return this.profiles.snapshot();
@@ -121,7 +134,7 @@ export class WebAppletManager {
           ? 'error'
           : 'running',
       error: !accounts.has(a.accountId)
-        ? 'Webアカウント枠を選び直して設定を保存してください。'
+        ? 'Webアカウント一覧の同期を待っています。枠が削除された場合は別の枠を選んでください。'
         : this.views.get(a.id)?.state.error || null,
       capabilities: [],
       settings: [],
@@ -349,6 +362,7 @@ export class WebAppletManager {
   }
   async close() {
     this.closed = true;
+    this.profiles.close();
     for (const v of this.views.values()) v.surface.close();
     this.views.clear();
     const deleted = new Set(this.profiles.pendingDeletion());

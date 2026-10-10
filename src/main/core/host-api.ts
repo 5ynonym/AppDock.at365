@@ -4,6 +4,7 @@ import { imageDirectory, registerLocalImages } from './panel-images';
 import { safeStorage, shell, dialog, nativeTheme } from 'electron';
 import { showNotification } from './notifications';
 import { queueSound } from './sounds';
+import { RegisteredSounds } from './registered-sounds';
 import type { ExtensionInstance } from './extensions';
 import type { SettingsStore } from './settings';
 import { atomicWrite, isObject } from './settings';
@@ -23,6 +24,7 @@ export function createHostApi(
   changed: () => void,
   commandsChanged: () => void = changed,
   executeCommand: (id: string) => Promise<unknown> = async () => {},
+  assetRoot = path.join(dataRoot, 'registered-assets'),
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -123,6 +125,7 @@ export function createHostApi(
           e.manifest.webAccounts,
           {
             capabilities: e.manifest.capabilities ?? [],
+            soundsDirectory: path.join(assetRoot, id, 'sounds'),
             page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),
             settings: () =>
               Object.fromEntries(
@@ -204,7 +207,9 @@ export function createHostApi(
         if (typeof p.file !== 'string') throw new Error('音声ファイルを指定してください。');
         const child = e.child;
         queueSound(
-          p.file,
+          p.file && !path.isAbsolute(p.file)
+            ? await new RegisteredSounds(path.join(assetRoot, id, 'sounds')).resolve(p.file)
+            : p.file,
           () => e.child === child && ['starting', 'running'].includes(e.state),
           () => log('error', id, '通知音を再生できません。WAVファイルを確認してください。'),
         );

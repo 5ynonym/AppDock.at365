@@ -41,8 +41,9 @@ const api: DockApi = {
     return () => ipcRenderer.removeListener('dock:hostCommand', handler);
   },
   snapshot: () => ipcRenderer.invoke('dock:snapshot'),
-  saveSettings: (value, revision, avatar) =>
-    ipcRenderer.invoke('dock:saveSettings', value, revision, avatar),
+  saveSettings: (value, revision, avatar, avatarName) =>
+    ipcRenderer.invoke('dock:saveSettings', value, revision, avatar, avatarName),
+  restoreSettingsBackup: (revision) => ipcRenderer.invoke('dock:restoreSettingsBackup', revision),
   setPinnedCommands: (ids) => ipcRenderer.invoke('dock:setPinnedCommands', ids),
   toggleExtension: (id, enabled) => ipcRenderer.invoke('dock:toggleExtension', id, enabled),
   restartExtension: (id) => ipcRenderer.invoke('dock:restartExtension', id),

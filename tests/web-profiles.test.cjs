@@ -31,21 +31,14 @@ function fixture() {
   const settings = new SettingsStore(path.join(root, 'settings.json'));
   fs.writeFileSync(settings.file, JSON.stringify(value));
   settings.load();
-  const file = path.join(root, '.appdock', 'web-applets', 'accounts.json');
+  const file = path.join(root, 'data', 'web-applets', 'accounts.json');
   return { root, account, settings, file, value };
 }
 
 test('Legacy roster migrates once with stable account IDs and untouched login storage', () => {
   const f = fixture();
   try {
-    const cookies = path.join(
-      f.root,
-      '.appdock',
-      'web-applets',
-      'sessions',
-      f.account.id,
-      'marker',
-    );
+    const cookies = path.join(f.root, 'data', 'web-applets', 'sessions', f.account.id, 'marker');
     fs.mkdirSync(path.dirname(cookies), { recursive: true });
     fs.writeFileSync(cookies, 'login-cookie-fixture');
     const store = new WebProfileStore(f.file);

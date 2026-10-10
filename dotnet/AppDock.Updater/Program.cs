@@ -128,6 +128,17 @@ internal static class Program
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         Process.Start(start)?.Dispose();
     }
+    private static string StateDirectory(string baseDirectory, string? requested)
+    {
+        var legacy = Path.Combine(baseDirectory, "data");
+        var state = Full(requested ?? legacy);
+        var profiles = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "at365", "AppDock", "profiles");
+        // Normal state is local-only. Isolated tests can keep state within their placement.
+        if (!Same(state, legacy) && !Within(baseDirectory, state) &&
+            !(Same(Path.GetDirectoryName(state)!, profiles) && System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(state), "^[a-f0-9]{64}$")))
+            throw new IOException("PC専用の更新記録保存先が正しくありません。");
+        NoLinks(state); return state;
+    }
     private static void Apply(string jobPath)
     {
         jobPath = Full(jobPath);
@@ -141,7 +152,8 @@ internal static class Program
         var baseDirectory = Full(root.GetProperty("baseDirectory").GetString()!); NoLinks(baseDirectory);
         var executable = Full(root.GetProperty("executable").GetString()!); NoLinks(executable);
         var result = Full(root.GetProperty("result").GetString()!);
-        if (!Same(result, Path.Combine(baseDirectory, ".appdock", "update-result.json"))) throw new IOException("結果保存先が正しくありません。");
+        var stateDirectory = StateDirectory(baseDirectory, root.TryGetProperty("stateDirectory", out var state) && state.ValueKind == JsonValueKind.String ? state.GetString() : null);
+        if (!Same(result, Path.Combine(stateDirectory, "update-result.json"))) throw new IOException("結果保存先が正しくありません。");
         var arguments = root.GetProperty("args").EnumerateArray().Select(v => v.GetString()!).ToArray();
         var swaps = new List<Swap>(); var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in root.GetProperty("items").EnumerateArray())
@@ -181,7 +193,7 @@ internal static class Program
             }
             catch (ArgumentException) { }
         }
-        var journal = Path.Combine(baseDirectory, ".appdock", "update-transaction.json");
+        var journal = Path.Combine(stateDirectory, "update-transaction.json");
         NoLinks(result); NoLinks(journal);
         if (File.Exists(journal)) throw new IOException("前回の更新復元が必要です。AppDockを起動し直してください。");
         File.WriteAllText(jobPath + ".ready", "ready");
@@ -248,11 +260,12 @@ internal static class Program
         // If a process failed to exit, avoid starting a second instance. Nothing was exchanged in that case.
         if (restored && (changed || allExited)) Restart(executable, arguments);
     }
-    private static void Recover(string baseDirectory)
+    private static void Recover(string baseDirectory, string? requestedState = null)
     {
         baseDirectory = Full(baseDirectory); NoLinks(baseDirectory);
-        var journal = Path.Combine(baseDirectory, ".appdock", "update-transaction.json"); NoLinks(journal);
-        var result = Path.Combine(baseDirectory, ".appdock", "update-result.json"); NoLinks(result);
+        var stateDirectory = StateDirectory(baseDirectory, requestedState);
+        var journal = Path.Combine(stateDirectory, "update-transaction.json"); NoLinks(journal);
+        var result = Path.Combine(stateDirectory, "update-result.json"); NoLinks(result);
         if (!File.Exists(journal)) return;
         using var document = JsonDocument.Parse(File.ReadAllText(journal));
         var committed = document.RootElement.TryGetProperty("committed", out var flag) && flag.GetBoolean();
@@ -335,6 +348,7 @@ internal static class Program
             if (args.Length == 3 && args[0] == "--extract") Extract(args[1], args[2]);
             else if (args.Length == 2 && args[0] == "--apply") Apply(args[1]);
             else if (args.Length == 2 && args[0] == "--recover") Recover(args[1]);
+            else if (args.Length == 3 && args[0] == "--recover") Recover(args[1], args[2]);
             else if (args.Length == 5 && args[0] == "--pack") Pack(args[1], args[2], args[3], args[4]);
             else throw new ArgumentException("AppDock.Updater: --apply job.json / --extract zip directory / --recover base / --pack host|applet source version output");
             return 0;

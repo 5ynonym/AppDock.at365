@@ -127,7 +127,7 @@ let app;
         JSON.parse(fs.readFileSync(path.join(installed, 'extension.json'))).version,
         '1.0.0',
       );
-      assert.equal(fs.existsSync(path.join(profile, '.appdock/update-transaction.json')), false);
+      assert.equal(fs.existsSync(path.join(profile, 'data/update-transaction.json')), false);
     }
     slow = false;
     await app.evaluate(({ dialog }) => {

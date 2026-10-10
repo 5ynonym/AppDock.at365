@@ -507,7 +507,7 @@ const groupColumns = [];
     );
     for (const owner of ['a', 'b'])
       assert.equal(
-        fs.existsSync(path.join(profile, '.appdock', 'storage', `test.${owner}`, 'calls.json')),
+        fs.existsSync(path.join(profile, 'data', 'storage', `test.${owner}`, 'calls.json')),
         false,
       );
     checks.push(
