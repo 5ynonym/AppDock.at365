@@ -104,6 +104,20 @@ export function CodexSettings() {
           onChange={(allowed) => void run({ kind: 'setExecution', allowed })}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <strong>Applet管理を許可する</strong>
+          <p>
+            有効・無効を保存し、有効なAppletを再起動できます。コマンド実行の許可も必要です。設定変更の許可とは独立しています。
+          </p>
+        </div>
+        <Toggle
+          label="CodexからのApplet管理を許可する"
+          checked={state.allowManageApplets}
+          disabled={busy || !state.enabled || !state.allowExecute}
+          onChange={(allowed) => void run({ kind: 'setAppletManagement', allowed })}
+        />
+      </div>
       <p>
         APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
       </p>

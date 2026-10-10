@@ -43,6 +43,8 @@ import { GestureManager, type GestureInvocation } from './core/gestures';
 import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
+import { AppletManagement } from './core/applet-management';
+import { appletManagementCommands } from '../shared/applet-management';
 import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import {
@@ -156,6 +158,16 @@ let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
 let webApplets: WebAppletManager;
 const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
+const appletManagement = new AppletManagement({
+  settings,
+  applets: allApplets,
+  ready: () => startupReady && !quitting,
+  reconcile: async () => {
+    webApplets.reconcile();
+    await manager.reconcile();
+  },
+  restart: (id) => (webId(id) ? webApplets.restart(id) : manager.restart(id)),
+});
 const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
@@ -269,6 +281,7 @@ function quitHost(restart = false) {
 }
 async function executeCommand(id: string, invocation?: GestureInvocation) {
   if (quitting) return;
+  if (appletManagement.has(id)) return appletManagement.execute(id);
   if (settingsCommands.hasGenerated(id)) return settingsCommands.execute(id, {}, false);
   if (id === gesturePauseCommand) {
     gestures?.togglePause();
@@ -305,6 +318,7 @@ function shortcutContext() {
 function availableShortcutCommands() {
   return [
     ...hostCommands.map((c) => ({ id: c.id, title: c.title, extensionId: null })),
+    ...appletManagementCommands(allApplets()).filter((c) => c.available),
     ...allApplets().flatMap((e) =>
       e.commands
         .filter((c) => c.available)
@@ -394,6 +408,9 @@ function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
   const available = [
     ...hostCommands.map((command) => command.id),
+    ...appletManagementCommands(allApplets())
+      .filter((c) => c.available)
+      .map((c) => c.id),
     ...allApplets().flatMap((extension) =>
       extension.commands.filter((command) => command.available).map((command) => command.id),
     ),
@@ -565,22 +582,12 @@ function registerIpc() {
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
   handle('dock:toggleExtension', async (id: string, enabled: boolean) => {
-    if (webId(id) && typeof enabled === 'boolean') {
-      const next = structuredClone(settings.value);
-      const item = next.webApplets.items.find((item) => item.id === id);
-      if (!item) throw Error('WebAppletがありません。');
-      item.enabled = enabled;
-      settings.save(next, settings.revision);
-      return;
-    }
-    if (!manager.items.has(id) || typeof enabled !== 'boolean')
-      throw new Error('拡張が見つかりません。');
-    settings.updateExtension(id, { enabled });
-    await manager.reconcile();
+    if (typeof enabled !== 'boolean') throw Error('有効状態が不正です。');
+    await appletManagement.run(id, enabled ? 'enable' : 'disable');
   });
-  handle('dock:restartExtension', (id: string) =>
-    webId(id) ? webApplets.restart(id) : manager.restart(id),
-  );
+  handle('dock:restartExtension', async (id: string) => {
+    await appletManagement.run(id, 'restart');
+  });
   handle('dock:executeCommand', (id: string) => executeCommand(id));
   handle('dock:executePanelAction', (id: string, actionId: string) =>
     manager.executePanelAction(id, actionId),
@@ -1049,10 +1056,12 @@ async function initialize() {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
     changed,
     audit: (level, message) => log.write(level, 'automation', message),
-    createApi: (writable, instanceId, executable) =>
+    createApi: (writable, instanceId, executable, manageable) =>
       new AutomationApi({
         settings,
         settingsCommands,
+        appletManagement,
+        manageable,
         save: (value, revision) => {
           try {
             return commitSettings(prepareSettings(value), revision);
