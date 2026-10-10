@@ -275,7 +275,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 7);
+    assert.equal((await client.listTools()).tools.length, 8);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -501,6 +501,151 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'patch reflected',
     );
     checks.push('MCP settings write, runtime snapshot and disk');
+    const readShortcuts = () => call(client, 'appdock_get_shortcuts');
+    const editShortcuts = async (operations, extra = {}) =>
+      call(client, 'appdock_execute_command', {
+        id: 'appdock.shortcuts.update',
+        args: { expectedRevision: (await readShortcuts()).revision, operations, ...extra },
+      });
+    const shortcutBefore = await readShortcuts();
+    assert.equal(shortcutBefore.shortcutEditingAllowed, false);
+    const additions = ['next', 'start'].map((name, i) => ({
+      kind: 'add',
+      binding: {
+        id: `mcp-shortcut-${i}`,
+        command: `${fixtureId}.${name}`,
+        key: 'Ctrl+Alt+F9',
+        enabled: true,
+        when: { scope: 'app', appletIds: [] },
+      },
+    }));
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: {
+            id: 'appdock.shortcuts.update',
+            args: { expectedRevision: shortcutBefore.revision, operations: additions },
+          },
+        })
+      ).structuredContent.code,
+      'SHORTCUT_EDITING_DISABLED',
+    );
+    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await until(
+      async () => (await readShortcuts()).shortcutEditingAllowed,
+      'shortcut editing grant',
+    );
+    const settingsBytes = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    assert.equal((await editShortcuts(additions, { dryRun: true })).completion, 'validated');
+    assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settingsBytes);
+    await editShortcuts(additions);
+    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    const shortcutSearch = page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' });
+    await shortcutSearch.fill(`${fixtureId}.next`);
+    await page
+      .locator('.shortcuts-editor')
+      .getByText('Ctrl+Alt+F9', { exact: true })
+      .first()
+      .waitFor();
+    await page.screenshot({ path: path.join(profile, 'mcp-shortcut-created.png') });
+    await shortcutSearch.fill('');
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    const callsFile = path.join(fixtureRoot, 'calls.json');
+    const beforeKeys = JSON.parse(fs.readFileSync(callsFile)).length;
+    await page.keyboard.press('Control+Alt+F9');
+    await until(
+      () => JSON.parse(fs.readFileSync(callsFile)).length === beforeKeys + 2,
+      'MCP shortcut executes two commands',
+    );
+    assert.deepEqual(JSON.parse(fs.readFileSync(callsFile)).slice(beforeKeys), ['next', 'start']);
+    await editShortcuts([
+      { kind: 'reorder', key: 'Ctrl+Alt+F9', ids: ['mcp-shortcut-1', 'mcp-shortcut-0'] },
+    ]);
+    await page.keyboard.press('Control+Alt+F9');
+    await until(
+      () => JSON.parse(fs.readFileSync(callsFile)).length === beforeKeys + 4,
+      'MCP reorder applied',
+    );
+    assert.deepEqual(JSON.parse(fs.readFileSync(callsFile)).slice(beforeKeys + 2), [
+      'start',
+      'next',
+    ]);
+    await editShortcuts([
+      {
+        kind: 'update',
+        id: 'mcp-shortcut-0',
+        changes: { key: 'Ctrl+Alt+F8', when: { scope: 'global', appletIds: [] } },
+      },
+    ]);
+    const osStatus = await until(
+      async () =>
+        (await readShortcuts()).globalHotKeys.find(
+          (s) => s.commandId === `${fixtureId}.next` && s.shortcut === 'Ctrl+Alt+F8',
+        ),
+      'OS registration status',
+    );
+    assert.equal(typeof osStatus.registered, 'boolean');
+    await editShortcuts([{ kind: 'update', id: 'mcp-shortcut-0', changes: { enabled: false } }]);
+    await until(
+      async () =>
+        !(await readShortcuts()).globalHotKeys.some((s) => s.commandId === `${fixtureId}.next`),
+      'OS registration removed',
+    );
+    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await until(
+      async () => !(await readShortcuts()).shortcutEditingAllowed,
+      'shortcut editing revoked',
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: {
+            id: 'appdock.shortcuts.update',
+            args: {
+              expectedRevision: (await readShortcuts()).revision,
+              operations: [{ kind: 'remove', id: 'mcp-shortcut-0' }],
+            },
+          },
+        })
+      ).structuredContent.code,
+      'SHORTCUT_EDITING_DISABLED',
+    );
+    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await until(
+      async () => (await readShortcuts()).shortcutEditingAllowed,
+      'shortcut editing regranted',
+    );
+    await editShortcuts([
+      { kind: 'remove', id: 'mcp-shortcut-0' },
+      { kind: 'remove', id: 'mcp-shortcut-1' },
+      {
+        kind: 'add',
+        binding: {
+          id: 'mcp-persistent',
+          command: 'appdock.open',
+          key: 'Ctrl+Alt+F9',
+          enabled: false,
+          when: { scope: 'app', appletIds: [] },
+        },
+      },
+    ]);
+    const shortcutLogs = (await page.evaluate(() => window.dock.snapshot())).logs.filter(
+      (l) => l.source === 'automation',
+    );
+    assert.ok(
+      shortcutLogs.some(
+        (l) =>
+          l.message.includes('target=appdock.shortcuts.update') &&
+          l.message.includes('result=success'),
+      ),
+    );
+    assert.ok(shortcutLogs.some((l) => l.message.includes('API=shortcuts.get')));
+    assert.ok(!JSON.stringify(shortcutLogs).includes('mcp-shortcut-0'));
+    checks.push(
+      `shortcut API dry run/add/change/remove/order, GUI reflection and real keyboard order, OS registration result=${osStatus.registered}, revocation and scoped audit`,
+    );
     const fixtureSettings = await call(client, 'appdock_get_settings', { appletId: fixtureId });
     assert.equal(fixtureSettings.values.feature, false);
     await call(client, 'appdock_execute_command', { id: `${fixtureId}.settings.feature.on` });
@@ -565,7 +710,9 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     draft.host.closeToTray = false;
     await json.fill(JSON.stringify(draft, null, 2));
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
-    await patch(client, { notifications: true });
+    await editShortcuts([
+      { kind: 'update', id: 'mcp-persistent', changes: { key: 'Ctrl+Alt+F8' } },
+    ]);
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () => (await page.locator('body').innerText()).includes('別の場所で変更'),
@@ -610,6 +757,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     }
     checks.push('both themes at 1280/960/700 without horizontal overflow');
     const before = await call(client, 'appdock_get_settings');
+    const persistedShortcuts = (await readShortcuts()).bindings;
     await manage(fixtureId, 'disable');
     await manage(webId, 'disable');
     await client.close();
@@ -629,6 +777,8 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     client = await connect(s);
     for (const id of [fixtureId, webId])
       assert.equal((await call(client, 'appdock_get_applet', { id })).applet.enabled, false);
+    assert.deepEqual((await readShortcuts()).bindings, persistedShortcuts);
+    assert.equal((await readShortcuts()).shortcutEditingAllowed, true);
     const after = await call(client, 'appdock_get_settings');
     assert.deepEqual(after.values, before.values);
     assert.notEqual(after.revision, before.revision);

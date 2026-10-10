@@ -118,6 +118,18 @@ export function CodexSettings() {
           onChange={(allowed) => void run({ kind: 'setAppletManagement', allowed })}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <strong>ショートカット編集を許可する</strong>
+          <p>キー・条件・実行順を編集できます。設定変更とコマンド実行の許可も必要です。</p>
+        </div>
+        <Toggle
+          label="Codexからのショートカット編集を許可する"
+          checked={state.allowEditShortcuts}
+          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
+          onChange={(allowed) => void run({ kind: 'setShortcutEditing', allowed })}
+        />
+      </div>
       <p>
         APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
       </p>

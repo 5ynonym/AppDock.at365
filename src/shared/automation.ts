@@ -3,6 +3,7 @@ export interface AutomationState {
   allowWrite: boolean;
   allowExecute: boolean;
   allowManageApplets: boolean;
+  allowEditShortcuts: boolean;
   port: number;
   running: boolean;
   endpoint: string;
@@ -21,7 +22,8 @@ export type AutomationAction =
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
   | { kind: 'setExecution'; allowed: boolean }
-  | { kind: 'setAppletManagement'; allowed: boolean };
+  | { kind: 'setAppletManagement'; allowed: boolean }
+  | { kind: 'setShortcutEditing'; allowed: boolean };
 
 export interface AutomationReply {
   state: AutomationState;

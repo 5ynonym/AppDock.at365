@@ -444,14 +444,23 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed: () => {},
     audit: (level, message) => audit.push({ level, message }),
-    createApi: (writable, instanceId, executable, manageable) =>
-      new AutomationApi({ ...f.options, writable, instanceId, executable, manageable }),
+    createApi: (writable, instanceId, executable, manageable, shortcutsEditable) =>
+      new AutomationApi({
+        ...f.options,
+        writable,
+        instanceId,
+        executable,
+        manageable,
+        shortcutsEditable,
+      }),
   };
   const service = new AutomationService(options);
   t.after(() => service.close());
   assert.equal(service.state().enabled, false);
   assert.equal(service.state().allowExecute, false);
   assert.equal(service.state().allowManageApplets, false);
+  assert.equal(service.state().allowEditShortcuts, false);
+  await service.action({ kind: 'setShortcutEditing', allowed: true });
   await service.action({ kind: 'setAppletManagement', allowed: true });
   const file = path.join(f.base, 'codex', 'config.toml');
   await service.action({ kind: 'selectConfig', file });
@@ -461,9 +470,11 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   const localConfigFile = path.join(options.localDirectory, 'automation.json');
   const legacyConfig = JSON.parse(fs.readFileSync(localConfigFile));
   delete legacyConfig.allowManageApplets;
+  delete legacyConfig.allowEditShortcuts;
   fs.writeFileSync(localConfigFile, JSON.stringify(legacyConfig));
   const legacyService = new AutomationService(options);
   assert.equal(legacyService.state().allowManageApplets, false);
+  assert.equal(legacyService.state().allowEditShortcuts, false);
   await legacyService.close();
   await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
   let s = service.state();
@@ -525,7 +536,17 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 7);
+  assert.equal(tools.length, 8);
+  assert.equal(
+    tools.find((t) => t.name === 'appdock_get_shortcuts').annotations.readOnlyHint,
+    true,
+  );
+  assert.ok(
+    Array.isArray(
+      (await client.callTool({ name: 'appdock_get_shortcuts', arguments: {} })).structuredContent
+        .bindings,
+    ),
+  );
   assert.equal(
     tools.find((t) => t.name === 'appdock_execute_command').annotations.idempotentHint,
     false,
@@ -612,6 +633,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(restarted.state().running, true);
   assert.equal(restarted.state().allowExecute, false);
   assert.equal(restarted.state().allowManageApplets, true);
+  assert.equal(restarted.state().allowEditShortcuts, true);
   const conflict = new AutomationService({
     ...options,
     localDirectory: path.join(f.base, 'other-local'),

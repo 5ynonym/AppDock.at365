@@ -201,7 +201,7 @@ export class SettingsCommands {
     }
     throw new SettingsCommandError('NOT_FOUND', '設定コマンドが見つかりません。');
   }
-  private checkRevision(revision: string) {
+  checkRevision(revision: string) {
     if (revision !== this.revision())
       throw new SettingsCommandError(
         'REVISION_CONFLICT',

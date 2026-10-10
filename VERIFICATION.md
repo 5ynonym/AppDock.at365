@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-11: ショートカット外部編集のコミット前確認
+
+- 対象19ファイルと依存状態・発行物を前回証跡へ照合してstage。型検査、標準234/234、固定EXEのGUI/MCP12群（実Codex接続を含む）を再実行し全終了0。製品/発行物は変更なし。
+- 証跡は`.artifacts/commit-validation-shortcut-editing-20261011/`、発行GUIは`automation-portable-1791670979339`。入力hash・検証tree・コマンド/終了コード/全ログを記録。検証後の変更は本記録だけで、文書差分・最終tree・commitを保存。ローカルコミットのみ、push/Release/deployなし。
+
+## 2026-10-11: ショートカットの外部編集（0.26.32）
+
+- 前回のApplet管理0.26.31を`162c12c99e3e77e60451326f3d258c4c65c2bcb2`へコミット後に実装。shortcuts.getとappdock.shortcuts.updateで取得/追加/変更/削除/同一キー順序変更に対応。既存keybindingsと互換フィールド、条件、共有revision/dryRun/原子的保存を利用し、GUIの未保存draftと他設定を保持する。
+- 外部編集はPC専用allowEditShortcutsを初期OFFとし、allowWrite/allowExecuteも必要。新規割当は公開済み引数なしコマンドに限定。既存の非公開/未導入割当は保持し、無効化/削除と既存同一キー内の並べ替えを許可。登録結果は取得APIで確認でき、保存成功とOS登録完了を区別する。
+- 型検査、関連40/40、標準234/234、source/固定発行EXEのGUI・MCP各12群が終了0。操作の一括検証/途中エラー時の保存抑止、revision競合、再起動後の保存状態と許可、権限取消、実キー入力による順序、グローバルキーのOS登録trueと解除、既存編集画面への表示、監査ログ、dirty draft保持を確認。初回の並べ替え単体試験で見つかった検索コールバック内のindex更新を修正後に全試験成功。
+- sourceは`.artifacts/automation-source-1791670029838`、portableは`.artifacts/automation-portable-1791670210334`。両テーマ1280/960/700で横溢れなし。追加割当と許可画面を画像で確認。実Codex Desktop0.162.0-alpha.17.2の隔離設定から8ツール発見、取得と編集dryRun成功。モデル推論、実利用Applet/サービス、グローバルキーの物理押下は対象外。AppDock内の実キー操作とOS登録状態は確認済み。
+- publish.bat終了0。単一EXE0.26.32は144051312bytes、SHA256 `b88056d228bd6709558099b039e2c6b5b24d099fea89a1909f10d27d85aa59bf`。feedと検証コピーの版/size/hashを照合。証跡は`.artifacts/shortcut-editing-20261011/validation.json`と完全ログ。依存/lockfile/toolchainの更新や取得ポリシー緩和なし。発行中に残ったWPF一時project1件は発行終了後に証跡へhash照合保存し、生成元だけ削除。
+- 終了/成功/参照保護/パス境界/再解析点/実プロセスを確認し、旧成功source2件とportable1件を整理（cleanup.json）。各方式最新3件、コミット再利用資料、失敗/不明、固定出力を保持。隔離試験プロセス残存0。今回のショートカット実装は未コミット。push/Release/実利用deploy/全体ZIP作成なし。
+
 ## 2026-10-11: Applet管理のコミット前確認
 
 - 0.26.31の対象22ファイルをstageし、型検査、標準226/226、固定発行EXEのGUI/MCP11群（実Codex接続を含む）を再実行して全終了0。製品内容と発行物hashは実装時と一致し、再発行不要。

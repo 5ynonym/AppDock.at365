@@ -3,6 +3,8 @@ import type { SettingsStore } from './settings';
 import type { AutomationApplet, AutomationCommand } from './automation-commands';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import { AppletManagement, AppletManagementError } from './applet-management';
+import { ShortcutCommands } from './shortcut-commands';
+import type { GlobalHotKeyStatus } from '../../shared/contracts';
 
 export class AutomationError extends Error {
   constructor(
@@ -22,10 +24,12 @@ export const automationMethods = [
   'applets.get',
   'commands.list',
   'commands.execute',
+  'shortcuts.get',
 ] as const;
 export class AutomationApi {
   private executing = false;
   private settingsCommands: SettingsCommands;
+  private shortcuts: ShortcutCommands;
   constructor(
     private options: {
       settings: SettingsStore;
@@ -33,6 +37,8 @@ export class AutomationApi {
       settingsCommands?: SettingsCommands;
       appletManagement?: AppletManagement;
       manageable?(): boolean;
+      shortcutsEditable?(): boolean;
+      shortcutStatus?(): GlobalHotKeyStatus[];
       applets(): AutomationApplet[];
       commands(): AutomationCommand[];
       execute(id: string): Promise<unknown>;
@@ -45,6 +51,12 @@ export class AutomationApi {
   ) {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
+    this.shortcuts = new ShortcutCommands({
+      ...options,
+      settingsCommands: this.settingsCommands,
+      commands: () => this.commands(),
+      status: options.shortcutStatus,
+    });
   }
   private commands() {
     return [
@@ -53,6 +65,7 @@ export class AutomationApi {
           ...this.options.commands(),
           ...this.settingsCommands.commands(),
           ...(this.options.appletManagement?.commands() ?? []),
+          ...this.shortcuts.commands(),
         ].map((c) => [
           c.id,
           {
@@ -92,6 +105,7 @@ export class AutomationApi {
         return {
           apiVersion: 2,
           appletManagementAllowed: this.options.manageable?.() ?? false,
+          shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
           version: this.options.version,
           instanceId: this.options.instanceId,
           methods: automationMethods,
@@ -120,6 +134,7 @@ export class AutomationApi {
       }
       case 'commands.list':
         return {
+          shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
           appletManagementAllowed: this.options.manageable?.() ?? false,
           commands: this.commands(),
           executable: this.options.executable(),
@@ -127,6 +142,13 @@ export class AutomationApi {
         };
       case 'commands.execute':
         return this.execute(this.id(params, true), params.args === undefined ? {} : params.args);
+      case 'shortcuts.get':
+        return {
+          ...this.shortcuts.get(),
+          writable: this.options.writable(),
+          executable: this.options.executable(),
+          shortcutEditingAllowed: this.options.shortcutsEditable?.() ?? false,
+        };
       case 'settings.getSchema':
       case 'settings.get': {
         if (
@@ -180,17 +202,29 @@ export class AutomationApi {
       throw new AutomationError('NOT_FOUND', '外部に公開されているコマンドではありません。');
     if (!command.available)
       throw new AutomationError('UNAVAILABLE', 'このコマンドは現在利用できません。');
-    if (!object(args) || (command.permission !== 'settings.write' && Object.keys(args).length))
+    if (
+      !object(args) ||
+      (!['settings.write', 'shortcuts.write'].includes(command.permission ?? '') &&
+        Object.keys(args).length)
+    )
       throw new AutomationError(
         'INVALID_ARGUMENT',
         'コマンドのinputSchemaに合うargsを指定してください。',
       );
-    if (command.permission === 'settings.write' && !this.options.writable())
+    if (
+      ['settings.write', 'shortcuts.write'].includes(command.permission ?? '') &&
+      !this.options.writable()
+    )
       throw new AutomationError(
         'WRITE_DISABLED',
         'AppDockのCodex連携画面で設定変更を許可してください。',
       );
     if (this.executing) throw new AutomationError('BUSY', '別のAPIコマンドを実行中です。');
+    if (command.permission === 'shortcuts.write' && !this.options.shortcutsEditable?.())
+      throw new AutomationError(
+        'SHORTCUT_EDITING_DISABLED',
+        'AppDockのCodex連携画面でショートカット編集を許可してください。',
+      );
     if (command.permission === 'applets.manage' && !this.options.manageable?.())
       throw new AutomationError(
         'APPLET_MANAGEMENT_DISABLED',
@@ -198,6 +232,15 @@ export class AutomationApi {
       );
     this.executing = true;
     try {
+      if (command.permission === 'shortcuts.write') {
+        const result = this.shortcuts.execute(args);
+        return {
+          id,
+          completion: result.dryRun ? 'validated' : 'settingsSaved',
+          effectVerified: false,
+          ...result,
+        };
+      }
       if (command.permission === 'applets.manage') {
         if (!this.options.appletManagement)
           throw new AppletManagementError('NOT_FOUND', 'Applet管理を利用できません。');
