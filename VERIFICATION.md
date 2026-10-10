@@ -991,6 +991,17 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 公開URL: [Gmail0.9.1](https://github.com/5ynonym/Applet.Gmail.at365/releases/tag/v0.9.1)、[Watch0.1.2](https://github.com/5ynonym/Applet.Watch.at365/releases/tag/v0.1.2)、[WebBrowserTools0.3.1](https://github.com/5ynonym/Applet.WebBrowserTools.at365/releases/tag/v0.3.1)。ノートと封印した配布物、draft/public/verified状態、個別更新結果、整理レポートはartifacts/release-bundled-applets-20261010/plan.jsonと各*-verified.json/*-retention-*.json、全7repo一覧はfinal-roster.json。plan.phaseはcomplete。
 - 手順文書の相対リンク69件と追加見出しリンク3件、git diff --check成功。今回は製品ソース変更なしで、新しいruntimeテスト/本体版更新/本体再発行/実利用deployは不要。既存の正式Prepareと各Applet版の検証を使用した。Release記録と失敗/不明/他作業のartifactは保持し、今回の手順作業でテストフォルダー削除は行っていない。
 
+## 2026-10-10 設定のPC間同期・保存領域の設計相談（未実装）
+
+- 現ソースのSettingsStoreは親フォルダーをfs.watchで監視し、250ms後にJSON/スキーマ検証してchangedを発行する。index.tsはテーマ/ページ/トレイ/WebApplet/キー/Applet設定へ反映し、useSettingsEditorはdirtyな下書きを保持する。revisionは各プロセス内の値であり、未到着の別PC更新の競合を解決する仕組みではない。
+- 隔離コンパイルした現SettingsStoreで6項目を確認（終了0）: 外部の直接編集、壊れたJSON中の直近正常値保持/元ファイル保持、壊れた編集後のrename置換、監視通知前の古い下書き保存拒否、壊れたJSONでの新Store起動失敗、永続backupなし。証跡は`.artifacts/settings-sync-review-20261010/result.json`。TypeScript CLIでsettings.tsを独立出力へnoCheckで変換した動作確認であり、全体型検査/実Electron GUI/実2台同期を行った結果ではない。既存out/publish/実利用設定は未変更。
+- 調査手順の修正: TypeScript 7はtranspileModule APIを提供しないため最初のrequireがMODULE_NOT_FOUNDで停止。個別ファイル指定CLIのTS5112は--ignoreConfigで解消。最終隔離コンパイルと動作確認は成功、製品変更不要。
+- `.appdock`はChromium、WebApplet/Gmailの永続session、暗号化secrets、Applet storage、Window状態、ログ、更新journalなどを含む。丸ごとの稼働中PC間同期は避ける。WebAppletはsettings.json内のaccountIdと別accounts.jsonを対応させるため、settings.jsonだけの同期では相手PCに同じ枠がなくなる場合がある。accounts.jsonのpendingDeletionはPC内の物理回収記録で、共有する枠名/IDと分離が必要。Gmailのselected/音声絶対パス等もそのまま共有しない。
+- アリスの提案（未承認/未実装）: EXE隣のsettings.jsonを共有し、同期利用時のPC専用データ/override/正常設定backupをLOCALAPPDATAへ保存。配置ごとに分離し従来portable保存も維持。Webの枠名/IDは共有名簿へ抽出できるが、Cookie/token/session/secretsはPC専用。ファイル到着順が異なる名簿/設定は参照待ちにし、外部削除を認証データの即時物理削除へ直結させない。
+- 監視に書込み安定待ち/有限再試行/定期照合/復帰時照合/同値抑制を追加し、受信設定を書き戻さない。正常値だけのPC内世代backupと起動時fallback/明示復元を追加する。未保存draftの競合を通知し、PC固有起動登録/画面/絶対パス等は共有希望値と実際のPC状態を分離する。単一JSONのファイル同期だけでは2台の未同期同時編集を完全に自動mergeする保証はない。
+- 参照: Electron safeStorage公式 https://www.electronjs.org/docs/latest/api/safe-storage 、DPAPI公式 https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata （通常は同じユーザー/PCで復号）、Node fs.watch公式 https://nodejs.org/api/fs.html#fswatchfilename-options-listener （通知方式の環境依存）。
+- 実装する場合の確認項目: 2個の隔離profileの双方向編集/rename・削除再作成・途中JSON・ロック・復帰、dirty draftと受信競合、backup/壊れた状態からの再起動、別PC相当の名簿到着順/未ログイン枠、同PC旧保存先からの停止中移行とrollback、Gmail/WebApplet分離/削除、実単一EXEでの反映/再起動専用項目。今回製品ソース/版/発行/同期サービス設定の変更なし。
+
 ## 2026-10-10 スタートアップ登録・管理者起動（0.26.13）
 
 - 一般設定へスタートアップ/常に管理者/現在の実権限・登録状態/状態確認/管理者再起動を追加。共有draft/JSON/revision/saveを使用し、既定OFF。元portable EXE・配置先・SIDの専用タスク、InteractiveToken/LogonTrigger/3秒遅延/電池制限なし/実行時間制限なし/IgnoreNew/対象ユーザー限定DACLを使用する。保存競合/失敗は元XMLへ戻し、管理者再起動は同一ユーザーのヘルパー確認後に元PID終了を待つ。仕様はdocs/launch-settings.md。
@@ -1001,3 +1012,10 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - Windows実機でSIDがユーザー名へ、空のArgumentsがnullへ変換される動きを確認し、同一SIDへの解決/string正規化へ対応。途中のGUI停止は試験側の未保存マーク付きカテゴリのexact照合、既定RunLevelのXML省略、テーマ/状態確認の反映待ちを修正して最終成功。初回発行後にヘルパー確認/長い引数対策を加えたため、同じ版を最終再発行して固定し、その後は製品ソースを変更していない。
 - 未確認: 検証Windowsユーザーは管理者グループに所属しないため、UAC承認後の実管理者トークン・Highest登録/解除・管理者上のジェスチャー動作は未実施。実Windowsサインインも未実施。これらを実行済みと扱わず、UAC承認は自動化していない。通常ユーザーへHighestが管理者権限を付与するとは案内しない。
 - テスト整理: 今回方式のlaunch-settings成功3回、settings-noticeはsource3/portable3を保持し、古い成功の削除候補0/削除0。試験終了と専用プロセス終了・タスク解除を確認。途中失敗4回/完了証拠なしの以前の記録/単独rollback証拠/固定ビルド/Release/他作業資料は保持。通常publishのみで未変更Applet再発行・全体ZIP生成/整理・commit/push/Release/実利用deployなし。並行する同期設計相談の文書差分を保持。
+
+### 同期設計の追加相談: Gmail専用枠とユーザー登録アセット
+
+- ユーザーはWebAppletの枠を同期し、Applet.Gmail専用枠自体と枠に紐づく設定を同期しない構成を希望。プロフィール画像等のユーザー登録アセットはAppDockフォルダーごと同期したいと明示。現コードはWebAppletのWebProfileStoreとGmail等のWebAccountControllerが別保存領域なので、保存先をホスト側で分けられる構造。Gmail専用accounts.jsonは枠ID/名前/選択/枠別sound/monitoringを保存し、全体のunreadOnly等はextension settingsにある。
+- 現profile.tsはavatar.pngをbaseDirectoryへ保存し、settings.jsonでは固定相対名を参照する。index.tsのsnapshotは画像mtimeをURLへ付加するが、独立した画像変更を通知する監視はない。素材だけの同期変更にも再表示通知と参照キャッシュ更新が必要。画像より先に設定が届いても入力や参照を削除しない設計にする。
+- 現sound-assets.tsのimportSoundは指定root内soundsへコピーし絶対パスを返す。pruneSoundsはそのrootのローカル参照外音声を削除するので、そのまま共有素材rootに向けない。登録素材は共有root内の相対パス/安定IDで参照し、Gmailの枠ごとの割当はPC専用のまま保持。共有素材の物理削除は明示操作等の別方針が必要。
+- 提案の保存分離: AppDock配置内settings.json/avatar.png/.appdock内共有枠名簿・ユーザー登録assets、LOCALAPPDATA内Gmail枠/全Webのsession/秘密情報/PC状態/キャッシュ/更新journal/backup。生成キャッシュとユーザー登録素材は区別する。現PCの旧認証/枠は停止中移行で保持し、別PCへ枠を転送しない。今回コード・版・発行・実利用データへ変更なし、ソース読取確認のみ。
