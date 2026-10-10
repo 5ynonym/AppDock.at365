@@ -1199,4 +1199,4 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 
 - 配布物試験で確認結果のsummary追加により更新元設定のlocatorが曖昧になったため、portable-updates-ui-testの2箇所を`.applet-update-source > summary`へ限定。製品コード変更なし。単一EXE更新/再起動11群、更新進捗/取消4群、更新復旧、全6Applet入りZIPの整合/展開起動が成功。新配布版のGmail UIとWallpaperのfixture/実nativeログ表示も成功。
 - テスト修正後に型検査と標準回帰198/198を再実行して成功。完全ログと入力tree/hashは`.artifacts/commit-release-0.26.25-20261011/test-fix-evidence.json`。最終記録の追加だけを後続差分として保存し、新planで配布物を生成・再検証する。最初の失敗planとログは保持。
-- テストフォルダーの候補を3repoで列挙し、成功292件と成功未確定408件を記録。今回の直近成功分、失敗/不明、固定配布物、過去の再利用/Release証跡は保持。過去分は方式/再利用依存を確定できないものを削除せず、今回の追加削除は0。候補監査は同証跡のcleanup-audit.json。最終配布物の確認結果・終了確認もRelease記録へ追記する。
+- テストフォルダーの候補を3repoで列挙し、成功275件と成功未確定408件を記録。今回の直近成功分、失敗/不明、固定配布物、過去の再利用/Release証跡は保持。過去分は方式/再利用依存を確定できないものを削除せず、今回の追加削除は0。候補監査は同証跡のcleanup-audit.json。最終配布物の確認結果・終了確認もRelease記録へ追記する。
