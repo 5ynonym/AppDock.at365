@@ -9,6 +9,8 @@ const {
   appletInputSettings,
   groupGestureBindings,
   moveGestureBinding,
+  applyGestureBinding,
+  applyGestureOrder,
 } = require('../out/main/shared/gestures');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
@@ -18,6 +20,51 @@ const row = (id, scope = 'global', command = 'test.run') => ({
   gesture: 'move-left',
   enabled: true,
   when: { scope, appletIds: [], processes: [] },
+});
+
+test('gesture editor preserves condition-only order, appends new inputs and rejects stale edits', () => {
+  const rows = [row('a'), { ...row('key'), gesture: 'key:A' }, row('b')];
+  const changed = { ...rows[0], enabled: false };
+  assert.deepEqual(
+    applyGestureBinding(rows, changed, rows[0]).map((r) => r.id),
+    ['a', 'key', 'b'],
+  );
+  assert.deepEqual(
+    applyGestureBinding(rows, row('c')).map((r) => r.id),
+    ['a', 'key', 'b', 'c'],
+  );
+  const moved = applyGestureBinding(rows, { ...rows[0], gesture: 'key:A' }, rows[0]);
+  assert.deepEqual(
+    moved.map((r) => r.id),
+    ['key', 'a', 'b'],
+  );
+  assert.throws(
+    () => applyGestureBinding([changed, ...rows.slice(1)], rows[0], rows[0]),
+    /変更されました/,
+  );
+  assert.throws(() => applyGestureBinding(rows.slice(1), rows[0], rows[0]), /変更されました/);
+});
+test('gesture order merges unrelated changes but rejects changed members of an edited group', () => {
+  const rows = [row('a'), { ...row('key'), gesture: 'key:A' }, row('b')];
+  const ordered = moveGestureBinding(rows, 'b', 'a');
+  const current = rows.map((r) => (r.id === 'key' ? { ...r, enabled: false } : r));
+  const merged = applyGestureOrder(current, rows, ordered);
+  assert.deepEqual(
+    merged.map((r) => r.id),
+    ['b', 'key', 'a'],
+  );
+  assert.equal(merged[1], current[1]);
+  for (const live of [
+    rows.slice(1),
+    [...rows, row('extra')],
+    rows.map((r) => (r.id === 'a' ? { ...r, enabled: false } : r)),
+    ordered,
+  ])
+    assert.throws(() => applyGestureOrder(live, rows, ordered), /変更されました/);
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ['a', 'key', 'b'],
+  );
 });
 test('gesture groups preserve local execution order without moving unrelated assignments', () => {
   const rows = [

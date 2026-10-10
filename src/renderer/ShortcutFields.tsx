@@ -71,6 +71,9 @@ export function ShortcutConditionField({
   ownerTitle,
   applets,
   allowDefault = false,
+  extraScopes = [],
+  selectedScope,
+  onExtraScope,
   onChange,
 }: {
   value: ShortcutCondition;
@@ -78,6 +81,9 @@ export function ShortcutConditionField({
   ownerTitle?: string;
   applets: { id: string; title: string }[];
   allowDefault?: boolean;
+  extraScopes?: { id: string; title: string }[];
+  selectedScope?: string;
+  onExtraScope?(scope: string): void;
   onChange(value: ShortcutCondition): void;
 }) {
   const [open, setOpen] = useState(false);
@@ -92,8 +98,13 @@ export function ShortcutConditionField({
     <div className="shortcut-condition-field">
       <select
         aria-label={label}
-        value={value.scope}
+        value={selectedScope ?? value.scope}
         onChange={(event) => {
+          if (extraScopes.some((scope) => scope.id === event.target.value)) {
+            onExtraScope?.(event.target.value);
+            setOpen(false);
+            return;
+          }
           const scope = event.target.value as ShortcutScope | 'default';
           onChange({ scope, appletIds: scope === 'applets' ? value.appletIds : [] });
           setOpen(scope === 'applets');
@@ -101,6 +112,11 @@ export function ShortcutConditionField({
         }}
       >
         {allowDefault && <option value="default">コマンドの既定</option>}
+        {extraScopes.map((scope) => (
+          <option key={scope.id} value={scope.id}>
+            {scope.title}
+          </option>
+        ))}
         {shortcutScopes
           .filter((scope) => scope.id !== 'owner' || ownerTitle || value.scope === 'owner')
           .map((scope) => (

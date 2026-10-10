@@ -1,3 +1,4 @@
+import { CommandBindingToolbar } from './CommandBindingToolbar';
 import { useEffect, useRef, useState } from 'react';
 import type { UiCommand } from '../shared/commands';
 import type { Settings, GlobalHotKeyStatus } from '../shared/contracts';
@@ -71,55 +72,19 @@ export function ShortcutsEditor({
   });
   return (
     <div className="shortcuts-editor command-shortcuts">
-      <header className="command-shortcuts-heading">
-        <div>
-          <h2>ショートカットキー</h2>
-          <p>コマンドを見つけて、キーと使う場面を設定できます。</p>
-        </div>
-        <span className="command-count">{catalog.length} コマンド</span>
-      </header>
-      <div className="command-shortcut-tools">
-        <div className="command-shortcut-search">
-          <span aria-hidden="true">⌕</span>
-          <input
-            type="search"
-            aria-label="ショートカットのコマンドを検索"
-            placeholder="コマンド・キー・提供元を検索…"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-          />
-        </div>
-        <select
-          className="shortcut-status-filter"
-          aria-label="ショートカットの絞り込み"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-        >
-          <option value="all">すべて</option>
-          <option value="assigned">割り当て済み</option>
-          <option value="unassigned">未割り当て</option>
-          <option value="conflict">登録エラー</option>
-        </select>
-      </div>
-      <div className="command-shortcut-summary">
-        <span role="status">
-          {visible.length} / {catalog.length} コマンドを表示
-        </span>
-        <button className="text-button shortcut-order-open" onClick={() => setOrderOpen(true)}>
-          実行順…
-        </button>
-        {(filter || statusFilter !== 'all') && (
-          <button
-            className="text-button"
-            onClick={() => {
-              setFilter('');
-              setStatusFilter('all');
-            }}
-          >
-            絞り込みを解除
-          </button>
-        )}
-      </div>
+      <CommandBindingToolbar
+        title="ショートカットキー"
+        description="コマンドを見つけて、キーと使う場面を設定できます。"
+        inputName="ショートカット"
+        count={catalog.length}
+        visibleCount={visible.length}
+        filter={filter}
+        statusFilter={statusFilter}
+        setFilter={setFilter}
+        setStatusFilter={setStatusFilter}
+        onOrder={() => setOrderOpen(true)}
+        showRegistrationErrors
+      />
       {error && <p role="alert">{error}</p>}
       {rows.length >= 2000 && (
         <p role="status">

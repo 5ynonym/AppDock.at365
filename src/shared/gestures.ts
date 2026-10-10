@@ -1,4 +1,6 @@
 import { normalizeShortcut, validCommandId } from './commands';
+import { applyBindingOrder } from './binding-order';
+import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
 import type { Settings } from './contracts';
 
@@ -48,6 +50,45 @@ export function groupGestureBindings(rows: GestureBinding[]) {
 }
 export function gestureTitle(gesture: string) {
   return gestureTypes.find(([id]) => id === gesture)?.[1] ?? `キー: ${gesture.slice(4)}`;
+}
+export function gestureConditionLabel(
+  when: GestureBinding['when'],
+  ownerTitle?: string,
+  applets: { id: string; title: string }[] = [],
+) {
+  if (when.scope === 'browser') return 'Webブラウザ';
+  if (when.scope === 'exe') return when.processes.join(' / ');
+  return keybindingConditionLabel(
+    { scope: when.scope, appletIds: when.appletIds },
+    ownerTitle,
+    applets,
+  );
+}
+export function applyGestureOrder(
+  current: GestureBinding[],
+  original: GestureBinding[],
+  ordered: GestureBinding[],
+) {
+  return applyBindingOrder(current, original, ordered, (row) => row.gesture, gestureTitle);
+}
+/** New inputs go at the end of their execution group; condition-only edits retain their slot. */
+export function applyGestureBinding(
+  rows: GestureBinding[],
+  row: GestureBinding,
+  original?: GestureBinding,
+) {
+  if (
+    original &&
+    JSON.stringify(rows.find((item) => item.id === original.id)) !== JSON.stringify(original)
+  )
+    throw Error('編集中に割り当てが変更されました。キャンセルして開き直してください。');
+  if (!original && rows.length >= 2000) throw Error('ジェスチャー割り当ては2000件以内です。');
+  if (original?.gesture === row.gesture)
+    return rows.map((item) => (item.id === row.id ? row : item));
+  const next = rows.filter((item) => item.id !== row.id);
+  const last = next.map((item) => item.gesture).lastIndexOf(row.gesture);
+  next.splice(last < 0 ? next.length : last + 1, 0, row);
+  return next;
 }
 export function moveGestureBinding(rows: GestureBinding[], id: string, target: string) {
   const source = rows.find((r) => r.id === id),
