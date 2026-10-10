@@ -1,5 +1,6 @@
 import type { ExtensionSnapshot, Settings } from './contracts';
 import { hostCommands, validCommandId } from './commands';
+import { appletManagementCommands } from './applet-management';
 import { appletDisplayName } from './applet-display-name';
 
 export const gesturePauseCommand = 'appdock.gestures.togglePause';
@@ -124,6 +125,7 @@ export function resolveTrayMenu(
 export function trayCommandCatalog(extensions: ExtensionSnapshot[]) {
   return [
     ...hostCommands,
+    ...appletManagementCommands(extensions),
     ...extensions.flatMap((e) =>
       e.commands.map((c) => ({
         ...c,

@@ -337,7 +337,7 @@ test('command policy uses provider declarations, projects details and never acti
   const legacy = make('at365.gmail', 'node', ['at365.gmail.open']);
   const input = [native, web, impostor, legacy];
   const catalog = automationCommands(input);
-  assert.equal(catalog.length, 7);
+  assert.equal(catalog.length, 10);
   assert.ok(
     !catalog.some(
       (c) =>
@@ -444,18 +444,27 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed: () => {},
     audit: (level, message) => audit.push({ level, message }),
-    createApi: (writable, instanceId, executable) =>
-      new AutomationApi({ ...f.options, writable, instanceId, executable }),
+    createApi: (writable, instanceId, executable, manageable) =>
+      new AutomationApi({ ...f.options, writable, instanceId, executable, manageable }),
   };
   const service = new AutomationService(options);
   t.after(() => service.close());
   assert.equal(service.state().enabled, false);
   assert.equal(service.state().allowExecute, false);
+  assert.equal(service.state().allowManageApplets, false);
+  await service.action({ kind: 'setAppletManagement', allowed: true });
   const file = path.join(f.base, 'codex', 'config.toml');
   await service.action({ kind: 'selectConfig', file });
   const savedSelection = new AutomationService(options);
   assert.equal(savedSelection.state().error, undefined);
   await savedSelection.close();
+  const localConfigFile = path.join(options.localDirectory, 'automation.json');
+  const legacyConfig = JSON.parse(fs.readFileSync(localConfigFile));
+  delete legacyConfig.allowManageApplets;
+  fs.writeFileSync(localConfigFile, JSON.stringify(legacyConfig));
+  const legacyService = new AutomationService(options);
+  assert.equal(legacyService.state().allowManageApplets, false);
+  await legacyService.close();
   await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
   let s = service.state();
   assert.equal(s.running, true);
@@ -602,6 +611,7 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(restarted.state().port, s.port);
   assert.equal(restarted.state().running, true);
   assert.equal(restarted.state().allowExecute, false);
+  assert.equal(restarted.state().allowManageApplets, true);
   const conflict = new AutomationService({
     ...options,
     localDirectory: path.join(f.base, 'other-local'),

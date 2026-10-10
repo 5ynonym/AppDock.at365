@@ -1,5 +1,7 @@
 # AppDock.at365 開発ガイド
 
+0.26.31のApplet管理コマンドは[共通操作API](docs/automation.md#applet管理02631以降)を参照してください。共通処理は`src/main/core/applet-management.ts`、登録は`src/shared/applet-management.ts`、回帰は`tests/applet-management.test.cjs`と`tests/automation.test.cjs`、実プロセス/UI/MCPは`scripts/automation-ui-test.cjs`で確認します。
+
 利用方法は[README.md](README.md)、実測結果と未確認事項は[VERIFICATION.md](VERIFICATION.md)を参照してください。
 
 ## 文書の入口

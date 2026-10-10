@@ -7,8 +7,8 @@ export interface AutomationCommand {
   appletId: string | null;
   available: boolean;
   unavailableReason: string | null;
-  completion: 'accepted' | 'handlerReturned' | 'settingsSaved';
-  permission?: 'settings.write';
+  completion: 'accepted' | 'handlerReturned' | 'settingsSaved' | 'lifecycleApplied';
+  permission?: 'settings.write' | 'applets.manage';
   inputSchema?: Record<string, unknown>;
 }
 export interface AutomationApplet {
@@ -22,7 +22,14 @@ export interface AutomationApplet {
   errorSummary: string | null;
 }
 // Deliberate product policy: never infer permission from a suffix, alias, or title.
-const hostIds = new Set(['appdock.open', 'appdock.settings.open', 'appdock.commands.search']);
+const hostIds = new Set([
+  'appdock.open',
+  'appdock.settings.open',
+  'appdock.commands.search',
+  'appdock.applets.open',
+  'appdock.logs.open',
+  'appdock.updates.open',
+]);
 export function automationApplets(applets: ExtensionSnapshot[]): AutomationApplet[] {
   return applets.map((a) => ({
     id: a.id,

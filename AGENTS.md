@@ -30,6 +30,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 
 ## ホスト・UI・Webアカウントの維持事項
 
+- Appletの有効・無効・再起動は本体のAppletManagementをGUI/通常コマンド/MCPで共有する。enabledの保存と再起動を分離し、無効なAppletを再起動で有効化しない。管理コマンドは登録されたAppletから本体が生成し、外部実行には既定OFFのallowManageAppletsとallowExecuteを要求する。Applet独自コマンドの公開宣言から管理権限を付与しない。詳細は[共通操作API](docs/automation.md#applet管理02631以降)。
+
 - 外部コマンドの公開範囲は各Appletのmanifest commands[].automationで宣言する。本体にApplet固有の許可一覧を置かず、別名や接尾辞から推測しない。runtime登録/置換から公開権限を受け取らない。設定変更と実行の許可を分離し、停止中Appletの自動有効化を避ける。受付/処理応答/操作先の効果確認を区別する。MCPの全API呼出しは既存automationログへ成功/失敗を記録し、引数・認証・生の例外を載せない。詳しくは[共通操作API](docs/automation.md)。
 
 - 共通操作API/MCP/Codex登録は[専用仕様](docs/automation.md)を正本とする。外部APIの許可項目・revision・既存保存経路を維持し、任意コマンドや全設定JSONを公開しない。127.0.0.1限定とHost/Origin/token検査、PC専用認証、登録範囲外のTOML保持を保つ。共通API変更はtests/automation.test.cjs、GUI/発行版はscripts/automation-ui-test.cjsで確認する。App Serverは検証用クライアントにだけ使い、会話UIへの組込みとは区別する。

@@ -6,6 +6,7 @@
 
 - `src/main/core/automation-api.ts`: 通信に依存しない操作、公開カタログ、実行権限、引数、受付状態。
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
+- `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
 - `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
@@ -42,13 +43,26 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
-未公開コマンド/設定、Appletプロセスの起動停止、アカウント/認証、キー/ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+未公開コマンド/設定、アカウント/認証、キー/ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+
+## Applet管理（0.26.31以降）
+
+本体が登録済みのファイル型AppletとWebAppletに `appdock.applets.<appletId>.enable` / `disable` / `restart` を生成します。引数はありません。Applet固有コマンドの公開宣言とは独立した本体コマンドで、設定JSONにIDを追加するだけでは生成しません。管理コマンドは対象appletIdを持ちますが、ショートカット・ジェスチャー・トレイではAppDock所属です。無効なAppletのenableも候補に残ります。削除済みの対象を実行すると拒否します。
+
+- enable/disable: enabledのみを既存SettingsStoreで保存し、他の設定を保持して状態を反映します。同じ値なら保存しません。有効化は設定済みの起動遅延に従います。
+- restart: 有効状態を保存し直さず、ファイル型は停止して再起動予約（起動遅延を尊重）、WebAppletはビューを作り直して表示します。無効なAppletはUNAVAILABLEで拒否します。再起動は実行中処理を中断し得ます。
+- 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未保存draftを混同しません。
+- 成功応答はcompletion=lifecycleApplied、changed（enabledの保存有無）、applet（id/enabled/state）、effectVerified=falseです。waitingは予約状態で、起動完了を意味しません。起動失敗はLIFECYCLE_FAILEDになり、保存済みenabledは巻き戻しません。失敗/通信切断後は状態とログを確認します。
+
+PC専用automation.jsonに `allowManageApplets` を追加しました。初期値と既存設定に項目がない場合はfalseです。「Codex連携」の「Applet管理を許可する」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
+
+カタログのpermission=applets.manageと、system.getInfo/commands.listのappletManagementAllowedで管理権限を確認できます。拒否はAPPLET_MANAGEMENT_DISABLEDです。取消は次の要求から有効で、開始済みの処理を中断しません。ローカル操作に外部操作の許可は不要です。MCPツールは既存の7件を維持し、管理操作もcommands.execute経由で監査ログへ記録します。
 
 ## 公開コマンド
 
 設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableとexecutableで必要な両許可を確認します。接尾辞・表示名・aliasから許可を推測しません。
 
-- 本体: appdock.open、appdock.settings.open、appdock.commands.searchと公開設定コマンド。
+- 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
 - 本体管理のWebApplet: 提供元のweb-applets.tsがopenだけを宣言。
 

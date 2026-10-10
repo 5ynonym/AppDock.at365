@@ -16,6 +16,7 @@ import type {
 } from '../shared/contracts';
 import './style.css';
 import { hostCommands, rankCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
+import { appletManagementCommands } from '../shared/applet-management';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { TraySettings } from './TraySettings';
@@ -309,6 +310,7 @@ function App() {
   };
   const commands: UiCommand[] = [
     ...hostCommands.map((command) => ({ ...command, extensionId: null })),
+    ...appletManagementCommands(snapshot?.extensions ?? []),
     ...(snapshot?.extensions.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
     ) ?? []),
@@ -337,7 +339,14 @@ function App() {
   const pins = snapshot?.settings.value.pinnedCommands ?? [];
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
+    if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
+      setPalette(false);
+      if (id === 'appdock.logs.open') setLogSource('');
+      setPage(id === 'appdock.applets.open' ? 'extensions' : 'logs');
+      return;
+    }
     if (id === 'appdock.updates.open') {
+      setPalette(false);
       setUpdatesRequest((value) => value + 1);
       setPage('settings');
       return;

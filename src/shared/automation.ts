@@ -2,6 +2,7 @@ export interface AutomationState {
   enabled: boolean;
   allowWrite: boolean;
   allowExecute: boolean;
+  allowManageApplets: boolean;
   port: number;
   running: boolean;
   endpoint: string;
@@ -19,7 +20,8 @@ export type AutomationAction =
   | { kind: 'register' | 'unregister' | 'test' | 'rotateToken' }
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
-  | { kind: 'setExecution'; allowed: boolean };
+  | { kind: 'setExecution'; allowed: boolean }
+  | { kind: 'setAppletManagement'; allowed: boolean };
 
 export interface AutomationReply {
   state: AutomationState;

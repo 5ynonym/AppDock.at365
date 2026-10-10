@@ -34,6 +34,13 @@ settings.keybindings.push({
   when: { scope: 'app', appletIds: [] },
 });
 settings.globalShortcutCommands = [];
+settings.keybindings.push({
+  id: 'test-applet-enable',
+  command: 'appdock.applets.test.automation-provider.enable',
+  key: 'Ctrl+Alt+F10',
+  enabled: true,
+  when: { scope: 'app', appletIds: [] },
+});
 settings.gestures.enabled = false;
 const fixtureId = 'test.automation-provider';
 const fixtureRoot = path.join(profile, 'extensions', 'automation-fixture');
@@ -71,6 +78,7 @@ fs.writeFileSync(
   `
 const fs=require('node:fs'),path=require('node:path');
 exports.activate=async(context)=>{
+ fs.appendFileSync(path.join(__dirname,'activations.txt'),process.pid+'\\n');
  context.tray.add('Fixture feature toggle','test.automation-provider.settings.feature.toggle');
  context.settings.onChanged(()=>fs.writeFileSync(path.join(__dirname,'observed.json'),JSON.stringify({feature:context.settings.get('feature',false)})));
  for(const name of ['next','start','stop','prepare-background']) context.commands.register('test.automation-provider.'+name,name,async()=>{
@@ -310,6 +318,122 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal(executed.effectVerified, false);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'calls.json'))), ['next']);
     assert.ok(!JSON.stringify(executed).includes('SECRET_COMMAND_RESULT'));
+    const lifecycleId = (id, op) => `appdock.applets.${id}.${op}`;
+    const manage = (id, op) => call(client, 'appdock_execute_command', { id: lifecycleId(id, op) });
+    assert.equal((await call(client, 'appdock_get_info')).appletManagementAllowed, false);
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: lifecycleId(fixtureId, 'disable') },
+        })
+      ).structuredContent.code,
+      'APPLET_MANAGEMENT_DISABLED',
+    );
+    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await until(
+      async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
+      'management permission',
+    );
+    assert.equal((await call(client, 'appdock_get_info')).writable, false);
+    const activationFile = path.join(fixtureRoot, 'activations.txt');
+    const beforeRestart = fs.readFileSync(activationFile, 'utf8');
+    const settingsBeforeRestart = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    assert.equal((await manage(fixtureId, 'restart')).completion, 'lifecycleApplied');
+    assert.notEqual(fs.readFileSync(activationFile, 'utf8'), beforeRestart);
+    assert.equal(
+      fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'),
+      settingsBeforeRestart,
+    );
+    await manage(fixtureId, 'disable');
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[fixtureId]
+        .enabled,
+      false,
+    );
+    const stoppedActivations = fs.readFileSync(activationFile, 'utf8');
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: lifecycleId(fixtureId, 'restart') },
+        })
+      ).structuredContent.code,
+      'UNAVAILABLE',
+    );
+    assert.equal(fs.readFileSync(activationFile, 'utf8'), stoppedActivations);
+    // Local commands share the service but do not depend on external permissions.
+    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await until(
+      async () => !(await call(client, 'appdock_get_info')).appletManagementAllowed,
+      'management revoked',
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: lifecycleId(fixtureId, 'enable') },
+        })
+      ).structuredContent.code,
+      'APPLET_MANAGEMENT_DISABLED',
+    );
+    await call(client, 'appdock_execute_command', { id: 'appdock.open' });
+    await page.bringToFront();
+    await call(client, 'appdock_execute_command', { id: 'appdock.commands.search' });
+    const managementPalette = page.getByRole('dialog', { name: 'コマンドパレット' });
+    await managementPalette
+      .getByRole('combobox', { name: 'コマンドを検索' })
+      .fill(lifecycleId(fixtureId, 'enable'));
+    await until(
+      () => managementPalette.locator('.palette-execute').isEnabled(),
+      'management command available in palette',
+    );
+    await page.keyboard.press('Escape');
+    await managementPalette.waitFor({ state: 'hidden' });
+    await page.keyboard.press('Control+Alt+F10');
+    await until(
+      async () =>
+        (await call(client, 'appdock_get_applet', { id: fixtureId })).applet.state === 'running',
+      'local management keyboard enables disabled Applet',
+    );
+    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await until(
+      async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
+      'management restored',
+    );
+    await manage(webId, 'disable');
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).webApplets.items.find(
+        (a) => a.id === webId,
+      ).enabled,
+      false,
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: lifecycleId(webId, 'restart') },
+        })
+      ).structuredContent.code,
+      'UNAVAILABLE',
+    );
+    await manage(webId, 'enable');
+    await manage(webId, 'restart');
+    for (const id of ['appdock.applets.open', 'appdock.logs.open', 'appdock.updates.open']) {
+      assert.equal((await call(client, 'appdock_execute_command', { id })).completion, 'accepted');
+      if (id === 'appdock.applets.open')
+        await page.locator('main.applet-detail-main').waitFor({ state: 'visible' });
+      if (id === 'appdock.logs.open')
+        await page.getByRole('textbox', { name: 'ログを検索' }).waitFor({ state: 'visible' });
+      if (id === 'appdock.updates.open')
+        await page.getByRole('region', { name: 'アップデート設定' }).waitFor({ state: 'visible' });
+    }
+    await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    await section.waitFor({ state: 'visible' });
+    checks.push(
+      'separate management permission default deny/revocation; persisted enable/disable; real Node restart without save; disabled restart rejected; local command bypasses external grant; WebApplet lifecycle; three host navigation commands',
+    );
     assert.equal(
       (
         await client.callTool({
@@ -403,6 +527,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       .first()
       .waitFor();
     await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
+    await page
+      .getByRole('searchbox', { name: 'ショートカットのコマンドを検索' })
+      .fill(lifecycleId(fixtureId, 'enable'));
+    await page.getByText(lifecycleId(fixtureId, 'enable'), { exact: true }).first().waitFor();
+    await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     await page.keyboard.press('Control+Alt+F11');
     await until(
@@ -481,16 +610,25 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     }
     checks.push('both themes at 1280/960/700 without horizontal overflow');
     const before = await call(client, 'appdock_get_settings');
+    await manage(fixtureId, 'disable');
+    await manage(webId, 'disable');
     await client.close();
     client = null;
     await stop(s);
     s = await start();
     page = s.page;
     assert.equal(
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state
+        .allowManageApplets,
+      true,
+    );
+    assert.equal(
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.allowExecute,
       true,
     );
     client = await connect(s);
+    for (const id of [fixtureId, webId])
+      assert.equal((await call(client, 'appdock_get_applet', { id })).applet.enabled, false);
     const after = await call(client, 'appdock_get_settings');
     assert.deepEqual(after.values, before.values);
     assert.notEqual(after.revision, before.revision);

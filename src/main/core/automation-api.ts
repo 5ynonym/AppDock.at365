@@ -2,6 +2,7 @@ import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import type { SettingsStore } from './settings';
 import type { AutomationApplet, AutomationCommand } from './automation-commands';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
+import { AppletManagement, AppletManagementError } from './applet-management';
 
 export class AutomationError extends Error {
   constructor(
@@ -30,6 +31,8 @@ export class AutomationApi {
       settings: SettingsStore;
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
+      appletManagement?: AppletManagement;
+      manageable?(): boolean;
       applets(): AutomationApplet[];
       commands(): AutomationCommand[];
       execute(id: string): Promise<unknown>;
@@ -46,7 +49,11 @@ export class AutomationApi {
   private commands() {
     return [
       ...new Map(
-        [...this.options.commands(), ...this.settingsCommands.commands()].map((c) => [
+        [
+          ...this.options.commands(),
+          ...this.settingsCommands.commands(),
+          ...(this.options.appletManagement?.commands() ?? []),
+        ].map((c) => [
           c.id,
           {
             ...c,
@@ -84,6 +91,7 @@ export class AutomationApi {
       case 'system.getInfo':
         return {
           apiVersion: 2,
+          appletManagementAllowed: this.options.manageable?.() ?? false,
           version: this.options.version,
           instanceId: this.options.instanceId,
           methods: automationMethods,
@@ -92,15 +100,13 @@ export class AutomationApi {
         };
       case 'applets.list':
         return {
-          applets: this.options
-            .applets()
-            .map(({ id, name, version, state, enabled }) => ({
-              id,
-              name,
-              version,
-              state,
-              enabled,
-            })),
+          applets: this.options.applets().map(({ id, name, version, state, enabled }) => ({
+            id,
+            name,
+            version,
+            state,
+            enabled,
+          })),
         };
       case 'applets.get': {
         const id = this.id(params);
@@ -114,6 +120,7 @@ export class AutomationApi {
       }
       case 'commands.list':
         return {
+          appletManagementAllowed: this.options.manageable?.() ?? false,
           commands: this.commands(),
           executable: this.options.executable(),
           writable: this.options.writable(),
@@ -184,8 +191,19 @@ export class AutomationApi {
         'AppDockのCodex連携画面で設定変更を許可してください。',
       );
     if (this.executing) throw new AutomationError('BUSY', '別のAPIコマンドを実行中です。');
+    if (command.permission === 'applets.manage' && !this.options.manageable?.())
+      throw new AutomationError(
+        'APPLET_MANAGEMENT_DISABLED',
+        'AppDockのCodex連携画面でApplet管理を許可してください。',
+      );
     this.executing = true;
     try {
+      if (command.permission === 'applets.manage') {
+        if (!this.options.appletManagement)
+          throw new AppletManagementError('NOT_FOUND', 'Applet管理を利用できません。');
+        const result = await this.options.appletManagement.execute(id);
+        return { id, completion: 'lifecycleApplied', effectVerified: false, ...result };
+      }
       if (command.permission === 'settings.write') {
         const result = this.settingsCommands.execute(id, args);
         return {
@@ -206,7 +224,7 @@ export class AutomationApi {
             : 'コマンド処理から応答が返りました。操作先での効果は未確認です。',
       };
     } catch (error) {
-      if (error instanceof SettingsCommandError)
+      if (error instanceof SettingsCommandError || error instanceof AppletManagementError)
         throw new AutomationError(error.code, error.message);
       throw new AutomationError(
         'COMMAND_FAILED',

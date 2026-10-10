@@ -19,6 +19,7 @@ interface LocalConfig {
   enabled: boolean;
   allowWrite: boolean;
   allowExecute: boolean;
+  allowManageApplets: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -43,7 +44,12 @@ export class AutomationService {
       version: string;
       encrypt(value: string): string;
       decrypt(value: string): string;
-      createApi(writable: () => boolean, id: string, executable: () => boolean): AutomationApi;
+      createApi(
+        writable: () => boolean,
+        id: string,
+        executable: () => boolean,
+        manageable: () => boolean,
+      ): AutomationApi;
       changed(): void;
       audit?(level: string, message: string): void;
     },
@@ -60,6 +66,7 @@ export class AutomationService {
       enabled: false,
       allowWrite: false,
       allowExecute: false,
+      allowManageApplets: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -78,6 +85,7 @@ export class AutomationService {
           typeof c.enabled !== 'boolean' ||
           typeof c.allowWrite !== 'boolean' ||
           (c.allowExecute !== undefined && typeof c.allowExecute !== 'boolean') ||
+          (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
           !Number.isInteger(c.port) ||
           c.port < 0 ||
           c.port > 65535 ||
@@ -90,6 +98,7 @@ export class AutomationService {
           throw Error();
         c.configFile = codexConfigPath(c.configFile);
         c.allowExecute ??= false;
+        c.allowManageApplets ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -120,6 +129,7 @@ export class AutomationService {
       enabled: this.config.enabled,
       allowWrite: this.config.allowWrite,
       allowExecute: this.config.allowExecute,
+      allowManageApplets: this.config.allowManageApplets,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -144,6 +154,11 @@ export class AutomationService {
         () => this.config.enabled && this.config.allowWrite && !this.closed,
         this.id,
         () => this.config.enabled && this.config.allowExecute && !this.closed,
+        () =>
+          this.config.enabled &&
+          this.config.allowExecute &&
+          this.config.allowManageApplets &&
+          !this.closed,
       ),
       () => this.token,
       () => {
@@ -224,6 +239,12 @@ export class AutomationService {
           this.config.allowExecute = action.allowed;
           this.save();
           message = 'このPCのコマンド実行許可を保存しました。';
+          break;
+        case 'setAppletManagement':
+          if (typeof action.allowed !== 'boolean') throw Error('Applet管理の許可が不正です。');
+          this.config.allowManageApplets = action.allowed;
+          this.save();
+          message = 'このPCのApplet管理許可を保存しました。';
           break;
         case 'register':
           if (!this.server) throw Error('先に連携を有効にしてMCPを起動してください。');

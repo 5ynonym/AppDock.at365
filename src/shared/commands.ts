@@ -4,6 +4,9 @@ export const hostCommands = [
   { id: 'appdock.open', title: 'AppDockを開く', extension: 'AppDock', available: true },
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },
+  { id: 'appdock.applets.open', title: 'Applet一覧を開く', extension: 'AppDock', available: true },
+  { id: 'appdock.logs.open', title: 'ログを開く', extension: 'AppDock', available: true },
+  { id: 'appdock.updates.open', title: '更新画面を開く', extension: 'AppDock', available: true },
   { id: 'appdock.restart', title: '再起動', extension: 'AppDock', available: true },
   {
     id: 'appdock.gestures.togglePause',
