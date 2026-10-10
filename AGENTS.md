@@ -107,3 +107,8 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - ショートカットの解除はその他メニューの「キーのクリア…」から確認後に選んだ行だけをdraftから除く。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは割り当て可能なキーとして残す。共通BindingActionsのremovalKindで文言を切り替え、ジェスチャーの削除確認は保持する。
 
 - タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。
+
+## PC間設定同期の相談時の注意（2026-10-10調査、未実装）
+
+- 現SettingsStoreの外部変更監視/dirty draft保護と、実際の2台ファイル同期・永続backup対応を区別する。`.appdock`は認証session/secrets/PC内状態が混在するため丸ごと共有できると案内しない。WebAppletの設定accountIdは別accounts.jsonの同じIDを必要とし、pendingDeletionはPC内回収記録。共有名簿・LOCALAPPDATA保存・世代backupは設計案で、現機能として扱わない。調査/未確認境界は[検証記録](VERIFICATION.md#2026-10-10-設定のpc間同期保存領域の設計相談未実装)を参照する。
+- 追加のユーザー要件: WebApplet用の枠名/IDは同期し、Gmail専用の枠名/IDと枠ごとの監視/音声割当/選択はPC専用にする。ユーザー登録アセットはAppDock配置内で共有し、認証/PC状態はLOCALAPPDATAへ分離する。Gmail全体のsettings.json設定と枠ごとの設定を混同しない。共有アセットの参照は相対パス/安定IDにし、PC内の枠削除を共有素材の自動削除へ直結させない。現行の保存先を変更した実装ではなく、同期設計の要件。
