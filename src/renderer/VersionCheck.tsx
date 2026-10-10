@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { UpdateResult } from '../shared/contracts';
-export function UpdateCheckTime({ checkedAt }: { checkedAt: string }) {
+export function UpdateCheckTime({ checkedAt }: { checkedAt?: string }) {
   return (
     <time dateTime={checkedAt} className="muted">
       最終確認:{' '}
-      {new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
-        new Date(checkedAt),
-      )}
+      {checkedAt
+        ? new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
+            new Date(checkedAt),
+          )
+        : '未確認'}
     </time>
   );
 }
@@ -52,7 +54,6 @@ export function VersionCheck({
   const check = async () => {
     setBusy(true);
     setError('');
-    setResult(undefined);
     try {
       setResult(await window.dock.checkUpdates(id));
     } catch (err) {
@@ -86,30 +87,39 @@ export function VersionCheck({
         >
           {busy ? '更新を確認中…' : '更新を確認'}
         </button>
-        {details && result && <UpdateCheckTime checkedAt={result.checkedAt} />}
+        {details && <UpdateCheckTime checkedAt={result?.checkedAt} />}
       </span>
-      {result && (
-        <span role="status">
-          {result.status === 'available'
-            ? `${result.latestVersion} が公開されています。`
-            : result.status === 'current'
-              ? '最新版です。'
-              : result.status === 'unpublished'
-                ? '公開リリースが見つかりません。'
-                : result.status === 'unsupported'
-                  ? '更新元が設定されていません。'
-                  : result.message}
-        </span>
-      )}
-      {result?.status === 'available' && result.releaseUrl && (
-        <button
-          className="text-button"
-          onClick={() => {
-            void window.dock.openReleases(id).catch((err: Error) => setError(updateError(err)));
-          }}
-        >
-          リリースを開く
-        </button>
+      {details && (
+        <details className="update-result-details">
+          <summary>確認結果</summary>
+          <div>
+            <span>
+              {!result
+                ? 'まだ更新を確認していません。'
+                : result.status === 'available'
+                  ? `${result.latestVersion} が公開されています。`
+                  : result.status === 'current'
+                    ? '最新版です。'
+                    : result.status === 'unpublished'
+                      ? '公開リリースが見つかりません。'
+                      : result.status === 'unsupported'
+                        ? '更新元が設定されていません。'
+                        : result.message}
+            </span>
+            {result?.status === 'available' && result.releaseUrl && (
+              <button
+                className="text-button"
+                onClick={() => {
+                  void window.dock
+                    .openReleases(id)
+                    .catch((err: Error) => setError(updateError(err)));
+                }}
+              >
+                リリースを開く
+              </button>
+            )}
+          </div>
+        </details>
       )}
       {error && (
         <span className="error-text" role="alert">

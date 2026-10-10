@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { compareVersions, parseVersion } from '../../shared/versions';
@@ -328,18 +328,66 @@ export class PortableUpdates {
     this.state.cancellable = true;
     this.state.progress = undefined;
     this.state.completion = undefined;
+    this.state.notice = undefined;
     this.state.phase = phase;
     this.options.changed();
   }
-  async check(ids?: string[]): Promise<UpdateState> {
+  private notice(kind: NonNullable<UpdateState['notice']>['kind'], message: string) {
+    this.state.notice = { id: randomUUID(), kind, message };
+  }
+  private checkedNotice(results: UpdateResult[]) {
+    const available = results.filter((result) => result.status === 'available');
+    const failed = results.filter(
+      (result) => result.status === 'error' || result.status === 'incompatible',
+    );
+    const skipped = results.filter(
+      (result) => result.status === 'unsupported' || result.status === 'unpublished',
+    );
+    const updates =
+      available.length === 1
+        ? `${available[0].name} ${available[0].latestVersion} に更新できます。`
+        : `${available.length}件の更新があります。`;
+    if (failed.length)
+      this.notice(
+        'error',
+        `${available.length ? `${updates} ` : ''}${failed.length}件の更新を確認できませんでした。${failed[0].name}: ${failed[0].message ?? '更新元を確認してください。'}`,
+      );
+    else if (available.length)
+      this.notice(
+        'available',
+        `${updates}${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
+      );
+    else if (skipped.length)
+      this.notice(
+        'info',
+        `確認できた対象に更新はありません。${skipped.length}件は更新元が未設定または未公開です。`,
+      );
+    else
+      this.notice(
+        'info',
+        results.length
+          ? '更新はありません。最新版を使用しています。'
+          : '更新を確認する対象がありません。',
+      );
+  }
+  async check(ids?: string[], silent = false): Promise<UpdateState> {
     this.begin('更新を確認中…');
     try {
-      for (const target of this.options.targets().filter((t) => !ids || ids.includes(t.id)))
-        this.update((await this.checkTarget(target)).result);
+      const results: UpdateResult[] = [];
+      for (const target of this.options.targets().filter((t) => !ids || ids.includes(t.id))) {
+        const { result } = await this.checkTarget(target);
+        results.push(result);
+        this.update(result);
+      }
+      if (!silent) this.checkedNotice(results);
       this.state.phase = '';
     } catch (error) {
-      if (!this.controller?.signal.aborted) throw error;
+      if (!this.controller?.signal.aborted) {
+        this.notice('error', String(error).replace(/^Error: /, ''));
+        throw error;
+      }
       this.state.phase = '更新確認を取り消しました。';
+      if (!silent) this.notice('info', this.state.phase);
     } finally {
       this.state.busy = false;
       this.state.cancellable = false;
@@ -365,10 +413,12 @@ export class PortableUpdates {
       if (!targets.length) throw Error('更新対象がありません。');
       if (!this.options.executable) throw Error('更新の適用は配布版のAppDockで行ってください。');
       const candidates: Candidate[] = [];
+      const results: UpdateResult[] = [];
       let hostVersion = this.options.hostVersion;
       for (const target of targets) {
         signal.throwIfAborted();
         const checked = await this.checkTarget(target, hostVersion);
+        results.push(checked.result);
         this.update(checked.result);
         if (checked.candidate && checked.result.installable) {
           candidates.push(checked.candidate);
@@ -377,6 +427,7 @@ export class PortableUpdates {
       }
       if (!candidates.length) {
         this.state.phase = '適用できる更新はありません。';
+        this.checkedNotice(results);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));
@@ -483,6 +534,7 @@ export class PortableUpdates {
         ))
       ) {
         this.state.phase = '更新を取り消しました。';
+        this.notice('info', this.state.phase);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
       this.state.phase = '再起動を準備中…';
@@ -529,8 +581,10 @@ export class PortableUpdates {
     } catch (error) {
       if (signal.aborted) {
         this.state.phase = '更新を取り消しました。インストール済みのファイルは変更していません。';
+        this.notice('info', this.state.phase);
       } else {
         this.state.phase = String(error).replace(/^Error: /, '');
+        this.notice('error', this.state.phase);
         throw error;
       }
     } finally {
@@ -565,7 +619,7 @@ export class PortableUpdates {
           target.kind === 'host' ? current.checkHostOnStartup : current.checkAppletsOnStartup,
         )
         .map((target) => target.id);
-      void this.check(currentIds)
+      void this.check(currentIds, true)
         .then(() => {
           if (this.options.settings().notifyOnStartup)
             notify(

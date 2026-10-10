@@ -76,3 +76,7 @@ Webページにはpreload/Node/ホストIPCを公開せず、sandbox/contextIsol
 ## 開発検証
 
 `tests/web-applets.test.cjs`は設定移行、ID/参照、危険なURL、origin比較、Web提供JSONの権限境界を確認します。`tests/web-profiles.test.cjs`は旧一覧の移行、設定byte/revision不変の即時保存、削除待ちの再起動/失敗再試行、参照/生成済みガード、junction/パスの削除境界と外部変更/不正ファイルの保持を確認します。`scripts/web-applets-ui-test.cjs [win-unpackedのEXE]`は独立ページ・即時操作・警告の取消/確認・下書き保持と従来のWeb表示を確認します。`scripts/web-profiles-migration-ui-test.cjs <保持した0.24.0のwin-unpacked EXE>`は旧版で作った実Cookieが移行後も残ることを隔離profileで確認します。旧配布物の再発行前に試験用コピーを保持し、現行EXEを旧版として試験しません。`scripts/web-applets-portable-test.cjs [単一EXE]`は実EXEの隔離コピーを通常起動して確認します。実サイトのログインや長時間動作とは区別します。
+
+## ページの言語
+
+WebAppletの専用sessionもWindowsの優先言語をChromiumから引き継ぎ、ホストで言語を固定しません。HTTPのAccept-Languageとnavigator.language/languagesの実測範囲は[検証記録](../VERIFICATION.md)、共通の扱いは[Webアカウントの言語](web-accounts.md#webviewの言語)を参照してください。サイト側で保存された言語設定は変更しません。

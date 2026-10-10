@@ -1051,6 +1051,7 @@ main {
   font-size: 9px;
 }
 .statusbar {
+  position: relative;
   grid-column: 1/-1;
   display: flex;
   align-items: center;
@@ -1068,54 +1069,6 @@ main {
   gap: 6px;
   min-width: 0;
   max-width: 36%;
-}
-.update-completion-notice {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 22px;
-  padding: 0 7px 0 9px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 10px;
-  animation: update-notice-fade 5.2s ease both;
-}
-.update-completion-notice > svg {
-  flex-shrink: 0;
-}
-.update-completion-notice > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.update-completion-notice > button {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border-radius: 50%;
-  color: inherit;
-}
-.update-completion-notice > button:hover {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-@keyframes update-notice-fade {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  5%,
-  94% {
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .update-completion-notice {
-    animation: none;
-  }
 }
 .statusbar i {
   background: var(--accent);
@@ -1730,11 +1683,13 @@ main {
     transition: none !important;
   }
 }
-.activity-rail > .avatar {
+.activity-rail .avatar {
   width: 30px;
   height: 30px;
   padding: 0;
   overflow: hidden;
+  border-radius: 50%;
+  flex-shrink: 0;
   color: #d2daf7;
   margin-top: 4px;
 }
@@ -2942,38 +2897,97 @@ summary {
   flex-basis: 100%;
 }
 
+/* The notice occupies the existing footer, including over native WebContentsView pages. */
+.statusbar:has(> .update-operation) > :not(.update-operation) {
+  visibility: hidden;
+}
 .update-operation {
+  position: absolute;
+  inset: 3px 12px;
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin: 16px 24px;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  flex-shrink: 0;
-}
-.update-operation-body {
-  flex: 1;
+  gap: 9px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
-.update-operation p {
-  margin: 0 0 6px;
+.update-operation.has-error {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--panel);
 }
-.update-operation progress {
-  width: 100%;
-  height: 10px;
-  accent-color: var(--purple);
-}
-.update-operation small {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
+.update-operation > svg,
 .update-operation > button {
   flex-shrink: 0;
+}
+.update-operation-message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.update-operation progress {
+  width: clamp(40px, 10vw, 140px);
+  height: 4px;
+  accent-color: var(--accent);
+}
+.update-operation small {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.update-operation button {
+  font-size: 10px;
+  color: inherit;
+  padding: 2px 5px;
+}
+.update-operation .update-notice-close {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+}
+.update-operation button:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.update-result-details {
+  position: relative;
+  font-size: 11px;
+}
+.update-result-details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.update-result-details > div {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  width: min(300px, 65vw);
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 6px 24px #0002;
+  overflow-wrap: anywhere;
+}
+.update-check-control time {
+  min-width: 175px;
+}
+@media (max-width: 1000px) {
+  .update-result-details > div {
+    left: 0;
+    right: auto;
+  }
+}
+@media (max-width: 760px) {
+  .update-operation small {
+    display: none;
+  }
 }
 /* Conditional shortcut assignments: one row per binding. */
 .command-id {

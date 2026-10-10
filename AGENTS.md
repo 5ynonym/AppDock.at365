@@ -41,7 +41,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 - 設定はuseSettingsEditorの共有draft/JSON/revision/saveを維持し、詳細/設定画面で二重draftや二重入力を作らない。settingActionsは自身の宣言済みcommandに限定し、実行中ガード・結果表示・未保存入力を保つ。
 - Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletへ切り替えても選択中のタブを維持する。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
-- 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
+- 更新の確認結果・進捗・適用完了は本文を動かさない共通ステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。通常結果は6秒で消え、ホバー/フォーカス中は残り時間を止める。失敗結果は自動消去しない。詳細はdocs/updates.mdを参照する。
 - 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/dataの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
 - 本体と全Appletの更新は`installUpdates('all')`の1job/1確認/1再起動へまとめる。同時適用する本体候補の版でAppletの最低host版を検証し、本体候補がない時は現行版を使う。ファイル型Appletだけを列挙し、WebAppletは本体に含める。確認日時は各確認ボタンの隣に置く。仕様と回帰は[更新ガイド](docs/updates.md)を参照する。
 
