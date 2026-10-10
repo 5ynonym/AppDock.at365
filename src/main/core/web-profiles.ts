@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { atomicWrite, type SettingsStore } from './settings';
+import { observeFile } from './file-observer';
 import {
   parseWebProfiles,
   profileId,
@@ -13,30 +14,50 @@ import {
 export class WebProfileStore {
   private value: WebProfile[] = [];
   private pending: string[] = [];
-  constructor(readonly file: string) {}
-  private read() {
-    const text = fs.readFileSync(this.file, 'utf8').replace(/^\uFEFF/, '');
+  private observer?: ReturnType<typeof observeFile>;
+  private settings?: SettingsStore;
+  constructor(
+    readonly file: string,
+    private localDirectory?: string,
+  ) {}
+  private get pendingFile() {
+    return this.localDirectory && path.join(this.localDirectory, 'pending-deletion.json');
+  }
+  private read(received?: string) {
+    if (received === undefined && !fs.existsSync(this.file) && this.value.length === 0)
+      return { accounts: [], pendingDeletion: [...this.pending] };
+    const text = (received ?? fs.readFileSync(this.file, 'utf8')).replace(/^\uFEFF/, '');
     if (Buffer.byteLength(text) > 65536) throw Error('Webアカウントの保存ファイルが大きすぎます。');
     const raw = JSON.parse(text);
     if (raw?.schemaVersion !== 1) throw Error('Webアカウントの保存形式に対応していません。');
     const accounts = parseWebProfiles(raw.accounts);
-    const pending = raw.pendingDeletion ?? [];
+    const pending = this.pendingFile
+      ? fs.existsSync(this.pendingFile)
+        ? JSON.parse(fs.readFileSync(this.pendingFile, 'utf8'))
+        : []
+      : (raw.pendingDeletion ?? []);
     if (
       !Array.isArray(pending) ||
-      pending.some((id) => !profileId(id) || accounts.some((a) => a.id === id)) ||
+      pending.some(
+        (id) => !profileId(id) || (!this.pendingFile && accounts.some((a) => a.id === id)),
+      ) ||
       new Set(pending).size !== pending.length
     )
       throw Error('Webアカウントの削除待ち記録が不正です。');
     return { accounts, pendingDeletion: pending as string[] };
   }
   load(settings: SettingsStore) {
-    const legacy = JSON.parse(fs.readFileSync(settings.file, 'utf8').replace(/^\uFEFF/, ''))
-      ?.webApplets?.accounts;
+    this.settings = settings;
+    fs.mkdirSync(path.dirname(this.file), { recursive: true });
+    const legacy = settings.recovered
+      ? undefined
+      : JSON.parse(fs.readFileSync(settings.file, 'utf8').replace(/^\uFEFF/, ''))?.webApplets
+          ?.accounts;
     if (fs.existsSync(this.file)) {
       const saved = this.read();
       this.value = saved.accounts;
       this.pending = saved.pendingDeletion;
-    } else {
+    } else if (legacy !== undefined) {
       const migrated = parseWebProfiles(legacy ?? []);
       atomicWrite(
         this.file,
@@ -48,6 +69,24 @@ export class WebProfileStore {
     // Existing account IDs/session directories are not moved or recreated.
     if (legacy !== undefined) settings.save(settings.value, settings.revision);
   }
+  watch(changed: () => void, failed: (error: Error) => void) {
+    this.observer = observeFile(
+      this.file,
+      (text) => {
+        const saved = this.read(text);
+        if (JSON.stringify(saved.accounts) !== JSON.stringify(this.value)) {
+          this.value = saved.accounts;
+          changed();
+        }
+      },
+      (error) => {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || this.value.length) failed(error);
+      },
+    );
+  }
+  close() {
+    this.observer?.close();
+  }
   snapshot() {
     return structuredClone(this.value);
   }
@@ -57,20 +96,37 @@ export class WebProfileStore {
     return { ...result };
   }
   private unchanged() {
+    if (!fs.existsSync(this.file) && this.settings?.value.webApplets.items.length)
+      throw Error('Webアカウント一覧の同期を待っています。枠が届いてから操作してください。');
     if (
       JSON.stringify(this.read()) !==
       JSON.stringify({ accounts: this.value, pendingDeletion: this.pending })
     )
-      throw Error('Webアカウントが別の場所で変更されました。再起動して読み直してください。');
+      throw Error(
+        'Webアカウントが別の場所で変更されました。一覧の同期を待ってから操作してください。',
+      );
   }
   private save(next: WebProfile[], pending = this.pending) {
     this.unchanged();
     const validated = parseWebProfiles(next);
     const text =
-      JSON.stringify({ schemaVersion: 1, accounts: validated, pendingDeletion: pending }, null, 2) +
-      '\n';
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          accounts: validated,
+          ...(!this.pendingFile ? { pendingDeletion: pending } : {}),
+        },
+        null,
+        2,
+      ) + '\n';
     if (Buffer.byteLength(text) > 65536) throw Error('Webアカウントの保存ファイルが大きすぎます。');
-    atomicWrite(this.file, text);
+    if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(pending));
+    try {
+      atomicWrite(this.file, text);
+    } catch (error) {
+      if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(this.pending));
+      throw error;
+    }
     this.value = validated;
     this.pending = [...pending];
   }
@@ -93,11 +149,11 @@ export class WebProfileStore {
     );
   }
   pendingDeletion() {
-    return [...this.pending];
+    return this.pending.filter((id) => !this.value.some((a) => a.id === id));
   }
   cleanupSessions(referenced: Iterable<string>, live: Iterable<string> = []) {
-    const blocked = new Set([...referenced, ...live]);
-    const root = path.resolve(path.dirname(this.file), 'sessions');
+    const blocked = new Set([...referenced, ...live, ...this.value.map((a) => a.id)]);
+    const root = path.resolve(this.localDirectory || path.dirname(this.file), 'sessions');
     for (const id of [...this.pending]) {
       if (blocked.has(id)) continue;
       this.unchanged();
@@ -124,10 +180,15 @@ export class WebProfileStore {
         // Locked/inaccessible files remain tracked for the next startup.
         continue;
       }
-      this.save(
-        this.value,
-        this.pending.filter((p) => p !== id),
-      );
+      if (this.pendingFile) {
+        const remaining = this.pending.filter((p) => p !== id);
+        atomicWrite(this.pendingFile, JSON.stringify(remaining));
+        this.pending = remaining;
+      } else
+        this.save(
+          this.value,
+          this.pending.filter((p) => p !== id),
+        );
     }
     return this.pendingDeletion();
   }

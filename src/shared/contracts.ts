@@ -33,12 +33,14 @@ export interface Settings {
   trayMenu?: import('./tray-menu').TrayMenuItem[];
   pinnedCommands: string[];
   ribbon: { order: string[]; hidden: string[]; bottom: string[]; separators: string[] };
-  profile: { name: string; avatar: 'avatar.png' | null };
+  profile: { name: string; avatar: string | null };
 }
 export interface SettingsSnapshot {
   value: Settings;
   revision: number;
   path: string;
+  syncError?: string;
+  recovered?: boolean;
 }
 export interface Command {
   id: string;
@@ -165,6 +167,8 @@ export interface HostSnapshot {
   logs: LogEntry[];
   version: string;
   dataDirectory: string;
+  sharedDirectory: string;
+  legacyLocalData: boolean;
   runtime: { electron: string; chrome: string; node: string; platform: string; arch: string };
   dark: boolean;
   avatarUrl: string | null;
@@ -176,6 +180,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  restoreSettingsBackup(revision: number): Promise<SettingsSnapshot | null>;
   refreshLaunchState(): Promise<LaunchState>;
   restartAsAdministrator(): Promise<void>;
   settingsNotice(state: SettingsNoticeState): Promise<void>;
@@ -209,6 +214,7 @@ export interface DockApi {
     value: Settings,
     revision: number,
     avatar?: Uint8Array | null,
+    avatarName?: string,
   ): Promise<SettingsSnapshot>;
   setPinnedCommands(ids: string[]): Promise<SettingsSnapshot>;
   toggleExtension(id: string, enabled: boolean): Promise<void>;

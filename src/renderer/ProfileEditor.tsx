@@ -11,7 +11,7 @@ export function ProfileEditor({
   avatarUrl: string | null;
   busy: boolean;
   onName(value: string): void;
-  onAvatar(bytes: Uint8Array | null, preview: string | null): void;
+  onAvatar(bytes: Uint8Array | null, preview: string | null, name?: string): void;
   onLoading(value: boolean): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -58,7 +58,7 @@ export function ProfileEditor({
       <div className="setting-row">
         <div>
           <strong>アバター画像</strong>
-          <p>PNG / JPEG · 5MBまで。保存するとavatar.pngを置き換えます。</p>
+          <p>PNG / JPEG · 5MBまで。同名の別画像は登録できません。</p>
         </div>
         <div className="profile-actions">
           <button
@@ -104,7 +104,7 @@ export function ProfileEditor({
               reader.onerror = () => reject(new Error('画像を読み込めません。'));
               reader.readAsDataURL(file);
             });
-            if (request === selection.current) onAvatar(bytes, preview);
+            if (request === selection.current) onAvatar(bytes, preview, file.name);
           } catch (e) {
             if (request === selection.current) setError(e instanceof Error ? e.message : String(e));
           } finally {
@@ -121,7 +121,7 @@ export function ProfileEditor({
         </div>
       )}
       <p className="footnote">
-        画像は設定ファイルの隣に1枚だけ保存します。変更は画面上部の「保存」で確定します。
+        画像はAppDock内のアバターフォルダーへ元の名前で保存します。変更は画面上部の「保存」で確定します。
       </p>
     </div>
   );

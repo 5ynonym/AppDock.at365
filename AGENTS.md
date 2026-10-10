@@ -16,6 +16,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
 - build-main.cjsはout/mainを再生成する。GUI試験や再起動の最中にビルドを重ねない。発行完了後の固定した配布物を使い、検証コピーと最終EXEのSHA256を照合する。
 - 本体の単一EXEとportableの展開先/Tray IDの安定性を維持する。scripts/build-portable.cjs・portable.nsiの展開mutex/lease、子プロセスの寿命、hProc形式のHANDLE変換を保つ。electron-builder更新時はcustom templateとの連携と実EXEの更新/再起動/同時起動/異常終了を確認する。
+- 実行時の自動展開物は同期不要。現portable.nsiはTEMP/AppDock.at365-識別子へ展開し、EXE配置内には展開しない。LOCALAPPDATA/at365/AppDock/runtimeへの変更は可能だが、2026-10-10の追加相談では未実装。変更時は配置別の安定パスと展開mutex/lease/最終終了時の限定削除を保ち、共有素材・認証・設定の保存先と混ぜない。
 - オールインワンZIPの作成・旧版整理はAppDockのリリース時だけ行う（2026-10-09ユーザーの追加指定）。Release Prepareは通常publish後に全Appletを再発行・同梱し、全チェックと新版ZIP/本体の整合検証成功後、sealでpublish直下の`AppDock.at365-all-in-one-<version>.zip`のうち新版より古い正式版を削除する。削除名はplanのremovedOldBundlesへ記録する。生成・配置・検証に失敗した場合は旧版を残す。別のZIP、ディレクトリ/リンク、`.artifacts`、GitHub Releaseへこの削除ルールを適用しない。詳細は[オールインワン作成](docs/all-in-one.md#publishの旧版zip整理)。
 - 同じ版のオールインワンZIPの置換はstage内のprevious-all-in-one.zipをbackupとして指定する。null backupで既存ファイルの削除に失敗する実例があり、失敗時に旧ZIPを保持する既存の回帰試験と発行先での実置換を確認する。実利用先deploy時の退避不要という指定とは区別する。
 - .NET SDK/Runtime・プロセス契約を変えたらnative AppletのRelease buildと接続/停止/表示/保存も確認する。runtimeconfig欠落は発行元・EXE内・実展開先を比較して原因を切り分ける。
@@ -37,7 +38,7 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 - Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletへ切り替えても選択中のタブを維持する。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
 - 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
 - 更新成功のお知らせは本文を遮らないステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。失敗結果は自動消去しない。
-- 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/.appdockの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
+- 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/dataの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
 - 本体と全Appletの更新は`installUpdates('all')`の1job/1確認/1再起動へまとめる。同時適用する本体候補の版でAppletの最低host版を検証し、本体候補がない時は現行版を使う。ファイル型Appletだけを列挙し、WebAppletは本体に含める。確認日時は各確認ボタンの隣に置く。仕様と回帰は[更新ガイド](docs/updates.md)を参照する。
 
 ## リリース
@@ -108,7 +109,20 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と参照先のALICE指示
 
 - タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。
 
-## PC間設定同期の相談時の注意（2026-10-10調査、未実装）
+## PC間設定同期と登録素材（2026-10-10、0.26.14実装）
 
-- 現SettingsStoreの外部変更監視/dirty draft保護と、実際の2台ファイル同期・永続backup対応を区別する。`.appdock`は認証session/secrets/PC内状態が混在するため丸ごと共有できると案内しない。WebAppletの設定accountIdは別accounts.jsonの同じIDを必要とし、pendingDeletionはPC内回収記録。共有名簿・LOCALAPPDATA保存・世代backupは設計案で、現機能として扱わない。調査/未確認境界は[検証記録](VERIFICATION.md#2026-10-10-設定のpc間同期保存領域の設計相談未実装)を参照する。
-- 追加のユーザー要件: WebApplet用の枠名/IDは同期し、Gmail専用の枠名/IDと枠ごとの監視/音声割当/選択はPC専用にする。ユーザー登録アセットはAppDock配置内で共有し、認証/PC状態はLOCALAPPDATAへ分離する。Gmail全体のsettings.json設定と枠ごとの設定を混同しない。共有アセットの参照は相対パス/安定IDにし、PC内の枠削除を共有素材の自動削除へ直結させない。現行の保存先を変更した実装ではなく、同期設計の要件。
+- 0.26.16以降の共有フォルダー名は小文字のdata。extensionsと同じEXE隣へ置く。旧.appdockの自動改名・移行・削除は行わず、古いアバター参照の読み取り互換だけ残す。登録・新規作成・隔離fixtureはdataを使う。
+
+- 新規Appletにも同じ保存境界を適用する。共有設定はホストSettings、共有する登録原素材はEXE隣のApplet別assets、端末固有のStorage/Secrets/認証/生成キャッシュはLOCALAPPDATAのホスト管理領域を使う。追加の共有保存が必要ならホスト側の専用領域/契約で扱い、PC専用Storageの保存先を共有rootへ変更しない。プロフィール登録画像はdata/assets/profileへ置く。
+
+- 0.26.15以降のPC専用rootは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`。ユーザーの全アプリでAPPDATA/LOCALAPPDATAにはat365を挟む。hostのdataPathsとnative updaterの許可rootを同時に更新し、共有データの配置や隔離test-profileの互換性を変えない。
+
+- 正本は[設定同期](docs/settings-sync.md)。EXE隣のsettings.jsonとdata内のWebApplet枠名簿・登録素材だけを共有し、全認証/session、Gmail専用枠/選択/枠別監視/音声割当、secrets/storage/Chromium/更新journal/backup等はLOCALAPPDATA内の配置別rootへ置く。Gmail全体のsettings.json設定とは区別する。旧.appdockの自動移行・削除はユーザー指定で追加しない。旧PC専用データが残る場合は警告する。
+- ファイル名を登録元/用途別フォルダー内のIDにする。対応表/インデックスを持たず、Windowsの大文字小文字を無視した同名同内容は再利用、同名別内容は拒否する。上書き・連番生成をしない。枠削除・停止・割当解除で共有素材を自動pruneしない。Gmailの登録済み音声一覧はホストAPIから供給する。
+- 設定/名簿受信は安定bytesの検証とpollを使い、壊れた受信で直近正常値を消さない。受信を書き戻さず、dirty draft/revision保護を維持する。名簿未到着時に空の共有ファイルを書かず、枠操作を同期待ちにする。外部の枠削除で他PCのCookieを回収予約しない。正常設定backupはPC内20世代、復元は明示確認後に異常bytesを保管して行う。
+- tests/settings-sync.test.cjs、registered-sounds.test.cjs、updater復旧回帰とsettings-sync-ui-test.cjsを確認する。GUIは直列で隔離し、固定単一EXEでも検証する。--test-local-stateはtest-profile専用。fixtureの2配置へのファイル配達と、実2PC/同期サービス/実Google認証の検証を区別する。実装前の調査記録はVERIFICATIONの履歴として保持する。
+
+## パスキー認証の調査時の注意（2026-10-10、未実装）
+
+- WebApplet/Gmailの通常PermissionRequest/Check全拒否だけをWebAuthn失敗の原因と断定しない。Electron 44.6.0の隔離WebContentsViewで全拒否のまま仮想resident credentialの作成/取得を実証。select-webauthn-accountが必要な経路はlistenerなしでNotAllowedError、fixture選択listenerありで成功。製品には選択処理がないが、Windows標準UIで選択済みならこのeventを通らない場合もあり、今回のWindows Hello失敗原因と断定しない。
+- ユーザーは製品変更なしの再押下と新しいアカウント枠でauth.openai.comの指紋パスキー認証成功を確認。初回は指紋画面が表示されないまま失敗画面へ遷移しており、指紋照合中の失敗と区別する。認証要求準備/WebAuthn/OS画面表示のどこで失敗したかはログなしで未特定。Gmail実認証とChrome保存パスキーの利用は別検証。Windows 24H2以降のアプリ許可、保存先、認証遷移/フォーカス/期限を切り分ける。修正する場合はホスト共通処理を検討し、通常権限の全許可や認証データの共有を追加しない。根拠/仮想試験と実認証の境界はVERIFICATIONの同日パスキー調査を参照する。

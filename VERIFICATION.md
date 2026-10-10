@@ -1,5 +1,32 @@
 # 検証記録
 
+## 2026-10-10: ポータブルEXEの実行時展開先の相談（変更なし）
+
+- ユーザーは自動展開物を同期不要と考え、LOCALAPPDATA配下へ展開可能か質問。scripts/portable.nsi/build-portable.cjsを読取確認。現展開先はTEMP/AppDock.at365-PortableId、IDはTEMP/外側EXE/test-profileに基づく。EXEの配置フォルダーへは展開しない。PORTABLE_EXECUTABLE_DIR/FILEは元のEXEを子へ渡し、共有設定や素材の配置はこの展開先とは別。最後のruntime lease終了後に専用の子フォルダーだけを削除する。
+- LOCALAPPDATA/at365/AppDock/runtime/識別子への変更はcustom NSIS templateで可能。ただし現時点では設計候補。変更する場合は安定した実行パス、Tray identity、二重起動/更新/再起動/親異常終了時のmutex/leaseと限定削除を維持し、実EXEで再検証する。今回の実行先変更・版更新・再発行・実利用展開先の整理は行っていない。
+- READMEに残っていたログイン保存先の旧.appdock記載を現LOCALAPPDATA方式へ修正し、現TEMP展開と同期対象外を明記。並行するUI/その他差分は保持。読取/文書だけのため製品テスト再実行・テスト削除は対象なし。
+
+## 2026-10-10: 0.26.15 at365保存先とプロフィール素材
+
+- ユーザーの追加指定によりPC専用rootを%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/へ変更。native updaterの許可rootも同時に変更し、旧namespace/別アプリrootは拒否する。APPDATA/LOCALAPPDATAへはat365を挟むという全アプリ共通方針と、今後のAppletも同期データはEXE配置内・端末固有データはホストのLOCALAPPDATA領域という規則を共有AGENTS/本体AGENTS/開発ガイドへ反映。現在のHost APIのSettingsは共有、Storage/SecretsはPC専用のApplet別領域を維持する。
+- 続く指定で新しいアバター登録先を.appdock/assets/profile/<元ファイル名>へ変更。名前未指定のPNGもこの中のavatar.pngへ保存する。元bytes保持・同名別画像拒否・登録原素材の保持を同じ処理へ統一し、EXE隣へ新規avatar.pngを書かない。従来の参照は読み取り互換を残し、旧データの自動移動/削除は追加しない。
+- 最終型検査と回帰190/190成功（at365-path-typecheck.log、at365-path-regression.log）。native helperは実LOCALAPPDATA内のランダムで不存在のIDに対し、at365/AppDockを受理、旧AppDock/別アプリを拒否し、保存ディレクトリを作成しないことも確認。既存の隔離journal復旧/設定受信/backup/素材/キー/.NET等の回帰を含む。
+- 元名画像登録/同名拒否/不正画像/登録原素材保持/キー/.NET/再起動のsource GUI成功: .artifacts/preferences-1791613082761、at365-path-preferences.log。最終単一EXEの通常起動2配置GUI成功: .artifacts/settings-sync-ui-1791613228647/result.json（portable-production-path、10項目）。test-profileを使わず各fixtureのLOCALAPPDATAだけを隔離し、at365保存先・Chromium/Gmail分離・settings受信/dirty/backup/名簿・音声・profile画像単独変更/再起動を確認。実2PC/同期サービス/実認証ではなく隔離ファイル配達の試験。
+- 最終固定単一EXE smoke成功: .artifacts/smoke-1791613278248/smoke-result.json、at365-path-smoke.log。ファイル名未指定のavatar.pngが.appdock/assets/profileに保存され、実画像表示・両テーマ・React/preloadのNode非公開・ピン/キー/トレイを確認。GUIは直列、専用プロセス終了を確認。smokeは既存の隔離root契約を使い、通常起動の保存先試験と区別する。
+- 追加のprofile指定が発行中に届いたため、同じ修正の0.26.15を最終再発行した。at365-path-publish-final.log終了0、単一EXE142,526,132 bytes/SHA256 3a7fc899aa617ea0fe82eac98c1a668ec6903406e7e905fccfdd5d46034c9342。feed/隔離コピー一致、梱包out59ファイル/updaterが最終ビルドと一致、文書167相対リンク・両repo diff検査成功。証跡: .artifacts/at365-path-final-check.json。Gmail0.9.2のZIP hashは不変、Gmailコード/版/配布物と既存全体ZIPは変更せず、README保存先説明だけ追随。
+- 作業完了時整理: 今回方式の通常起動GUI/名前未指定avatar smoke/source profile GUIはいずれも成功1回を保持。旧preferencesの結果/旧smokeの方式や再利用が未確定の記録、失敗/認証/固定ビルド/Release資料は保持し削除0。0.26.14の成功証拠も保持。実利用データの移動/削除、他アプリの既存保存先変更、commit/push/Release/deploy、同期サービス設定変更なし。
+
+## 2026-10-10: 0.26.14 設定同期・PC専用保存・ファイル名アセット
+
+- ユーザーが設計から一括実装へ承認し、登録元/用途別フォルダーの元ファイル名をIDにすること、同名別内容を拒否すること、旧.appdock移行を追加しないことを指定。共有settings.json/WebApplet枠/登録素材と、LOCALAPPDATA内の配置別認証・Gmail枠/枠設定・PC状態を分離。旧PC専用データの残存警告を追加し、実利用の旧フォルダーは移動・削除していない。仕様は[設定同期](docs/settings-sync.md)。
+- 安定bytesの受信/rename/poll、dirty draftと保存前revision保護、正常20世代backup、破損/欠落時のローカル正常値継続、明示確認付き復元を追加。WebApplet名簿未到着時に空ファイルを生成しない。外部の枠削除で別PCのCookieを回収予約しない。アバター原画像/WAVは元ファイル名、同名同内容の再利用/別内容の拒否、共有素材の非prune、画像だけの受信再表示を実装。
+- 最終のmain/renderer型検査とホスト回帰189/189成功。同期の途中JSON/rename/復旧/バックアップ20世代/古いdraft、名簿未到着の上書き防止、名簿外部削除とローカル回収の分離、名前/内容/登録rootの検証、native updaterのLOCALAPPDATA journal/result復旧と異なるroot拒否を含む。ログ: .artifacts/settings-sync-typecheck.log、settings-sync-regression.log。Gmail 0.9.2はpublish.bat -Testで21/21成功。
+- sourceの2配置GUI: .artifacts/settings-sync-ui-1791611591247/result.json。最終固定単一EXEの2配置GUI: .artifacts/settings-sync-ui-1791611784215/result.json（10項目成功）。Chromium/Gmailの保存分離、settingsの起動中反映・dirty維持と古い保存拒否・破損再起動fallback/正常受信、WebApplet枠受信と外部削除後のローカルデータ保持、Gmail枠IDの非共有、登録音声一覧の到着と枠別独立選択、元アバター名と画像だけの反映、再起動保持を確認。実同期サービスを使わずファイルを隔離2配置へ配達した試験で、2台の実PCや実Googleログインは未検証。
+- アバター登録/同名別画像拒否/不正画像拒否・キーと.NET等の既存設定GUI: .artifacts/preferences-1791611134067、settings-sync-preferences.log（終了0）。Gmailの既存UI機能GUI: ../Applet.Gmail.at365/.artifacts/ui-features-1791611016171/result.json（終了0）。登録済みWAV選択・同名拒否・標準/試聴・再起動、画像/枠/検索/キー/テーマ/geometry等を確認。音声欄の両テーマ画像を目視確認。途中で旧更新フィード/alert/keybindingsを前提にしたテストfixtureが失敗し、現契約に合わせたfixture・待機/locatorへ修正して最終成功。
+- WebAppletの最終単一EXE回帰: .artifacts/web-portable-1791611830475/result.json。UI登録/well-known JSON/遅延表示/remote分離、ページと別Windowの入力/toolbar、停止/再開/ribbon、複数枠Cookie分離と再起動保持/Gmail保存維持が成功。GUIを直列実行し、専用起動プロセスを終了している。
+- publish.bat終了0。本体0.26.14単一EXE 142,526,458 bytes、SHA256 2b12b5aa93f12103b7337cd8637e124e49796d038cc4813be0da55b8b8076e36。feedと隔離コピー一致、梱包outの全59ファイルとupdaterが最終ビルドに一致、文書167相対リンク成功。Gmail 0.9.2更新ZIP 89,381 bytes、SHA256 1a6484571df3d02481fd449d3ac1a900fec219e4ccf3d9d0008308e6c2889238、最低host0.26.14・全8ファイルのZIP/発行先一致。証跡: 両repo .artifacts/settings-sync-final-check.json、host settings-sync-publish.log、Gmail settings-sync-gmail-build.log。確認スクリプトのasar区切り/ZIP根階層の前提を修正して最終照合成功。
+- 終了済みテスト整理: WebApplet portable成功の直近3回を保持し、古いweb-portable-1791531774239だけ削除（109,019,930 bytes）。結果/絶対root/再解析点/43プロセスの実行画像と候補参照0/全ファイル排他読み取りを確認。同期GUIはsource2/portable1の成功を保持。preferencesの個別resultなし、旧Gmailの方式/再利用不明、失敗・不明の資料は保持。結果: .artifacts/settings-sync-cleanup-{result,removed-proof}.json。通常publishのみで既存0.26.11全体ZIPのhash/size不変、未変更Applet再発行・commit/push/Release/実利用deploy・同期サービス設定変更なし。
+
 ## 2026-10-10: 古い成功テストフォルダーの整理
 
 - ユーザーの削除依頼により、本体と全6Appletの`.artifacts`を確認。成功結果と実行方式を判定できるものを種類/方式ごとに直近3回まで保持し、それより古い94フォルダー（本体70、Gmail24）を削除。合計9,102,018,616 bytes（約9.1GB / 8.48GiB）。他5Appletは安全に削除できる条件を満たす古い成功分がなかった。
@@ -1019,3 +1046,21 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 現profile.tsはavatar.pngをbaseDirectoryへ保存し、settings.jsonでは固定相対名を参照する。index.tsのsnapshotは画像mtimeをURLへ付加するが、独立した画像変更を通知する監視はない。素材だけの同期変更にも再表示通知と参照キャッシュ更新が必要。画像より先に設定が届いても入力や参照を削除しない設計にする。
 - 現sound-assets.tsのimportSoundは指定root内soundsへコピーし絶対パスを返す。pruneSoundsはそのrootのローカル参照外音声を削除するので、そのまま共有素材rootに向けない。登録素材は共有root内の相対パス/安定IDで参照し、Gmailの枠ごとの割当はPC専用のまま保持。共有素材の物理削除は明示操作等の別方針が必要。
 - 提案の保存分離: AppDock配置内settings.json/avatar.png/.appdock内共有枠名簿・ユーザー登録assets、LOCALAPPDATA内Gmail枠/全Webのsession/秘密情報/PC状態/キャッシュ/更新journal/backup。生成キャッシュとユーザー登録素材は区別する。現PCの旧認証/枠は停止中移行で保持し、別PCへ枠を転送しない。今回コード・版・発行・実利用データへ変更なし、ソース読取確認のみ。
+
+## 2026-10-10 パスキー認証の実現性調査（製品実装なし）
+
+- ユーザー報告: WebAppletの https://auth.openai.com でWindows Helloパスキー認証に一度失敗したが、製品コードを変更せずパスキーボタンを再度押すと指紋認証が表示され、ログインに成功した。追加確認では新しいアカウント枠でも成功。初回はパスキーボタン押下後、指紋画面が表示されないまま失敗画面へ遷移した。指紋照合中の失敗とは区別し、サイトの認証要求準備からWebAuthn/Windowsの画面表示までを切り分け対象とする。実WebAuthn呼出しやOSへの到達はログ未取得で不明。現在の環境・同サイトで使用可能なことをユーザーが確認。原因は未特定。Gmailの実Google認証は未検証。
+- 現ソース/ローカルruntimeはElectron 44.6.0。WebAppletはWebAppletManager/AppletSurface、GmailはWebAccountControllerで、いずれもホストのWebContentsViewと専用sessionを使用。通常のPermissionRequest/Checkは全拒否。select-webauthn-accountの処理は製品ソースに存在しない。WebAppletは許可origin外の認証遷移を止め、新規Window要求を現在のViewへ読み替えるので、別サイトへの対応では遷移・popup依存も切り分ける。
+- 隔離試験: .artifacts/passkey-investigation-20261010/probe.cjs / result.json。ローカルHTTP localhost、専用userData/メモリsession、非表示WebContentsView、Node無効/sandbox/contextIsolation有効。通常の権限を全拒否したままCDP仮想CTAP2 resident credentialを作成し、作成成功→選択listenerなしのgetはNotAllowedError→fixture用選択listenerありでget成功。通常のPermissionRequest/Check呼出しは0、select-webauthn-accountは1回。試験用だけでfocus emulationを有効化。実サイトへの通信、実パスキー作成/取得/列挙、実アカウントへの認証は行っていない。
+- 仮想authenticatorを追加する前の能力判定はsecure/api/platform/conditionalすべてtrue。ただし能力判定や仮想authenticator成功は、実Windows Helloや入力欄の自動候補UIの成功を意味しない。sandbox内起動は0x80000003で終了し結果未生成。通常Windows環境で同一probeを実行しexit 0、結果を読戻し確認。
+- 結論: Windows Helloパスキーは現構成で利用可能（上記OpenAIサイトはユーザー実証）。一律権限拒否をパスキー失敗の原因と断定できず、全権限を許可する修正は不要。選択eventが必要な認証経路にはホスト共通の選択UI/取消処理を追加する余地があるが、今回の初回失敗の原因とは未確認。Windows標準UI側で選択済みの応答はChromiumが選択eventを経由せず成功させる場合がある。Chrome/Google Password Manager保存とWindows Hello保存は区別する。
+- 初回失敗の候補（推測）: 認証challenge/セッションの期限・取消、ページ遷移やフォーカスのタイミング、Windows/WebAuthnの一時的な状態。再発時は時刻、画面のエラー文、指紋画面が出る前/後、再押下/再読込での変化を記録し、秘密値・認証URLのquery・credential IDをログへ出さない。Windows 11 24H2以降は設定「プライバシーとセキュリティ > パスキーへのアクセス」のアプリ許可も確認対象。ただし今回の成功後に許可拒否を原因と断定しない。
+- 参照: [Electron session/選択event](https://www.electronjs.org/docs/latest/api/session#event-select-webauthn-account)、[Windowsパスキーとアプリ許可](https://learn.microsoft.com/en-us/windows/security/identity-protection/passkeys/)、[Googleの保存環境](https://developers.google.com/identity/passkeys/supported-environments)、[Chromiumの選択済み応答分岐](https://raw.githubusercontent.com/chromium/chromium/main/content/browser/webauth/authenticator_common_impl.cc)。オンラインmainのソースは設計理解の補助で、同梱版の根拠はローカルelectron.d.tsと44.6.0実行結果。OpenAI公式ログインURLを確認したが、初回失敗を特定する公開資料は得られていない。
+- 製品ソース・版・publish・実利用ログイン情報は変更なし。既存の同期対応差分を保持。調査記録とAGENTSだけ追記し、commit/push/Release/deployなし。
+## 2026-10-10: 0.26.16 共有フォルダーをdataへ変更
+
+- 共有名簿・登録音声・アバター原素材の保存先をEXE隣の小文字dataへ変更。settings.jsonの配置、LOCALAPPDATA/at365/AppDock/profiles/配置IDのPC専用rootは維持。旧.appdockの自動移行・削除なし。古い画像参照は読み取り互換のみ残す。旧領域のPC専用データ検出を維持し、固定EXE試験で旧ファイルの不変も確認。
+- 最終型検査と190/190回帰成功（.artifacts/data-folder-typecheck.log、data-folder-regression.log）。source同期GUI11項目、プロフィールGUI7項目、Gmail総合GUIが成功。固定0.26.16 EXEの通常起動2配置GUI11項目も成功（settings-sync-ui-1791615128338/result.json）。LOCALAPPDATAをfixture内へ向け、実利用データを変更しない。Gmail音声一覧の両テーマ画像を保存、lightを目視確認。実2台・実同期サービス・Google認証は未確認。
+- 固定EXE smoke成功（smoke-1791615191737/smoke-result.json）、data/assets/profile/avatar.pngの保存と実表示を確認。publish.bat終了0。最終EXE142527588bytes、SHA256 456014e1295b6d3f8d66cafbcb359f60933195454b0399e534999c204485ac1e。feed/梱包59ファイル/updater一致、文書ローカルリンク182件確認（.artifacts/data-folder-final-check.json）。既存オールインワンZIPと未変更Gmail0.9.2配布ZIPは不変。
+- 完了時整理: source同期成功3回、portable-production-path成功2回、旧portable成功1回を保持。旧smoke/プロフィール/Gmailの実行方式不明、失敗・再利用・認証資料を保持し、今回削除0。Wallpaperのprotocol一時画像はランナー終了時に削除済み。固定ビルド/Release出力を整理対象にしない。
+- ユーザーの追加指定により今回対応したAppDock/Gmail/WallpaperSlideshowを各repoでコミットする。各モジュール自身のpublishへ発行済み。外部公開・push・実利用deploy・同期設定変更なし。

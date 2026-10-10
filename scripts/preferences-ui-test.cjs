@@ -16,7 +16,14 @@ require('../tests/fixtures/install.cjs')(profile, legacy);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
 const hash = () =>
   createHash('sha256')
-    .update(fs.readFileSync(path.join(profile, 'avatar.png')))
+    .update(
+      fs.readFileSync(
+        path.join(
+          profile,
+          JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).profile.avatar,
+        ),
+      ),
+    )
     .digest('hex');
 let application;
 async function launch() {
@@ -147,10 +154,21 @@ async function waitPins(page, pins) {
     await page.getByText('すべて保存されています', { exact: true }).waitFor();
     assert.notEqual(hash(), firstHash);
     const finalHash = hash();
-    assert.deepEqual(
-      fs.readdirSync(profile).filter((n) => n.startsWith('avatar')),
-      ['avatar.png'],
-    );
+    const conflict = path.join(profile, 'conflict', 'icon.png');
+    fs.mkdirSync(path.dirname(conflict), { recursive: true });
+    fs.copyFileSync(path.join(profile, 'pins.png'), conflict);
+    await page.getByLabel('アバター画像を選択').setInputFiles(conflict);
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await page
+      .getByText(/同名の別画像が登録されています/)
+      .first()
+      .waitFor();
+    assert.equal(hash(), finalHash);
+    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    assert.deepEqual(fs.readdirSync(path.join(profile, 'data/assets/profile')).sort(), [
+      'icon.png',
+      'pins.png',
+    ]);
     const rejected = await page.evaluate(async () => {
       const s = await window.dock.snapshot();
       try {
@@ -195,8 +213,8 @@ async function waitPins(page, pins) {
             'pin / order / filter / unpin',
             'shortcut recording / shared bindings / remapping',
             'TypeScript and .NET keyboard commands',
-            'profile name / image upload / overwrite',
-            'invalid image preserves profile and previous PNG',
+            'profile name / image upload / original filenames / retained assets',
+            'same-name different image and invalid image preserve profile and registered originals',
             'restart persistence',
           ],
         },

@@ -2,6 +2,7 @@ import { parseKeybindings, withKeybindings } from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, migrateGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
+import { avatarReference } from './asset-names';
 import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, validRibbonId, validSeparatorId, defaultRibbon } from './applet-pages';
@@ -205,9 +206,11 @@ export function parseSettings(value: unknown): Settings {
     typeof profile.name !== 'string' ||
     !profile.name.trim() ||
     profile.name.length > 80 ||
-    (profile.avatar !== null && profile.avatar !== 'avatar.png')
+    (profile.avatar !== null && !avatarReference(profile.avatar))
   )
-    throw new Error('プロフィールは80文字以内の名前と avatar.png / null を指定してください。');
+    throw new Error(
+      'プロフィールは80文字以内の名前と、登録アバターの相対パス / null を指定してください。',
+    );
   const updates = {
     ...createDefaultSettings().updates,
     ...(object(value.updates) ? value.updates : {}),

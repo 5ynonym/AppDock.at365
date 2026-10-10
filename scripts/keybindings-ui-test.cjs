@@ -74,7 +74,7 @@ settings.keybindings = [
 ];
 const server = http.createServer((_, res) => res.end('<h1>Remote fixture</h1><input id="text">'));
 const calls = () => {
-  const d = path.join(profile, '.appdock/storage/test.keys');
+  const d = path.join(profile, 'data/storage/test.keys');
   try {
     return fs
       .readdirSync(d)

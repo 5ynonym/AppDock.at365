@@ -73,9 +73,9 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const base = path.join(output, `case-${step}`);
     const applet = path.join(base, 'extensions/fixture');
     fs.mkdirSync(applet, { recursive: true });
-    fs.mkdirSync(path.join(base, '.appdock/web-accounts'), { recursive: true });
+    fs.mkdirSync(path.join(base, 'data/web-accounts'), { recursive: true });
     fs.writeFileSync(path.join(base, 'settings.json'), 'preserved settings');
-    fs.writeFileSync(path.join(base, '.appdock/web-accounts/cookie'), 'preserved fixture');
+    fs.writeFileSync(path.join(base, 'data/web-accounts/cookie'), 'preserved fixture');
     const executable = path.join(base, 'AppDock.at365.exe');
     fs.writeFileSync(executable, 'old exe fixture');
     const hostSource = path.join(stage, 'new.exe');
@@ -110,7 +110,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
         sha256: treeHash(appletSource),
       },
     ];
-    const result = path.join(base, '.appdock/update-result.json');
+    const result = path.join(base, 'data/update-result.json');
     const job = path.join(stage, 'job.json');
     const paused = path.join(stage, 'paused');
     fs.writeFileSync(
@@ -143,7 +143,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       }
       child.kill();
       await exited;
-      const journal = path.join(base, '.appdock/update-transaction.json');
+      const journal = path.join(base, 'data/update-transaction.json');
       assert.ok(fs.existsSync(journal));
       const savedJournal = fs.readFileSync(journal);
       fs.writeFileSync(path.join(base, 'interrupted-journal.json'), savedJournal);
@@ -195,7 +195,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       );
       assert.equal(fs.readFileSync(path.join(base, 'settings.json'), 'utf8'), 'preserved settings');
       assert.equal(
-        fs.readFileSync(path.join(base, '.appdock/web-accounts/cookie'), 'utf8'),
+        fs.readFileSync(path.join(base, 'data/web-accounts/cookie'), 'utf8'),
         'preserved fixture',
       );
       const report = JSON.parse(fs.readFileSync(result));

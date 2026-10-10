@@ -4,6 +4,8 @@
 
 ## 文書の入口
 
+- [設定同期・登録素材・PC専用保存](docs/settings-sync.md): 0.26.14の保存境界と0.26.15のat365/profile保存先、ファイル名ID、受信監視、バックアップ、隔離GUI検証。
+
 - [作業ルール](AGENTS.md): このrepo固有の運用上の注意と未実装の相談事項。[過去の実装記録](docs/implementation-history.md)は当時の検証範囲を調べる際に参照。
 
 - [GitHub Release手順](docs/RELEASING.md): 本体の通常版/オールインワンと未公開の同梱Appletをまとめて公開・取得確認し、今回公開した各repoを最新3件へ整理。

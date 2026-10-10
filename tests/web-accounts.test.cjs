@@ -75,13 +75,17 @@ test('Web item keys cannot inject source, and sound settings accept only local W
     null,
     {},
     { enabled: 1, file: '' },
-    { enabled: true, file: 'relative.wav' },
+    { enabled: true, file: 'nested/relative.wav' },
     { enabled: true, file: 'https://evil.test/a.wav' },
     { enabled: true, file: 'C:\\fixture\\sound.exe' },
     { enabled: true, file: 'C:\\' + 'x'.repeat(4096) + '.wav' },
     { enabled: true, file: 'C:\\fixture\\bad\u0000.wav' },
   ])
     assert.throws(() => parseWebAccountSound(sound), /WAV/);
+  assert.deepEqual(parseWebAccountSound({ enabled: true, file: 'ベル.wav' }), {
+    enabled: true,
+    file: 'ベル.wav',
+  });
 });
 test('Web account cycle wraps, preserves one account and rejects invalid directions', async () => {
   const { WebAccountController } = require('../out/main/main/core/web-accounts');

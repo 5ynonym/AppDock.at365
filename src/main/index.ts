@@ -16,8 +16,10 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
+import { dataPaths } from './core/data-paths';
 import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
@@ -96,7 +98,16 @@ const baseDirectory = testDirectory
     : app.isPackaged
       ? process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe'))
       : app.getAppPath();
-const dataDirectory = path.join(baseDirectory, '.appdock');
+const isolatedLocal = process.argv
+  .find((a) => a.startsWith('--test-local-state='))
+  ?.slice('--test-local-state='.length);
+const paths = dataPaths(
+  baseDirectory,
+  process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'),
+  testDirectory || smoke ? isolatedLocal || path.join(baseDirectory, 'data') : undefined,
+);
+const dataDirectory = paths.local;
+const sharedDirectory = paths.shared;
 fs.mkdirSync(dataDirectory, { recursive: true });
 app.setPath('userData', path.join(dataDirectory, 'chromium'));
 app.setAppUserModelId('at365.appdock');
@@ -113,7 +124,10 @@ if (locked)
       ...(smoke && smokeDirectory ? ['--smoke-test', `--smoke-dir=${baseDirectory}`] : []),
     ],
   );
-const settings = new SettingsStore(path.join(baseDirectory, 'settings.json'));
+const settings = new SettingsStore(
+  path.join(baseDirectory, 'settings.json'),
+  path.join(dataDirectory, 'settings-backups'),
+);
 const launch = new WindowsLaunch(
   app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
   baseDirectory,
@@ -146,6 +160,7 @@ let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
 let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+let avatarPoll: ReturnType<typeof setInterval> | undefined;
 let updater: PortableUpdates;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 const changed = () => {
@@ -302,6 +317,25 @@ function runTrayCommand(id: string) {
     showWindow();
   });
 }
+function avatarFile(): string | undefined {
+  const relative = settings.value.profile.avatar;
+  if (!relative) return;
+  const file = path.resolve(baseDirectory, relative);
+  try {
+    if (
+      fs.lstatSync(file).isSymbolicLink() ||
+      fs.realpathSync(file).toLowerCase() !== file.toLowerCase()
+    )
+      return;
+    return file;
+  } catch {
+    return;
+  }
+}
+function avatarSignature() {
+  const file = avatarFile();
+  return file ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : '';
+}
 function snapshot(): HostSnapshot {
   return {
     launch: launch.state,
@@ -323,11 +357,16 @@ function snapshot(): HostSnapshot {
       arch: process.arch,
     },
     dataDirectory,
+    sharedDirectory,
+    legacyLocalData:
+      dataDirectory !== sharedDirectory &&
+      [sharedDirectory, path.join(baseDirectory, '.appdock')].some((directory) =>
+        ['chromium', 'web-accounts', 'storage', 'secrets', 'web-applets/sessions'].some((p) =>
+          fs.existsSync(path.join(directory, p)),
+        ),
+      ),
     dark: nativeTheme.shouldUseDarkColors,
-    avatarUrl:
-      settings.value.profile.avatar && fs.existsSync(path.join(baseDirectory, 'avatar.png'))
-        ? `appdock://host/avatar.png?v=${fs.statSync(path.join(baseDirectory, 'avatar.png')).mtimeMs}`
-        : null,
+    avatarUrl: avatarFile() ? `appdock://host/avatar.png?v=${avatarSignature()}` : null,
   };
 }
 function applySettings() {
@@ -457,9 +496,21 @@ function registerIpc() {
     await launch.restartElevated([...launch.args, '--restore-view', '--appdock-elevation-attempt']);
     quitHost();
   });
+  handle('dock:restoreSettingsBackup', async (revision: number) => {
+    const answer = await dialog.showMessageBox(window!, {
+      type: 'warning',
+      message: 'このPCの正常な設定で共有ファイルを復元しますか？',
+      detail:
+        '復元したsettings.jsonは同期先のPCにも届きます。現在の破損ファイルはそのままでは使えません。',
+      buttons: ['キャンセル', 'バックアップで復元'],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    return answer.response === 1 ? settings.restoreBackup(revision) : null;
+  });
   handle(
     'dock:saveSettings',
-    async (value: Settings, revision: number, avatar?: Uint8Array | null) => {
+    async (value: Settings, revision: number, avatar?: Uint8Array | null, avatarName?: string) => {
       let next = parseSettings(value);
       webApplets.validateAccounts(next.webApplets.items);
       validateAppletSettings(next, manager.snapshot());
@@ -468,7 +519,7 @@ function registerIpc() {
         next.host,
         settings.value.host,
         () => settings.assertRevision(revision),
-        () => saveUserSettings(settings, baseDirectory, next, revision, avatar),
+        () => saveUserSettings(settings, baseDirectory, next, revision, avatar, avatarName),
       );
     },
   );
@@ -542,11 +593,11 @@ async function initialize() {
     : path.join(app.getAppPath(), '.artifacts', 'updater', 'AppDock.Updater.exe');
   if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) {
     try {
-      execFileSync(helperPath, ['--recover', baseDirectory], { windowsHide: true });
+      execFileSync(helperPath, ['--recover', baseDirectory, dataDirectory], { windowsHide: true });
     } catch (error) {
       dialog.showErrorBox(
         'AppDock — 更新の復元が必要です',
-        `中断された更新を復元できませんでした。\n${String(error)}\n.appdock/update-transaction.json と更新用一時フォルダーを保持しています。`,
+        `中断された更新を復元できませんでした。\n${String(error)}\n${dataDirectory} の更新記録と一時フォルダーを保持しています。`,
       );
       app.quit();
       return;
@@ -570,6 +621,7 @@ async function initialize() {
       changed,
       () => manager.emit('changed'),
       executeCommand,
+      path.join(paths.assets, 'applets'),
     ),
     log: log.write,
   });
@@ -606,12 +658,14 @@ async function initialize() {
             .filter(
               (argument) =>
                 argument.startsWith('--test-profile=') ||
+                argument.startsWith('--test-local-state=') ||
                 argument.startsWith('--remote-debugging-port=') ||
                 argument.startsWith('--inspect='),
             )
         : []),
     ],
     baseDirectory,
+    stateDirectory: dataDirectory,
     fetcher: net.fetch,
     changed,
     confirm: async (names) => {
@@ -654,7 +708,14 @@ async function initialize() {
     (message) => log.write('error', 'hotkeys', message),
     (key) => dispatchShortcut(key, true),
   );
-  webApplets = new WebAppletManager(settings, dataDirectory, changed, executeCommand);
+  webApplets = new WebAppletManager(
+    settings,
+    dataDirectory,
+    changed,
+    executeCommand,
+    sharedDirectory,
+    (error) => log.write('error', 'web-accounts', error.message),
+  );
   gestures = new GestureManager(
     path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
     () => {
@@ -688,6 +749,7 @@ async function initialize() {
     void syncHotKeys(true);
     void manager.reconcile();
   });
+  settings.on('statusChanged', changed);
   settings.watch((e) =>
     log.write(
       'error',
@@ -696,6 +758,18 @@ async function initialize() {
     ),
   );
   applySettings();
+  let lastAvatar = avatarSignature();
+  avatarPoll = setInterval(() => {
+    try {
+      const next = avatarSignature();
+      if (next !== lastAvatar) {
+        lastAvatar = next;
+        changed();
+      }
+    } catch {
+      /* A sync write can temporarily lock an image. Retry on the next poll. */
+    }
+  }, 2000);
   nativeTheme.on('updated', changed);
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
@@ -722,9 +796,8 @@ async function initialize() {
       );
     }
     if (url.host === 'host' && url.pathname === '/avatar.png') {
-      const file = path.join(baseDirectory, 'avatar.png');
-      if (!settings.value.profile.avatar || !fs.existsSync(file))
-        return new Response('Not found', { status: 404 });
+      const file = avatarFile();
+      if (!file) return new Response('Not found', { status: 404 });
       return net.fetch(pathToFileURL(file).href);
     }
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
@@ -920,7 +993,7 @@ async function initialize() {
     [...manager.items.values()].map((item) => item.manifest),
   );
   migrated.trayMenu = getTrayMenu(migrated, allApplets());
-  if (JSON.stringify(migrated) !== JSON.stringify(settings.value))
+  if (!settings.recovered && JSON.stringify(migrated) !== JSON.stringify(settings.value))
     settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
@@ -1090,7 +1163,7 @@ async function runSmoke() {
       throw new Error('Preload / React check failed');
     if (
       !result.avatarLoaded ||
-      result.profile.avatar !== 'avatar.png' ||
+      result.profile.avatar !== 'data/assets/profile/avatar.png' ||
       result.paletteKeys[0] !== 'Ctrl+P' ||
       result.pins.length !== 2
     )
@@ -1120,7 +1193,7 @@ async function runSmoke() {
             .snapshot()
             .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
           settingsPath: settings.file,
-          avatarPath: path.join(baseDirectory, 'avatar.png'),
+          avatarPath: path.join(baseDirectory, 'data', 'assets', 'profile', 'avatar.png'),
           nativeClock,
           trayCommands: {
             defaultOpen: true,
@@ -1173,6 +1246,7 @@ app.on('before-quit', (event) => {
     }
   })().finally(() => {
     settings.close();
+    clearInterval(avatarPoll);
     tray?.destroy();
     shutdownFinished = true;
     app.quit();

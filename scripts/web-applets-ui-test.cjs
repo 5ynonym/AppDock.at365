@@ -12,7 +12,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 fs.mkdirSync(profile, { recursive: true });
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-const gmailMarker = path.join(profile, '.appdock', 'web-accounts', 'at365.gmail', 'accounts.json');
+const gmailMarker = path.join(profile, 'data', 'web-accounts', 'at365.gmail', 'accounts.json');
 fs.mkdirSync(path.dirname(gmailMarker), { recursive: true });
 fs.writeFileSync(gmailMarker, '{"gmail":"preserve-this-authentication-area"}');
 const markerBytes = fs.readFileSync(gmailMarker);
@@ -212,7 +212,7 @@ async function remote(id) {
   await dock.getByLabel('WebAppletの名前', { exact: true }).fill('編集中のWeb');
   const beforeAccounts = await snapshot(),
     settingsBytes = fs.readFileSync(path.join(profile, 'settings.json'));
-  const accountFile = path.join(profile, '.appdock', 'web-applets', 'accounts.json');
+  const accountFile = path.join(profile, 'data', 'web-applets', 'accounts.json');
   await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
   await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
   const originalAccountFile = fs.readFileSync(accountFile);
@@ -324,7 +324,7 @@ async function remote(id) {
   );
   const beforeDelete = fs.readFileSync(accountFile);
   const unusedId = (await snapshot()).webAccounts[2].id;
-  const unusedPath = path.join(profile, '.appdock', 'web-applets', 'sessions', unusedId);
+  const unusedPath = path.join(profile, 'data', 'web-applets', 'sessions', unusedId);
   fs.mkdirSync(path.join(unusedPath, 'Cache'), { recursive: true });
   fs.writeFileSync(path.join(unusedPath, 'Cache', 'fixture'), 'remove this entire folder');
   await app.evaluate(({ dialog }) => {
@@ -737,7 +737,7 @@ async function remote(id) {
   );
   const survivor = await remote(copied);
   await survivor.evaluate(() => (document.cookie = 'proof=survivor; Max-Age=3600; SameSite=Lax'));
-  const removedPath = path.join(profile, '.appdock', 'web-applets', 'sessions', second);
+  const removedPath = path.join(profile, 'data', 'web-applets', 'sessions', second);
   const beforeDeletionSettings = fs.readFileSync(path.join(profile, 'settings.json'));
   await dock.locator('[data-ribbon-id="settings"]').click();
   await dock

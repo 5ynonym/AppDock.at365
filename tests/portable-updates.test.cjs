@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 const { PortableUpdates, safeRelative } = require('../out/main/main/core/portable-updates.js');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema.js');
@@ -342,8 +342,8 @@ function digestTree(directory) {
 async function applyJob(directory, items, afterReady = () => {}) {
   const job = path.join(directory, 'job.json');
   const base = path.join(directory, 'installed');
-  fs.mkdirSync(path.join(base, '.appdock'), { recursive: true });
-  const result = path.join(base, '.appdock/update-result.json');
+  fs.mkdirSync(path.join(base, 'data'), { recursive: true });
+  const result = path.join(base, 'data/update-result.json');
   fs.writeFileSync(
     job,
     JSON.stringify({
@@ -397,9 +397,9 @@ test('shared updater swaps two Applet folders, removes obsolete payload files, a
       sha256: digestTree(staged),
     });
   }
-  fs.mkdirSync(path.join(base, '.appdock/web-accounts'), { recursive: true });
+  fs.mkdirSync(path.join(base, 'data/web-accounts'), { recursive: true });
   fs.writeFileSync(path.join(base, 'settings.json'), 'user settings');
-  fs.writeFileSync(path.join(base, '.appdock/web-accounts/cookie'), 'cookie');
+  fs.writeFileSync(path.join(base, 'data/web-accounts/cookie'), 'cookie');
   const result = await applyJob(f.directory, items);
   assert.equal(result.ok, true);
   for (const item of items) {
@@ -407,7 +407,7 @@ test('shared updater swaps two Applet folders, removes obsolete payload files, a
     assert.equal(fs.existsSync(path.join(item.destination, 'obsolete.dll')), false);
   }
   assert.equal(fs.readFileSync(path.join(base, 'settings.json'), 'utf8'), 'user settings');
-  assert.equal(fs.readFileSync(path.join(base, '.appdock/web-accounts/cookie'), 'utf8'), 'cookie');
+  assert.equal(fs.readFileSync(path.join(base, 'data/web-accounts/cookie'), 'utf8'), 'cookie');
 });
 test('shared updater restores the first Applet if the second destination changes after preparation', async (t) => {
   const f = fixture(t);
@@ -588,6 +588,69 @@ test('metadata cancellation does not become an origin error or request a later t
   assert.match(result.phase, /取り消しました/);
 });
 
+test('recovery stores journals and results in isolated local state and rejects an unrelated location', (t) => {
+  const f = fixture(t),
+    base = path.join(f.directory, 'installed'),
+    local = path.join(base, 'local-state');
+  const destination = path.join(base, 'extensions', 'fixture'),
+    suffix = 'b'.repeat(32),
+    backup = destination + '.previous-' + suffix;
+  fs.mkdirSync(destination, { recursive: true });
+  fs.mkdirSync(backup);
+  fs.mkdirSync(local);
+  fs.writeFileSync(path.join(destination, 'payload'), 'new');
+  fs.writeFileSync(path.join(backup, 'payload'), 'old');
+  const journal = path.join(local, 'update-transaction.json');
+  fs.writeFileSync(
+    journal,
+    JSON.stringify({
+      swaps: [
+        {
+          item: {
+            kind: 'applet',
+            id: 'fixture',
+            version: '2.0.0',
+            source: f.source,
+            destination,
+            sha256: null,
+          },
+          next: destination + '.update-' + suffix,
+          backup,
+        },
+      ],
+    }),
+  );
+  assert.equal(spawnSync(helper, ['--recover', base, local], { windowsHide: true }).status, 0);
+  assert.equal(fs.readFileSync(path.join(destination, 'payload'), 'utf8'), 'old');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(local, 'update-result.json'))).restored, true);
+  assert.equal(fs.existsSync(path.join(base, 'data')), false);
+  assert.notEqual(
+    spawnSync(helper, ['--recover', base, path.join(f.directory, 'unrelated')], {
+      windowsHide: true,
+    }).status,
+    0,
+  );
+});
+test('native recovery accepts the at365 namespace and rejects the old namespace without creating state', (t) => {
+  const f = fixture(t);
+  const id = hash(randomUUID());
+  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+  const state = path.join(local, 'at365', 'AppDock', 'profiles', id);
+  const old = path.join(local, 'AppDock', 'profiles', id);
+  const other = path.join(local, 'at365', 'AnotherApp', 'profiles', id);
+  for (const candidate of [state, old, other]) assert.equal(fs.existsSync(candidate), false);
+  // No journal exists at these random IDs. Recover only validates the namespace and returns.
+  assert.equal(
+    spawnSync(helper, ['--recover', f.directory, state], { windowsHide: true }).status,
+    0,
+  );
+  for (const candidate of [old, other])
+    assert.notEqual(
+      spawnSync(helper, ['--recover', f.directory, candidate], { windowsHide: true }).status,
+      0,
+    );
+  for (const candidate of [state, old, other]) assert.equal(fs.existsSync(candidate), false);
+});
 test('recovery validates the complete journal before touching an installed Applet', (t) => {
   const f = fixture(t);
   const base = path.join(f.directory, 'installed');
@@ -617,8 +680,8 @@ test('recovery validates the complete journal before touching an installed Apple
   fs.mkdirSync(outside);
   fs.writeFileSync(path.join(outside, 'preserved'), 'untouched');
   const invalid = { ...safe, item: { ...safe.item, destination: outside } };
-  fs.mkdirSync(path.join(base, '.appdock'), { recursive: true });
-  const journal = path.join(base, '.appdock/update-transaction.json');
+  fs.mkdirSync(path.join(base, 'data'), { recursive: true });
+  const journal = path.join(base, 'data/update-transaction.json');
   // Reverse-order recovery used to touch the safe item before rejecting the invalid one.
   const contents = JSON.stringify({ swaps: [invalid, safe] });
   fs.writeFileSync(journal, contents);

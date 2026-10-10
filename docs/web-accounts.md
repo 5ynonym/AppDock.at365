@@ -1,4 +1,6 @@
-# WebアカウントAPI（v0.20.0）
+# WebアカウントAPI（v0.26.14）
+
+0.26.14のPC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。Gmail等の枠はPC専用rootのweb-accountsに保存し、共有WebApplet枠とは分離します。ローカルUIのsnapshot.registeredSoundsに登録済みのファイル名を渡します。setSoundは登録済みファイル名、pickSoundはファイル登録、testSoundは試聴です。sound.fileは枠に紐づくローカル設定としてファイル名だけを保存し、ホストが自身のAppletの素材rootへ解決します。
 
 0.18.0では[Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の旧版説明の「操作Window」は現在の表示先と読み替えてください。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。
 
@@ -79,7 +81,7 @@ URLは宣言したHTTPS origin内、観測先もその1つに限定します。u
 
 保存は既存SettingsStoreのupdateExtensionで行い、ほかの項目・有効化状態を保持します。既存の競合検出とatomicWriteを使い、失敗は呼び出し元へ返します。AppDockからの変更もonChangedでローカルUIへ通知し、停止時に購読を解除します。Gmail 0.6.0の設定タブがこのAPIを使います。
 
-`.appdock/web-accounts/<extension-id>/accounts.json`に安定したUUIDと表示名、`sessions/<account-id>/`にChromiumの永続セッションを保存します。`session.fromPath`を使うので複数のApplet・アカウント間でCookieを共有しません。アカウント保存はatomicWrite、不正な既存JSONは上書きせず起動エラーとして報告します。停止・異常終了でWebContents/UIを明示破棄し、Cookieをflushします。ウィンドウの×は非表示にし、Appletを止めるまで背景のページ更新を維持します。
+`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/web-accounts/<extension-id>/accounts.json`に安定したUUIDと表示名、`sessions/<account-id>/`にChromiumの永続セッションを保存します。`session.fromPath`を使うので複数のApplet・アカウント間でCookieを共有しません。アカウント保存はatomicWrite、不正な既存JSONは上書きせず起動エラーとして報告します。停止・異常終了でWebContents/UIを明示破棄し、Cookieをflushします。ウィンドウの×は非表示にし、Appletを止めるまで背景のページ更新を維持します。
 
 soundはaccounts.jsonの各枠へ追加し、旧データは未指定ならOFFで扱います。0.14.0は同じ保存先のwindow-state.jsonへ通常の位置・サイズ/最大化を記録します。共通WindowStateStoreで300ms遅延保存、終了時flush、DIP丸め補正とモニター作業領域への復帰を再利用します。最小化/非表示では通常枠を上書きしません。保存失敗はホストログへ内容を含まない診断を残し、ページを閉じません。
 
