@@ -275,7 +275,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 8);
+    assert.equal((await client.listTools()).tools.length, 9);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -646,6 +646,18 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     checks.push(
       `shortcut API dry run/add/change/remove/order, GUI reflection and real keyboard order, OS registration result=${osStatus.registered}, revocation and scoped audit`,
     );
+    await require('./automation-gesture-checks.cjs')({
+      page,
+      client,
+      call,
+      until,
+      section,
+      profile,
+      fixtureId,
+    });
+    checks.push(
+      'gesture API add/update/remove/reorder/configure/dry run, GUI reflection, revocation, atomic validation and audit',
+    );
     const fixtureSettings = await call(client, 'appdock_get_settings', { appletId: fixtureId });
     assert.equal(fixtureSettings.values.feature, false);
     await call(client, 'appdock_execute_command', { id: `${fixtureId}.settings.feature.on` });
@@ -757,6 +769,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     }
     checks.push('both themes at 1280/960/700 without horizontal overflow');
     const before = await call(client, 'appdock_get_settings');
+    const persistedGestures = await call(client, 'appdock_get_gestures');
     const persistedShortcuts = (await readShortcuts()).bindings;
     await manage(fixtureId, 'disable');
     await manage(webId, 'disable');
@@ -777,6 +790,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     client = await connect(s);
     for (const id of [fixtureId, webId])
       assert.equal((await call(client, 'appdock_get_applet', { id })).applet.enabled, false);
+    assert.deepEqual(
+      (await call(client, 'appdock_get_gestures')).settings,
+      persistedGestures.settings,
+    );
+    assert.equal((await call(client, 'appdock_get_gestures')).gestureEditingAllowed, true);
     assert.deepEqual((await readShortcuts()).bindings, persistedShortcuts);
     assert.equal((await readShortcuts()).shortcutEditingAllowed, true);
     const after = await call(client, 'appdock_get_settings');

@@ -130,6 +130,20 @@ export function CodexSettings() {
           onChange={(allowed) => void run({ kind: 'setShortcutEditing', allowed })}
         />
       </div>
+      <div className="setting-row">
+        <div>
+          <strong>ジェスチャー編集を許可する</strong>
+          <p>
+            割当・条件・実行順・動作設定を編集できます。設定変更とコマンド実行の許可も必要です。
+          </p>
+        </div>
+        <Toggle
+          label="Codexからのジェスチャー編集を許可する"
+          checked={state.allowEditGestures}
+          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
+          onChange={(allowed) => void run({ kind: 'setGestureEditing', allowed })}
+        />
+      </div>
       <p>
         APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
       </p>

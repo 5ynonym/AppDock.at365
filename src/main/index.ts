@@ -1056,13 +1056,21 @@ async function initialize() {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
     changed,
     audit: (level, message) => log.write(level, 'automation', message),
-    createApi: (writable, instanceId, executable, manageable, shortcutsEditable) =>
+    createApi: (
+      writable,
+      instanceId,
+      executable,
+      manageable,
+      shortcutsEditable,
+      gesturesEditable,
+    ) =>
       new AutomationApi({
         settings,
         settingsCommands,
         appletManagement,
         manageable,
         shortcutsEditable,
+        gesturesEditable,
         shortcutStatus: () => hotKeys?.statuses ?? [],
         save: (value, revision) => {
           try {

@@ -8,6 +8,7 @@
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
 - `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
 - `shortcut-commands.ts`: ショートカットの限定読取り、操作列の検証・原子的保存。共有keybindingsとSettingsCommandsのrevisionを使用。
+- `gesture-commands.ts`: ジェスチャーの読取り、割当操作・動作設定の一括検証と保存。共有gesturesとSettingsCommandsのrevisionを使用。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
 - `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
@@ -29,6 +30,7 @@
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
 | shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。0.26.32以降 |
+| gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。0.26.33以降 |
 
 旧settings.patch/appdock_patch_settingsは削除しました。設定変更はすべてcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
@@ -45,11 +47,54 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
-未公開コマンドの実行/一般設定、アカウント/認証、ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+未公開コマンドの実行/一般設定、アカウント/認証、リボン編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+
+## ジェスチャー編集（0.26.33以降）
+
+取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。MCPは計9ツールになりました。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
+
+取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
+
+編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。Codex連携画面で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
+
+```json
+{
+  "id": "appdock.gestures.update",
+  "args": {
+    "expectedRevision": "<gestures.getで取得したrevision>",
+    "dryRun": true,
+    "operations": [
+      {
+        "kind": "add",
+        "binding": {
+          "id": "gesture-open",
+          "command": "appdock.open",
+          "gesture": "move-up",
+          "enabled": true,
+          "when": { "scope": "app", "appletIds": [], "processes": [] }
+        }
+      },
+      { "kind": "configure", "changes": { "distance": 60 } }
+    ]
+  }
+}
+```
+
+- add: binding全項目を指定。既存と重複しない安定IDを付け、同じ入力の実行順末尾へ追加します。
+- update: idとchanges（command/gesture/enabled/whenの部分更新）。whenを指定するときはscope/appletIds/processes全体が必要です。入力変更は移動先の末尾、条件だけの変更は現在位置を保ちます。
+- remove: 削除するidを指定します。存在しないIDはNOT_FOUNDです。
+- reorder: gestureとidsを指定。同じ入力の無効行も含む全IDが必要で、別入力の順序は維持します。
+- configure: changesでenabled、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center）を部分更新します。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+
+exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で各100件まで。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
+
+operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正規化/実行順処理を共用し、一括検証後に1回だけ保存します。dryRun/無変更は保存せず、途中エラーも全体を保存しません。他の本体/Applet設定・ショートカットとrevisionを共用し、未通知のディスク更新・再起動・GUI未保存入力に対する競合保護を維持します。エラーはINVALID_ARGUMENT/NOT_FOUND/COMMAND_NOT_ASSIGNABLE/REVISION_CONFLICT/SAVE_FAILED、および実行/書込/編集の許可不足です。
+
+結果はdryRun/changed/settings/bindings/revision/warning/applies=gesturesChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。入力処理への反映は非同期であり、保存完了は物理ジェスチャーの成功や現在の一時停止解除を示しません。全API呼出しを既存automationログへ記録し、操作引数やexe名はログに残しません。
 
 ## ショートカット編集（0.26.32以降）
 
-取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。MCPの読取りツールが1件増え、計8件です。更新後はCodexを再読み込みしてください。
+取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.33ではジェスチャー取得を含め9件です。更新後はCodexを再読み込みしてください。
 
 読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 

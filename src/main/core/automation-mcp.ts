@@ -14,6 +14,7 @@ const names = [
   'appdock_list_commands',
   'appdock_execute_command',
   'appdock_get_shortcuts',
+  'appdock_get_gestures',
 ];
 const descriptions = [
   'AppDockの版・接続先・対応APIを取得します。',
@@ -24,6 +25,7 @@ const descriptions = [
   '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
   'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可、Appletの有効・無効・再起動はApplet管理許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
   'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
+  'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
 ];
 function tools() {
   return names.map((name, i) => ({
