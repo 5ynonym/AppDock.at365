@@ -142,6 +142,8 @@ Webサービスのアカウント別ページには0.12.0の[WebアカウントA
 | Storage | 拡張ID・キー別のJSON永続データ（1件1MBまで） | `storage` |
 | Secrets | 拡張ID・キー別の暗号化文字列 | `secrets` |
 
+ログは.NETの`context.Log.InfoAsync/ErrorAsync`、Nodeの`context.log.info/error`を使い、独自ファイルへの出力を避けてください。ホストがApplet IDを付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。0.26.18以降はdeactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
+
 設定変更はキャッシュへ通知します。設定に依存する表示やタイマー間隔等は、OnChangedの購読または都度読み取りで反映してください。UIへHTML/JavaScriptは渡せません。Reactがテキストとして描画します。API v1は1拡張1パネルです。
 
 ## 通信
