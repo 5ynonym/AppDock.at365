@@ -793,6 +793,7 @@ function App() {
                             </div>
                           ) : (
                             <AppletSettingsPanel
+                              commands={shortcutCommands}
                               applets={orderedApplets.map((e) => ({
                                 id: e.id,
                                 title: e.displayName,

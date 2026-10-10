@@ -3,6 +3,7 @@ import type { UiCommand } from '../shared/commands';
 import type { Settings, GlobalHotKeyStatus } from '../shared/contracts';
 import { getKeybindings, keybindingConditionLabel, type Keybinding } from '../shared/keybindings';
 import { ShortcutCommandList } from './ShortcutCommandList';
+import { ShortcutOrderDialog } from './ShortcutOrderDialog';
 
 /** Settings adds catalog-wide discovery around the same command list used by Applet details. */
 export function ShortcutsEditor({
@@ -21,6 +22,7 @@ export function ShortcutsEditor({
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
+  const [orderOpen, setOrderOpen] = useState(false);
   const lastStatuses = useRef(statuses);
   useEffect(() => {
     if (statuses.length) lastStatuses.current = statuses;
@@ -103,6 +105,9 @@ export function ShortcutsEditor({
         <span role="status">
           {visible.length} / {catalog.length} コマンドを表示
         </span>
+        <button className="text-button shortcut-order-open" onClick={() => setOrderOpen(true)}>
+          実行順…
+        </button>
         {(filter || statusFilter !== 'all') && (
           <button
             className="text-button"
@@ -123,6 +128,7 @@ export function ShortcutsEditor({
       )}
       <ShortcutCommandList
         commands={visible}
+        allCommands={catalog}
         settings={settings}
         applets={applets}
         onChange={onChange}
@@ -132,6 +138,15 @@ export function ShortcutsEditor({
           void window.dock.retryGlobalHotKeys().catch((reason) => setError(String(reason)))
         }
       />
+      {orderOpen && (
+        <ShortcutOrderDialog
+          settings={settings}
+          commands={catalog}
+          applets={applets}
+          onChange={onChange}
+          onClose={() => setOrderOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -112,7 +112,11 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
 
   // Deletion immediately updates the shared draft and can be discarded before saving.
   await assigned.getByRole('button', { name: /その他の操作/ }).click();
-  assert.deepEqual(await page.getByRole('menuitem').allTextContents(), ['編集', '削除']);
+  assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
+    '編集',
+    'このキーの実行順…',
+    '削除',
+  ]);
   await page.getByRole('menuitem', { name: '削除', exact: true }).click();
   assert.equal(await page.getByRole('alertdialog').count(), 0);
   assert.equal(await assigned.count(), 0);

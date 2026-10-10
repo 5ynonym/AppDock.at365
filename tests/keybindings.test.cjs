@@ -14,6 +14,7 @@ const {
   moveKeybindingWithinKey,
   keybindingGroups,
   appendKeybinding,
+  applyKeybindingOrder,
   changeKeybindingKey,
   changeKeybindingCommand,
 } = require('../out/main/shared/keybindings');
@@ -104,6 +105,42 @@ test('changing a command preserves binding identity and explicit conditions, res
       source.when,
     );
   }
+});
+test('order panel merges unrelated edits and preserves other key slots atomically', () => {
+  const original = [row('a', 'a'), { ...row('x', 'x'), key: 'F2' }, row('b', 'b')];
+  const edited = moveKeybindingWithinKey(original, 'b', 'a');
+  const current = original.map((r) => (r.id === 'x' ? { ...r, enabled: false } : r));
+  current.push({ ...row('new', 'new'), key: 'F3' });
+  const result = applyKeybindingOrder(current, original, edited);
+  assert.deepEqual(
+    result.map((r) => r.id),
+    ['b', 'x', 'a', 'new'],
+  );
+  assert.equal(result[1], current[1]);
+  assert.deepEqual(
+    resolveKeybindings(result, 'Ctrl+F12', { appFocused: true }, [{ id: 'a' }, { id: 'b' }]),
+    ['b', 'a'],
+  );
+  assert.deepEqual(
+    original.map((r) => r.id),
+    ['a', 'x', 'b'],
+  );
+});
+test('order panel refuses changed, removed, added or reordered members of an edited key', () => {
+  const original = [row('a', 'a'), row('b', 'b')];
+  const edited = moveKeybindingWithinKey(original, 'b', 'a');
+  for (const current of [
+    [original[0]],
+    [...original, row('c', 'c')],
+    [...original].reverse(),
+    original.map((r) => ({ ...r, enabled: false })),
+    original.map((r) => ({ ...r, when: { scope: 'global', appletIds: [] } })),
+  ])
+    assert.throws(() => applyKeybindingOrder(current, original, edited), /変更されました/);
+  assert.throws(
+    () => applyKeybindingOrder(original, original, [original[0], original[0]]),
+    /変更されました/,
+  );
 });
 test('new settings round-trip beyond legacy limits and include bindings in the size limit', () => {
   const keybindings = Array.from({ length: 501 }, (_, i) =>

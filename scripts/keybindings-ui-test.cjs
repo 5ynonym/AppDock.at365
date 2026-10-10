@@ -388,7 +388,11 @@ const expectCalls = async (before, expected) => {
       'Recorded key saved',
     );
     await row.getByRole('button', { name: /その他の操作/ }).click();
-    assert.deepEqual(await dock.getByRole('menuitem').allTextContents(), ['編集', '削除']);
+    assert.deepEqual(await dock.getByRole('menuitem').allTextContents(), [
+      '編集',
+      'このキーの実行順…',
+      '削除',
+    ]);
     await dock.keyboard.press('Escape');
     await openEdit();
     await editDialog.getByRole('switch').click();

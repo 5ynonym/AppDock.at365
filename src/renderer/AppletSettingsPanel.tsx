@@ -1,4 +1,5 @@
 import type { ExtensionSnapshot } from '../shared/contracts';
+import type { UiCommand } from '../shared/commands';
 import { AppletSettings } from './AppletSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { AppletShortcutOverview } from './AppletShortcutOverview';
@@ -10,6 +11,7 @@ import { useLayoutEffect, useRef } from 'react';
 export function AppletSettingsPanel({
   applet,
   applets,
+  commands,
   editor,
   tab,
   onWebAccounts,
@@ -17,6 +19,7 @@ export function AppletSettingsPanel({
 }: {
   applet: ExtensionSnapshot;
   applets: { id: string; title: string }[];
+  commands: UiCommand[];
   editor: SettingsEditor;
   tab: 'settings' | 'shortcuts';
   onWebAccounts(): void;
@@ -46,6 +49,7 @@ export function AppletSettingsPanel({
         <AppletShortcutOverview
           key={applet.id}
           applet={applet}
+          allCommands={commands}
           settings={draft}
           applets={applets}
           onChange={edit}

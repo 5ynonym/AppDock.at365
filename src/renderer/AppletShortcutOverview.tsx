@@ -1,14 +1,17 @@
 import type { ExtensionSnapshot, Settings } from '../shared/contracts';
 import { getKeybindings } from '../shared/keybindings';
 import { ShortcutCommandList } from './ShortcutCommandList';
+import type { UiCommand } from '../shared/commands';
 
 export function AppletShortcutOverview({
   applet,
+  allCommands,
   settings,
   applets,
   onChange,
 }: {
   applet: ExtensionSnapshot;
+  allCommands: UiCommand[];
   settings: Settings;
   applets: { id: string; title: string }[];
   onChange(settings: Settings): void;
@@ -28,6 +31,7 @@ export function AppletShortcutOverview({
       <h2>ショートカットキー</h2>
       <ShortcutCommandList
         commands={normal}
+        allCommands={allCommands}
         settings={settings}
         applets={applets}
         onChange={onChange}
@@ -37,6 +41,7 @@ export function AppletShortcutOverview({
           <h3>互換コマンドへの割り当て</h3>
           <ShortcutCommandList
             commands={aliases}
+            allCommands={allCommands}
             settings={settings}
             applets={applets}
             onChange={onChange}
