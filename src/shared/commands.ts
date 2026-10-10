@@ -1,4 +1,5 @@
 import type { Command } from './contracts';
+import { generatedSettingCommands, hostSettingDefinitions } from './settings-commands';
 export const hostCommands = [
   { id: 'appdock.open', title: 'AppDockを開く', extension: 'AppDock', available: true },
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
@@ -11,6 +12,10 @@ export const hostCommands = [
     available: true,
   },
   { id: 'appdock.quit', title: '終了', extension: 'AppDock', available: true },
+  ...generatedSettingCommands('appdock', hostSettingDefinitions, true).map((c) => ({
+    ...c,
+    extension: 'AppDock',
+  })),
 ];
 export interface UiCommand extends Command {
   extension: string;

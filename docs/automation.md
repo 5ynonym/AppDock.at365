@@ -4,7 +4,9 @@
 
 ## 構成
 
-- `src/main/core/automation-api.ts`: 通信に依存しない操作、許可項目、検証、外部revision。
+- `src/main/core/automation-api.ts`: 通信に依存しない操作、公開カタログ、実行権限、引数、受付状態。
+- `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
+- `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
 - `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
 - `automation.ts`: PC専用設定、暗号化、起動/停止、登録状態、接続テスト。
@@ -13,20 +15,19 @@
 
 `dock:automation` IPCは本体Window/mainFrame/URL検査を通し、WebAppletやAppletページへ公開しません。本体のprepareSettings/commitSettingsを共有して保存します。APIからWindows起動登録・UACを呼びません。
 
-## API v1
+## API v2（0.26.30以降）
 
 | 内部メソッド | MCPツール | 引数と結果 |
 | --- | --- | --- |
 | system.getInfo | appdock_get_info | 引数なし。apiVersion/version/instanceId/methods/writable/executable |
 | applets.list | appdock_list_applets | 引数なし。applets配列（id/name/version/state/enabled） |
-| settings.getSchema | appdock_get_settings_schema | 引数なし。fields/scope=host/writable |
-| settings.get | appdock_get_settings | 引数なし。values/revision/warning |
-| settings.patch | appdock_patch_settings | changes/expectedRevision/任意dryRun。changed/values/revision/applies/warning |
-| applets.get | appdock_get_applet | id。applet（基本情報/description/runtime/errorSummary）と公開commands/executable |
+| settings.getSchema | appdock_get_settings_schema | 任意appletId。fields/scope/appletId/writable。省略時は本体 |
+| settings.get | appdock_get_settings | 任意appletId。values/revision/warning。省略時は本体 |
+| applets.get | appdock_get_applet | id。applet（基本情報/description/runtime/errorSummary）と公開commands/executable/writable |
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
-| commands.execute | appdock_execute_command | id。id/completion/effectVerified=false/message |
+| commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
 
-changes/valuesは以下の本体設定だけです。上位のhostオブジェクトで囲みません。
+旧settings.patch/appdock_patch_settingsは削除しました。設定変更はすべてcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
 | キー | 値 | 適用タイミング |
 | --- | --- | --- |
@@ -35,25 +36,25 @@ changes/valuesは以下の本体設定だけです。上位のhostオブジェ�
 | closeToTray | boolean | nextClose |
 | startMinimized | boolean | nextStart |
 
-`{"changes":{"theme":"light"},"expectedRevision":"<取得したrevision>","dryRun":true}`で検証します。dryRunでも書込許可とrevision照合が必要です。未知項目・余分な引数・型不一致・空changesを拒否し、指定外を保持して一括保存します。同じ値だけなら書きません。
+`{"id":"appdock.settings.update","args":{"changes":{"theme":"light"},"expectedRevision":"<取得したrevision>","dryRun":true}}`で検証します。dryRunでもコマンド実行・書込の両許可とrevision照合が必要です。未知項目・余分な引数・型不一致・空changesを拒否し、指定外を保持して一括保存します。同じ値だけなら書きません。
 
-revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透明な文字列です。本体/MCP再起動前の値は使えません。保存直前にディスクも確認し、未通知の外部更新・破損を上書きしません。GUIのdirty draftを保持し、API更新後に古いGUI版を保存すると既存の競合検査で拒否します。GUI入力を自動保存/破棄しません。ファイル同期の未到着な変更までmergeする保証はありません。
+revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透明な文字列です。本体再起動前の値は使えません。本体の設定コマンドサービスをローカル操作とMCPで共有するため、MCPの停止・再開だけではrevisionの実行IDは変わりません。保存直前にディスクも確認し、未通知の外部更新・破損を上書きしません。GUIのdirty draftを保持し、API更新後に古いGUI版を保存すると既存の競合検査で拒否します。GUI入力を自動保存/破棄しません。ファイル同期の未到着な変更までmergeする保証はありません。
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
-任意コマンド、Applet固有設定・プロセスの起動停止、アカウント/認証、キー/ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
+未公開コマンド/設定、Appletプロセスの起動停止、アカウント/認証、キー/ジェスチャー編集、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
 
 ## 公開コマンド
 
-設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completionです。接尾辞・表示名・aliasから許可を推測しません。
+設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableとexecutableで必要な両許可を確認します。接尾辞・表示名・aliasから許可を推測しません。
 
-- 本体: appdock.open、appdock.settings.open、appdock.commands.search。
+- 本体: appdock.open、appdock.settings.open、appdock.commands.searchと公開設定コマンド。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
 - 本体管理のWebApplet: 提供元のweb-applets.tsがopenだけを宣言。
 
-Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、既存executeCommandへ渡します。APIコマンドの同時実行は1件、重複時はBUSY。設定変更許可だけでは実行できず、実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
+Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、通常コマンドは既存executeCommandへ、設定コマンドは共通SettingsCommandsへ渡します。通常のApplet RPCコマンドは引き続き引数なしで、argsに値を渡すと拒否します。APIコマンドの同時実行は1件、重複時はBUSY。設定変更許可だけでは実行できず、実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
 
-本体の表示要求はcompletion=accepted、Appletの処理応答はhandlerReturned。どちらも操作先の効果を別途検証していないのでeffectVerified=falseです。生のコマンド戻り値/例外は返しません。EXECUTION_DISABLED/UNAVAILABLE/BUSY/COMMAND_FAILEDを追加。応答消失や失敗時は処理済みの可能性があるため、自動再試行せず効果を確認します。MCPの実行ツールはreadOnlyHint=false/idempotentHint=falseです。
+本体の表示要求はcompletion=accepted、Appletの処理応答はhandlerReturned。設定保存はsettingsSaved、dryRunはvalidatedです。いずれも操作先の効果を別途検証していないのでeffectVerified=falseです。settingsSavedは永続化を表し、非同期settings.changedの反映完了は表しません。生のコマンド戻り値/例外は返しません。EXECUTION_DISABLED/UNAVAILABLE/BUSY/COMMAND_FAILEDを追加。応答消失や失敗時は処理済みの可能性があるため、自動再試行せず効果を確認します。MCPの実行ツールはreadOnlyHint=false/idempotentHint=false/destructiveHint=trueです。設定値によって履歴の縮小などを伴うため、実行入口全体を非破壊とは宣言しません。
 
 Applet詳細には全設定・認証・パス・panelを含めません。WebAppletのURLと生の起動エラーも出さず、説明/エラー概要へ置き換えます。
 
@@ -75,7 +76,32 @@ runtime登録やhost.commands.replaceのautomation値は採用せず、manifest�
 
 本体は宣言の検証・実行許可・稼働状態・同時実行制御・監査ログを管理します。公開宣言は実行許可を有効にするものではありません。現在はPC単位のコマンド実行許可を全Appletで共有し、Applet/コマンド個別の許可スイッチはありません。
 
-0.26.28以前の固定一覧による互換公開は行いません。Gmail 0.9.3はopen、WallpaperSlideshow 0.4.4はnext/start/stopを宣言します。旧Appletは通常操作を継続できますが、新本体のMCPにはコマンドを公開しません。本体と対応Appletの両方を更新してください。Codexの登録方法と8つのMCPツール名は変わりません。
+0.26.28以前の固定一覧による互換公開は行いません。Gmail 0.9.4はopenと公開設定、WallpaperSlideshow 0.4.5はnextと公開設定を宣言します。Codexの登録方法は同じですがMCPは7ツールになりました。更新後はCodexを再読み込みしてください。
+
+## 設定宣言と自動生成コマンド
+
+この宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsへ、必要な項目だけautomation=trueを付けます。型は最上位のboolean/number/string/静的selectに限定し、既存の型・最小最大・選択肢検証を共有します。入れ子、JSON、動的select、アカウント情報を一括公開する機能はありません。
+
+```json
+{
+  "key": "monitoring",
+  "title": "監視",
+  "type": "boolean",
+  "default": true,
+  "automation": true,
+  "generateCommands": ["on", "off", "toggle"]
+}
+```
+
+公開項目がある提供元には、複数項目を一括指定できるsettings.updateを1件生成します。各コマンドのinputSchemaはcommands.list/get_appletから取得できます。settings.get/getSchemaへappletIdを渡すと、そのAppletの公開項目だけを取得します。設定全体で同じrevisionを使い、別の提供元への更新でも以前のrevisionは無効になります。
+
+booleanのgenerateCommandsは任意で、on/off/toggleから必要なものだけを指定します。型がbooleanのdefaultを必須とし、実行時の保存値が未設定ならdefaultを使用します。IDは`<owner>.settings.<key>.on|off|toggle`、表示名は設定titleから生成します。ONはtrue、OFFはfalseです。「停止」設定のONは停止を意味します。toggleはディスク検査後の最新値を反転して同じ同期処理内で保存し、競合時に再試行しません。
+
+生成した引数なしコマンドは、通常の検索・ショートカット・ジェスチャー・トレイ候補へ自動追加します。実キーやトレイ項目は自動割当しません。AppletのdefaultKeybindings/defaultGestureBindings/settingActionsからも生成IDを参照できます。停止中も候補に残しますが実行は有効かつrunningに限ります。automationを省略した生成コマンドはローカル専用です。MCP公開時には両許可が必要です。
+
+生成IDとsettings.updateは宣言・alias・runtime登録/置換との重複を拒否します。提供元IDのappdockは本体専用です。生成IDは180文字以内。引数付きsettings.updateを引数なしショートカットの候補へは追加しません。
+
+初期対応: Gmailは監視/通知/ツールバー/未読のみと履歴件数、壁紙は停止と更新間隔を公開します。Gmailの外部リンク確認省略・通知内容表示、認証や画像フォルダーは非公開です。壁紙の旧start/stop/toggle/resume/pauseは廃止し、paused.off/on/toggleへ置換しました。既存割当の自動移行は行わないため、必要なキーを新コマンドへ割り当て直してください。
 
 ## API監査ログ
 
@@ -108,9 +134,9 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 ## 検証
 
 - `dev.bat run typecheck` / `dev.bat run build`
-- `dev.bat exec node --test tests/automation.test.cjs tests/settings-sync.test.cjs`
+- `dev.bat exec node --test tests/automation.test.cjs tests/settings-commands.test.cjs tests/settings-sync.test.cjs`
 - `dev.bat exec node scripts/automation-ui-test.cjs [publish/AppDock.at365.exe]`
-- APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUI生成の隔離configを実Codexで読み込み、8ツールの発見と取得/変更/再取得/復元・公開コマンド実行を確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
+- APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUI生成の隔離configを実Codexで読み込み、7ツールの発見と取得/変更/再取得/復元・公開コマンド実行を確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
 
 証跡は.artifacts/automation-source-* / automation-portable-*とVERIFICATIONに記録します。ビルドをGUI検証と同時実行しません。
 

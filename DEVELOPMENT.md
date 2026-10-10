@@ -229,3 +229,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 タスクトレイの保存形式・移行・編集UI・一時停止コマンドと検証は[タスクトレイ仕様](docs/tray-menu.md)を参照してください。
 
 0.26.25の更新確認/進捗は共通のステータスバー通知へ統一しています。表示時間・確認結果・実Windowの可視状態の扱いは[更新ガイド](docs/updates.md#設定と取得)を参照してください。リボンのアバター用CSSは配置用の中間要素があっても一致するセレクターとし、画像の余白なし・正円を維持します。
+
+## 設定コマンド（0.26.30）
+
+変更操作はcommands.executeのid/argsに統一し、旧settings.patchを削除。読取りはsettings.get/getSchemaに任意appletIdを追加しました。設定定義のautomation/generateCommandsから本体・Appletの更新schemaと引数なしコマンドを生成します。仕様と利用例は[共通操作API](docs/automation.md#設定宣言と自動生成コマンド)、保存競合は[設定同期](docs/settings-sync.md)を正本とします。主な回帰はtests/settings-commands.test.cjs、tests/automation.test.cjs、scripts/automation-ui-test.cjsです。

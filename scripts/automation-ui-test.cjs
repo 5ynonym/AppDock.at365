@@ -26,6 +26,13 @@ const settings = require('../out/main/shared/settings-schema').createDefaultSett
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
 settings.keybindings = [];
+settings.keybindings.push({
+  id: 'test-settings-switch',
+  command: 'appdock.settings.notifications.toggle',
+  key: 'Ctrl+Alt+F11',
+  enabled: true,
+  when: { scope: 'app', appletIds: [] },
+});
 settings.globalShortcutCommands = [];
 settings.gestures.enabled = false;
 const fixtureId = 'test.automation-provider';
@@ -46,7 +53,17 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'index.cjs',
     commands: fixtureCommands,
-    capabilities: [],
+    capabilities: ['settings'],
+    settings: [
+      {
+        key: 'feature',
+        title: 'Fixture feature',
+        type: 'boolean',
+        default: false,
+        automation: true,
+        generateCommands: ['on', 'off', 'toggle'],
+      },
+    ],
   }),
 );
 fs.writeFileSync(
@@ -54,6 +71,8 @@ fs.writeFileSync(
   `
 const fs=require('node:fs'),path=require('node:path');
 exports.activate=async(context)=>{
+ context.tray.add('Fixture feature toggle','test.automation-provider.settings.feature.toggle');
+ context.settings.onChanged(()=>fs.writeFileSync(path.join(__dirname,'observed.json'),JSON.stringify({feature:context.settings.get('feature',false)})));
  for(const name of ['next','start','stop','prepare-background']) context.commands.register('test.automation-provider.'+name,name,async()=>{
   if(name==='stop') throw Error('SECRET_COMMAND_FAILURE');
   const file=path.join(__dirname,'calls.json');
@@ -153,7 +172,10 @@ async function call(client, name, args = {}) {
 }
 async function patch(client, changes) {
   const s = await call(client, 'appdock_get_settings');
-  return call(client, 'appdock_patch_settings', { changes, expectedRevision: s.revision });
+  return call(client, 'appdock_execute_command', {
+    id: 'appdock.settings.update',
+    args: { changes, expectedRevision: s.revision },
+  });
 }
 let client;
 const webServer = http.createServer((_req, res) => {
@@ -245,7 +267,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 8);
+    assert.equal((await client.listTools()).tools.length, 7);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -259,6 +281,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'fixture running',
     );
     const catalog = await call(client, 'appdock_list_commands');
+    assert(
+      (await page.evaluate(() => window.dock.snapshot())).extensions
+        .find((e) => e.id === fixtureId)
+        .tray.some((t) => t.command === `${fixtureId}.settings.feature.toggle`),
+    );
     assert.ok(catalog.commands.some((c) => c.id === `${fixtureId}.next` && c.available));
     assert.ok(
       !catalog.commands.some((c) => c.id === 'appdock.quit' || c.id.endsWith('prepare-background')),
@@ -350,6 +377,46 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'patch reflected',
     );
     checks.push('MCP settings write, runtime snapshot and disk');
+    const fixtureSettings = await call(client, 'appdock_get_settings', { appletId: fixtureId });
+    assert.equal(fixtureSettings.values.feature, false);
+    await call(client, 'appdock_execute_command', { id: `${fixtureId}.settings.feature.on` });
+    await until(
+      () =>
+        fs.existsSync(path.join(fixtureRoot, 'observed.json')) &&
+        JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'observed.json'))).feature === true,
+      'Applet settingsChanged observed',
+    );
+    await page.evaluate(
+      (id) => window.dock.executeCommand(id),
+      `${fixtureId}.settings.feature.toggle`,
+    );
+    await until(
+      () => JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'observed.json'))).feature === false,
+      'local generated command observed',
+    );
+    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    await page
+      .getByRole('searchbox', { name: 'ショートカットのコマンドを検索' })
+      .fill('appdock.settings.notifications.toggle');
+    await page
+      .getByText('appdock.settings.notifications.toggle', { exact: true })
+      .first()
+      .waitFor();
+    await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    await page.keyboard.press('Control+Alt+F11');
+    await until(
+      async () => (await call(client, 'appdock_get_settings')).values.notifications === true,
+      'generated host keyboard command',
+    );
+    await page.keyboard.press('Control+Alt+F11');
+    await until(
+      async () => (await call(client, 'appdock_get_settings')).values.notifications === false,
+      'generated host keyboard restore',
+    );
+    checks.push(
+      'manifest settings generate discoverable MCP/local commands and shortcut rows; keyboard toggle persists; Applet settingsChanged observes updates',
+    );
     if (process.env.APPDOCK_TEST_CODEX_EXE) {
       const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
       await require('./automation-codex-check.cjs')({
@@ -430,8 +497,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal(
       (
         await client.callTool({
-          name: 'appdock_patch_settings',
-          arguments: { changes: { theme: 'dark' }, expectedRevision: before.revision },
+          name: 'appdock_execute_command',
+          arguments: {
+            id: 'appdock.settings.update',
+            args: { changes: { theme: 'dark' }, expectedRevision: before.revision },
+          },
         })
       ).structuredContent.code,
       'REVISION_CONFLICT',

@@ -60,6 +60,8 @@ export interface TrayItem {
   command: string;
 }
 export interface SettingDefinition {
+  automation?: boolean;
+  generateCommands?: ('on' | 'off' | 'toggle')[];
   key: string;
   title: string;
   type:

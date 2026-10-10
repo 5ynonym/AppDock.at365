@@ -3,19 +3,13 @@ import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import {
-  AutomationApi,
-  AutomationError,
-  automationFields,
-  automationMethods,
-} from './automation-api';
+import { AutomationApi, AutomationError, automationMethods } from './automation-api';
 
 const names = [
   'appdock_get_info',
   'appdock_list_applets',
   'appdock_get_settings_schema',
   'appdock_get_settings',
-  'appdock_patch_settings',
   'appdock_get_applet',
   'appdock_list_commands',
   'appdock_execute_command',
@@ -23,56 +17,40 @@ const names = [
 const descriptions = [
   'AppDockの版・接続先・対応APIを取得します。',
   'Appletの基本情報と稼働状態を取得します。設定や認証情報は含みません。',
-  '変更できる本体設定の説明・型・適用タイミングを取得します。',
-  '公開された本体設定と変更番号を取得します。変更前に呼んでください。',
-  '本体の基本設定だけを変更します。直前に取得したexpectedRevisionが必要です。dryRun=trueは検証のみです。競合時は再取得してください。',
+  '公開された設定の型・適用タイミングを取得します。appletId省略時は本体設定です。',
+  '公開された設定と変更番号を取得します。appletId省略時は本体設定です。変更前に呼んでください。',
   '指定したAppletの説明・状態・エラー概要・外部公開コマンドを取得します。認証情報や全設定は含みません。',
   '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
-  '公開されたコマンドをidで実行します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
+  'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
 ];
 function tools() {
   return names.map((name, i) => ({
     name,
     description: descriptions[i],
-    inputSchema:
-      i === 4
-        ? {
-            type: 'object' as const,
-            properties: {
-              changes: {
-                type: 'object',
-                properties: Object.fromEntries(
-                  Object.entries(automationFields).map(([key, field]) => [
-                    key,
-                    {
-                      type: field.type,
-                      ...('enum' in field ? { enum: field.enum } : {}),
-                      description: field.description,
-                    },
-                  ]),
-                ),
-                additionalProperties: false,
-                minProperties: 1,
-              },
-              expectedRevision: { type: 'string' },
-              dryRun: { type: 'boolean', default: false },
-            },
-            required: ['changes', 'expectedRevision'],
-            additionalProperties: false,
-          }
-        : i === 5 || i === 7
-          ? {
-              type: 'object' as const,
-              properties: { id: { type: 'string', maxLength: 200 } },
-              required: ['id'],
-              additionalProperties: false,
-            }
-          : { type: 'object' as const, properties: {}, additionalProperties: false },
+    inputSchema: {
+      type: 'object' as const,
+      properties:
+        i === 2 || i === 3
+          ? { appletId: { type: 'string', maxLength: 200 } }
+          : i === 4
+            ? { id: { type: 'string', maxLength: 200 } }
+            : i === 6
+              ? {
+                  id: { type: 'string', maxLength: 200 },
+                  args: {
+                    type: 'object',
+                    description: 'commands.listで取得したinputSchemaに従う引数',
+                  },
+                }
+              : {},
+      ...(i === 4 || i === 6 ? { required: ['id'] } : {}),
+      additionalProperties: false,
+    },
     annotations: {
-      readOnlyHint: i !== 4 && i !== 7,
-      destructiveHint: false,
-      idempotentHint: i !== 7,
-      openWorldHint: i === 7,
+      readOnlyHint: i !== 6,
+      destructiveHint: i === 6,
+      idempotentHint: i !== 6,
+      openWorldHint: i === 6,
     },
   }));
 }
@@ -141,7 +119,7 @@ export class AutomationMcp {
         {
           capabilities: { tools: {} },
           instructions:
-            'Read settings and their revision before changing them. List public commands before executing an exact id. Command permission is separate from settings permission. Commands never auto-enable a stopped Applet. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
+            'Read settings and their revision before changing them. List public commands before executing an exact id. Setting commands require both command and settings permissions. Use commands.execute with args following the listed inputSchema. A settingsSaved response confirms persistence, not completion of Applet settingsChanged. Commands never auto-enable a stopped Applet. A command response is not proof of its external effect. Do not retry commands after errors or lost responses without checking their effect. Never overwrite settings.json directly. Account data is not exposed.',
         },
       );
       this.requests.add(sdk);

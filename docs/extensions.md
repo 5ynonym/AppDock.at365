@@ -210,3 +210,5 @@ command.executeは任意のinvocation（session/window/process/source）を受�
 ## v0.26.29: 外部コマンド公開
 
 manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣言できます。省略/falseは非公開、runtime登録や別名だけでは公開しません。形式・動的コマンドとの照合・権限は[共通操作API](automation.md#appletによる公開宣言)を参照してください。利用するAppletは`minimumHostVersion: "0.26.29"`以上を指定します。
+
+設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。AppDock 0.26.30以降、settings capabilityと明示の公開・生成宣言が必要です。

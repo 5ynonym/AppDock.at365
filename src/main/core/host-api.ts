@@ -11,6 +11,10 @@ import { atomicWrite, isObject } from './settings';
 import type { Panel } from '../../shared/contracts';
 import { parseSettingOptions, validateSettingValue } from '../../shared/setting-definitions';
 import { parseExtensionCommands } from '../../shared/extension-commands';
+import {
+  generatedSettingCommands,
+  validateSettingCommandIds,
+} from '../../shared/settings-commands';
 import { getWebAccounts } from './web-accounts';
 import { safePageShortcut } from '../../shared/keybindings';
 import { pathToFileURL } from 'node:url';
@@ -95,7 +99,10 @@ export function createHostApi(
               if (
                 e.state !== 'running' ||
                 typeof command !== 'string' ||
-                !e.commands.some((item) => item.id === command)
+                ![
+                  ...e.commands,
+                  ...generatedSettingCommands(id, e.manifest.settings ?? [], true),
+                ].some((item) => item.id === command)
               )
                 throw Error('自身の実行中コマンドだけを呼び出せます。');
               return executeCommand(command);
@@ -225,8 +232,13 @@ export function createHostApi(
       case 'host.commands.replace': {
         requireCapability('dynamic-commands');
         const commands = parseExtensionCommands(id, p.commands);
+        validateSettingCommandIds(id, e.manifest.settings ?? [], commands);
         e.commands = commands;
-        e.tray = e.tray.filter((item) => commands.some((command) => command.id === item.command));
+        e.tray = e.tray.filter((item) =>
+          [...commands, ...generatedSettingCommands(id, e.manifest.settings ?? [], true)].some(
+            (command) => command.id === item.command,
+          ),
+        );
         commandsChanged();
         return null;
       }
@@ -268,7 +280,10 @@ export function createHostApi(
           throw new Error('silentはbooleanです。');
         if (
           p.command != null &&
-          (typeof p.command !== 'string' || !e.commands.some((c) => c.id === p.command))
+          (typeof p.command !== 'string' ||
+            ![...e.commands, ...generatedSettingCommands(id, e.manifest.settings ?? [], true)].some(
+              (c) => c.id === p.command,
+            ))
         )
           throw new Error('このAppletの登録済みコマンドを指定してください。');
         if (settings.value.host.notifications) {

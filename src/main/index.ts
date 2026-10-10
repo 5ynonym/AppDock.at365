@@ -20,6 +20,7 @@ import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
+import { SettingsCommands } from './core/settings-commands';
 import { dataPaths } from './core/data-paths';
 import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
@@ -155,6 +156,11 @@ let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
 let webApplets: WebAppletManager;
 const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
+const settingsCommands = new SettingsCommands({
+  settings,
+  applets: allApplets,
+  save: (value, revision) => commitSettings(prepareSettings(value), revision),
+});
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
 let gestures: GestureManager | undefined;
@@ -263,6 +269,7 @@ function quitHost(restart = false) {
 }
 async function executeCommand(id: string, invocation?: GestureInvocation) {
   if (quitting) return;
+  if (settingsCommands.hasGenerated(id)) return settingsCommands.execute(id, {}, false);
   if (id === gesturePauseCommand) {
     gestures?.togglePause();
     trayMenu();
@@ -1045,6 +1052,7 @@ async function initialize() {
     createApi: (writable, instanceId, executable) =>
       new AutomationApi({
         settings,
+        settingsCommands,
         save: (value, revision) => {
           try {
             return commitSettings(prepareSettings(value), revision);
