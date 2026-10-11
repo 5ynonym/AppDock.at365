@@ -99,3 +99,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 ## WebAppletの操作（0.26.39）
 
 登録したWebAppletを対象に、同じsettings.getSchema/settings.get/commands.list/commands.executeを使います。Node/.NET SDKとMCPの双方で利用できます。設定とコマンドの公開宣言はWebApplet提供元に置き、通信層に専用入口は追加しません。公開する範囲・引数例・表示先の優先順位は[WebApplet公開操作](web-applets.md#共通apiへの公開02639以降)を参照してください。Webページ自身へのホストAPI注入は行いません。
+
+## 描画モデルAPI（0.26.40）
+
+`ui.ribbon.get`、`ui.assets.get`、`ui.actions.invoke`を共通操作カタログへ追加。既存の編集用`ribbon.get`とは独立する。モデル・操作ID・MCP公開範囲・Shell roleは[Shell API](shell-api.md)を参照。

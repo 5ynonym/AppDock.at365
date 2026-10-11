@@ -178,7 +178,7 @@ async function execute(id) {
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 11);
+    assert.equal((await client.listTools()).tools.length, 14);
     assert.ok(
       (await client.callTool({ name: 'appdock_send_keys', arguments: { keys: 'A' } })).isError,
     );

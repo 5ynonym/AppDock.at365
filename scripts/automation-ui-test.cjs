@@ -301,7 +301,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 11);
+    assert.equal((await client.listTools()).tools.length, 14);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,
@@ -500,7 +500,15 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.ok(!JSON.stringify(logs).includes('SECRET_'));
     const persisted = fs.readFileSync(path.join(local, 'logs', 'host.log'), 'utf8');
     assert.ok(persisted.includes('API=commands.execute'));
-    await page.getByRole('button', { name: 'ログ', exact: true }).click();
+    const shell = await until(
+      () =>
+        s.browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .find((p) => p.url().includes('/shells/default/')),
+      'Default Shell',
+    );
+    await shell.getByRole('button', { name: 'ログ', exact: true }).click();
     await page.getByRole('combobox', { name: 'ログのApplet' }).selectOption('automation');
     await page.getByRole('textbox', { name: 'ログを検索' }).fill('API=commands.execute');
     await page
@@ -702,6 +710,14 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await require('./automation-ribbon-checks.cjs')({
       page,
+      shell: await until(
+        () =>
+          s.browser
+            .contexts()
+            .flatMap((c) => c.pages())
+            .find((p) => p.url().includes('/shells/default/')),
+        'Default Shell',
+      ),
       client,
       call,
       until,
@@ -892,7 +908,17 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.deepEqual(restoredTray.menu, persistedTray.menu);
     assert.deepEqual(restoredTray.clicks, persistedTray.clicks);
     assert.equal(restoredTray.trayEditingAllowed, true);
-    await page.locator('.ribbon-bottom [data-ribbon-id="separator:mcp-persistent"]').waitFor();
+    const restoredShell = await until(
+      () =>
+        s.browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .find((p) => p.url().includes('/shells/default/')),
+      'restored Default Shell',
+    );
+    await restoredShell
+      .locator('.ribbon-bottom [data-ribbon-id="separator:mcp-persistent"]')
+      .waitFor();
     assert.deepEqual((await readShortcuts()).bindings, persistedShortcuts);
     assert.equal((await readShortcuts()).shortcutEditingAllowed, true);
     const after = await call(client, 'appdock_get_settings');

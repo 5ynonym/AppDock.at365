@@ -1,5 +1,65 @@
 // One operation catalog drives MCP tools and both Applet SDK entry points.
 export const appDockOperations = {
+  'ui.ribbon.get': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read'],
+    name: 'appdock_get_ribbon_view',
+    description:
+      'リボンの描画モデル・選択状態・操作IDを取得します。編集用ribbon.getとは独立したepoch/revisionです。',
+    inputSchema: {
+      type: 'object',
+      properties: { contextId: { type: 'string', enum: ['primary'] } },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  'ui.assets.get': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read'],
+    name: 'appdock_get_ui_asset',
+    description: '描画モデルで公開されたassetIdからPNG/WebPのdata URLを取得します。',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', maxLength: 64 } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  'ui.actions.invoke': {
+    callers: ['mcp', 'applet'],
+    permissions: ['execute'],
+    name: 'appdock_invoke_ui_action',
+    description:
+      '描画モデルのactionIdを実行します。epochと一意なrequestIdが必要です。同じIDの再送は512件の受付記録内で重複実行しません。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        contextId: { type: 'string', enum: ['primary'] },
+        epoch: { type: 'string', maxLength: 100 },
+        requestId: { type: 'string', minLength: 1, maxLength: 100 },
+        actionId: { type: 'string', maxLength: 250 },
+      },
+      required: ['epoch', 'requestId', 'actionId'],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+  },
   'input.sendKeys': {
     callers: ['applet'],
     permissions: ['sendInput'],

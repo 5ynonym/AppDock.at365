@@ -15,7 +15,7 @@ fs.cpSync(
   path.join(profile, 'extensions', 'Applet.Gmail.at365'),
   { recursive: true },
 );
-let app, dock;
+let app, dock, rail;
 const checks = [];
 const until = async (fn, label) => {
   const end = Date.now() + 15000;
@@ -25,17 +25,31 @@ const until = async (fn, label) => {
   }
   throw Error(label);
 };
-const button = (label) => dock.getByRole('button', { name: label, exact: true });
+const button = (label) =>
+  (['設定', 'ホーム', 'Applet', 'ログ'].includes(label) ? rail : dock).getByRole('button', {
+    name: label,
+    exact: true,
+  });
 const ribbonIds = (group) =>
-  dock
+  rail
     .locator(`.ribbon-${group} [data-ribbon-id]`)
     .evaluateAll((elements) => elements.map((element) => element.dataset.ribbonId));
 const save = async () => {
+  const before = (await dock.evaluate(() => window.dock.snapshot())).settings.revision;
   await button('変更をすべて保存').click();
   await dock
     .locator('.settings-toolbar:visible')
     .getByText('すべて保存されています', { exact: true })
     .waitFor();
+  await dock.waitForFunction(
+    async (before) => (await window.dock.snapshot()).settings.revision > before,
+    before,
+  );
+  const revision = await rail.evaluate(async () => (await window.appdockShell.get()).revision);
+  await rail.waitForFunction(
+    (revision) => Number(document.querySelector('.activity-rail')?.dataset.revision) >= revision,
+    revision,
+  );
 };
 async function launch() {
   const env = { ...process.env };
@@ -48,6 +62,14 @@ async function launch() {
   dock = await app.firstWindow();
   dock.setDefaultTimeout(15000);
   await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await until(() => {
+    rail = app
+      .context()
+      .pages()
+      .find((p) => p.url().includes('/shells/default/index.html'));
+    return !!rail;
+  }, 'Shell page');
+  await rail.locator('[data-ribbon-id="home"]').waitFor();
   await app.evaluate(({ app }) =>
     app.on('session-created', (session) => {
       if (!session.isPersistent()) return;
@@ -116,12 +138,12 @@ async function launch() {
     assert.equal(persisted.separators.length, 1);
     assert.ok(persisted.bottom.includes('page:at365.gmail:gmail'));
     assert.ok(!persisted.bottom.includes(persisted.separators[0]));
-    assert.equal(await dock.locator('.ribbon-top [role="separator"]').count(), 1);
+    assert.equal(await rail.locator('.ribbon-top [role="separator"]').count(), 1);
     assert.equal(
-      await dock.locator('.ribbon-bottom [data-ribbon-id="page:at365.gmail:gmail"]').count(),
+      await rail.locator('.ribbon-bottom [data-ribbon-id="page:at365.gmail:gmail"]').count(),
       1,
     );
-    const topBottom = await dock.evaluate(() => ({
+    const topBottom = await rail.evaluate(() => ({
       top: document.querySelector('.ribbon-top').getBoundingClientRect().bottom,
       bottom: document.querySelector('.ribbon-bottom').getBoundingClientRect().top,
     }));
@@ -131,7 +153,7 @@ async function launch() {
       'Host shortcuts renamed and first in Applet settings; separator add/delete/move; cross-group drag; per-group ordering; real top/bottom placement',
     );
 
-    await dock
+    await rail
       .locator('.activity-rail')
       .getByRole('button', { name: 'Gmail', exact: true })
       .click();
@@ -199,7 +221,7 @@ async function launch() {
     restartSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
     await launch();
-    assert.equal(await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));
     await until(
       async () => (await ribbonIds('bottom')).includes('page:at365.gmail:gmail'),
@@ -209,7 +231,7 @@ async function launch() {
       (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon,
       persisted,
     );
-    assert.equal(await dock.locator('.ribbon-top [role="separator"]').count(), 1);
+    assert.equal(await rail.locator('.ribbon-top [role="separator"]').count(), 1);
     assert.ok((await ribbonIds('bottom')).includes('page:at365.gmail:gmail'));
     await button('設定').click();
     await dock
@@ -222,7 +244,7 @@ async function launch() {
     assert.equal(deleted.separators.length, 0);
     for (const ids of [deleted.order, deleted.hidden, deleted.bottom])
       assert.ok(!ids.includes(persisted.separators[0]));
-    assert.equal(await dock.locator('.activity-rail [role="separator"]').count(), 0);
+    assert.equal(await rail.locator('.activity-rail [role="separator"]').count(), 0);
     await button('リボンを初期状態に戻す').click();
     await save();
     assert.deepEqual(await ribbonIds('bottom'), ['theme', 'profile']);
@@ -244,6 +266,18 @@ async function launch() {
     console.log(JSON.stringify({ ok: true, profile, checks }));
   } catch (error) {
     console.error(error);
+    if (rail && !rail.isClosed())
+      fs.writeFileSync(
+        path.join(profile, 'shell-failure.json'),
+        JSON.stringify(
+          await rail.evaluate(async () => ({
+            view: await window.appdockShell.get(),
+            html: document.body.innerHTML,
+          })),
+          null,
+          2,
+        ),
+      );
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify({ ok: false, checks, error: String(error) }, null, 2),

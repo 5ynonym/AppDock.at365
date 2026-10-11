@@ -57,6 +57,8 @@ export class AppletManagement {
     }
     const applet = this.options.applets().find((a) => a.id === id);
     if (!applet) throw new AppletManagementError('NOT_FOUND', 'Appletがありません。');
+    if (applet.sourceKind === 'builtin' && operation !== 'restart')
+      throw new AppletManagementError('UNAVAILABLE', 'Default Shellは無効化できません。');
     if (['starting', 'stopping'].includes(applet.state))
       throw new AppletManagementError('BUSY', 'Appletの状態を変更中です。');
     if (operation === 'restart' && !applet.enabled)

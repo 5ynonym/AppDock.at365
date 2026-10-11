@@ -12,6 +12,40 @@ function temporary(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
+test('Shell manifest uses trusted discovery origin, requires capability and confines its entry', (t) => {
+  const dir = temporary(t);
+  fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{}');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html>');
+  const manifest = {
+    apiVersion: 1,
+    id: 'appdock.default-shell',
+    name: 'Default Shell',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'worker.cjs',
+    capabilities: ['shell'],
+    shell: { apiVersion: 1, ui: 'index.html' },
+    sourceKind: 'builtin',
+  };
+  const write = () => fs.writeFileSync(path.join(dir, 'extension.json'), JSON.stringify(manifest));
+  write();
+  assert.throws(() => readManifest(dir), /Reserved/);
+  assert.equal(readManifest(dir, 'builtin').sourceKind, 'builtin');
+  manifest.id = 'fixture.shell';
+  write();
+  assert.equal(readManifest(dir).sourceKind, 'external');
+  manifest.capabilities = [];
+  write();
+  assert.throws(() => readManifest(dir), /Invalid Shell/);
+  manifest.capabilities = ['shell'];
+  manifest.shell.apiVersion = 2;
+  write();
+  assert.throws(() => readManifest(dir), /Invalid Shell/);
+  manifest.shell.apiVersion = 1;
+  manifest.shell.ui = '../outside.html';
+  write();
+  assert.throws(() => readManifest(dir));
+});
 test('settings create beside selected executable directory, persist and reject stale revisions', (t) => {
   const file = path.join(temporary(t), 'settings.json');
   const store = new SettingsStore(file);

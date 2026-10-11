@@ -1,5 +1,6 @@
 import { CommandContexts } from './command-contexts';
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -35,7 +36,10 @@ function contained(root: string, entry: string) {
     throw new Error('entry は拡張フォルダ内に置いてください。');
   return resolved;
 }
-function readManifest(folder: string): LoadedManifest {
+function readManifest(
+  folder: string,
+  sourceKind: 'builtin' | 'external' = 'external',
+): LoadedManifest {
   const m: any = JSON.parse(fs.readFileSync(path.join(folder, 'extension.json'), 'utf8'));
   if (
     !isObject(m) ||
@@ -87,6 +91,20 @@ function readManifest(folder: string): LoadedManifest {
     )
       throw Error('externalLinkSettingには自身のboolean設定とsettings capabilityが必要です。');
   }
+  delete m.sourceKind;
+  if (m.id === 'appdock.default-shell' && sourceKind !== 'builtin')
+    throw Error('Reserved Shell ID');
+  if (m.shell !== undefined) {
+    if (
+      !isObject(m.shell) ||
+      m.shell.apiVersion !== 1 ||
+      typeof m.shell.ui !== 'string' ||
+      !/\.html$/i.test(m.shell.ui) ||
+      !m.capabilities?.includes('shell')
+    )
+      throw Error('Invalid Shell manifest');
+    contained(folder, m.shell.ui);
+  }
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
@@ -122,11 +140,17 @@ function readManifest(folder: string): LoadedManifest {
     defaultGestureBindings,
     settingActions: parseSettingActions(m.settingActions, bindingCommands),
     folder,
+    sourceKind,
     entryPath: contained(folder, m.entry),
   } as LoadedManifest;
 }
-type LoadedManifest = ExtensionManifest & { folder: string; entryPath: string };
+type LoadedManifest = ExtensionManifest & {
+  folder: string;
+  entryPath: string;
+  sourceKind: 'builtin' | 'external';
+};
 export interface ExtensionInstance {
+  runtimeSession?: string;
   attention?: boolean;
   manifest: LoadedManifest;
   state: ExtensionSnapshot['state'];
@@ -142,6 +166,7 @@ export interface ExtensionInstance {
   peer?: JsonLinePeer | null;
 }
 interface ManagerOptions {
+  builtinRoots?: string[];
   hostVersion?: string;
   roots: string[];
   settings: SettingsStore;
@@ -152,6 +177,7 @@ interface ManagerOptions {
   log: (level: string, source: string, message: string) => void;
 }
 class ExtensionManager extends EventEmitter {
+  builtinRoots: string[];
   readonly executions = new CommandContexts();
   roots: string[];
   settings: SettingsStore;
@@ -166,6 +192,7 @@ class ExtensionManager extends EventEmitter {
   hostVersion: string;
   constructor({
     roots,
+    builtinRoots = [],
     settings,
     nodeExecutable,
     nodeWorker,
@@ -175,7 +202,8 @@ class ExtensionManager extends EventEmitter {
     hostVersion = '0.0.0',
   }: ManagerOptions) {
     super();
-    this.roots = roots;
+    this.builtinRoots = builtinRoots;
+    this.roots = [...builtinRoots, ...roots];
     this.settings = settings;
     this.nodeExecutable = nodeExecutable;
     this.nodeWorker = nodeWorker;
@@ -188,6 +216,7 @@ class ExtensionManager extends EventEmitter {
     this.hostVersion = hostVersion;
   }
   discover() {
+    const rejected = new Set<string>();
     for (const root of this.roots) {
       if (!fs.existsSync(root)) continue;
       for (const dir of fs.readdirSync(root, { withFileTypes: true })) {
@@ -195,12 +224,20 @@ class ExtensionManager extends EventEmitter {
         const folder = path.join(root, dir.name);
         if (!fs.existsSync(path.join(folder, 'extension.json'))) continue;
         try {
-          const manifest = readManifest(folder);
+          const manifest = readManifest(
+            folder,
+            this.builtinRoots.includes(root) ? 'builtin' : 'external',
+          );
+          if (rejected.has(manifest.id)) continue;
           if (this.items.has(manifest.id)) {
+            if (this.items.get(manifest.id)!.manifest.sourceKind !== 'builtin') {
+              this.items.delete(manifest.id);
+              rejected.add(manifest.id);
+            }
             this.log(
               'warn',
               manifest.id,
-              '同じIDの拡張が重複しています。先に見つけた拡張を使用します。',
+              '同じIDの拡張が重複しています。外部の重複した拡張は起動しません。',
             );
             continue;
           }
@@ -227,7 +264,9 @@ class ExtensionManager extends EventEmitter {
       state: e.state,
       scheduledStartAt: e.scheduledStartAt,
       error: e.error,
-      enabled: this.settings.value.extensions[e.manifest.id]?.enabled ?? false,
+      enabled:
+        e.manifest.sourceKind === 'builtin' ||
+        (this.settings.value.extensions[e.manifest.id]?.enabled ?? false),
       commands: this.commandCatalog(e),
       tray: e.tray,
       panel: e.panel,
@@ -288,7 +327,9 @@ class ExtensionManager extends EventEmitter {
       .then(async () => {
         if (this.shuttingDown) return;
         for (const e of this.items.values()) {
-          const enabled = this.settings.value.extensions[e.manifest.id]?.enabled ?? false;
+          const enabled =
+            e.manifest.sourceKind === 'builtin' ||
+            (this.settings.value.extensions[e.manifest.id]?.enabled ?? false);
           if (enabled && e.state === 'stopped') await this.schedule(e);
           if (enabled && e.state === 'waiting' && e.scheduledDelay !== this.delay(e))
             await this.schedule(e);
@@ -310,6 +351,7 @@ class ExtensionManager extends EventEmitter {
     return this.queue;
   }
   delay(e: ExtensionInstance) {
+    if (e.manifest.sourceKind === 'builtin') return 0;
     return (
       this.settings.value.extensions[e.manifest.id]?.startupDelaySeconds ??
       e.manifest.startupDelaySeconds ??
@@ -369,6 +411,7 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async start(e: ExtensionInstance) {
+    e.runtimeSession = randomUUID();
     e.state = 'starting';
     e.error = null;
     this.emit('changed');
@@ -588,7 +631,10 @@ class ExtensionManager extends EventEmitter {
         const e = this.items.get(id);
         if (!e) throw new Error('拡張が見つかりません。');
         await this.stop(e);
-        if (this.settings.value.extensions[id]?.enabled && !this.shuttingDown) {
+        if (
+          (e.manifest.sourceKind === 'builtin' || this.settings.value.extensions[id]?.enabled) &&
+          !this.shuttingDown
+        ) {
           if (immediate) await this.start(e);
           else await this.schedule(e);
         }

@@ -1,4 +1,5 @@
 export interface HostSettings {
+  shellProvider?: string;
   theme: 'dark' | 'light' | 'system';
   closeToTray: boolean;
   notifications: boolean;
@@ -118,6 +119,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  shell?: { apiVersion: 1; ui: string };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;
   id: string;
@@ -140,6 +142,7 @@ export interface ExtensionManifest {
   pages?: import('./applet-pages').AppletPageDefinition[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
+  sourceKind?: 'builtin' | 'external';
   displayName: string;
   folder: string;
   state: 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'error';
@@ -158,6 +161,8 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  navigation: import('./shell').NavigationState;
+  shell: import('./shell').ShellStatus;
   appletApi?: {
     permissions: import('./appdock-api').AppletApiPermissions;
     error?: string;
@@ -187,6 +192,13 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  focusShell(edge: 'first' | 'last'): Promise<void>;
+  onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
+  navigate(route: string): Promise<void>;
+  shellViewport(
+    bounds: { x: number; y: number; width: number; height: number } | null,
+  ): Promise<void>;
+  retryShell(): Promise<void>;
   setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,

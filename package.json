@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.26.39",
+  "version": "0.26.40",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -9,7 +9,7 @@
   "scripts": {
     "postinstall": "install-electron",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
-    "build": "node scripts/build-main.cjs && vite build",
+    "build": "node scripts/build-main.cjs && vite build && vite build --config vite.shell.config.mts && node scripts/build-shell.cjs",
     "start": "pnpm run build && electron .",
     "test": "pnpm run build:updater && pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
     "build:test-extensions": "node scripts/build-test-extensions.cjs",
@@ -68,6 +68,10 @@
       {
         "from": "assets/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "out/shells",
+        "to": "shells"
       }
     ],
     "win": {

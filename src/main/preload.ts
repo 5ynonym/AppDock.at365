@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  focusShell: (edge) => ipcRenderer.invoke('dock:focusShell', edge),
+  onShellFocusHost: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, edge: 'before' | 'after') => callback(edge);
+    ipcRenderer.on('dock:shellFocusHost', handler);
+    return () => ipcRenderer.removeListener('dock:shellFocusHost', handler);
+  },
+  navigate: (route) => ipcRenderer.invoke('dock:navigate', route),
+  shellViewport: (bounds) => ipcRenderer.invoke('dock:shellViewport', bounds),
+  retryShell: () => ipcRenderer.invoke('dock:retryShell'),
   setAppletApiPermissions: (permissions) =>
     ipcRenderer.invoke('dock:appletApiPermissions', permissions),
   automation: (action) => ipcRenderer.invoke('dock:automation', action),

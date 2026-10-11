@@ -7,15 +7,17 @@ export const appletManagementId = (id: string, operation: AppletOperation) =>
 /** Host-owned commands; Applets cannot grant themselves lifecycle privileges. */
 export function appletManagementCommands(applets: ExtensionSnapshot[]) {
   return applets.flatMap((a) =>
-    (['enable', 'disable', 'restart'] as const).map((operation) => ({
-      id: appletManagementId(a.id, operation),
-      title: `${a.displayName}を${{ enable: '有効にする', disable: '無効にする', restart: '再起動する' }[operation]}`,
-      extension: 'AppDock',
-      extensionId: null,
-      appletId: a.id,
-      operation,
-      available:
-        !['starting', 'stopping'].includes(a.state) && (operation !== 'restart' || a.enabled),
-    })),
+    (['enable', 'disable', 'restart'] as const)
+      .filter((operation) => a.sourceKind !== 'builtin' || operation === 'restart')
+      .map((operation) => ({
+        id: appletManagementId(a.id, operation),
+        title: `${a.displayName}を${{ enable: '有効にする', disable: '無効にする', restart: '再起動する' }[operation]}`,
+        extension: 'AppDock',
+        extensionId: null,
+        appletId: a.id,
+        operation,
+        available:
+          !['starting', 'stopping'].includes(a.state) && (operation !== 'restart' || a.enabled),
+      })),
   );
 }

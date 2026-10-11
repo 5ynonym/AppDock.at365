@@ -59,7 +59,7 @@ settings.extensions['test.pages'] = { enabled: false, settings: {} };
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [];
-let app, dock;
+let app, dock, rail;
 const until = async (fn, message) => {
   const end = Date.now() + 20000;
   while (Date.now() < end) {
@@ -80,7 +80,11 @@ const localUi = async (suffix) =>
         .find((page) => page.url().endsWith(suffix)),
     `Missing UI ${suffix}`,
   );
-const button = (title) => dock.getByRole('button', { name: title, exact: true });
+const button = (title) =>
+  (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title)
+    ? rail
+    : dock
+  ).getByRole('button', { name: title, exact: true });
 const setDisplay = (extensionId, pageId, display) =>
   dock.evaluate(
     async ({ extensionId, pageId, display }) => {
@@ -120,6 +124,14 @@ async function launch() {
     env,
   });
   dock = await app.firstWindow();
+  await until(() => {
+    rail = app
+      .context()
+      .pages()
+      .find((p) => p.url().includes('/shells/default/index.html'));
+    return !!rail;
+  }, 'Shell renderer');
+  await rail.locator('[data-ribbon-id="home"]').waitFor();
   await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
   await app.evaluate(({ app }) => {
     app.on('session-created', (ses) => {
@@ -138,15 +150,15 @@ async function launch() {
 (async () => {
   try {
     await launch();
-    assert.equal(await dock.locator('[data-ribbon-id="page:test.pages:main"]').count(), 0);
-    assert.equal(await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="page:test.pages:main"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.toggleExtension('test.pages', true));
     await button('ページ検証').click();
     let ui = await localUi('/test.pages/index.html');
     await ui.getByLabel('保持する入力').fill('表示先を変えても保持');
     await until(
       async () =>
-        (await dock
+        (await rail
           .locator('[data-ribbon-id="page:test.pages:main"]')
           .getAttribute('aria-current')) === 'page',
       'Page selection',
@@ -184,7 +196,7 @@ async function launch() {
     await setDisplay('test.pages', 'main', 'page');
     await until(
       async () =>
-        (await dock
+        (await rail
           .locator('[data-ribbon-id="page:test.pages:main"]')
           .getAttribute('aria-current')) === 'page',
       'Return to page',
@@ -379,7 +391,7 @@ async function launch() {
 
     const ribbonBeforeStop = (await dock.evaluate(() => window.dock.snapshot())).settings.value
       .ribbon;
-    await dock.locator('[data-ribbon-id="extensions"]').click();
+    await rail.locator('[data-ribbon-id="extensions"]').click();
     await dock
       .locator('.sidebar-extensions')
       .getByRole('button', { name: /^Gmail/ })
@@ -387,18 +399,18 @@ async function launch() {
     const gmailToggle = dock.getByRole('switch', { name: 'Gmailを有効にする', exact: true });
     await gmailToggle.click();
     await until(
-      async () => (await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
+      async () => (await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
       'Stopped Gmail ribbon disappears',
     );
     await until(() => gmailUi.isClosed(), 'Stopped Gmail UI disposed');
-    assert.equal(await dock.locator('[data-ribbon-id="page:test.pages:main"]').count(), 1);
+    assert.equal(await rail.locator('[data-ribbon-id="page:test.pages:main"]').count(), 1);
     assert.deepEqual(
       (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon,
       ribbonBeforeStop,
     );
     await gmailToggle.click();
     await until(
-      async () => (await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 1,
+      async () => (await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 1,
       'Resumed Gmail ribbon returns',
     );
     await button('Gmail').click();
@@ -421,12 +433,12 @@ async function launch() {
     await dock.getByLabel('設定をリボンに表示').uncheck();
     await button('変更をすべて保存').click();
     await until(
-      async () => (await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
+      async () => (await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
       'Hidden Gmail',
     );
-    assert.equal(await dock.locator('[data-ribbon-id="settings"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
     await button('ホーム').click();
-    await dock.getByLabel('リボン', { exact: true }).click({ button: 'right' });
+    await rail.getByLabel('リボン', { exact: true }).click({ button: 'right' });
     await dock.getByRole('heading', { name: 'リボン', exact: true }).waitFor();
     await dock.screenshot({ path: path.join(profile, 'ribbon-settings.png') });
     checks.push(
@@ -445,8 +457,8 @@ async function launch() {
     restartSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
     await launch();
-    assert.equal(await dock.locator('[data-ribbon-id="settings"]').count(), 0);
-    assert.equal(await dock.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
+    assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.executeCommand('at365.gmail.open'));
     const restoredUi = await localUi('/web/index.html');
     const restored = await restoredUi.evaluate(() => window.webAccounts.snapshot());

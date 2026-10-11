@@ -1441,3 +1441,28 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 
 - 仕様・実装計画とAGENTS/DEVELOPMENTの案内をDefault Shell（本体同梱の標準描画）、Shell Applet（差替え拡張）、Shell Host（本体側の実行基盤）へ統一。仕様へ用語表を追加し、Shellは前二者の総称と明記した。Default ShellをShell Appletと呼んでいた本文・段階表を訂正。提案ソース配置はshells/defaultへ整理し、実行契約は維持。
 - ローカル参照103件存在、仕様本文の旧名称・禁止名・行末空白0件、差分検査成功。名称置換の初回スクリプトは置換順による一致検査で保存前に停止し、修正後に適用・読戻しを確認。製品コード/版/設定/publishを変更せず、製品試験は未実行。
+
+## 2026-10-11: 0.26.40 Default ShellとShell Hostの初期実装
+
+- 設計文書4件を先に`80c5bd7e1a2f2d5c0fba4264169ac56aaed1bce5`へコミットし、その後に実装。文書コミットの証跡は`.artifacts/commit-validation-shell-plan-20261011/`。以下の実装変更は未コミット。
+- リボン描画を`shells/default`へ移し、本体rendererの重複描画を除去。共通manifest/worker/専用preload/View経路でDefault ShellとShell Appletを扱い、同時ビルドして単一EXEへ収録。表示モデル・意味的操作・NavigationCoordinatorを本体へ集約した。公開契約は`docs/shell-api.md`。
+- epoch/revision、snapshotと変更通知、binding/session/context、実行時の許可・利用可否照合、操作の重複排除、可搬な画像取得を実装。通常AppletとMCPへui.ribbon.get/ui.assets.get/ui.actions.invokeを公開。Shellの選択・ready後の切替・タイムアウト・故障記録・Default Shell復帰・明示再試行・safe-shell起動を実装した。意図的な無効化を故障扱いせず、未導入の選択先も設定画面から戻せる。
+- 型検査、build、通常`publish.bat`成功。`dev.bat exec node --test tests/core.test.cjs tests/ui-presentation.test.cjs tests/appdock-api.test.cjs tests/applet-management.test.cjs tests/ribbon-commands.test.cjs tests/settings-sync.test.cjs`の48件、`tests/shell-boundaries.test.cjs`の内部import境界1件が成功。計49件の関連検証で、標準全回帰は未実行。記録は`.artifacts/shell-validation-20261011/unit.log`と`boundaries.log`。
+- ソースGUIはリボン配置3群（ribbon-layout-1791711669093）、Appletページ7群（applet-pages-1791711927907）、設定通知9群（settings-notice-1791711751518）が成功。既存ページのpage/window切替・session・入力・共有draft・フローティング通知を確認。GUIは隔離profileで直列実行した。
+- Shell専用GUIはソース14群（shell-host-1791713562287）、最終固定EXE13群（shell-host-1791713851278）が成功。単一描画/専用ブリッジ/Tab境界、選択状態、重複操作、実MCPと通常Node Applet、別Shellへの切替、停止/再有効化、rendererとworker故障、再試行、保留中切替取消、readyタイムアウト、再起動後の故障抑制、safe-shellを検証。Default Shell自身のrenderer強制終了→ネイティブ再試行はソース試験でdialog応答fixtureを使った確認で、実ダイアログの手操作確認とは区別する。
+- 最終固定EXEの設定通知GUIも8群成功（settings-notice-1791713933566）。保存・未保存draft・不正JSON・revision競合・Web表示上の通知・再起動後の保持・両テーマを確認。各profileのchecks.json/result.jsonに結果を保存した。
+- 発行物`publish/AppDock.at365.exe`は0.26.40、144082059 bytes、SHA256 `eaa966ac066e0c3134c74cd713d3048c1f25f7c6c7e7018decc86d98fd537b6e`。update.jsonと最終GUI/計測コピーが一致。Default Shellの成果物5ファイルとmanifest版もout/publish収録先で一致。発行ログは`.artifacts/shell-validation-20261011/publish-delivery.log`、照合は同`artifacts.json`。
+- 性能はハードウェアアクセラレーションOFF・空の隔離profile・EXE起動からCDP接続/表示準備までを各1回計測。0.26.39は10053 ms/5プロセス/Private 145.92 MiB、最終0.26.40は10225 ms/7プロセス/Private 207.99 MiB（約62.07 MiB増加）。5秒のアイドルCPUは1コア換算0.58%→1.44%。Working Set合計409.09→595.16 MiBは共有ページを重複計上するため主指標にしない。旧版はshell-metrics-1791713188032の旧版レコード、最終版はshell-metrics-1791714155975を参照。同条件の単回観測であり統計的な性能保証ではない。独立renderer/workerによる追加コストを今後の改善対象として記録する。
+- Node24.21.0/pnpm12.10.1、依存版・lockfile・toolchainは維持。版更新後のfrozen installは制限環境で既知のstack overflowとなり、同じコマンドを通常Windows権限で再実行して359件再利用/ダウンロード0で成功。検査・公開後待機ポリシーの緩和なし。試験中に見つかった待機/locatorの不足とShell復旧・選択・無効化の問題を修正し、最終版で再確認した。失敗記録は保持。
+- 古い終了済み成功Shellソース試験4件だけを使用中・絶対パス境界・再解析ポイント検査後に整理し、最新3件を保持。固定旧版、最終配布物試験、参照済み資料、失敗/不明資料は保持。整理と残存プロセス確認は`.artifacts/shell-validation-20261011/cleanup-result.json`、最終入力/証跡ハッシュは同`validation.json`。
+- 同時複数Shell/Window、本文の多重表示、全UI移植、内蔵チャットは後続。物理的な混在DPI/モニター移動、応答しないrendererの長時間ハング、実Google認証/メール、実Codexのモデル推論は今回未確認。本体だけをpublishし、未変更Applet再発行・全体ZIP・push・Release・実利用deployは行っていない。
+
+## 2026-10-11: Shell基盤のコミット前検証
+
+- 実装時の入力355件・証跡・固定EXEのSHA256を照合して一致。承認対象41ファイルの開始stage treeは`bb873ecac3e3e7e34dc96fb5c6a415aa1a72504d`。型検査と標準回帰283/283が成功した。検証証跡は`.artifacts/commit-validation-shell-20261011/`。
+- 初回の制限環境ではローカルHTTP接続EACCES、設定renameのEPERMなどにより47件が失敗。同一コマンドを通常Windows権限で実行すると282/283成功し、残る1件はMCPツール数を旧11個と期待していた試験だった。14個と新しい3ツールの存在を検証するよう修正し、標準回帰全件成功。既存MCP/Codex/入力GUIのツール数と、別rendererへ移ったリボンのlocatorも更新した。最初のMCP GUIは旧ログボタンlocatorで停止し、修正後に成功。失敗ログを保持し、製品コード・依存・発行EXEは変更していない。
+- 固定portableのShell13群（shell-host-1791714785141）、設定通知8群（settings-notice-1791714988725）、MCP16群（automation-portable-1791714900237）、実Node/.NET共通API・許可画面5群（applet-api-portable-1791714948057）が成功。実Codex0.162.0-alpha.17.2から14ツールの発見・読取/操作も成功し、モデル推論なし。共通APIの旧DLL指定による追加試験は今回未指定で、既存SDKと自己設定の互換性を確認した。
+- 発行済みwin-unpacked版のネイティブ入力4群も成功（native-input-ui-1791715022767）。既存WebBrowserTools/WindowsToolsの発行コピーと専用入力受信ウィンドウで、許可/取消/MCP経由/連続入力を確認。兄弟repoは読取りのみで変更・再発行しない。実サービス認証、実ブラウザーの操作効果、OSロック・消灯、物理混在DPIは今回対象外。
+- ソースのリボン配置・ページ・共有draftおよびDefault Shell強制終了試験は実装時の検証を参照し、当該製品ソース・試験の不変を確認。今回の追加は試験5ファイルの追随とDEVELOPMENTの実装状態訂正、検証記録のみ。標準回帰後tree`dc2b66826daba23fa73e038e88344c94a8b66634`、最終GUI入力tree`25633ad745ab0e1cd202a8116573d71e0bd3807b`。後者からの差分は本検証記録だけと照合し、最終tree/commitを同証跡へ保存する。
+- 0.26.40のEXE/feedは144082059 bytes、SHA256 `eaa966ac066e0c3134c74cd713d3048c1f25f7c6c7e7018decc86d98fd537b6e`を維持し、今回の各portableコピーと一致。版追加・再publishなし。Node24.21.0/pnpm12.10.1/.NET SDK10.0.401、固定依存と入力・試験・発行物のハッシュをvalidation.jsonへ記録。
+- 境界/再解析/使用中を確認して未参照の旧成功settings-notice3件を整理し、各方式の最新3件・再利用参照・固定・失敗/不明資料を保持。隔離試験プロセス残存0。ローカルコミットまででpush・Release・実利用deployなし。

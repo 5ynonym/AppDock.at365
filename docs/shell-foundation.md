@@ -1,12 +1,12 @@
 # AppDock Shell Hostの仕様と実装計画
 
-状態: 2026-10-11の設計案。製品への実装は未着手。基準ソースはAppDock 0.26.39。
+状態: 2026-10-11に0.26.39を基準として設計し、0.26.40でリボン移行・共通API・Shell切替/復旧の初回実装を追加。確定した公開契約は[Shell API](shell-api.md)、実測結果と未確認条件は[VERIFICATION](../VERIFICATION.md)を参照。
 
 目的は、今後の描画を伴う機能を「状態と操作」「表示情報」「描画」に分けて追加できる基盤を作ること。最初の移行対象をリボンに限定し、本体repo内のDefault Shellで描画・操作・状態追随・復旧まで成立させる。移行したUIの実装は本体rendererから除去し、標準・復旧時とも同じDefault Shellを使う。将来の複数Shellに備えて表示インスタンスを識別するが、今回提供する本体ウィンドウと有効なShell表示は各1つとする。
 
 Default Shellは本体に同梱して更新・復旧を保証する役割を持つ。配布方法を理由に専用の描画実装や非公開APIを作らず、移行したUIの描画はDefault Shellへ集約する。
 
-本書は今後の実装範囲と受入条件を定める案であり、現在の公開APIを説明する文書ではない。既存の契約は[共通操作API](appdock-api.md)、[Appletページ](applet-pages.md)、[Applet API](extensions.md)を参照する。
+本書は設計方針と受入条件を保存する。APIの正確な引数名・保存形式・初版の制約はShell APIを正本とする。既存の契約は[共通操作API](appdock-api.md)、[Appletページ](applet-pages.md)、[Applet API](extensions.md)を参照する。
 
 ## 用語と命名
 

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict'),
   path = require('node:path');
 module.exports = async function ({
   page,
+  shell,
   client,
   call,
   until,
@@ -49,9 +50,9 @@ module.exports = async function ({
     'hidden logs reflected',
   );
   assert.equal(await row('home').getByRole('combobox').inputValue(), 'bottom');
-  await page.locator('.ribbon-bottom [data-ribbon-id="home"]').waitFor();
-  await page.locator('.ribbon-bottom [data-ribbon-id="separator:mcp-test"]').waitFor();
-  await page.locator('[data-ribbon-id="logs"]').waitFor({ state: 'detached' });
+  await shell.locator('.ribbon-bottom [data-ribbon-id="home"]').waitFor();
+  await shell.locator('.ribbon-bottom [data-ribbon-id="separator:mcp-test"]').waitFor();
+  await shell.locator('[data-ribbon-id="logs"]').waitFor({ state: 'detached' });
   const bottom = (await read()).items
     .filter((i) => i.placement === 'bottom')
     .map((i) => i.id)
@@ -60,13 +61,14 @@ module.exports = async function ({
   await until(
     async () =>
       JSON.stringify(
-        await page
+        await shell
           .locator('.ribbon-bottom [data-ribbon-id]')
           .evaluateAll((els) => els.map((el) => el.dataset.ribbonId)),
       ) === JSON.stringify(bottom),
     'real bottom order',
   );
   await page.screenshot({ path: path.join(profile, 'mcp-ribbon-edited.png') });
+  await shell.screenshot({ path: path.join(profile, 'mcp-ribbon-shell.png') });
   // Existing GUI writes remain visible through the same read API.
   await row('logs').getByRole('checkbox').check();
   await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
@@ -74,7 +76,7 @@ module.exports = async function ({
     async () => (await read()).items.find((i) => i.id === 'logs').visible,
     'GUI ribbon save',
   );
-  await page.locator('[data-ribbon-id="logs"]').waitFor();
+  await shell.locator('[data-ribbon-id="logs"]').waitFor();
   // A disabled Applet retains its configurable page, without implicit activation or navigation.
   await manage(webId, 'disable');
   const disabled = (await read()).items.find((i) => i.appletId === webId);
@@ -84,9 +86,9 @@ module.exports = async function ({
     { kind: 'update', id: disabled.id, changes: { visible: true, placement: 'bottom' } },
   ]);
   assert.equal((await call(client, 'appdock_get_applet', { id: webId })).applet.enabled, false);
-  await page.locator(`[data-ribbon-id="${disabled.id}"]`).waitFor({ state: 'detached' });
+  await shell.locator(`[data-ribbon-id="${disabled.id}"]`).waitFor({ state: 'detached' });
   await manage(webId, 'enable');
-  await page.locator(`.ribbon-bottom [data-ribbon-id="${disabled.id}"]`).waitFor();
+  await shell.locator(`.ribbon-bottom [data-ribbon-id="${disabled.id}"]`).waitFor();
   const saved = fs.readFileSync(file, 'utf8');
   assert.equal(
     (
@@ -100,7 +102,7 @@ module.exports = async function ({
   assert.equal(fs.readFileSync(file, 'utf8'), saved);
   await edit([{ kind: 'removeSeparator', id: 'separator:mcp-test' }]);
   await until(
-    async () => (await page.locator('[data-ribbon-id="separator:mcp-test"]').count()) === 0,
+    async () => (await shell.locator('[data-ribbon-id="separator:mcp-test"]').count()) === 0,
     'separator removed',
   );
   await edit([{ kind: 'reset' }]);

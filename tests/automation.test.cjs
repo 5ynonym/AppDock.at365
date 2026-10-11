@@ -560,7 +560,16 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 11);
+  assert.equal(tools.length, 14);
+  for (const name of [
+    'appdock_get_ribbon_view',
+    'appdock_get_ui_asset',
+    'appdock_invoke_ui_action',
+  ])
+    assert.ok(
+      tools.some((tool) => tool.name === name),
+      name,
+    );
   assert.equal(tools.find((t) => t.name === 'appdock_get_tray').annotations.readOnlyHint, true);
   assert.ok(
     Array.isArray(

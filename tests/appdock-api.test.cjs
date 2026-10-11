@@ -76,7 +76,11 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
   for (const method of automationMethods.filter(
-    (m) => !m.startsWith('input.') && m !== 'commands.execute' && m !== 'applets.get',
+    (m) =>
+      !m.startsWith('input.') &&
+      !m.startsWith('ui.') &&
+      m !== 'commands.execute' &&
+      m !== 'applets.get',
   ))
     assert.equal((await f.call(method)).ok, true, method);
   assert.equal(f.api.call('system.getInfo').executable, false);

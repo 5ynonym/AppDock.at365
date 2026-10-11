@@ -68,10 +68,10 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       const status = await rpc('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly' });
       const entry = status.data?.find((x) => x.name === server);
       tools = Object.keys(entry?.tools ?? {});
-      if (tools.length === 11) break;
+      if (tools.length === 14) break;
       await new Promise((r) => setTimeout(r, 250));
     }
-    assert.equal(tools.length, 11, 'Codex discovers all eleven MCP tools');
+    assert.equal(tools.length, 14, 'Codex discovers all fourteen MCP tools');
     const call = (tool, args = {}) =>
       rpc('mcpServer/tool/call', { threadId, server, tool, arguments: args });
     const info = await call('appdock_get_info');
@@ -198,7 +198,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       toolCount: tools.length,
       checks: [
         'installed Codex reads GUI-created config',
-        'discovers eleven MCP tools; reads shortcuts, gestures, ribbon and tray with dry-run editing; lists commands and executes appdock.open',
+        'discovers fourteen MCP tools; reads shortcuts, gestures, ribbon and tray with dry-run editing; lists commands and executes appdock.open',
         'get info/get settings/patch/read back/restore through Codex MCP client',
       ],
       modelInvoked: false,

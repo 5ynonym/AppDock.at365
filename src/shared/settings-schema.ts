@@ -62,6 +62,12 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   for (const key of ['closeToTray', 'notifications', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
+  if (
+    value.host.shellProvider !== undefined &&
+    (typeof value.host.shellProvider !== 'string' ||
+      !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(value.host.shellProvider))
+  )
+    throw Error('host.shellProvider はShellのIDです。');
   const hardwareAcceleration =
     value.host.hardwareAcceleration === undefined ? true : value.host.hardwareAcceleration;
   if (typeof hardwareAcceleration !== 'boolean')

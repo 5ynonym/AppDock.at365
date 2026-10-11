@@ -33,7 +33,7 @@ import { UpdateProgress } from './UpdateProgress';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
-import { visibleRibbonItems, orderRibbon, type RibbonItem } from '../shared/applet-pages';
+import { defaultShellId } from '../shared/shell';
 import { RibbonSettings } from './RibbonSettings';
 import { WebAppletSettings } from './WebAppletSettings';
 import { WebAccountSettings } from './WebAccountSettings';
@@ -81,13 +81,54 @@ function App() {
   const appletSidebar = useAppletSidebar();
   const [settingsSidebarHost, setSettingsSidebarHost] = useState<HTMLDivElement | null>(null);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
-  const [page, setPage] = useRestartView<Page>(
+  const [page, setLocalPage] = useRestartView<Page>(
     'page',
     'home',
     (value) =>
       ['home', 'extensions', 'settings', 'logs'].includes(value) ||
       /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
   );
+  const setPage = (next: Page) => {
+    setLocalPage(next);
+    void window.dock.navigate(next).catch((e) => setError(String(e)));
+  };
+  const ribbonSlot = useRef<HTMLDivElement>(null);
+  useEffect(
+    () =>
+      window.dock.onShellFocusHost((edge) => {
+        const selector =
+          edge === 'before'
+            ? '.titlebar button'
+            : '.sidebar button, main button, main input, main select';
+        const elements = [...document.querySelectorAll<HTMLElement>(selector)].filter(
+          (e) => e.getClientRects().length && !e.matches(':disabled'),
+        );
+        const target = edge === 'before' ? elements.at(-1) : elements[0];
+        if (target) target.focus();
+        else {
+          const main = document.querySelector('main');
+          if (main) {
+            main.tabIndex = -1;
+            main.focus();
+          }
+        }
+      }),
+    [],
+  );
+  const navigationSeen = useRef(-1);
+  useEffect(() => {
+    const nav = snapshot?.navigation;
+    if (!nav || nav.request === navigationSeen.current) return;
+    navigationSeen.current = nav.request;
+    if (nav.request === 0) {
+      void window.dock.navigate(page);
+      return;
+    }
+    setLocalPage(nav.route as Page);
+    setPalette(false);
+    if (nav.section === 'profile') setProfileRequest((v) => v + 1);
+    if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
+  }, [snapshot?.navigation]);
   const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
   const openingRestoredPage = useRef(false);
   const [selected, setSelected] = useRestartView<string>('selected', '');
@@ -100,6 +141,31 @@ function App() {
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const update = () => {
+      const r = ribbonSlot.current?.getBoundingClientRect();
+      void window.dock
+        .shellViewport(
+          r && !palette
+            ? {
+                x: Math.round(r.x),
+                y: Math.round(r.y),
+                width: Math.round(r.width),
+                height: Math.round(r.height),
+              }
+            : null,
+        )
+        .catch((e) => setError(String(e)));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (ribbonSlot.current) observer.observe(ribbonSlot.current);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [palette, !!snapshot]);
   const [detailView, setDetailView] = useRestartView<AppletDetailView>(
     'detailView',
     'description',
@@ -142,7 +208,10 @@ function App() {
       }
     }
   }, [page, detailSettings, editor.mode]);
-  const orderedApplets = orderApplets(snapshot?.extensions ?? [], editor.draft.appletOrder);
+  const orderedApplets = orderApplets(
+    snapshot?.extensions.filter((e) => e.sourceKind !== 'builtin') ?? [],
+    editor.draft.appletOrder,
+  );
   const [logSource, setLogSource] = useRestartView<string>('logSource', '');
   const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
@@ -386,80 +455,11 @@ function App() {
         settingOptions: {},
       }
     : (orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0]);
-  const active = snapshot?.extensions.filter((e) => e.state === 'running').length ?? 0;
-  const ribbon = orderRibbon(
-    visibleRibbonItems(
-      snapshot?.extensions ?? [],
-      snapshot?.settings.value.ribbon.separators ?? [],
-    ),
-    snapshot?.settings.value.ribbon.order ?? [],
-  ).filter((item) => !snapshot?.settings.value.ribbon.hidden.includes(item.id));
-  const renderRibbonItem = (item: RibbonItem) =>
-    item.kind === 'separator' ? (
-      <div
-        key={item.id}
-        className="ribbon-separator"
-        role="separator"
-        aria-label={item.title}
-        data-ribbon-id={item.id}
-      />
-    ) : (
-      <button
-        key={item.id}
-        data-ribbon-id={item.id}
-        title={item.id === 'profile' ? snapshot?.settings.value.profile.name : item.title}
-        aria-label={item.title}
-        aria-current={page === item.id ? 'page' : undefined}
-        className={item.id === 'profile' ? 'avatar' : page === item.id ? 'active' : ''}
-        onClick={() => {
-          if (item.extensionId) {
-            void action(() => window.dock.openAppletPage(item.extensionId!, item.pageId!));
-          } else if (item.id === 'theme') {
-            if (snapshot)
-              void action(() =>
-                window.dock.saveSettings(
-                  {
-                    ...snapshot.settings.value,
-                    host: {
-                      ...snapshot.settings.value.host,
-                      theme: snapshot.dark ? 'light' : 'dark',
-                    },
-                  },
-                  snapshot.settings.revision,
-                ),
-              );
-          } else if (item.id === 'profile') {
-            setPage('settings');
-            setProfileRequest((value) => value + 1);
-          } else setPage(item.id as Page);
-        }}
-      >
-        {item.id === 'profile' ? (
-          snapshot?.avatarUrl ? (
-            <img src={snapshot.avatarUrl} alt="ユーザーのアバター" />
-          ) : (
-            Array.from(snapshot?.settings.value.profile.name ?? 'ユキ')[0]
-          )
-        ) : (
-          <>
-            {item.iconImage ? (
-              <img src={item.iconImage} alt="" width={21} height={21} />
-            ) : (
-              <Icon
-                name={
-                  (item.id === 'theme' ? (snapshot?.dark ? 'sun' : 'moon') : item.icon) as IconName
-                }
-                size={21}
-              />
-            )}
-            <span className="rail-label">{item.title}</span>
-          </>
-        )}
-      </button>
-    );
+  const active = orderedApplets.filter((e) => e.state === 'running').length;
   return (
     <div
       className={`shell ${page === 'extensions' || page === 'settings' ? 'with-sidebar' : ''}`}
+      data-route={page}
       style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
     >
       <header className="titlebar">
@@ -490,28 +490,21 @@ function App() {
           ))}
         </div>
       </header>
-      <aside
-        className="activity-rail"
-        aria-label="リボン"
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setPage('settings');
-          setRibbonRequest((value) => value + 1);
+      <div
+        className="shell-ribbon-slot"
+        ref={ribbonSlot}
+        tabIndex={0}
+        aria-label="リボンに移動"
+        onFocus={(event) => {
+          const from = event.relatedTarget;
+          const before =
+            from instanceof Node &&
+            !!(
+              from.compareDocumentPosition(event.currentTarget) & Node.DOCUMENT_POSITION_FOLLOWING
+            );
+          void window.dock.focusShell(before ? 'first' : 'last');
         }}
-      >
-        <Brand />
-        <div className="ribbon-buttons ribbon-top" aria-label="上寄せのリボン">
-          {ribbon
-            .filter((item) => !snapshot?.settings.value.ribbon.bottom.includes(item.id))
-            .map(renderRibbonItem)}
-        </div>
-        <div className="rail-spacer" />
-        <div className="ribbon-buttons ribbon-bottom" aria-label="下寄せのリボン">
-          {ribbon
-            .filter((item) => snapshot?.settings.value.ribbon.bottom.includes(item.id))
-            .map(renderRibbonItem)}
-        </div>
-      </aside>
+      />
       {page === 'extensions' && (
         <aside className="sidebar" aria-label="Applet一覧">
           <AppletIndex
@@ -542,6 +535,14 @@ function App() {
                 : undefined
         }
       >
+        {snapshot?.shell.error && (
+          <div className="error-banner" role="alert">
+            Shellの起動または切替に失敗しました。
+            <button onClick={() => void action(() => window.dock.retryShell())}>
+              Shellを再試行
+            </button>
+          </div>
+        )}
         {snapshot?.legacyLocalData && (
           <div className="error-banner" role="alert">
             旧保存領域にPC専用データが残っています。同期する前にAppDockを終了して旧データを整理してください。自動移行・削除は行いません。
@@ -637,7 +638,7 @@ function App() {
                       <span>実行中のApplet</span>
                       <strong>
                         {active}
-                        <small> / {snapshot.extensions.length}</small>
+                        <small> / {orderedApplets.length}</small>
                       </strong>
                     </div>
                   </div>
@@ -659,9 +660,7 @@ function App() {
                     </span>
                     <div>
                       <span>エラーのApplet</span>
-                      <strong>
-                        {snapshot.extensions.filter((e) => e.state === 'error').length}
-                      </strong>
+                      <strong>{orderedApplets.filter((e) => e.state === 'error').length}</strong>
                     </div>
                     <button
                       aria-label="ログを開く"
@@ -700,7 +699,7 @@ function App() {
                 </section>
                 <div className="section-heading">
                   <h3>
-                    Applet<span>{snapshot.extensions.length}</span>
+                    Applet<span>{orderedApplets.length}</span>
                   </h3>
                   <button className="text-button" onClick={() => setPage('extensions')}>
                     すべて見る
@@ -1323,7 +1322,8 @@ function SettingsPage({
                     snapshot.value.extensions[e.id]?.updateSource,
                 )
               : id === 'appearance'
-                ? draft.host.theme !== snapshot.value.host.theme
+                ? draft.host.theme !== snapshot.value.host.theme ||
+                  draft.host.shellProvider !== snapshot.value.host.shellProvider
                 : id === 'general'
                   ? changed(
                       {
@@ -1612,6 +1612,34 @@ function SettingsPage({
               {category === 'appearance' && (
                 <>
                   <h3>表示</h3>
+                  <SettingRow
+                    title="Shell"
+                    description="リボンを描画するShellを選びます。Shell Appletは有効にしてから選択してください。"
+                  >
+                    <select
+                      aria-label="Shell"
+                      value={draft.host.shellProvider || defaultShellId}
+                      onChange={(e) =>
+                        edit({ ...draft, host: { ...draft.host, shellProvider: e.target.value } })
+                      }
+                    >
+                      <option value={defaultShellId}>Default Shell</option>
+                      {draft.host.shellProvider &&
+                        draft.host.shellProvider !== defaultShellId &&
+                        !extensions.some((e) => e.shell && e.id === draft.host.shellProvider) && (
+                          <option value={draft.host.shellProvider} disabled>
+                            未導入のShell ({draft.host.shellProvider})
+                          </option>
+                        )}
+                      {extensions
+                        .filter((e) => e.shell && e.id !== defaultShellId)
+                        .map((e) => (
+                          <option key={e.id} value={e.id} disabled={!e.enabled}>
+                            {e.displayName}
+                          </option>
+                        ))}
+                    </select>
+                  </SettingRow>
                   <SettingRow title="テーマ" description="ワークスペースの配色を選びます。">
                     <select
                       aria-label="テーマ"

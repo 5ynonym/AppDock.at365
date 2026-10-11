@@ -49,7 +49,7 @@ async function until(fn, message) {
   }
   throw Error(message);
 }
-let app, browser, page, child;
+let app, browser, page, child, rail;
 const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (portable) {
   fs.copyFileSync(path.resolve(process.argv[2]), portable);
@@ -101,12 +101,25 @@ async function launch(restore = false) {
       'host renderer',
     );
   }
+  rail = await until(
+    () => pages().find((p) => p.url().includes('/shells/default/index.html')),
+    'Shell renderer',
+  );
+  await rail.locator('[data-ribbon-id="home"]').waitFor();
   page.setDefaultTimeout(12000);
   await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
 }
 const pages = () => (portable ? browser.contexts().flatMap((c) => c.pages()) : browser.pages());
 const button = (name) => page.getByRole('button', { name, exact: true });
-const ribbon = (name) => page.locator(`[data-ribbon-id="${name}"]`);
+const ribbon = (name) => ({
+  click: async () => {
+    await rail.locator('[data-ribbon-id="' + name + '"]').click();
+    await page.waitForFunction(
+      (route) => document.querySelector('.shell')?.getAttribute('data-route') === route,
+      name,
+    );
+  },
+});
 const tab = (name) => page.getByRole('tab', { name, exact: true });
 const select = (name) =>
   page
@@ -149,6 +162,7 @@ async function close() {
   page.on('pageerror', (error) => errors.push(error.message));
   try {
     await ribbon('settings').click();
+    await page.locator('.settings-categories').waitFor();
     assert.deepEqual(await page.locator('.settings-categories span[title]').allTextContents(), [
       '表示',
       '一般',
@@ -157,6 +171,8 @@ async function close() {
       'ショートカット',
       'マウスジェスチャー',
       'Webアカウント',
+      '操作の許可',
+      'Codex連携',
       'プロフィール',
       'バージョン情報・更新',
     ]);

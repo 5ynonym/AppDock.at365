@@ -446,41 +446,6 @@ code {
 .brand-mark.small span:last-child {
   height: 16px;
 }
-.activity-rail {
-  background: var(--rail);
-  border-right: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 10px;
-  padding: 20px 0 14px;
-}
-.activity-rail > .brand-mark {
-  margin-bottom: 18px;
-}
-.activity-rail button {
-  width: 40px;
-  height: 42px;
-  color: var(--faint);
-  border-radius: 8px;
-  position: relative;
-}
-.activity-rail button.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.activity-rail button.active:before {
-  content: '';
-  position: absolute;
-  width: 2px;
-  height: 19px;
-  left: -9px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-.rail-spacer {
-  flex: 1;
-}
 .avatar {
   width: 29px;
   height: 29px;
@@ -1683,16 +1648,6 @@ main {
     transition: none !important;
   }
 }
-.activity-rail .avatar {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 50%;
-  flex-shrink: 0;
-  color: #d2daf7;
-  margin-top: 4px;
-}
 .avatar img,
 .profile-avatar img {
   width: 100%;
@@ -2014,19 +1969,6 @@ main {
 }
 .settings-categories > *:not(.sidebar-resizer) {
   flex-shrink: 0;
-}
-.activity-rail {
-  padding-inline: 6px;
-}
-.activity-rail button:not(.avatar) {
-  width: 62px;
-  min-height: 52px;
-  height: auto;
-  flex-direction: column;
-  gap: 5px;
-}
-.rail-label {
-  font-size: 11px;
 }
 .titlebar-search {
   -webkit-app-region: no-drag;
@@ -2433,9 +2375,6 @@ summary {
   .extension-grid {
     grid-template-columns: 1fr;
   }
-  .activity-rail button:not(.avatar) {
-    width: 54px;
-  }
 }
 /* Editable SendKey command definitions supplied by an applet. */
 .send-key-list {
@@ -2588,19 +2527,6 @@ summary {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.ribbon-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow-y: auto;
-  min-height: 0;
-  width: 100%;
-  align-items: center;
-  scrollbar-width: thin;
-}
-.ribbon-buttons > button {
-  flex-shrink: 0;
-}
 .applet-page-main {
   display: flex;
   flex-direction: column;
@@ -2750,22 +2676,6 @@ summary {
 .drag-handle {
   cursor: grab;
   opacity: 0.6;
-}
-
-.activity-rail {
-  min-height: 0;
-  overflow: hidden;
-}
-.rail-spacer {
-  min-height: 12px;
-}
-.ribbon-separator {
-  height: 1px;
-  min-height: 1px;
-  width: 38px;
-  margin: 7px auto;
-  background: var(--border);
-  flex-shrink: 0;
 }
 .ribbon-placement {
   margin: 22px 0;
@@ -4215,4 +4125,8 @@ summary {
     font-size: 12px;
     color: var(--muted);
   }
+}
+
+.shell-ribbon-slot {
+  min-height: 0;
 }

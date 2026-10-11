@@ -1,6 +1,6 @@
 # AppDockの作業ルール
 
-- Shellの未実装仕様・計画は[Shell Hostの仕様と実装計画](docs/shell-foundation.md)を参照する。正式名称はDefault Shell（本体同梱の標準描画）、Shell Applet（差替え拡張）、Shell Host（本体側の起動・表示領域・切替・共通API）へ統一する。Default Shellは本体repo内で同時ビルド・単一EXEへ同梱し、Shell Appletと同じ公開API/実行経路を使う。移行したリボン描画は本体から撤去し、通常/復旧は同じDefault Shellを使う。本体とShell間の内部importやDefault Shell専用APIを作らない。独立repo規則は追加Appletに適用し、Default Shellは本体と一緒に発行・更新する。初期範囲はリボン/共通モデル・操作・購読/切替・復旧/MCP検証まで。複数Shellに備えて寿命を分離するが、複数ウィンドウ・全UI移植は後続。文書化済みであり実装済みとは扱わない。
+- Shellの設計・後続計画は[Shell Hostの仕様と実装計画](docs/shell-foundation.md)を参照する。正式名称はDefault Shell（本体同梱の標準描画）、Shell Applet（差替え拡張）、Shell Host（本体側の起動・表示領域・切替・共通API）へ統一する。Default Shellは本体repo内で同時ビルド・単一EXEへ同梱し、Shell Appletと同じ公開API/実行経路を使う。移行したリボン描画は本体から撤去し、通常/復旧は同じDefault Shellを使う。本体とShell間の内部importやDefault Shell専用APIを作らない。独立repo規則は追加Appletに適用し、Default Shellは本体と一緒に発行・更新する。初期範囲はリボン/共通モデル・操作・購読/切替・復旧/MCP検証まで。複数Shellに備えて寿命を分離するが、複数ウィンドウ・全UI移植は後続。0.26.40のリボン移行・共通API・切替/復旧の実装契約は[Shell API](docs/shell-api.md)。同時複数Shell/Windowは未実装。
 
 - 0.26.39以降のWebApplet公開範囲は[WebApplet](docs/web-applets.md#共通apiへの公開02639以降)を正本とする。提供元が5コマンドとname/displayを宣言し、SettingsCommandsでwebApplets.itemsへ保存する。URL/アカウント/遷移制限やWebページへのIPCを公開しない。Applet操作の新規既定値は全項目ON、既存の保存済み拒否・旧個別許可・読込失敗時の拒否は維持する。MCPの初期OFFは変更しない。
 

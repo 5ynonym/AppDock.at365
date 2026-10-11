@@ -1,3 +1,6 @@
+import { ShellHost } from './core/shell-host';
+import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
+import { defaultShellId } from '../shared/shell';
 import { NativeInput } from './core/native-input';
 import {
   app,
@@ -75,12 +78,12 @@ import {
   refreshPageDisplays,
   localPageSource,
 } from './core/applet-pages';
-import { pageDisplay, pageKey } from '../shared/applet-pages';
+import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
 import { SettingsNotice } from './core/settings-notice';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
-import { AppDockApi } from './core/appdock-api';
+import { AppDockApi, AutomationError } from './core/appdock-api';
 import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
 import { automationApplets, automationCommands } from './core/automation-commands';
 import type { AutomationAction } from '../shared/automation';
@@ -155,6 +158,33 @@ if (locked) {
 }
 let window: BrowserWindow | null = null;
 let settingsNotice: SettingsNotice | undefined;
+let shellHost: ShellHost | undefined;
+const safeShell = process.argv.includes('--safe-shell');
+const navigation = new NavigationCoordinator(() => changed());
+const presentation = new UiPresentation({
+  settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
+  applets: () => (manager ? allApplets() : []),
+  dark: () => nativeTheme.shouldUseDarkColors,
+  avatar: () => {
+    const file = avatarFile();
+    return file
+      ? nativeImage.createFromPath(file).resize({ width: 96, height: 96 }).toDataURL()
+      : undefined;
+  },
+  navigation,
+  execute: executeCommand,
+  theme: toggleTheme,
+});
+async function toggleTheme() {
+  commitSettings(
+    prepareSettings({
+      ...settings.value,
+      host: { ...settings.value.host, theme: nativeTheme.shouldUseDarkColors ? 'light' : 'dark' },
+    }),
+    settings.revision,
+  );
+  return { accepted: true, settingsSaved: true };
+}
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
@@ -192,6 +222,12 @@ let automation: AutomationService | undefined;
 const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
 const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
   !quitting && (automation?.allowed(key) ?? false);
+const externalUiPermissions = (id?: string) =>
+  id
+    ? ['starting', 'running'].includes(manager?.items.get(id)?.state ?? '')
+      ? appletApiAccess.get()
+      : {}
+    : { execute: mcpAllowed('allowExecute'), write: mcpAllowed('allowWrite') };
 let nativeInput: NativeInput | undefined;
 const sendInput =
   (method: string) =>
@@ -205,6 +241,38 @@ const sendInput =
   };
 const operationApi = new AppDockApi({
   handlers: {
+    'ui.ribbon.get': async (_params, id) => {
+      const permissions = externalUiPermissions(id);
+      return {
+        ...presentation.get(
+          (action) =>
+            !!permissions.execute &&
+            (!action.theme || !!permissions.write) &&
+            (!action.command ||
+              automationCommands(allApplets()).some((c) => c.id === action.command && c.available)),
+        ),
+      };
+    },
+    'ui.assets.get': async (params) => presentation.getAsset(params.id),
+    'ui.actions.invoke': async (params, id) => ({
+      result: await presentation.invoke(
+        params as unknown as import('../shared/shell').UiActionRequest,
+        id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp',
+        async (action) => {
+          if (!externalUiPermissions(id).execute)
+            throw new AutomationError('API_DISABLED', '操作が許可されていません。');
+          if (action.command)
+            return operationApi.call('commands.execute', { id: action.command }, id);
+          if (action.theme) {
+            if (!externalUiPermissions(id).write) throw Error('設定変更が許可されていません。');
+            return toggleTheme();
+          }
+          navigation.navigate(action.route!, action.section);
+          showWindow();
+          return { accepted: true };
+        },
+      ),
+    }),
     'input.sendKeys': sendInput('input.sendKeys'),
     'input.appCommand': sendInput('input.appCommand'),
   },
@@ -242,6 +310,7 @@ const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
+    shellHost?.refresh();
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
   }, 60);
 };
@@ -416,6 +485,13 @@ function avatarSignature() {
 }
 function snapshot(): HostSnapshot {
   return {
+    navigation: navigation.state,
+    shell: shellHost?.status ?? {
+      selected: defaultShellId,
+      active: null,
+      error: null,
+      safeMode: safeShell,
+    },
     appletApi: {
       permissions: appletApiAccess.get(),
       error: appletApiAccess.error,
@@ -516,6 +592,17 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:focusShell', (edge) => shellHost?.focus(edge));
+  handle('dock:navigate', (route: string) => navigation.navigate(route));
+  handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
+  handle('dock:retryShell', async () => {
+    const selected = safeShell
+      ? defaultShellId
+      : settings.value.host.shellProvider || defaultShellId;
+    for (const id of new Set([selected, defaultShellId]))
+      if (manager.items.get(id)?.state === 'error') await manager.restart(id);
+    shellHost?.retry();
+  });
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
     appletApiAccess.set(permissions);
@@ -715,6 +802,11 @@ async function initialize() {
   manager = new ExtensionManager({
     hostVersion: app.getVersion(),
     roots: [external],
+    builtinRoots: [
+      app.isPackaged
+        ? path.join(process.resourcesPath, 'shells')
+        : path.join(app.getAppPath(), 'out', 'shells'),
+    ],
     settings,
     nodeExecutable: process.execPath,
     nodeWorker: path.join(__dirname, 'node-worker.js'),
@@ -747,16 +839,19 @@ async function initialize() {
         source: settings.value.updates.hostSource,
         destination: process.env.PORTABLE_EXECUTABLE_FILE || '',
       },
-      ...manager.snapshot().map((extension) => ({
-        id: extension.id,
-        name: extension.displayName,
-        kind: 'applet' as const,
-        version: extension.version,
-        destination: extension.folder,
-        source:
-          settings.value.extensions[extension.id]?.updateSource ??
-          (extension.updateRepository ? `github:${extension.updateRepository}` : ''),
-      })),
+      ...manager
+        .snapshot()
+        .filter((e) => e.sourceKind !== 'builtin')
+        .map((extension) => ({
+          id: extension.id,
+          name: extension.displayName,
+          kind: 'applet' as const,
+          version: extension.version,
+          destination: extension.folder,
+          source:
+            settings.value.extensions[extension.id]?.updateSource ??
+            (extension.updateRepository ? `github:${extension.updateRepository}` : ''),
+        })),
     ],
     settings: () => settings.value.updates,
     hostVersion: app.getVersion(),
@@ -984,6 +1079,61 @@ async function initialize() {
     path.join(__dirname, 'settings-notice-preload.js'),
     (message) => log.write('error', 'settings', message),
   );
+  shellHost = new ShellHost({
+    window,
+    preload: path.join(__dirname, 'shell-preload.js'),
+    ui: presentation,
+    providers: () => manager.snapshot(),
+    selected: () => settings.value.host.shellProvider || defaultShellId,
+    safeMode: safeShell,
+    ready: () => startupReady && !quitting,
+    failureFile: path.join(dataDirectory, 'shell-failures.json'),
+    changed,
+    log: (message) => log.write('error', 'shell', message),
+    failed: (message, retry) => {
+      log.write('error', 'shell', message);
+      void dialog
+        .showMessageBox(window!, {
+          type: 'error',
+          title: 'Default Shell',
+          message: 'リボンを起動できません。',
+          detail: message,
+          buttons: ['再試行', 'ログを開く', '終了'],
+          defaultId: 0,
+        })
+        .then(async (result) => {
+          if (result.response === 0) {
+            const p = manager.items.get(defaultShellId);
+            if (p?.state === 'error') await manager.restart(defaultShellId);
+            retry();
+          } else if (result.response === 1) navigation.navigate('logs');
+          else quitHost();
+        });
+    },
+    shortcut: (input) => {
+      if (input.type !== 'keyDown' || input.isAutoRepeat || input.isComposing || shortcutRecording)
+        return false;
+      const key = shortcutFromEvent({
+        key: input.key,
+        code: input.code,
+        ctrlKey: input.control,
+        altKey: input.alt,
+        shiftKey: input.shift,
+        metaKey: input.meta,
+      });
+      if (!key) return false;
+      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === key)) return true;
+      const commands = resolveKeybindings(
+        getKeybindings(settings.value),
+        key,
+        { appFocused: true },
+        availableShortcutCommands(),
+      );
+      if (!commands.length) return false;
+      void shortcutDispatcher.dispatch(key, commands);
+      return true;
+    },
+  });
   configurePageHost({
     overlay: () => settingsNotice?.layout(),
     window: () => window,
@@ -1000,7 +1150,10 @@ async function initialize() {
     },
     selected: (key) => {
       // Closing Applet surfaces during shutdown must not overwrite the restart destination.
-      if (!quitting) window?.webContents.send('dock:appletPage', key);
+      if (!quitting) {
+        navigation.navigate(key || 'home');
+        window?.webContents.send('dock:appletPage', key);
+      }
     },
     failed: (message) => log.write('error', 'pages', message),
     shortcut: (input, appletId) => {
@@ -1364,6 +1517,7 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (shutdownStarted) return;
   shutdownStarted = true;
+  shellHost?.dispose();
   void (async () => {
     for (const stop of [
       () => automation?.close(),

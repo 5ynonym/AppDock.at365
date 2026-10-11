@@ -14,7 +14,7 @@ MCPとAppletが共有する操作サービス・Node/.NET SDK・独立した許�
 
 ## 文書の入口
 
-- [Shell Hostの仕様と実装計画](docs/shell-foundation.md): 未実装の設計案。Default Shellは本体同梱の標準描画、Shell Appletは差替え拡張、Shell Hostは本体側の実行基盤を指す。リボンをDefault Shellへ移して本体の重複描画を撤去する。共通の公開API・実行経路、同時ビルド/単一EXE同梱、Default Shellへの復旧、MCP利用、将来の複数Shellに残す境界。
+- [Shell Hostの仕様と実装計画](docs/shell-foundation.md): 0.26.40で初期基盤を実装済み。Default Shellは本体同梱の標準描画、Shell Appletは差替え拡張、Shell Hostは本体側の実行基盤を指す。リボンはDefault Shellへ移行し、本体の重複描画を撤去した。共通の公開API・実行経路、同時ビルド/単一EXE同梱、Default Shellへの復旧、MCP利用と、将来の複数Shellに残す境界を記載する。
 
 - [実装・コミット・リリースの共通手順](docs/development-workflow.md): 実装時のテスト選択、コミット前の必要回帰、リリース前のコミット漏れ/プッシュ確認、検証証跡の再利用条件。本体と全Appletに適用します。以下の試験一覧は、この手順に従って必要な段階で実行します。
 
@@ -257,3 +257,9 @@ Applet/MCPの許可をApiPermissionsSettingsへ集約し、一般/Codex接続ペ
 ## WebApplet公開設定と許可既定値（0.26.39）
 
 WebApplet提供元の公開宣言を共通SettingsCommandsとコマンドカタログで扱います。[仕様・回帰範囲](docs/web-applets.md#共通apiへの公開02639以降)と[Applet既定許可](docs/appdock-api.md#宣言と許可)を参照してください。MCP/Applet通信・SDKの変更やApplet再発行は不要です。
+
+## Shell実装の入口
+
+0.26.40からの公開契約・ビルド境界は[Shell API](docs/shell-api.md)。Default Shellのソースは`shells/default`、本体側は`src/main/core/shell-host.ts`と`ui-presentation.ts`。新たなUIは機能状態・操作・表示モデルを本体側へ置き、Shellは公開モデルを描画する。移行した描画を本体rendererへ重複実装しない。
+
+`dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
