@@ -100,6 +100,7 @@ async function execute(id) {
     );
     target.stderr.resume();
     targetPeer = new JsonLinePeer(target.stdout, target.stdin, async () => {});
+    await page.evaluate(() => window.dock.setAppletApiPermissions({}));
     await focus();
     await assert.rejects(execute(ids[0] + '.new-tab'), /許可/);
     await assert.rejects(execute(ids[1] + '.send.test'), /許可/);
@@ -120,6 +121,8 @@ async function execute(id) {
       'restore-tab': 'key:T, Shift, Control',
     };
     for (const command of snapshot.extensions.find((e) => e.id === ids[0]).commands) {
+      // Ordinary commands deliberately retain the native 150 ms re-entry guard.
+      await sleep(170);
       await focus();
       await clear();
       await execute(command.id);
@@ -128,11 +131,12 @@ async function execute(id) {
         command.id,
       );
     }
+    await sleep(170);
     await clear();
     await execute(ids[1] + '.send.test');
     assert.ok((await events()).some((e) => e.includes('A') && e.includes('Control')));
     checks.push(
-      'real Node WebBrowserTools eleven commands and .NET WindowsTools use shared native input; default off, one global input grant without read permission',
+      'real Node WebBrowserTools eleven commands and .NET WindowsTools use shared native input; explicit denial, one global input grant without read permission',
     );
     await focus();
     await clear();
@@ -200,23 +204,46 @@ async function execute(id) {
       sender.send('input.sendKeys', { keys: 'A' }, 'fixture', { window: '1', source: 'gesture' }),
       { code: 'INPUT_FAILED' },
     );
-    const controller = new AbortController();
-    await targetPeer.request('hold');
-    await sleep(60);
-    const cancelled = sender
-      .send('input.sendKeys', { keys: 'A' }, 'fixture', {
-        window: focused.window,
-        source: 'gesture',
-        signal: controller.signal,
-      })
-      .then(
-        () => false,
-        (e) => e.code,
-      );
-    await sleep(70);
-    controller.abort();
-    assert.equal(await cancelled, 'CANCELLED');
-    await targetPeer.request('release');
+    // A foreground change tests target protection instead of cancellation. Retry only
+    // that observed environmental interruption, and still require real cancellation.
+    let cancellationVerified = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await focus();
+      await clear();
+      const controller = new AbortController();
+      try {
+        await targetPeer.request('hold');
+        await sleep(60);
+        const cancelled = sender
+          .send('input.sendKeys', { keys: 'A' }, 'fixture', {
+            window: focused.window,
+            source: 'gesture',
+            signal: controller.signal,
+          })
+          .then(
+            () => false,
+            (e) => e.code,
+          );
+        await sleep(70);
+        controller.abort();
+        const code = await cancelled;
+        const state = await targetPeer.request('snapshot');
+        if (code === 'INPUT_FAILED' && !state.focused) {
+          console.error(
+            'Cancellation fixture lost foreground; restarting this case: ' + (attempt + 1),
+          );
+          continue;
+        }
+        assert.equal(code, 'CANCELLED');
+        assert.ok(!state.events.some((e) => e.startsWith('key:A')));
+        cancellationVerified = true;
+        break;
+      } finally {
+        controller.abort();
+        await targetPeer.request('release');
+      }
+    }
+    assert.ok(cancellationVerified, 'Cancellation requires an uninterrupted foreground target');
     await sleep(60);
     await clear();
     const before = Date.now();

@@ -162,7 +162,7 @@ PC専用automation.jsonに `allowManageApplets` を追加しました。初期�
 
 - 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
-- 本体管理のWebApplet: 提供元のweb-applets.tsがopenだけを宣言。
+- 本体管理のWebApplet: 提供元のweb-applets.tsがopen/back/forward/reload/homeを宣言。0.26.39以降はname/displayの設定宣言も共通設定コマンドに登録。詳細は[WebApplet公開操作](web-applets.md#共通apiへの公開02639以降)。
 
 Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、通常コマンドは既存executeCommandへ、設定コマンドは共通SettingsCommandsへ渡します。通常のApplet RPCコマンドは引き続き引数なしで、argsに値を渡すと拒否します。APIコマンドの同時実行は1件、重複時はBUSY。設定変更許可だけでは実行できず、実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
 

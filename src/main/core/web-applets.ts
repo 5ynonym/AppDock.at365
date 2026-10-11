@@ -9,6 +9,7 @@ import {
   manifestDefaults,
   webId,
   webUrl,
+  webAppletSettingDefinitions,
   type WebApplet,
   type WebDefaults,
   type WebPageState,
@@ -137,7 +138,7 @@ export class WebAppletManager {
         ? 'Webアカウント一覧の同期を待っています。枠が削除された場合は別の枠を選んでください。'
         : this.views.get(a.id)?.state.error || null,
       capabilities: [],
-      settings: [],
+      settings: webAppletSettingDefinitions,
       tray: [],
       settingOptions: {},
       commands: ['open', 'back', 'forward', 'reload', 'home'].map((key) => ({
@@ -152,7 +153,7 @@ export class WebAppletManager {
           } as Record<string, string>
         )[key],
         activateOnExecute: key === 'open',
-        automation: key === 'open',
+        automation: true,
         available: a.enabled,
       })),
       pages: [
@@ -192,6 +193,7 @@ export class WebAppletManager {
       } else {
         v.item = a;
         v.surface.options.title = a.name;
+        v.surface.options.defaultDisplay = a.display;
         if (v.surface.display === 'window') v.surface.window?.setTitle(a.name);
       }
     }

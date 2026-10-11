@@ -13,6 +13,7 @@ import {
 import { validateSettingValue } from '../../shared/setting-definitions';
 import type { SettingsStore } from './settings';
 import type { AutomationCommand } from './automation-commands';
+import { applyWebAppletPublicSettings, webId } from '../../shared/web-applets';
 
 export class SettingsCommandError extends Error {
   constructor(
@@ -43,15 +44,12 @@ export class SettingsCommands {
   private owners(): Owner[] {
     return [
       { id: 'appdock', title: 'AppDock', fields: hostSettingDefinitions, available: true },
-      ...this.options
-        .applets()
-        .filter((a) => a.runtime !== 'web')
-        .map((a) => ({
-          id: a.id,
-          title: a.displayName,
-          fields: a.settings ?? [],
-          available: a.enabled && a.state === 'running',
-        })),
+      ...this.options.applets().map((a) => ({
+        id: a.id,
+        title: a.displayName,
+        fields: a.settings ?? [],
+        available: a.enabled && a.state === 'running',
+      })),
     ];
   }
   // Compatibility path: self-owned settings include private/undeclared keys and work during activation.
@@ -104,7 +102,9 @@ export class SettingsCommands {
     const saved: Record<string, unknown> =
       owner.id === 'appdock'
         ? { ...settings.host }
-        : (settings.extensions[owner.id]?.settings ?? {});
+        : webId(owner.id)
+          ? { ...settings.webApplets.items.find((a) => a.id === owner.id) }
+          : (settings.extensions[owner.id]?.settings ?? {});
     return Object.fromEntries(
       fields.map((f) => [f.key, Object.hasOwn(saved, f.key) ? saved[f.key] : f.default]),
     );
@@ -252,6 +252,7 @@ export class SettingsCommands {
       throw new SettingsCommandError('REVISION_CONFLICT', '設定を再取得してください。');
   }
   private applies(owner: string, key: string) {
+    if (webId(owner)) return 'immediate';
     return owner === 'appdock'
       ? ({ closeToTray: 'nextClose', startMinimized: 'nextStart' }[key] ?? 'immediate')
       : 'settingsChanged';
@@ -278,14 +279,27 @@ export class SettingsCommands {
     const store = this.options.settings,
       next = structuredClone(store.value);
     const before = this.values(owner, store.value, fields);
-    const changed = Object.keys(changes).filter((k) => before[k] !== changes[k]);
     if (owner.id === 'appdock') Object.assign(next.host, changes);
-    else {
+    else if (webId(owner.id)) {
+      const item = next.webApplets.items.find((a) => a.id === owner.id);
+      if (!item?.enabled)
+        throw new SettingsCommandError('UNAVAILABLE', 'WebAppletが有効である必要があります。');
+      try {
+        applyWebAppletPublicSettings(item, changes);
+      } catch {
+        throw new SettingsCommandError(
+          'INVALID_ARGUMENT',
+          '公開されたWebApplet設定の値を確認してください。',
+        );
+      }
+    } else {
       const extension = next.extensions[owner.id];
       if (!extension?.enabled)
         throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効である必要があります。');
       this.applyAppletChanges(next, owner.id, changes);
     }
+    const after = this.values(owner, next, fields);
+    const changed = Object.keys(changes).filter((k) => before[k] !== after[k]);
     if (!dryRun && changed.length) {
       try {
         this.options.save(next, store.revision);

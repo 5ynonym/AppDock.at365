@@ -1407,3 +1407,19 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 対象17ファイルを確認し、検証開始treeは`782878b329fb2879cdf56543828a4c5ba5ad5d50`。実装証跡の全335ファイル・各ログ・固定EXEをSHA256照合して一致。型検査と文書リンク99件は同じ入力の成功記録を再利用。
 - 今回、本体標準回帰276/276、固定発行版の許可画面/新旧SDK6群とMCP15群（実Codex11ツール、推論なし）を再実行して成功。許可の独立性、停止中設定、draft保持、両テーマ3幅、再起動保存を確認。製品修正・再発行不要、0.26.38 EXE/feed不変。
 - 証跡`.artifacts/commit-validation-permission-ui-20261011/`。最終試験profileはapplet-api-portable-1791704317194 / automation-portable-1791704360721。開始treeから最終treeまでの差分は本項の検証記録だけ。試験プロセス残存0、各方式最新3回・既存検証参照・失敗/不明資料を保持して整理対象なし。コミットのみ、pushなし。
+
+## 2026-10-11: 0.26.39 WebApplet公開操作とApplet許可の既定値
+
+- WebApplet提供元がopen/back/forward/reload/homeとname/displayを宣言し、既存カタログとSettingsCommandsへ登録。settings.get/getSchemaとcommands.executeでApplet/MCP双方から利用可能。更新はwebApplets.itemsへ保存し、URL/アカウント/遷移規則/アイコン/imported/認証を公開しない。既存revision・dryRun・原子的検査・停止中拒否・監査を継続。表示先の既定値は既存Viewへ反映し、ページ個別の保存値を優先する。
+- Appletの新規既定値は全9項目ON。version 2の保存済み値・省略による拒否、旧個別version 1の全体拒否、不正/アクセス拒否時の拒否は維持。ファイル不在ENOENTだけを新規扱いにした。MCPの接続・7操作許可は初期OFFを維持し、情報取得は連携ON時に許可する従来契約。WebページにホストAPIを注入しない。
+- 関連回帰33件・型検査・文書リンク107件成功。最終単一EXEで新旧SDK/許可UI6群とMCP16群成功、実Codex11ツール接続（推論なし）。MCP/実Node AppletからWeb設定の取得/更新・実ページの履歴/リロード/開始ページ移動、未公開項目を混ぜた要求の原子的拒否、許可の独立性/取消を確認。発行win-unpackedで入力4群も成功（連続gesture13ms）。両テーマ3幅・既存draft・再起動保存も確認。標準全回帰はコミット依頼時の対象として今回は未実施。実外部サイトの認証/操作は対象外。
+- 最終本体EXE0.26.39は144074577bytes、SHA256 `cfa11f71e4048124c8213338f33dce0589e8a411360c7e920a92e41e89d1fa01`。feed/GUI検証コピー一致。証跡`.artifacts/web-api-20261011/validation.json`。最終SDK profile1791705713351、MCP1791705763714、入力1791705815389。
+- 制限環境の固定lockfile installがSTATUS_STACK_OVERFLOWとなり、通常実行権限の同じ固定installで成功（359既存package再利用、download0）。依存/lockfile/toolchain更新や検査緩和なし。途中の発行はwin-unpacked.tmp置換EPERMで失敗、使用中プロセスなしを確認して同じ手順で再試行し成功。原因を特定したものではない。アクセス拒否試験はWindowsの非ディレクトリ配下がENOENTになるため想定が外れ、EACCESを明示する試験へ直して成功。各失敗記録保持。
+- 古い成功native-input-ui-1791701339012を境界・リンク・使用中検査後に整理。各方式最新3回、既存検証参照、失敗/不明、固定fixtureを保持。試験残存0。未コミット、本体だけローカルpublish完了。Applet改修/再発行、push、Release、実利用deploy、全体ZIPは行わない。
+
+## 2026-10-11 WebApplet API 0.26.39 コミット確認
+
+- 標準回帰277件、発行単一EXEのApplet SDK/UI6群・MCP16群（実Codex11ツール、推論なし）、発行入力4群が成功。WebAppletの5操作、公開設定、独立した許可と既存SDK互換を確認。
+- 入力試験では取消直前の最前面喪失と通常コマンドの150ms再入抑止を観測。試験だけを修正し、通常操作の間隔を確保。取消ケースはINPUT_FAILEDかつ実測focused=falseのときだけ最大3回まで再準備し、CANCELLEDとキー未送信を必須とする。前面を変えた原因は未特定。最終2回は4群成功、連続gesture3回10～11ms。途中の失敗・診断資料は保持。
+- 製品・依存・発行物に追加変更なし。EXE SHA256 cfa11f71e4048124c8213338f33dce0589e8a411360c7e920a92e41e89d1fa01。型検査/文書107リンクは実装時のソース337件とログのハッシュを照合して再利用。後続変更は独立した入力GUI試験と本記録のみで、影響する入力試験は最終内容で再実行。
+- 証跡: `.artifacts/commit-validation-web-api-20261011/validation.json`。標準回帰/SDK/MCPの開始tree、入力試験修正後tree、記録追記後の最終treeを分けて保存する。旧成功試験1件を整理、最新3回/過去証跡参照/失敗を保持。残存試験プロセス0。push/Release/実利用deployなし。

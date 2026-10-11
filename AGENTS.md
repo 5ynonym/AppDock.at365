@@ -1,5 +1,7 @@
 # AppDockの作業ルール
 
+- 0.26.39以降のWebApplet公開範囲は[WebApplet](docs/web-applets.md#共通apiへの公開02639以降)を正本とする。提供元が5コマンドとname/displayを宣言し、SettingsCommandsでwebApplets.itemsへ保存する。URL/アカウント/遷移制限やWebページへのIPCを公開しない。Applet操作の新規既定値は全項目ON、既存の保存済み拒否・旧個別許可・読込失敗時の拒否は維持する。MCPの初期OFFは変更しない。
+
 - 0.26.38の操作許可UIは設定の専用「操作の許可」へ集約する。Applet/MCPを独立した列で編集し、PC専用即時保存と共有draftの保持を維持する。接続/登録はCodex連携へ残す。前提不足時は保存済みON/OFFを保って理由を表示し、他の許可を自動変更しない。仕様と回帰は[共通操作API](docs/appdock-api.md)を参照する。
 
 - 0.26.36以降のMCP/Applet共通操作は[AppDock共通操作API](docs/appdock-api.md)を正本とする。AppDockApiの単一インスタンスと操作カタログを共有し、Codexの許可と全Applet共通のPC専用許可を分離する。操作定義のcallers/permissions/schemaで公開先・許可・入力を管理し、入力APIはApplet専用とする。明示公開されたAppletコマンド経由の呼出しは許可する。AppletのHTTP接続や秘密token共有は不要。host.appdock.callの呼出元は接続から決定する。既存自己設定のcapability/非公開キー/activate時の契約を保ち、共通SettingsCommandsを通す。再入時の同期設定変更・非同期BUSY・自身の実行/管理SELF_CALL、Node/.NET SDK、旧DLL互換は専用回帰で確認する。

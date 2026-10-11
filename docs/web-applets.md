@@ -80,3 +80,24 @@ Webページにはpreload/Node/ホストIPCを公開せず、sandbox/contextIsol
 ## ページの言語
 
 WebAppletの専用sessionもWindowsの優先言語をChromiumから引き継ぎ、ホストで言語を固定しません。HTTPのAccept-Languageとnavigator.language/languagesの実測範囲は[検証記録](../VERIFICATION.md)、共通の扱いは[Webアカウントの言語](web-accounts.md#webviewの言語)を参照してください。サイト側で保存された言語設定は変更しません。
+
+## 共通APIへの公開（0.26.39以降）
+
+登録したサイトIDをappletIdとしてsettings.getSchema/settings.getに渡すと、name（名前）とdisplay（既定の表示先、page/window）だけを取得できます。URL・accountId・遷移規則・allowedOrigins・icon・imported・Cookieは返しません。追加・削除・ログイン情報消去や任意のURL/JavaScript実行も公開しません。
+
+公開コマンドは`<webId>.open`、`.back`、`.forward`、`.reload`、`.home`と、`<webId>.settings.update`です。設定変更は既存の共有revision、dryRun、原子的保存・競合検査を使い、webApplets.itemsの対象だけを更新します。extensions配下に別の設定を作りません。名前の入力は1〜80文字で制御文字不可、前後空白は除去、displayはpage/windowの選択です。未知・非公開項目を混ぜた要求は全体を拒否します。
+
+```ts
+const current = await context.appdock.call('settings.get', { appletId: webId });
+await context.appdock.call('commands.execute', {
+  id: `${webId}.settings.update`,
+  args: { changes: { name: '仕事用ページ', display: 'page' }, expectedRevision: current.revision },
+});
+await context.appdock.call('commands.execute', { id: `${webId}.open` });
+```
+
+.NETも同じ操作名・引数をCallAsyncへ渡します。MCPではappdock_get_settings/appdock_execute_commandを使い、通信の追加は不要です。通常コマンドは実行許可、設定更新は実行と設定変更の許可を要求し、Applet側は情報取得許可も必要です。登録済みでも無効/表示エラー中のAppletのコマンド・設定変更は拒否し、設定の取得は可能です。有効・無効・再起動は既存のApplet管理コマンドを使います。
+
+開く以外のページ操作は先に画面を開く必要があります。戻る/進むは既存の履歴と遷移規則に従い、移動先がない/許可されない場合は移動しません。成功応答は操作受付・処理応答であり、読み込みやサイト側の効果を保証しません。既定表示先の変更は既存Viewを再利用して反映しますが、ページ個別の表示先が保存されている場合はそちらが優先されます。
+
+回帰はtests/web-api.test.cjsとscripts/automation-web-checks.cjs（automation-ui-test.cjsから実行）で、MCPと実Node Applet、ローカルWebページの履歴/再読込、非公開設定の拒否、独立した許可と保存を確認します。

@@ -1,4 +1,4 @@
-# AppDock共通操作API（0.26.37）
+# AppDock共通操作API（0.26.39）
 
 MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保存処理を使います。機能別の契約は[共通操作APIの各操作](automation.md)を正本とし、この文書はAppletの接続・許可・互換性を説明します。
 
@@ -13,7 +13,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-0.26.38以降は本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。0.26.37の共通許可は変更せず引き継ぎます。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。初期値はすべてOFF。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+0.26.38以降は本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。0.26.37の共通許可は変更せず引き継ぎます。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。0.26.39以降、applet-api.jsonが存在しない新規環境の初期値は全9項目ONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -95,3 +95,7 @@ await context.AppDock.CallAsync("commands.execute", new {
 ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCP情報取得は連携中許可の固定表示、入力は直接公開なしの固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsに残し相互リンクします。
 
 従来のPC専用APIで即時保存し、共有settings.jsonのdraft/revisionとは独立します。この画面にはJSON切替を出さず、別項目の未保存変更がある場合だけ既存の保存ツールバーを表示します。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。
+
+## WebAppletの操作（0.26.39）
+
+登録したWebAppletを対象に、同じsettings.getSchema/settings.get/commands.list/commands.executeを使います。Node/.NET SDKとMCPの双方で利用できます。設定とコマンドの公開宣言はWebApplet提供元に置き、通信層に専用入口は追加しません。公開する範囲・引数例・表示先の優先順位は[WebApplet公開操作](web-applets.md#共通apiへの公開02639以降)を参照してください。Webページ自身へのホストAPI注入は行いません。

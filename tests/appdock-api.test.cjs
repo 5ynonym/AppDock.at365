@@ -66,8 +66,13 @@ function setup(t) {
     grant: (p) => access.set(p),
   };
 }
-test('Applet grants are default-off, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
+test('Applet grants are default-on, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
   const f = setup(t);
+  assert.equal((await f.call('system.getInfo')).ok, true);
+  assert.ok(Object.values(f.access.get()).every((v) => v === true));
+  assert.equal(Object.keys(f.access.get()).length, 9);
+  f.grant({});
+  assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
   for (const method of automationMethods.filter(
@@ -210,6 +215,16 @@ test('Malformed grants fail closed; invalid edits never change stored permission
   assert.ok(bad.error);
   assert.deepEqual(bad.get(f.manifest), {});
   assert.throws(() => bad.set({ read: true }));
+  // An access error must not be mistaken for a missing file by existsSync.
+  const deniedFile = path.join(f.dir, 'denied.json');
+  const statSync = fs.statSync;
+  t.mock.method(fs, 'statSync', (name, ...args) => {
+    if (name === deniedFile) throw Object.assign(new Error('denied'), { code: 'EACCES' });
+    return statSync(name, ...args);
+  });
+  const inaccessible = new AppletApiAccess(deniedFile);
+  assert.ok(inaccessible.error);
+  assert.deepEqual(inaccessible.get(f.manifest), {});
 });
 test('Node SDK exposes structured error codes and unwraps the same result', async () => {
   const client = createAppDockClient(async (method, args) => {
@@ -235,6 +250,7 @@ test('Applet-only operations require only their declared grant and cannot be cal
   assert.ok(!operationsFor('mcp').some(([name]) => name.startsWith('input.')));
   assert.ok(operationsFor('applet').some(([name]) => name === 'input.sendKeys'));
   assert.throws(() => f.api.call('input.sendKeys', { keys: 'A' }), { code: 'NOT_FOUND' });
+  f.grant({});
   assert.equal((await f.call('input.sendKeys', { keys: 'A' })).error.code, 'API_DISABLED');
   f.grant({ sendInput: true });
   assert.equal((await f.call('input.sendKeys', { keys: 'A' })).ok, true);

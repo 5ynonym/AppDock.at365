@@ -26,8 +26,17 @@ export class AppletApiAccess {
   error?: string;
   constructor(private file: string) {
     try {
-      if (!fs.existsSync(file)) return;
-      if (fs.statSync(file).size > 262144) throw Error();
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(file);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        this.grants = Object.fromEntries(
+          Object.keys(appletApiPermissionLabels).map((key) => [key, true]),
+        );
+        return;
+      }
+      if (stat.size > 262144) throw Error();
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
       // Existing per-Applet grants are not broadened to every installed Applet.
       if (saved.version === 1 && isObject(saved.grants)) return;

@@ -45,11 +45,13 @@ settings.gestures.enabled = false;
 const fixtureId = 'test.automation-provider';
 const fixtureRoot = path.join(profile, 'extensions', 'automation-fixture');
 fs.mkdirSync(fixtureRoot, { recursive: true });
-const fixtureCommands = ['next', 'start', 'stop', 'prepare-background'].map((name) => ({
-  id: `${fixtureId}.${name}`,
-  title: name,
-  automation: name !== 'prepare-background',
-}));
+const fixtureCommands = ['next', 'start', 'stop', 'prepare-background', 'web-api-probe'].map(
+  (name) => ({
+    id: `${fixtureId}.${name}`,
+    title: name,
+    automation: !['prepare-background', 'web-api-probe'].includes(name),
+  }),
+);
 fs.writeFileSync(
   path.join(fixtureRoot, 'extension.json'),
   JSON.stringify({
@@ -60,7 +62,7 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'index.cjs',
     commands: fixtureCommands,
-    capabilities: ['settings'],
+    capabilities: ['settings', 'appdock-api'],
     settings: [
       {
         key: 'feature',
@@ -78,6 +80,11 @@ fs.writeFileSync(
   `
 const fs=require('node:fs'),path=require('node:path');
 exports.activate=async(context)=>{
+ context.commands.register('test.automation-provider.web-api-probe','Web API probe',async()=>{
+  const request=JSON.parse(fs.readFileSync(path.join(__dirname,'api-request.json'),'utf8'));let reply;
+  try{reply={ok:true,value:await context.appdock.call(request.method,request.params)}}catch(e){reply={ok:false,code:e.code}}
+  fs.writeFileSync(path.join(__dirname,'api-reply.json'),JSON.stringify(reply));
+ });
  fs.appendFileSync(path.join(__dirname,'activations.txt'),process.pid+'\\n');
  context.tray.add('Fixture feature toggle','test.automation-provider.settings.feature.toggle');
  context.settings.onChanged(()=>fs.writeFileSync(path.join(__dirname,'observed.json'),JSON.stringify({feature:context.settings.get('feature',false)})));
@@ -186,9 +193,14 @@ async function patch(client, changes) {
   });
 }
 let client;
+let webVisits = 0;
 const webServer = http.createServer((_req, res) => {
   res.setHeader('Content-Type', 'text/html');
-  res.end('<h1>Automation Web fixture</h1>');
+  res.end(
+    '<h1>Automation Web fixture</h1><a href="/second">Next</a><p id="visit">' +
+      ++webVisits +
+      '</p>',
+  );
 });
 const webId = 'web.11111111-2222-3333-4444-555555555555';
 (async () => {
@@ -515,6 +527,22 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'patch reflected',
     );
     checks.push('MCP settings write, runtime snapshot and disk');
+    await require('./automation-web-checks.cjs')({
+      page,
+      browser: s.browser,
+      client,
+      call,
+      until,
+      togglePermission,
+      profile,
+      fixtureId,
+      fixtureRoot,
+      webId,
+      url: `http://127.0.0.1:${webServer.address().port}/`,
+    });
+    checks.push(
+      'WebApplet five public commands, real page history/reload/home, safe settings via MCP and Node SDK, independent grants, dry run, forbidden fields and persistence',
+    );
     const readShortcuts = () => call(client, 'appdock_get_shortcuts');
     const editShortcuts = async (operations, extra = {}) =>
       call(client, 'appdock_execute_command', {

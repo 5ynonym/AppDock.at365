@@ -206,12 +206,14 @@ async function grant(id, permissions) {
     );
     for (const id of ids) {
       assert.equal((await snapshot()).settings.value.extensions[id].settings.privateFlag, true);
-      assert.equal((await probe(id, 'read')).code, 'API_DISABLED');
+      assert.equal((await probe(id, 'read')).ok, true);
       assert.equal((await probe(id, 'legacy')).ok, true);
     }
     checks.push(
-      'MCP off, default-denied Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
+      'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
+    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 9);
+    assert.ok(Object.values((await snapshot()).appletApi.permissions).every((v) => v === true));
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: '一般', exact: true }).click();
     assert.equal(await page.getByRole('switch', { name: /^Applet：/ }).count(), 0);
@@ -221,6 +223,23 @@ async function grant(id, permissions) {
     const panel = page.getByRole('region', { name: '操作の許可', exact: true });
     assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
     assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 7);
+    for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
+      assert.equal(await control.isChecked(), true);
+    const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
+      .state;
+    assert.ok(
+      Object.entries(mcpDefaults)
+        .filter(([key]) => key.startsWith('allow'))
+        .every(([, v]) => v === false),
+    );
+    await grant(ids[0], {});
+    await until(
+      async () =>
+        await panel
+          .getByRole('switch', { name: /^Applet：/ })
+          .evaluateAll((nodes) => nodes.every((n) => n.getAttribute('aria-checked') === 'false')),
+      'all grants revoked',
+    );
     await panel.getByText('直接公開なし', { exact: true }).waitFor();
     await panel.getByText('連携中は許可', { exact: true }).waitFor();
     const mcpWrite = panel.getByRole('switch', {

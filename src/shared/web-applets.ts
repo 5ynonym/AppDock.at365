@@ -1,4 +1,39 @@
 import { parseKeybindingDefaults, type KeybindingDefault } from './keybindings';
+import type { SettingDefinition } from './contracts';
+
+// The built-in WebApplet provider owns its public setting declarations.
+export const webAppletSettingDefinitions: SettingDefinition[] = [
+  {
+    key: 'name',
+    title: '名前',
+    type: 'string',
+    automation: true,
+    description: '1～80文字の名前。前後の空白は除去し、制御文字は使用できません。',
+  },
+  {
+    key: 'display',
+    title: '既定の表示先',
+    type: 'select',
+    automation: true,
+    description: '表示先の既定値。ページ個別の表示先が保存済みならそちらを優先します。',
+    options: [
+      { value: 'page', label: '本体のページ' },
+      { value: 'window', label: '別ウィンドウ' },
+    ],
+  },
+];
+
+export function applyWebAppletPublicSettings(item: WebApplet, changes: Record<string, unknown>) {
+  for (const key of Object.keys(changes))
+    if (!webAppletSettingDefinitions.some((f) => f.key === key))
+      throw Error('公開されていない設定です。');
+  if (Object.hasOwn(changes, 'name')) item.name = webProfileName(changes.name);
+  if (Object.hasOwn(changes, 'display')) {
+    if (changes.display !== 'page' && changes.display !== 'window')
+      throw Error('表示先が不正です。');
+    item.display = changes.display;
+  }
+}
 
 export type WebNavigation = 'none' | 'same-origin' | 'any';
 export interface WebProfile {

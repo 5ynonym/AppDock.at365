@@ -251,3 +251,7 @@ Windowsのキー・操作メッセージ送信を本体InputHostへ集約し、W
 ## 操作許可の統合UI（0.26.38）
 
 Applet/MCPの許可をApiPermissionsSettingsへ集約し、一般/Codex接続ページから重複スイッチを除きました。PC専用保存・設定draft・MCPの固定公開範囲は[共通操作API](docs/appdock-api.md)を参照してください。GUI回帰は新旧SDK試験とMCP試験で移動後のスイッチを実操作します。
+
+## WebApplet公開設定と許可既定値（0.26.39）
+
+WebApplet提供元の公開宣言を共通SettingsCommandsとコマンドカタログで扱います。[仕様・回帰範囲](docs/web-applets.md#共通apiへの公開02639以降)と[Applet既定許可](docs/appdock-api.md#宣言と許可)を参照してください。MCP/Applet通信・SDKの変更やApplet再発行は不要です。
