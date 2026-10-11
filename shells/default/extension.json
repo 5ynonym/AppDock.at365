@@ -6,5 +6,11 @@
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
-  "shell": { "apiVersion": 1, "ui": "index.html" }
+  "shell": {
+    "apiVersion": 1,
+    "ui": "index.html",
+    "views": {
+      "overlay.command-palette": "overlay.html"
+    }
+  }
 }

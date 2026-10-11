@@ -1,6 +1,6 @@
-# Shell Host / Default Shell（0.26.40）
+# Shell Host / Default Shell（0.26.41）
 
-最初の移行対象はリボン。本体rendererは表示領域だけを確保し、描画は`shells/default`のDefault Shellに集約する。タイトルバー・本文・設定画面・共有設定draft・AppletページのWebContentsは本体に残る。[設計と後続計画](shell-foundation.md)も参照。
+リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。タイトルバー・本文・設定画面・共有設定draft・AppletページのWebContentsは本体に残る。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
 
 ## 構成と拡張
 
@@ -11,7 +11,7 @@
 
 Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node worker・RPC経路で起動する。独立したVite成果物を`out/shells/default`へ生成し、worker/manifestとともにportable EXEへ同梱する。本体からDefault Shellのコンポーネントをimportしない。個別のupdate.zipや更新対象には含めず、本体版と同時更新する。
 
-追加のShell Appletは通常の独立Appletと同じ場所へ配置し、例えば次を宣言する。`shell.ui`はApplet内のHTML。相対パスの包含・APIメジャー版・minimumHostVersionを検証する。
+追加のShell Appletは通常の独立Appletと同じ場所へ配置する。`shell.views`に担当領域のHTMLだけを宣言する。従来の`shell.ui`はリボンの別名として維持し、`views.ribbon`があればそちらを優先する。相対パスの包含・APIメジャー版・minimumHostVersionを検証する。
 
 ```json
 {
@@ -19,11 +19,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
   "id": "example.shell",
   "name": "Example Shell",
   "version": "1.0.0",
-  "minimumHostVersion": "0.26.40",
+  "minimumHostVersion": "0.26.41",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
-  "shell": { "apiVersion": 1, "ui": "index.html" }
+  "shell": { "apiVersion": 1, "views": { "ribbon": "index.html" } }
 }
 ```
 
@@ -31,11 +31,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 ## 描画モデルと共通操作
 
-| 操作 | 引数と戻り値 |
-| --- | --- |
-| `ui.ribbon.get` | 任意`contextId: "primary"`。`schemaVersion: 1`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
-| `ui.assets.get` | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。ファイルパス・任意URLは受け付けない |
-| `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する |
+| 操作                | 引数と戻り値                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui.ribbon.get`     | 任意`contextId: "primary"`。`schemaVersion: 1`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
+| `ui.assets.get`     | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。ファイルパス・任意URLは受け付けない                                                     |
+| `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する      |
 
 各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。`kind`はbutton/separator、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像1件はdata URLで1 MiB以下。構造化モデルにローカルパス・openCommand・認証情報を含めない。
 
@@ -56,7 +56,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 初期表示はconnectのsnapshot、以後は変更通知。通知は本体の変更通知と同じ60msで集約し、同じrevisionを再配信しない。Viewの全体再作成やAppletページの再表示は状態追随に使わない。
 
-`onFocus(first/last)`は本体からのフォーカス移動、`focusHost(before/after)`はShellからの移動。Default ShellはTab/Shift+Tabで境界を越え、共通ショートカットはShell Hostが既存ディスパッチャへ渡す。パレット表示中はShellのネイティブViewを隠し、閉じると同じViewを復帰する。表示領域は本体の予約領域をzoom込みのDIPへ変換する。
+`executeCommand(id)`は接続元のShell Applet自身が登録した利用可能コマンドを通常のコマンド実行経路へ渡す。文字列の接頭辞で所有者を推測せず、登録元と現状態を照合する。他Appletや本体の任意コマンドは受け付けない。リボンの共通操作には`invoke`を使う。Shell Appletは通常のcommands/settings/pagesも併用でき、Shellとして選択されていない間も有効なAppletとして動作する。
+
+`getSettings()`で自Appletの現在の設定を取得し、`onSettingsChanged(callback)`で変更を購読できる。購読してから取得する。通常workerの`context.settings.set`で更新した設定も反映されるため、例えば「コンパクト表示」コマンド→設定更新→Shellの再描画という経路を作れる。書込みは通常の設定API/生成コマンドと検証を使い、Shell専用の保存領域や第二の設定状態を作らない。APIはリボン/オーバーレイ共通の`ShellAppletApi`として定義する。
+
+`onFocus(first/last)`は本体からのフォーカス移動、`focusHost(before/after)`はShellからの移動。Default ShellはTab/Shift+Tabで境界を越え、共通ショートカットはShell Hostが既存ディスパッチャへ渡す。パレット表示中は独立オーバーレイを最前面に置き、下のリボン・Appletページは同じViewを保持する。表示領域は本体の予約領域をzoom込みのDIPへ変換する。
 
 ## 切替・復旧と後続範囲
 

@@ -479,14 +479,22 @@ const expectCalls = async (before, expected) => {
       s.settings.value.pinnedCommands = ['test.keys.a'];
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
-    await dock.locator('[data-ribbon-id="home"]').click();
+    await (
+      await require('./shell-overlay-helper.cjs').ribbonPage(dock)
+    )
+      .locator('[data-ribbon-id="home"]')
+      .click();
     assert.equal(await dock.locator('.home-pins .command-id').textContent(), 'test.keys.a');
     await dock.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
-    await dock.getByPlaceholder('コマンドを入力…').fill('test.keys.a');
-    assert.equal(await dock.locator('.palette-command .command-id').textContent(), 'test.keys.a');
-    await dock.screenshot({ path: path.join(profile, 'command-ids.png') });
-    await dock.getByPlaceholder('コマンドを入力…').fill('キー検証');
-    assert.ok((await dock.locator('.palette-command').count()) >= 5);
+    const palette = await require('./shell-overlay-helper.cjs').overlayPage(dock);
+    await palette.getByPlaceholder('コマンドを入力…').fill('test.keys.a');
+    assert.equal(
+      await palette.locator('.palette-command .command-id').textContent(),
+      'test.keys.a',
+    );
+    await palette.screenshot({ path: path.join(profile, 'command-ids.png') });
+    await palette.getByPlaceholder('コマンドを入力…').fill('キー検証');
+    assert.ok((await palette.locator('.palette-command').count()) >= 5);
     checks.push(
       'new Applet/host binding defaults, unchanged existing scopes and full searchable IDs in settings, palette and home',
     );

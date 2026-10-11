@@ -2,8 +2,8 @@ import { WebContentsView, ipcMain, type BrowserWindow, type IpcMainInvokeEvent }
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { defaultShellId, type ShellStatus } from '../../shared/shell';
+import { createShellView } from './shell-view';
+import { defaultShellId, shellView, type ShellStatus } from '../../shared/shell';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import type { UiPresentation } from './ui-presentation';
 
@@ -14,6 +14,7 @@ type Binding = {
   url: string;
   ready: boolean;
   revision: number;
+  settingsSignature?: string;
   timer: ReturnType<typeof setTimeout>;
 };
 /** Owns surfaces, never imports a Shell renderer. Both providers use this exact path. */
@@ -39,6 +40,8 @@ export class ShellHost {
       log(message: string): void;
       failed(message: string, retry: () => void): void;
       shortcut(input: Electron.Input): boolean;
+      execute(provider: string, command: string): Promise<unknown>;
+      settings(provider: string): Record<string, unknown>;
     },
   ) {
     try {
@@ -87,6 +90,12 @@ export class ShellHost {
       if (b !== this.active || !b.ready) throw Error('Shell is not active');
       return options.ui.invoke(request, b.session);
     });
+    ipcMain.handle('shell:executeCommand', (event, command) => {
+      const b = binding(event);
+      if (b !== this.active || !b.ready) throw Error('Shell is not active');
+      return options.execute(b.id, command);
+    });
+    ipcMain.handle('shell:getSettings', (event) => options.settings(binding(event).id));
     ipcMain.handle('shell:ready', (event, session) => {
       const b = binding(event);
       if (session !== b.session) throw Error('Stale Shell session');
@@ -156,7 +165,15 @@ export class ShellHost {
       }
     }
     let id = this.options.safeMode ? defaultShellId : this.options.selected();
-    const requested = providers.find((p) => p.id === id && p.shell && p.enabled);
+    const configured = providers.find((p) => p.id === id && p.shell);
+    // A provider may replace only other regions. Ribbon fallback is normal, not a failure.
+    if (configured && !shellView(configured.shell, 'ribbon')) {
+      id = defaultShellId;
+      this.error = null;
+    }
+    const requested = providers.find(
+      (p) => p.id === id && shellView(p.shell, 'ribbon') && p.enabled,
+    );
     if (id !== defaultShellId && (!requested || this.failed.has(id)))
       this.error ||= `${id}: 使用できないためDefault Shellを表示しています。`;
     if (requested?.state === 'error' && !this.failed.has(id)) {
@@ -184,7 +201,9 @@ export class ShellHost {
       }
     }
     if (this.pending?.id !== id && this.active?.id !== id && !this.failed.has(id)) {
-      const p = providers.find((p) => p.id === id && p.shell && p.state === 'running');
+      const p = providers.find(
+        (p) => p.id === id && shellView(p.shell, 'ribbon') && p.state === 'running',
+      );
       if (p) {
         try {
           this.open(p);
@@ -199,11 +218,19 @@ export class ShellHost {
     if (this.active?.id === this.options.selected() && !this.failed.has(this.active.id))
       this.error = null;
     const snapshot = this.options.ui.get();
-    for (const b of [this.active, this.pending])
+    for (const b of [this.active, this.pending]) {
+      if (b && !b.view.webContents.isDestroyed()) {
+        const signature = JSON.stringify(this.options.settings(b.id));
+        if (b.settingsSignature !== signature) {
+          b.settingsSignature = signature;
+          b.view.webContents.send('shell:settingsChanged');
+        }
+      }
       if (b && b.revision !== snapshot.revision && !b.view.webContents.isDestroyed()) {
         b.revision = snapshot.revision;
         b.view.webContents.send('shell:changed', snapshot);
       }
+    }
   }
   retry() {
     this.failed.clear();
@@ -234,23 +261,16 @@ export class ShellHost {
   }
   private open(provider: ExtensionSnapshot) {
     if (this.pending) this.close(this.pending);
-    const file = fs.realpathSync(path.resolve(provider.folder, provider.shell!.ui));
-    const relative = path.relative(fs.realpathSync(provider.folder), file);
-    if (relative.startsWith('..') || path.isAbsolute(relative))
-      throw Error('Shell UI is outside provider');
-    const view = new WebContentsView({
-      webPreferences: {
-        preload: this.options.preload,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
+    const { view, url } = createShellView(
+      provider.folder,
+      shellView(provider.shell, 'ribbon')!,
+      this.options.preload,
+    );
     const b: Binding = {
       id: provider.id,
       session: randomUUID(),
       view,
-      url: pathToFileURL(file).href,
+      url,
       ready: false,
       revision: 0,
       timer: setTimeout(() => this.fail(b, 'Shell ready timeout'), 10000),
@@ -258,9 +278,6 @@ export class ShellHost {
     this.pending = b;
     view.setVisible(false);
     this.options.window.contentView.addChildView(view);
-    view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    view.webContents.on('will-navigate', (event) => event.preventDefault());
-    view.webContents.on('will-redirect', (event) => event.preventDefault());
     view.webContents.on('render-process-gone', () => this.fail(b, 'Shell renderer exited'));
     view.webContents.on('unresponsive', () => this.fail(b, 'Shell renderer is unresponsive'));
     view.webContents.on('before-input-event', (event, input) => {
@@ -291,7 +308,17 @@ export class ShellHost {
     this.disposed = true;
     for (const b of [this.active, this.pending]) if (b) this.close(b);
     this.active = this.pending = undefined;
-    for (const method of ['connect', 'get', 'asset', 'invoke', 'ready', 'dispose', 'focusHost'])
+    for (const method of [
+      'connect',
+      'get',
+      'asset',
+      'invoke',
+      'ready',
+      'dispose',
+      'focusHost',
+      'executeCommand',
+      'getSettings',
+    ])
       ipcMain.removeHandler(`shell:${method}`);
   }
 }

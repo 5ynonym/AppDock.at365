@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-11: 0.26.41 コミット前回帰
+
+- コミット対象をstageしたtree `1c4c3ec2bc350fc9aabeca72de345a2a1bc498ae`で、型検査・標準回帰288/288と関連GUIを完了。sourceはShell Host、overlay、Applet/Gmailページ、設定通知、トレイ、ホスト再起動/終了、画面遷移、設定保持、Windowsホットキー、条件付きキー、MCP操作、ジェスチャー、基本UIの13種類すべて成功。固定単一EXEでもoverlay・トレイ・再起動/終了の3種類が成功し、計18コマンドの終了0と検証前後tree一致を記録した。
+- 既存GUI試験のリボン/プロフィール参照を独立Default Shellへ移し、非同期画面遷移の完了待機と、現在のApplet管理コマンドを含むパレット検索結果の検査を整備。Watchの旧コマンドID固定値を現行manifest参照へ変更した。実入力試験は初期化/フォーカスを確認し、送信中にランナーを止めない非同期処理と既存のScanCode方式を使用。隔離キーF16/F20/Ctrl+Alt+F9で非表示時操作・記録中停止・競合/再登録・終了時解放を確認した。同期送信での未到達等の失敗ログ・診断記録は保持し、OS側の低レベル原因は断定しない。
+- このコミット工程で製品ソース・依存・版・発行物の追加変更はない。0.26.41のEXEは144081513bytes、SHA256 `0519a4b897728c2f107d9b1714132594d846e7b90e388001a752bc0ffcf5e9bf`のまま。feed、隔離コピー、試験fixtureのハッシュを再照合した。実サービス認証・物理IME・複数Shell/Windowの検証に読み替えない。
+- 証跡は`.artifacts/commit-validation-overlay-20261011/validation.json`、`complete-*.json`と完全ログ。Node/pnpm/.NET/OS、依存・試験入力・Gmail/Watchの参照commit/tree、GUI profile16件、文書リンク184件を記録。最終検証後の変更は本VERIFICATIONの追記だけとして差分検査し、最終treeとコミットSHAを同証跡へ追記する。
+- テストprofile386件を列挙し、最新3回/方式・再利用証跡・失敗/状態不明を保持。未参照の古い成功19件を絶対パス・再解析ポイント・使用プロセス検査後に削除し、`cleanup-deleted.json`へ結果ハッシュを記録。隔離テストプロセスの残存0。push/Release/実利用deployは行わない。
+
+## 2026-10-11: 共通オーバーレイ・部分Shell・コマンドパレット移行（0.26.41）
+
+- パレットの描画とCSSをDefault Shellへ移し、本体の重複実装を撤去。OverlayHostが遅延生成・重なり順・ready/終了・入力停止・元WebContentsへのフォーカス復帰を所有し、CommandPaletteSessionがモデル・実行/選択・ピン保存を管理する。トレイ編集は描画なしのCommandPickerから同じパレットを呼ぶ。
+- `shell.views`のribbon/overlay.command-paletteで担当領域だけを提供可能。未提供領域はDefault Shell。通常のコマンド・設定・ページと併用でき、描画から自己コマンドを実行し、自己設定の取得/変更購読で再描画できる。リボンとパレットの故障・復旧を分離し、ログページは後続の契約/移行対象として仕様化。
+- 型検査・ビルド・関連27/27回帰成功（palette/core/presentation/boundaries/tray）。source GUIはオーバーレイ7群（shell-overlay-1791721440033）、既存Shell/MCP/復旧14群（shell-host-1791721372544）、既存Applet/Gmailページ7群（applet-pages-1791721472874）、設定通知9群（settings-notice-1791721530696）、トレイ5群（tray-menu-ui-1791720741248）、ホスト再起動/終了（host-commands-1791721208103）が成功。IME composingイベント、Tab/Escape/Enter、停止中コマンドの選択、ピン、独立描画、ページ入力/フォーカス保持、自己コマンドの所有者検査と設定通知、readyタイムアウト、故障注入、再試行を確認。
+- 0.26.41固定単一EXEでオーバーレイ7群（shell-overlay-1791721737218）、トレイ4群（tray-menu-ui-1791721796135）、再起動/終了（host-commands-1791721864418）が成功。両テーマを確認。sourceは実Windowを900×640へ変更し、portableは900×640のviewportエミュレーションで寸法・overflowを検査。既存トレイ試験は1280/1000/900幅も確認。物理IME・物理通知領域クリック・実サービスログインの検証とは区別する。
+- パレット終了直後に本体rendererの古いmodal状態でキー入力を捨てる問題を修正し、停止判定をmainのdispatcherへ集約。旧GUI試験の本体DOM参照を独立Viewへ更新し、View破棄と入力完了の競合、再起動後の複数View選択、試験manifestのpages capability、所有ページ終了と提供元停止の区別、Electron未対応CDP操作を修正した。失敗profileとログは保持。
+- frozen-lockfileは制限環境のSTATUS_STACK_OVERFLOW後、同じ操作を通常権限で成功。設定回帰のEPERM、Electron起動不可、publish内.NET工程の終了1も通常権限で再検証して成功。依存・lockfile・toolchainの版は変更なし。publish終了0、host/Default Shell/feedとも0.26.41。EXEは144081513bytes、SHA256 `0519a4b897728c2f107d9b1714132594d846e7b90e388001a752bc0ffcf5e9bf`。feedと隔離コピーを照合。
+- 証跡は`.artifacts/overlay-validation-20261011/validation.json`と同フォルダーのログ・GUI結果参照。開発文書リンク169件とdiffを確認。標準全回帰、全既存GUI、複数Shell/Window、ログページ差し替え、overlayのMCP公開は今回未実施/未実装。既存MCPリボンは上記Shell試験で確認。変更した古いpreferences/navigation/keybindings/hotkeys/ui/automation試験はパレット参照の移行までで、今回全編の再実行はしていない。
+- 成功済みprofileを方式別に整理し、最新3回・再利用参照・失敗/不明を保持。参照のない古い成功5件を絶対パス・再解析ポイント・使用プロセス検査後に削除（一覧と結果hashはcleanup-deleted.json）。隔離GUI残存0。実装は未コミット。push/Release/実利用deploy/未変更Appletの発行/全体ZIPの作成は行っていない。
+
 ## 2026-10-11: Applet専用入力API・全Applet共通許可（0.26.37）
 
 - 操作カタログにcallers/permissionsを追加し、MCPとAppletの公開先・許可を共通dispatcherで判定。新規handlerのJSON Schema検証も共通化。既存11操作に加えinput.sendKeys/input.appCommandをApplet専用で公開し、MCPの列挙・直接実行には出さない。明示公開されたAppletコマンドからの呼出しはApplet側の許可で実行する。

@@ -260,6 +260,8 @@ WebApplet提供元の公開宣言を共通SettingsCommandsとコマンドカタ�
 
 ## Shell実装の入口
 
+0.26.41の[部分Shellと共通オーバーレイ](docs/shell-overlays.md)は、`shell.views`による領域単位の選択、リボン/パレットそれぞれのDefault Shell復旧、通常Applet機能との併用を定義する。`OverlayHost`と内容別`OverlayController`を分離し、新しいモーダルは表示寿命・最前面・入力停止・フォーカス復帰を再利用する。トレイのコマンド選択も同じ描画を使用する。パレット関連回帰は`tests/command-palette.test.cjs`、`scripts/shell-overlay-ui-test.cjs [固定EXE]`。新しいページ領域は取得/購読/操作契約を定義してから移す。
+
 0.26.40からの公開契約・ビルド境界は[Shell API](docs/shell-api.md)。Default Shellのソースは`shells/default`、本体側は`src/main/core/shell-host.ts`と`ui-presentation.ts`。新たなUIは機能状態・操作・表示モデルを本体側へ置き、Shellは公開モデルを描画する。移行した描画を本体rendererへ重複実装しない。
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。

@@ -12,6 +12,7 @@ export class SettingsNotice {
     private url: string,
     private preload: string,
     private failed: (message: string) => void,
+    private onLayout: () => void = () => {},
   ) {
     for (const [channel, callback] of [
       ['state', () => this.state],
@@ -108,5 +109,6 @@ export class SettingsNotice {
     });
     // Re-adding an existing child moves it above any newly attached Applet surface.
     this.window.contentView.addChildView(this.view);
+    this.onLayout();
   }
 }

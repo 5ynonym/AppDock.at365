@@ -1,6 +1,6 @@
 # AppDock Shell Hostの仕様と実装計画
 
-状態: 2026-10-11に0.26.39を基準として設計し、0.26.40でリボン移行・共通API・Shell切替/復旧の初回実装を追加。確定した公開契約は[Shell API](shell-api.md)、実測結果と未確認条件は[VERIFICATION](../VERIFICATION.md)を参照。
+状態: 2026-10-11に0.26.39を基準として設計し、0.26.40でリボン移行・共通API・Shell切替/復旧を実装。0.26.41で[共通オーバーレイ・パレット移行・部分Shell](shell-overlays.md)を追加。以下の初期計画はリボン導入時点の記録。現在の公開契約は[Shell API](shell-api.md)、実測結果と未確認条件は[VERIFICATION](../VERIFICATION.md)を参照。
 
 目的は、今後の描画を伴う機能を「状態と操作」「表示情報」「描画」に分けて追加できる基盤を作ること。最初の移行対象をリボンに限定し、本体repo内のDefault Shellで描画・操作・状態追随・復旧まで成立させる。移行したUIの実装は本体rendererから除去し、標準・復旧時とも同じDefault Shellを使う。将来の複数Shellに備えて表示インスタンスを識別するが、今回提供する本体ウィンドウと有効なShell表示は各1つとする。
 
@@ -12,11 +12,11 @@ Default Shellは本体に同梱して更新・復旧を保証する役割を持�
 
 仕様・実装計画・開発文書・設定画面の正式名称は以下に統一する。
 
-| 正式名称 | 意味 |
-| --- | --- |
-| Default Shell | 本体と一緒にビルド・配布する標準の描画実装。通常時と復旧時に同じ実装を使う |
-| Shell Applet | Default Shellを差し替えるために追加する拡張機能 |
-| Shell Host | 本体側にあるShellの起動・表示領域・切替・復旧・共通APIを担当する仕組み |
+| 正式名称      | 意味                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Default Shell | 本体と一緒にビルド・配布する標準の描画実装。通常時と復旧時に同じ実装を使う                                            |
+| Shell Applet  | Default Shellの担当領域を部分的またはまとめて差し替える描画能力を持つApplet。通常のコマンド・設定・ページも併用できる |
+| Shell Host    | 本体側にあるShellの起動・表示領域・切替・復旧・共通APIを担当する仕組み                                                |
 
 ShellはDefault ShellとShell Appletをまとめた総称としてのみ使う。双方に同じ公開Shell APIと実行境界を適用し、Default ShellをShell Appletと呼ばない。Shell Hostはリボンなど移行対象のUI描画実装を持たない。未移行の既存画面は本体rendererに残るが、Shell Hostの描画機能として扱わない。
 
@@ -24,28 +24,28 @@ ShellはDefault ShellとShell Appletをまとめた総称としてのみ使う�
 
 ## 今回完成させる範囲
 
-| 対象 | 今回の到達点 |
-| --- | --- |
-| 表示と操作の共通契約 | 型付き表示モデル、意味を持つ操作ID、状態の取得と購読、接続寿命を実装 |
-| リボン | 既存の見た目・項目・配置・操作を維持してDefault Shellへ移す |
-| 本体の画面遷移 | リボンと既存入口が同じ状態・操作処理を使う。選択表示をShellが独自判定しない |
-| Shellの選択と復旧 | Default Shellと導入済みShell Appletを選べる。準備後の切替と故障時のDefault Shell復帰を実装 |
-| 外部利用 | 同じ表示モデルと操作をMCP/通常Applet APIへ公開し、独立した小さな検証クライアントで実証 |
-| 今後の開発 | 新しい表示モデル・操作を足す手順と小さなfixtureを用意 |
+| 対象                 | 今回の到達点                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| 表示と操作の共通契約 | 型付き表示モデル、意味を持つ操作ID、状態の取得と購読、接続寿命を実装                       |
+| リボン               | 既存の見た目・項目・配置・操作を維持してDefault Shellへ移す                                |
+| 本体の画面遷移       | リボンと既存入口が同じ状態・操作処理を使う。選択表示をShellが独自判定しない                |
+| Shellの選択と復旧    | Default Shellと導入済みShell Appletを選べる。準備後の切替と故障時のDefault Shell復帰を実装 |
+| 外部利用             | 同じ表示モデルと操作をMCP/通常Applet APIへ公開し、独立した小さな検証クライアントで実証     |
+| 今後の開発           | 新しい表示モデル・操作を足す手順と小さなfixtureを用意                                      |
 
 複数Shellの同時表示、複数本体ウィンドウ、横リボンや自由配置、設定画面全体の移植、汎用UI記述言語、全WebContentsの多重表示、内蔵作成チャットは今回の対象外。これらの完成を基盤導入の前提にしない。
 
 ## 現状と移行が必要な箇所
 
-| 現在の実装 | 移行する責務 |
-| --- | --- |
-| [renderer/main.tsx](../src/renderer/main.tsx) | リボン構築、項目別クリック分岐、選択ページ、プロフィール・リボン設定への移動が同居している |
-| [shared/applet-pages.ts](../src/shared/applet-pages.ts) | 項目列挙・並び順・有効Applet判定・保存配置の検証を再利用する |
-| [RibbonCommands](../src/main/core/ribbon-commands.ts) | ribbon.getは設定編集用。アイコン・選択・統一操作を揃えた描画APIは別に追加する |
-| [main/index.ts](../src/main/index.ts) | 本体コマンドの一部をrendererへ通知している。リボンに関係する遷移は共通状態管理へ接続する |
-| [AppletSurface](../src/main/core/applet-pages.ts) | 画面と表示先の分離を再利用する。現在の単一host/selected/boundsをそのまま新Shell契約へ公開しない |
-| [applet-page-preload.ts](../src/main/applet-page-preload.ts) | 自分の設定・コマンド用の限定入口。新Shellには別の専用ブリッジを用意する |
-| [useSettingsEditor](../src/renderer/useSettingsEditor.ts) | 共有draftと保存の唯一の所有者として維持する。今回Shellへ移さない |
+| 現在の実装                                                   | 移行する責務                                                                                    |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| [renderer/main.tsx](../src/renderer/main.tsx)                | リボン構築、項目別クリック分岐、選択ページ、プロフィール・リボン設定への移動が同居している      |
+| [shared/applet-pages.ts](../src/shared/applet-pages.ts)      | 項目列挙・並び順・有効Applet判定・保存配置の検証を再利用する                                    |
+| [RibbonCommands](../src/main/core/ribbon-commands.ts)        | ribbon.getは設定編集用。アイコン・選択・統一操作を揃えた描画APIは別に追加する                   |
+| [main/index.ts](../src/main/index.ts)                        | 本体コマンドの一部をrendererへ通知している。リボンに関係する遷移は共通状態管理へ接続する        |
+| [AppletSurface](../src/main/core/applet-pages.ts)            | 画面と表示先の分離を再利用する。現在の単一host/selected/boundsをそのまま新Shell契約へ公開しない |
+| [applet-page-preload.ts](../src/main/applet-page-preload.ts) | 自分の設定・コマンド用の限定入口。新Shellには別の専用ブリッジを用意する                         |
+| [useSettingsEditor](../src/renderer/useSettingsEditor.ts)    | 共有draftと保存の唯一の所有者として維持する。今回Shellへ移さない                                |
 
 ## 責務と依存方向
 
@@ -53,16 +53,16 @@ ShellはDefault ShellとShell Appletをまとめた総称としてのみ使う�
 
 下表のUiPresentationService、UiActionService、NavigationCoordinator、ShellManager、ShellSurfaceはShell Hostの構成要素とする。既存機能サービスを呼び、Default ShellとShell Appletへ同じ契約を提供する。
 
-| 層 | 責務 |
-| --- | --- |
-| 既存機能サービス | SettingsStore/SettingsCommands、コマンド実行、Applet管理、ページ起動、テーマ、ログ |
-| UiPresentationService | 登録情報と状態から表示モデルを生成し、変更番号と変更通知を管理 |
-| UiActionService | 操作IDを現在の登録内容へ解決し、呼出元・利用可否を検証して既存処理を実行 |
-| NavigationCoordinator | 本体内の論理的なページ選択と設定カテゴリへの移動要求を管理 |
-| ShellManager | providerの選択、表示インスタンス、準備完了、切替、終了、故障復旧 |
-| ShellSurface | Electron View、割当領域、フォーカス、重なり、専用ブリッジを管理 |
+| 層                           | 責務                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| 既存機能サービス             | SettingsStore/SettingsCommands、コマンド実行、Applet管理、ページ起動、テーマ、ログ                |
+| UiPresentationService        | 登録情報と状態から表示モデルを生成し、変更番号と変更通知を管理                                    |
+| UiActionService              | 操作IDを現在の登録内容へ解決し、呼出元・利用可否を検証して既存処理を実行                          |
+| NavigationCoordinator        | 本体内の論理的なページ選択と設定カテゴリへの移動要求を管理                                        |
+| ShellManager                 | providerの選択、表示インスタンス、準備完了、切替、終了、故障復旧                                  |
+| ShellSurface                 | Electron View、割当領域、フォーカス、重なり、専用ブリッジを管理                                   |
 | Default Shell / Shell Applet | TypeScript/Reactによる描画、キーボード移動、ホバー等の一時状態。初版のDefault Shellはリボンを担当 |
-| MCP/通常Appletアダプター | 同じ表示・操作サービスを各接続の公開範囲と許可で呼ぶ |
+| MCP/通常Appletアダプター     | 同じ表示・操作サービスを各接続の公開範囲と許可で呼ぶ                                              |
 
 クラス名と新規ファイル名は実装時の候補。責務と契約を優先し、小さな処理まで機械的に別クラスへ分割しない。本体に各Applet固有の名前や振る舞いを追加せず、提供元のページ・コマンド宣言を使う。
 
@@ -72,15 +72,15 @@ ShellはDefault ShellとShell Appletをまとめた総称としてのみ使う�
 
 描画用のUiRibbonSnapshot v1を定義する。保存用ribbon.getとappdock.ribbon.updateは現在の契約を維持する。
 
-| フィールド | 意味 |
-| --- | --- |
-| schemaVersion | 表示契約のメジャー版。初版は1 |
-| hostEpoch | 本体起動ごとの識別子。再起動前の状態・要求と区別する |
-| contextId | 論理的な表示状態の識別子。初版はprimaryのみ |
-| revision | この呼出元向けモデルの更新番号。設定保存revisionとは独立 |
-| appearance | 現在のテーマ、表示名などリボンに必要な最小情報 |
-| items | 順番を確定した表示対象項目。非表示・無効Appletを除く |
-| actions | このモデルの操作一覧。enabledと利用不可理由を含む |
+| フィールド    | 意味                                                     |
+| ------------- | -------------------------------------------------------- |
+| schemaVersion | 表示契約のメジャー版。初版は1                            |
+| hostEpoch     | 本体起動ごとの識別子。再起動前の状態・要求と区別する     |
+| contextId     | 論理的な表示状態の識別子。初版はprimaryのみ              |
+| revision      | この呼出元向けモデルの更新番号。設定保存revisionとは独立 |
+| appearance    | 現在のテーマ、表示名などリボンに必要な最小情報           |
+| items         | 順番を確定した表示対象項目。非表示・無効Appletを除く     |
+| actions       | このモデルの操作一覧。enabledと利用不可理由を含む        |
 
 項目には安定したid、kind（button/separator）、label、tooltip、icon、placement（start/end）、selected、actionIdを持たせる。start/endは既存top/bottomを変換した配置意図であり、保存形式は変えない。将来の未読数等は必要な機能を実装する時に任意フィールドとして追加する。
 
@@ -118,11 +118,11 @@ NavigationCoordinatorはprimary contextの選択ページと、プロフィー�
 
 共通の表示/操作サービスに、ホストが生成した呼出元文脈を渡す。専用ブリッジのshell、通常のapplet、mcpを区別し、リクエスト本文から権限・Applet ID・Shell IDを名乗らせない。
 
-| 呼出元 | 読取りと操作 |
-| --- | --- |
+| 呼出元        | 読取りと操作                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------ |
 | 選択中のShell | 現在の本体リボンと同じ操作範囲。Default ShellとShell Appletの両方に同じ公開Shell契約を適用 |
-| 通常Applet | 既存appdock-api capabilityと全Applet共通許可を使用 |
-| MCP | 既存の接続認証・公開範囲・操作許可を使用 |
+| 通常Applet    | 既存appdock-api capabilityと全Applet共通許可を使用                                         |
+| MCP           | 既存の接続認証・公開範囲・操作許可を使用                                                   |
 
 Shell用契約は一般Appletの許可を全開放する仕組みではない。一般Appletの許可をOFFにしても、本体の設定画面と復旧入口を操作できる。Shell宣言だけでは権限を与えず、ShellManagerが選択・準備したViewの接続へ限定する。既存applet-page/preloadやリモートWebページには追加しない。
 
@@ -138,14 +138,14 @@ MCPと通常Appletのモデルは同じschemaを使うが、実行可能なactio
 
 名称は以下を実装案とする。新規操作は既存の名前・結果を変更せず追加する。
 
-| API案 | 契約 |
-| --- | --- |
-| ui.ribbon.get | contextId省略時primary。schemaVersion/epoch/revision付き完全snapshotを返す |
-| ui.assets.get | モデル内のassetIdに対応する画像を取得。pathやURLを引数にしない |
-| ui.actions.invoke | hostEpoch/contextId/actionId/requestIdで現在の操作を要求 |
-| Shell専用connect | ホスト発行sessionId/contextId、対応版、初回snapshotと購読を取得 |
-| Shell専用ready | 初回snapshotを描画した後に通知。現在準備中のsessionにだけ有効 |
-| Shell専用dispose | 購読解除。View側の切断時にもホストが必ず回収 |
+| API案             | 契約                                                                       |
+| ----------------- | -------------------------------------------------------------------------- |
+| ui.ribbon.get     | contextId省略時primary。schemaVersion/epoch/revision付き完全snapshotを返す |
+| ui.assets.get     | モデル内のassetIdに対応する画像を取得。pathやURLを引数にしない             |
+| ui.actions.invoke | hostEpoch/contextId/actionId/requestIdで現在の操作を要求                   |
+| Shell専用connect  | ホスト発行sessionId/contextId、対応版、初回snapshotと購読を取得            |
+| Shell専用ready    | 初回snapshotを描画した後に通知。現在準備中のsessionにだけ有効              |
+| Shell専用dispose  | 購読解除。View側の切断時にもホストが必ず回収                               |
 
 初版のcontextIdはprimaryのみを受け付け、未知contextはエラーとする。Shellの接続先contextはホストが割り当て、任意Window IDを受け付けない。外部は論理contextを指定できても、埋込みViewやWindowを管理できない。
 
@@ -237,14 +237,14 @@ Default ShellとShell Appletは本体rendererの内部ファイルを直接impor
 
 ## 実装の順序と完了条件
 
-| 段階 | 変更対象と成果物 | 次へ進む条件 |
-| --- | --- | --- |
-| 1 契約と表示サービス | sharedにUI契約、coreにprojection/action/navigation。既存ribbon/commands/settingsの処理を再利用 | 表示・設定revision分離、公開範囲、登録解除、遷移がモデル/操作試験で確認できる |
-| 2 移行準備 | 既存クリック/画面遷移を共通操作へ接続し、リボンを移動可能な表示部分へ整理 | 従来のページ復元、キー、未保存編集が同等に動作。ここは中間状態であり最終構成に本体リボンを残さない |
-| 3 共通Applet経路 | 同梱Shell探索元/manifest/公開Shell SDK/専用preload/ShellManager/ShellSurface/選択/復旧 | Default Shell/Shell Appletのfixtureを同じ経路で起動し、ready切替・取消・故障・safe起動が成立 |
+| 段階                    | 変更対象と成果物                                                                                | 次へ進む条件                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1 契約と表示サービス    | sharedにUI契約、coreにprojection/action/navigation。既存ribbon/commands/settingsの処理を再利用  | 表示・設定revision分離、公開範囲、登録解除、遷移がモデル/操作試験で確認できる                       |
+| 2 移行準備              | 既存クリック/画面遷移を共通操作へ接続し、リボンを移動可能な表示部分へ整理                       | 従来のページ復元、キー、未保存編集が同等に動作。ここは中間状態であり最終構成に本体リボンを残さない  |
+| 3 共通Applet経路        | 同梱Shell探索元/manifest/公開Shell SDK/専用preload/ShellManager/ShellSurface/選択/復旧          | Default Shell/Shell Appletのfixtureを同じ経路で起動し、ready切替・取消・故障・safe起動が成立        |
 | 4 Default Shellへの移植 | shells/defaultへ唯一のリボン実装を移動、本体から削除。build/publishへの同梱と依存境界検査を追加 | 内部import/非公開APIなしで既存リボンが動き、Shell Appletなしの固定単一EXEでも起動・操作・復旧できる |
-| 5 外部経路 | 共通カタログの3 API、MCP/通常Applet経路、独立表示fixture | 実MCPで表示/画像/操作/再取得が通り、非公開操作と権限取消を回避できない |
-| 6 配布と記録 | 本体とDefault Shellの版整合、単一EXEへの収録、本体publish、仕様/試験記録更新 | 下記受入条件を固定配布物で満たし、生成物/終了/整理を確認 |
+| 5 外部経路              | 共通カタログの3 API、MCP/通常Applet経路、独立表示fixture                                        | 実MCPで表示/画像/操作/再取得が通り、非公開操作と権限取消を回避できない                              |
+| 6 配布と記録            | 本体とDefault Shellの版整合、単一EXEへの収録、本体publish、仕様/試験記録更新                    | 下記受入条件を固定配布物で満たし、生成物/終了/整理を確認                                            |
 
 段階1〜6を今回の基盤実装の範囲とする。2で終えて「分離できた」とは扱わず、Default Shell・Shell Applet fixture・外部クライアントが公開契約を使えるところまで実証する。段階3のView/フォーカス試験をDefault Shell移植前に行い、画面合成の問題を早期に解消する。
 
@@ -254,19 +254,19 @@ Default ShellとShell Appletは本体rendererの内部ファイルを直接impor
 
 ## 受入条件と検証
 
-| 分類 | 確認する振る舞い |
-| --- | --- |
-| リボン | 標準6項目、Applet、上下順、非表示、区切り、アバター、テーマ、右クリック、有効待機/エラー/無効化/再開 |
-| 状態追随 | 設定外部更新、Applet追加/削除、他入口からのページ遷移、同一ページへの再要求、再接続/epoch更新、古い応答の無視 |
-| 操作 | 重複要求、古い操作ID、実行直前の無効化、再入/取消、テーマの部分更新、受付と効果の区別 |
-| 権限 | Shell/通常Applet/MCPの分離、未公開コマンド、writeなしテーマ変更、実行中の許可取消、偽の呼出元/古いsession/remoteページ拒否 |
-| 既存画面 | 本体ページ/別Window、Gmail/WebAppletのViewとsession同一性、共有draft/選択タブ/未保存通知、再起動復元 |
-| 入力と合成 | Tab境界、フォーカス復帰、条件付きキー、パレット/dialog/通知、両テーマ、狭幅、DPI変更、最小化/復帰 |
-| 復旧 | Shell AppletのHTML欠落/非対応版/ready未到着/renderer・worker終了/応答不能、切替中の別選択、無効化/削除、未導入同期先、safe起動、Default Shell自体の失敗時の最小通知 |
-| 外部 | 本体rendererをimportしないfixtureが実MCPから描画・画像取得・クリック・状態追随。切断時の操作自動再送なし |
-| 寿命 | 2読者への同じ状態配信、片方の解除後も他方は継続、Shell再起動で機能の二重起動なし、購読/View回収 |
-| 負荷 | 起動と切替の時間、移行前固定版との追加メモリ/待機CPU比較、再起動を繰り返してもView/購読が増え続けない |
-| 依存と同梱 | 本体のリボン描画撤去、双方の内部import拒否、Default ShellとShell AppletのAPI同等性、単一EXE内のmanifest/asset整合、重複ID拒否、個別更新対象からの除外 |
+| 分類       | 確認する振る舞い                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| リボン     | 標準6項目、Applet、上下順、非表示、区切り、アバター、テーマ、右クリック、有効待機/エラー/無効化/再開                                                                |
+| 状態追随   | 設定外部更新、Applet追加/削除、他入口からのページ遷移、同一ページへの再要求、再接続/epoch更新、古い応答の無視                                                       |
+| 操作       | 重複要求、古い操作ID、実行直前の無効化、再入/取消、テーマの部分更新、受付と効果の区別                                                                               |
+| 権限       | Shell/通常Applet/MCPの分離、未公開コマンド、writeなしテーマ変更、実行中の許可取消、偽の呼出元/古いsession/remoteページ拒否                                          |
+| 既存画面   | 本体ページ/別Window、Gmail/WebAppletのViewとsession同一性、共有draft/選択タブ/未保存通知、再起動復元                                                                |
+| 入力と合成 | Tab境界、フォーカス復帰、条件付きキー、パレット/dialog/通知、両テーマ、狭幅、DPI変更、最小化/復帰                                                                   |
+| 復旧       | Shell AppletのHTML欠落/非対応版/ready未到着/renderer・worker終了/応答不能、切替中の別選択、無効化/削除、未導入同期先、safe起動、Default Shell自体の失敗時の最小通知 |
+| 外部       | 本体rendererをimportしないfixtureが実MCPから描画・画像取得・クリック・状態追随。切断時の操作自動再送なし                                                            |
+| 寿命       | 2読者への同じ状態配信、片方の解除後も他方は継続、Shell再起動で機能の二重起動なし、購読/View回収                                                                     |
+| 負荷       | 起動と切替の時間、移行前固定版との追加メモリ/待機CPU比較、再起動を繰り返してもView/購読が増え続けない                                                               |
+| 依存と同梱 | 本体のリボン描画撤去、双方の内部import拒否、Default ShellとShell AppletのAPI同等性、単一EXE内のmanifest/asset整合、重複ID拒否、個別更新対象からの除外               |
 
 複数読者の試験はサービスと外部クライアントで行い、製品の複数Shellウィンドウ対応を完了扱いにしない。
 

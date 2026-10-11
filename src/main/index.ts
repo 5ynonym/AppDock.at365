@@ -1,6 +1,10 @@
 import { ShellHost } from './core/shell-host';
+import { OverlayHost } from './core/overlay-host';
+import { CommandPaletteSession } from './core/command-palette';
+import type { CommandPaletteRequest } from '../shared/overlays';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
 import { defaultShellId } from '../shared/shell';
+import { appletInputSettings } from '../shared/gestures';
 import { NativeInput } from './core/native-input';
 import {
   app,
@@ -21,7 +25,7 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
 import { SettingsCommands } from './core/settings-commands';
@@ -159,6 +163,8 @@ if (locked) {
 let window: BrowserWindow | null = null;
 let settingsNotice: SettingsNotice | undefined;
 let shellHost: ShellHost | undefined;
+let overlayHost: OverlayHost | undefined;
+let paletteSession: CommandPaletteSession | undefined;
 const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(() => changed());
 const presentation = new UiPresentation({
@@ -311,6 +317,7 @@ const changed = () => {
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
     shellHost?.refresh();
+    overlayHost?.refresh();
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
   }, 60);
 };
@@ -399,8 +406,53 @@ function quitHost(restart = false) {
   quitting = true;
   app.quit();
 }
+function executeShellCommand(provider: string, command: string) {
+  const applet = manager
+    .snapshot()
+    .find((p) => p.id === provider && p.enabled && p.state === 'running');
+  if (!applet?.commands.some((c) => c.id === command && c.available))
+    throw Error('Command is not available from this Shell Applet');
+  return executeCommand(command);
+}
+function openCommandPalette(request: CommandPaletteRequest) {
+  if (!startupReady || quitting || !overlayHost) throw Error('AppDockは準備中です。');
+  const session = new CommandPaletteSession(request, {
+    commands: () => [
+      ...hostCommands.map((c) => ({ ...c, extensionId: null })),
+      ...appletManagementCommands(allApplets()),
+      ...allApplets().flatMap((e) =>
+        e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
+      ),
+    ],
+    pins: () => settings.value.pinnedCommands,
+    shortcuts: () => settings.value.shortcuts,
+    dark: () => nativeTheme.shouldUseDarkColors,
+    savePins: (ids) => {
+      settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision);
+    },
+    execute: executeCommand,
+    changed,
+  });
+  paletteSession = session;
+  overlayHost.open(session);
+  return session.result
+    .then((result) => {
+      if (result.status === 'executed' && window && !window.isDestroyed())
+        window.webContents.send('dock:paletteExecuted');
+      return result;
+    })
+    .finally(() => {
+      if (paletteSession === session) paletteSession = undefined;
+    });
+}
 async function executeCommand(id: string, invocation?: GestureInvocation) {
   if (quitting) return;
+  if (id === 'appdock.commands.search') {
+    showWindow();
+    if (overlayHost?.active) overlayHost.cancel('toggle');
+    else void openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
+    return;
+  }
   if (appletManagement.has(id)) return appletManagement.execute(id);
   if (settingsCommands.hasGenerated(id)) return settingsCommands.execute(id, {}, false);
   if (id === gesturePauseCommand) {
@@ -429,7 +481,7 @@ async function executeCommand(id: string, invocation?: GestureInvocation) {
 const shortcutDispatcher = new ShortcutDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
-  () => quitting || shortcutRecording,
+  () => quitting || shortcutRecording || !!overlayHost?.active,
 );
 function shortcutContext() {
   const appletId = activeShortcutApplet();
@@ -447,7 +499,7 @@ function availableShortcutCommands() {
   ];
 }
 function dispatchShortcut(key: string, globalEvent = false) {
-  if (shortcutRecording || quitting) return Promise.resolve();
+  if (shortcutRecording || quitting || overlayHost?.active) return Promise.resolve();
   const commands = resolveKeybindings(
     getKeybindings(settings.value),
     key,
@@ -485,6 +537,7 @@ function avatarSignature() {
 }
 function snapshot(): HostSnapshot {
   return {
+    overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
     shell: shellHost?.status ?? {
       selected: defaultShellId,
@@ -546,7 +599,7 @@ function syncHotKeys(retry = false) {
       extension.commands.filter((command) => command.available).map((command) => command.id),
     ),
   ];
-  return hotKeys.sync(settings.value, available, shortcutRecording, retry);
+  return hotKeys.sync(settings.value, available, shortcutRecording || !!overlayHost?.active, retry);
 }
 function prepareSettings(value: Settings) {
   let next = parseSettings(value);
@@ -602,6 +655,7 @@ function registerIpc() {
     for (const id of new Set([selected, defaultShellId]))
       if (manager.items.get(id)?.state === 'error') await manager.restart(id);
     shellHost?.retry();
+    overlayHost?.retry();
   });
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
@@ -614,7 +668,16 @@ function registerIpc() {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
     return automation.action(action);
   });
-  handle('dock:settingsNotice', (state) => settingsNotice?.update(state));
+  handle('dock:settingsNotice', (state) => {
+    settingsNotice?.update(state);
+    overlayHost?.layout();
+  });
+  handle('dock:openCommandPalette', (request: CommandPaletteRequest) =>
+    openCommandPalette(request),
+  );
+  handle('dock:cancelCommandPalette', (requestId: string) => {
+    if (paletteSession?.request.requestId === requestId) paletteSession.cancel('owner-disposed');
+  });
   handle('dock:confirmDiscardSettings', async () => {
     const answer = await dialog.showMessageBox(window!, {
       type: 'warning',
@@ -908,7 +971,7 @@ async function initialize() {
       (error) => hotKeys?.failed(error),
     ),
     async (id) => {
-      if (shortcutRecording || quitting) return;
+      if (shortcutRecording || quitting || overlayHost?.active) return;
       await executeCommand(id);
     },
     changed,
@@ -937,7 +1000,7 @@ async function initialize() {
           window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
         },
         commands: availableShortcutCommands(),
-        recording: shortcutRecording || quitting,
+        recording: shortcutRecording || quitting || !!overlayHost?.active,
       };
     },
     shortcutDispatcher,
@@ -1078,11 +1141,14 @@ async function initialize() {
     'appdock://host/index.html?settingsNotice=1',
     path.join(__dirname, 'settings-notice-preload.js'),
     (message) => log.write('error', 'settings', message),
+    () => overlayHost?.layout(),
   );
   shellHost = new ShellHost({
     window,
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
+    execute: executeShellCommand,
+    settings: (id) => appletInputSettings(settings.value, id),
     providers: () => manager.snapshot(),
     selected: () => settings.value.host.shellProvider || defaultShellId,
     safeMode: safeShell,
@@ -1111,7 +1177,13 @@ async function initialize() {
         });
     },
     shortcut: (input) => {
-      if (input.type !== 'keyDown' || input.isAutoRepeat || input.isComposing || shortcutRecording)
+      if (
+        input.type !== 'keyDown' ||
+        input.isAutoRepeat ||
+        input.isComposing ||
+        shortcutRecording ||
+        overlayHost?.active
+      )
         return false;
       const key = shortcutFromEvent({
         key: input.key,
@@ -1134,8 +1206,30 @@ async function initialize() {
       return true;
     },
   });
+  overlayHost = new OverlayHost({
+    window,
+    preload: path.join(__dirname, 'overlay-preload.js'),
+    providers: () => manager.snapshot(),
+    selected: () =>
+      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    route: () => navigation.state.route,
+    execute: executeShellCommand,
+    settings: (id) => appletInputSettings(settings.value, id),
+    changed: () => {
+      void syncHotKeys();
+      changed();
+    },
+    failed: (message) => {
+      log.write('error', 'overlay', message);
+      if (!overlayHost?.active)
+        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
+    },
+  });
   configurePageHost({
-    overlay: () => settingsNotice?.layout(),
+    overlay: () => {
+      settingsNotice?.layout();
+      overlayHost?.layout();
+    },
     window: () => window,
     display: (key, fallback) => {
       const web = settings.value.webApplets.items.find((item) => pageKey(item.id, 'main') === key);
@@ -1162,6 +1256,7 @@ async function initialize() {
         input.isAutoRepeat ||
         input.isComposing ||
         shortcutRecording ||
+        overlayHost?.active ||
         quitting
       )
         return false;
@@ -1401,10 +1496,7 @@ async function runSmoke() {
     );
     tray!.emit('click');
     await new Promise((r) => setTimeout(r, 150));
-    if (
-      !(await window!.webContents.executeJavaScript(`!!document.querySelector('.command-palette')`))
-    )
-      throw new Error('Selected tray click did not open command palette');
+    if (!overlayHost?.active) throw new Error('Selected tray click did not open command palette');
     window!.hide();
     settings.save(
       { ...settings.value, host: { ...settings.value.host, trayClickCommand: 'missing.command' } },
@@ -1518,6 +1610,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   shellHost?.dispose();
+  overlayHost?.dispose();
   void (async () => {
     for (const stop of [
       () => automation?.close(),

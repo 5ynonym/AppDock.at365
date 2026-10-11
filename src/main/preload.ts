@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  onPaletteExecuted: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('dock:paletteExecuted', handler);
+    return () => ipcRenderer.removeListener('dock:paletteExecuted', handler);
+  },
   focusShell: (edge) => ipcRenderer.invoke('dock:focusShell', edge),
   onShellFocusHost: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, edge: 'before' | 'after') => callback(edge);
@@ -57,6 +62,8 @@ const api: DockApi = {
     ipcRenderer.invoke('dock:saveSettings', value, revision, avatar, avatarName),
   restoreSettingsBackup: (revision) => ipcRenderer.invoke('dock:restoreSettingsBackup', revision),
   setPinnedCommands: (ids) => ipcRenderer.invoke('dock:setPinnedCommands', ids),
+  openCommandPalette: (request) => ipcRenderer.invoke('dock:openCommandPalette', request),
+  cancelCommandPalette: (requestId) => ipcRenderer.invoke('dock:cancelCommandPalette', requestId),
   toggleExtension: (id, enabled) => ipcRenderer.invoke('dock:toggleExtension', id, enabled),
   restartExtension: (id) => ipcRenderer.invoke('dock:restartExtension', id),
   executeCommand: (id) => ipcRenderer.invoke('dock:executeCommand', id),

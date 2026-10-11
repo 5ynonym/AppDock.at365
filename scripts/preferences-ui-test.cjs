@@ -45,6 +45,7 @@ async function launch() {
   return page;
 }
 async function waitPins(page, pins) {
+  page = await require('./shell-overlay-helper.cjs').overlayPage(page);
   await page.waitForFunction(
     (expected) =>
       Array.from(document.querySelectorAll('.palette-command.pinned'))
@@ -56,22 +57,38 @@ async function waitPins(page, pins) {
 (async () => {
   try {
     let page = await launch();
+    let palette;
     await page.keyboard.press('Control+p');
-    await page.getByRole('dialog', { name: 'コマンドパレット' }).waitFor();
-    await page.getByRole('button', { name: '保存APIを確認をピン留め', exact: true }).click();
+    palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await (
+      await require('./shell-overlay-helper.cjs').overlayPage(page)
+    )
+      .getByRole('button', { name: '保存APIを確認をピン留め', exact: true })
+      .click();
     await waitPins(page, ['appdock.welcome.verify-storage']);
-    await page.getByRole('button', { name: 'ウェルカムを更新をピン留め', exact: true }).click();
+    await (
+      await require('./shell-overlay-helper.cjs').overlayPage(page)
+    )
+      .getByRole('button', { name: 'ウェルカムを更新をピン留め', exact: true })
+      .click();
     await waitPins(page, ['appdock.welcome.verify-storage', 'appdock.welcome.refresh']);
-    await page.getByRole('button', { name: 'ウェルカムを更新を上に移動', exact: true }).click();
+    await (
+      await require('./shell-overlay-helper.cjs').overlayPage(page)
+    )
+      .getByRole('button', { name: 'ウェルカムを更新を上に移動', exact: true })
+      .click();
     await waitPins(page, ['appdock.welcome.refresh', 'appdock.welcome.verify-storage']);
     await page.screenshot({ path: path.join(profile, 'pins.png') });
-    await page.getByPlaceholder('コマンドを入力…').fill('ウェルカムを更新');
+    await palette.getByPlaceholder('コマンドを入力…').fill('ウェルカムを更新');
     await waitPins(page, ['appdock.welcome.refresh']);
     assert.deepEqual(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.pinnedCommands,
       ['appdock.welcome.refresh', 'appdock.welcome.verify-storage'],
     );
-    await page.keyboard.press('Escape');
+    await require('./shell-overlay-helper.cjs').closingAction(
+      (await require('./shell-overlay-helper.cjs').overlayPage(page)).keyboard.press('Escape'),
+    );
+    await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     await page.keyboard.press('Control+,');
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
     const setShortcut = async (commandId, key) => {
@@ -100,16 +117,29 @@ async function waitPins(page, pins) {
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.getByRole('status').filter({ hasText: '設定を保存' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
-    await page.getByRole('button', { name: 'ホーム', exact: true }).first().click();
+    await (
+      await require('./shell-overlay-helper.cjs').ribbonPage(page)
+    )
+      .getByRole('button', { name: 'ホーム', exact: true })
+      .first()
+      .click();
+    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
     await page.keyboard.press('Control+p');
-    assert.equal(await page.getByRole('dialog').count(), 0);
+    assert.equal((await page.evaluate(() => window.dock.snapshot())).overlay.active, false);
     await page.keyboard.press('Control+Alt+p');
-    await page.getByRole('dialog', { name: 'コマンドパレット' }).waitFor();
-    await page.keyboard.press('Escape');
+    palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await require('./shell-overlay-helper.cjs').closingAction(
+      (await require('./shell-overlay-helper.cjs').overlayPage(page)).keyboard.press('Escape'),
+    );
+    await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     await page.keyboard.press('Control+Alt+r');
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     // Assign and execute a real .NET command through the same shortcut settings.
-    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await (
+      await require('./shell-overlay-helper.cjs').ribbonPage(page)
+    )
+      .getByRole('button', { name: 'Applet', exact: true })
+      .click();
     await page
       .getByRole('complementary', { name: 'Applet一覧' })
       .getByRole('button', { name: /.NET Connection Demo/ })
@@ -122,7 +152,13 @@ async function waitPins(page, pins) {
     const before = (await page.evaluate(() => window.dock.snapshot())).extensions
       .find((e) => e.id === 'appdock.dotnet-demo')
       .panel.facts.find((f) => f.label === 'Refresh').value;
-    await page.getByRole('button', { name: 'ホーム', exact: true }).first().click();
+    await (
+      await require('./shell-overlay-helper.cjs').ribbonPage(page)
+    )
+      .getByRole('button', { name: 'ホーム', exact: true })
+      .first()
+      .click();
+    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
     await page.keyboard.press('Control+Alt+d');
     await page.waitForFunction(
       (previous) =>
@@ -138,19 +174,20 @@ async function waitPins(page, pins) {
           ),
       before,
     );
-    await page.getByRole('button', { name: 'プロフィール設定を開く' }).click();
-    await page.getByLabel('ユーザー名').fill('ユキちゃん');
+    const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
+    await shell.locator('[data-ribbon-id="profile"]').click();
+    await page.getByLabel('ユーザー名').fill('検証ユーザー');
     await page.getByLabel('アバター画像を選択').setInputFiles(path.join(root, 'assets/icon.png'));
     await page.getByAltText('プロフィール画像').waitFor();
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.locator('.avatar img').waitFor();
-    await page.waitForFunction(() => {
+    await shell.locator('.avatar img').waitFor();
+    await shell.waitForFunction(() => {
       const img = document.querySelector('.avatar img');
       return img?.complete && img.naturalWidth > 0;
     });
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
-      'ユキちゃん',
+      '検証ユーザー',
     );
     const firstHash = hash();
     await page.getByLabel('アバター画像を選択').setInputFiles(path.join(profile, 'pins.png'));
@@ -190,23 +227,34 @@ async function waitPins(page, pins) {
     assert.equal(hash(), finalHash);
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
-      'ユキちゃん',
+      '検証ユーザー',
     );
     await page.screenshot({ path: path.join(profile, 'profile.png') });
     await application.close();
     application = undefined;
     page = await launch();
-    await page.locator('.avatar img').waitFor();
+    await (
+      await require('./shell-overlay-helper.cjs').ribbonPage(page)
+    )
+      .locator('.avatar img')
+      .waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
-      'ユキちゃん',
+      '検証ユーザー',
     );
     assert.equal(hash(), finalHash);
     await page.keyboard.press('Control+Alt+p');
     await waitPins(page, ['appdock.welcome.refresh', 'appdock.welcome.verify-storage']);
-    await page.getByRole('button', { name: '保存APIを確認をピン留め解除', exact: true }).click();
+    await (
+      await require('./shell-overlay-helper.cjs').overlayPage(page)
+    )
+      .getByRole('button', { name: '保存APIを確認をピン留め解除', exact: true })
+      .click();
     await waitPins(page, ['appdock.welcome.refresh']);
-    await page.keyboard.press('Escape');
+    await require('./shell-overlay-helper.cjs').closingAction(
+      (await require('./shell-overlay-helper.cjs').overlayPage(page)).keyboard.press('Escape'),
+    );
+    await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     console.log(
       JSON.stringify(
         {

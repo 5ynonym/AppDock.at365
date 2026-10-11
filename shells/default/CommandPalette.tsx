@@ -1,33 +1,37 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { rankCommands, movePinnedCommand, type UiCommand } from '../shared/commands';
-import { Icon } from './Icon';
+import { rankCommands, type UiCommand } from '../../src/shared/commands';
+import { Icon } from '../../src/shared/ui-icons';
 
 /** Execution and selection share navigation and favorites; only the caller decides the action. */
 export function CommandPalette({
   commands,
   pins = [],
-  onPinsChange,
+  onPinAction,
   shortcuts = {},
   busy = false,
   mode = 'execute',
   onChoose,
   onClose,
-  selectionDescription,
+  error = '',
 }: {
   commands: UiCommand[];
   pins?: string[];
-  onPinsChange?(ids: string[]): void;
+  onPinAction?(
+    type: 'togglePin' | 'movePin',
+    commandId: string,
+    direction?: -1 | 1,
+    visibleIds?: string[],
+  ): void;
   shortcuts?: Record<string, string[]>;
   busy?: boolean;
   mode?: 'execute' | 'select';
   onChoose(command: UiCommand): void;
   onClose(): void;
-  selectionDescription?(command: UiCommand): string;
+  error?: string;
 }) {
   const [query, setQuery] = useState(''),
-    [index, setIndex] = useState(0),
-    [error, setError] = useState('');
+    [index, setIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null),
     prefix = useId();
   const filtered = rankCommands(
@@ -42,14 +46,7 @@ export function CommandPalette({
   const visiblePins = filtered.filter((c) => pins.includes(c.id)).map((c) => c.id);
   const canChoose = (c: UiCommand) => !busy && (mode === 'select' || c.available);
   useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector('input')?.focus();
-    if (mode === 'select')
-      void window.dock.setShortcutRecording(true).catch((e) => setError(String(e)));
-    return () => {
-      if (mode === 'select') void window.dock.setShortcutRecording(false);
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
-    };
   }, [mode]);
   useEffect(() => {
     ref.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
@@ -159,29 +156,24 @@ export function CommandPalette({
                       {!c.available && <span> · Applet起動後に利用できます</span>}
                       {pinned && <span className="pin-badge">PINNED</span>}
                     </small>
-                    {selectionDescription && <small>{selectionDescription(c)}</small>}
                   </div>
                   {shortcuts[c.id]?.[0] && <kbd>{shortcuts[c.id][0]}</kbd>}
                 </button>
-                {onPinsChange && (
+                {onPinAction && (
                   <div className="palette-pin-controls">
                     {pinned && (
                       <>
                         <button
                           aria-label={`${c.title}を上に移動`}
                           disabled={busy || pinIndex <= 0}
-                          onClick={() =>
-                            onPinsChange(movePinnedCommand(pins, c.id, -1, visiblePins))
-                          }
+                          onClick={() => onPinAction('movePin', c.id, -1, visiblePins)}
                         >
                           ↑
                         </button>
                         <button
                           aria-label={`${c.title}を下に移動`}
                           disabled={busy || pinIndex === visiblePins.length - 1}
-                          onClick={() =>
-                            onPinsChange(movePinnedCommand(pins, c.id, 1, visiblePins))
-                          }
+                          onClick={() => onPinAction('movePin', c.id, 1, visiblePins)}
                         >
                           ↓
                         </button>
@@ -192,9 +184,7 @@ export function CommandPalette({
                       aria-label={`${c.title}を${pinned ? 'ピン留め解除' : 'ピン留め'}`}
                       aria-pressed={pinned}
                       disabled={busy}
-                      onClick={() =>
-                        onPinsChange(pinned ? pins.filter((id) => id !== c.id) : [...pins, c.id])
-                      }
+                      onClick={() => onPinAction('togglePin', c.id)}
                     >
                       {pinned ? '★' : '☆'}
                     </button>
@@ -208,7 +198,7 @@ export function CommandPalette({
         {error && <p role="alert">{error}</p>}
         <div className="palette-footer">
           ↑↓キーで選択・Enterで{mode === 'select' ? '選択（実行しません）' : '実行'}・Escで閉じる。
-          {onPinsChange && '☆でピン留め、矢印ボタンで並べ替え。'}
+          {onPinAction && '☆でピン留め、矢印ボタンで並べ替え。'}
         </div>
       </div>
     </div>,

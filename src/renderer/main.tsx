@@ -1,7 +1,6 @@
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { Icon, type IconName } from './Icon';
 import { Toggle } from './Toggle';
-import { CommandPalette } from './CommandPalette';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -125,7 +124,6 @@ function App() {
       return;
     }
     setLocalPage(nav.route as Page);
-    setPalette(false);
     if (nav.section === 'profile') setProfileRequest((v) => v + 1);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
   }, [snapshot?.navigation]);
@@ -134,7 +132,10 @@ function App() {
   const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
-  const [palette, setPalette] = useState(false);
+  const openPalette = () =>
+    window.dock
+      .openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' })
+      .catch((e) => setError(String(e)));
   const [busy, setBusy] = useState(false);
   const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
@@ -146,7 +147,7 @@ function App() {
       const r = ribbonSlot.current?.getBoundingClientRect();
       void window.dock
         .shellViewport(
-          r && !palette
+          r
             ? {
                 x: Math.round(r.x),
                 y: Math.round(r.y),
@@ -165,7 +166,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [palette, !!snapshot]);
+  }, [!!snapshot]);
   const [detailView, setDetailView] = useRestartView<AppletDetailView>(
     'detailView',
     'description',
@@ -230,10 +231,10 @@ function App() {
       void execute(id);
     });
   }, []);
+  useEffect(() => window.dock.onPaletteExecuted(() => setToast('コマンドを実行しました。')), []);
   useEffect(
     () =>
       window.dock.onAppletPage((key) => {
-        setPalette(false);
         setPage(key ? (key as Page) : 'home');
       }),
     [],
@@ -274,7 +275,7 @@ function App() {
       void window.dock
         .pageViewport(
           key,
-          key && rect && !palette
+          key && rect
             ? {
                 x: Math.round(rect.x),
                 y: Math.round(rect.y),
@@ -293,7 +294,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [page, palette, error, !!snapshot, restoringPage]);
+  }, [page, error, !!snapshot, restoringPage]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
@@ -323,7 +324,7 @@ function App() {
           shortcut,
           {
             appFocused: true,
-            appletId: !palette && page.startsWith('page:') ? page.split(':')[1] : undefined,
+            appletId: page.startsWith('page:') ? page.split(':')[1] : undefined,
           },
           commands.filter((c) => c.available),
         );
@@ -338,11 +339,10 @@ function App() {
           })
           .catch((error) => setError(String(error)));
       }
-      if (e.key === 'Escape') setPalette(false);
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [snapshot, busy, page, palette]);
+  }, [snapshot, busy, page]);
   useEffect(() => {
     document.documentElement.dataset.theme = snapshot?.dark ? 'dark' : 'light';
   }, [snapshot?.dark]);
@@ -410,30 +410,25 @@ function App() {
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
     if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
-      setPalette(false);
       if (id === 'appdock.logs.open') setLogSource('');
       setPage(id === 'appdock.applets.open' ? 'extensions' : 'logs');
       return;
     }
     if (id === 'appdock.updates.open') {
-      setPalette(false);
       setUpdatesRequest((value) => value + 1);
       setPage('settings');
       return;
     }
     if (id === 'appdock.commands.search') {
-      setPalette((v) => !v);
+      await openPalette();
       return;
     }
     if (id === 'appdock.settings.open') {
-      setPalette(false);
       setPage('settings');
       return;
     }
-    setPalette(false);
     await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
   }
-  const updatePins = (ids: string[]) => void action(() => window.dock.setPinnedCommands(ids));
   const webManagerSelected = selected === webManagerId;
   const selectedApplet: ExtensionSnapshot | undefined = webManagerSelected
     ? {
@@ -472,7 +467,7 @@ function App() {
         <button
           className="titlebar-search"
           onClick={() => {
-            setPalette(true);
+            void openPalette();
           }}
         >
           <Icon name="search" size={15} /> コマンドを検索 {paletteKey && <kbd>{paletteKey}</kbd>}
@@ -650,7 +645,7 @@ function App() {
                       <span>使えるコマンド</span>
                       <strong>{commands.length}</strong>
                     </div>
-                    <button onClick={() => setPalette(true)} aria-label="コマンド一覧">
+                    <button onClick={() => void openPalette()} aria-label="コマンド一覧">
                       <Icon name="arrow" />
                     </button>
                   </div>
@@ -881,7 +876,7 @@ function App() {
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
           <VersionCheck compact disabled={editor.dirty} />
         </span>
-        <button onClick={() => setPalette(true)}>
+        <button onClick={() => void openPalette()}>
           <Icon name="command" size={12} />
           コマンドパレット {paletteKey && <kbd>{paletteKey}</kbd>}
         </button>
@@ -898,17 +893,6 @@ function App() {
           <Icon name="check" size={17} />
           {toast}
         </div>
-      )}
-      {palette && (
-        <CommandPalette
-          commands={commands}
-          pins={pins}
-          onPinsChange={updatePins}
-          shortcuts={snapshot?.settings.value.shortcuts}
-          busy={busy}
-          onChoose={(command) => void execute(command.id)}
-          onClose={() => setPalette(false)}
-        />
       )}
     </div>
   );
@@ -1614,7 +1598,7 @@ function SettingsPage({
                   <h3>表示</h3>
                   <SettingRow
                     title="Shell"
-                    description="リボンを描画するShellを選びます。Shell Appletは有効にしてから選択してください。"
+                    description="Shell Appletが担当する領域だけを差し替え、ほかの領域はDefault Shellを使います。有効にしてから選択してください。"
                   >
                     <select
                       aria-label="Shell"

@@ -119,7 +119,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
-  shell?: { apiVersion: 1; ui: string };
+  shell?: { apiVersion: 1; ui?: string; views?: Record<string, string> };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;
   id: string;
@@ -163,6 +163,7 @@ export interface LogEntry {
 export interface HostSnapshot {
   navigation: import('./shell').NavigationState;
   shell: import('./shell').ShellStatus;
+  overlay: { active: boolean; kind: string | null };
   appletApi?: {
     permissions: import('./appdock-api').AppletApiPermissions;
     error?: string;
@@ -232,6 +233,7 @@ export interface DockApi {
   retryGlobalHotKeys(): Promise<void>;
   setShortcutRecording(recording: boolean): Promise<void>;
   onHostCommand(callback: (id: string) => void): () => void;
+  onPaletteExecuted(callback: () => void): () => void;
   snapshot(): Promise<HostSnapshot>;
   saveSettings(
     value: Settings,
@@ -240,6 +242,10 @@ export interface DockApi {
     avatarName?: string,
   ): Promise<SettingsSnapshot>;
   setPinnedCommands(ids: string[]): Promise<SettingsSnapshot>;
+  openCommandPalette(
+    request: import('./overlays').CommandPaletteRequest,
+  ): Promise<import('./overlays').CommandPaletteResult>;
+  cancelCommandPalette(requestId: string): Promise<void>;
   toggleExtension(id: string, enabled: boolean): Promise<void>;
   restartExtension(id: string): Promise<void>;
   executeCommand(id: string): Promise<unknown>;

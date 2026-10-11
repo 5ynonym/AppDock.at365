@@ -42,6 +42,18 @@ test('Shell manifest uses trusted discovery origin, requires capability and conf
   write();
   assert.throws(() => readManifest(dir), /Invalid Shell/);
   manifest.shell.apiVersion = 1;
+  manifest.shell = { apiVersion: 1, views: { 'overlay.command-palette': 'index.html' } };
+  manifest.commands = [{ id: 'fixture.shell.run', title: 'Run' }];
+  write();
+  assert.equal(readManifest(dir).commands[0].id, 'fixture.shell.run');
+  assert.equal(readManifest(dir).shell.ui, undefined);
+  manifest.shell.views['overlay.command-palette'] = '../outside.html';
+  write();
+  assert.throws(() => readManifest(dir));
+  manifest.shell = { apiVersion: 1, views: {} };
+  write();
+  assert.throws(() => readManifest(dir), /Invalid Shell/);
+  manifest.shell = { apiVersion: 1 };
   manifest.shell.ui = '../outside.html';
   write();
   assert.throws(() => readManifest(dir));

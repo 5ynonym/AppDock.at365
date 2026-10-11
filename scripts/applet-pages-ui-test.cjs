@@ -186,8 +186,8 @@ async function launch() {
       'Generic local page / owned command bridge / native Window count / process isolation',
     );
     await button('コマンドを検索 Ctrl+P').click();
-    await dock.locator('.command-palette').waitFor();
-    await dock.keyboard.press('Escape');
+    const palette = await require('./shell-overlay-helper.cjs').overlayPage(dock);
+    await require('./shell-overlay-helper.cjs').closingAction(palette.keyboard.press('Escape'));
     assert.equal(await ui.getByLabel('保持する入力').inputValue(), '表示先を変えても保持');
     await setDisplay('test.pages', 'main', 'window');
     await button('ページ検証').click();

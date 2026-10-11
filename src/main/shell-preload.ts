@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ShellApi, RibbonView } from '../shared/shell';
 const api: ShellApi = {
+  getSettings: () => ipcRenderer.invoke('shell:getSettings'),
+  onSettingsChanged: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('shell:settingsChanged', handler);
+    return () => ipcRenderer.removeListener('shell:settingsChanged', handler);
+  },
+  executeCommand: (id) => ipcRenderer.invoke('shell:executeCommand', id),
   focusHost: (edge) => ipcRenderer.invoke('shell:focusHost', edge),
   onFocus: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, edge: 'first' | 'last') => callback(edge);

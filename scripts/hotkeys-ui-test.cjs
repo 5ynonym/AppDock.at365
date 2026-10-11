@@ -1,5 +1,5 @@
 const { _electron: electron } = require('playwright');
-const { spawnSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -18,6 +18,7 @@ const remapKey = isolatedKeys ? 'F20' : 'F24';
 const backgroundKey = isolatedKeys ? 'Ctrl+Alt+F9' : 'F23';
 const manifestPath = path.join(clockFolder, 'extension.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const toggleCommand = manifest.defaultKeybindings[0].command;
 manifest.defaultKeybindings[0].key = initialKey;
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 // Initialize a new installation before adding its enabled state to settings.
@@ -33,11 +34,11 @@ const { WindowsHotKeyBackend } = require('../out/main/main/core/global-hotkeys.j
 const checks = [];
 let application;
 let contender;
-function send(key) {
+async function send(key) {
   const parts = key.split('+');
   const base = parts.at(-1);
   const virtualKey = base === 'Pause' ? 0x13 : 0x6f + Number(base.slice(1));
-  const result = spawnSync(
+  const child = spawn(
     'powershell.exe',
     [
       '-NoProfile',
@@ -49,10 +50,19 @@ function send(key) {
       String(virtualKey),
       ...(parts.includes('Ctrl') ? ['-Control'] : []),
       ...(parts.includes('Alt') ? ['-Alt'] : []),
+      ...(isolatedKeys ? ['-ScanCode'] : []),
     ],
-    { windowsHide: true, encoding: 'utf8' },
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
   );
-  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  let output = '';
+  child.stdout.on('data', (chunk) => (output += chunk));
+  child.stderr.on('data', (chunk) => (output += chunk));
+  await new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(Error(output || `SendInput helper exit ${code}`)),
+    );
+  });
 }
 async function until(check, message) {
   const deadline = Date.now() + 15000;
@@ -72,6 +82,7 @@ async function until(check, message) {
     });
     const page = await application.firstWindow();
     const snapshot = () => page.evaluate(() => window.dock.snapshot());
+    await until(async () => (await snapshot()).startupReady, 'Host startup did not finish.');
     const registered = async (key) =>
       (await snapshot()).globalHotKeys.some(
         (status) => status.shortcut === key && status.registered,
@@ -98,12 +109,12 @@ async function until(check, message) {
       ),
       false,
     );
-    send(initialKey);
+    await send(initialKey);
     await until(
       async () => (await visible()) === false,
       'Hidden AppDock did not toggle Watch off.',
     );
-    send(initialKey);
+    await send(initialKey);
     await until(async () => (await visible()) === true, 'Hidden AppDock did not toggle Watch on.');
     checks.push('Windows Pause toggles Watch both ways while AppDock is hidden');
     await application.evaluate(({ BrowserWindow }) => {
@@ -113,8 +124,8 @@ async function until(check, message) {
     });
     await page.keyboard.press('Control+,');
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    await page.getByLabel('ショートカットのコマンドを検索').fill('at365.watch.toggle');
-    const row = page.locator('[data-shortcut-command="at365.watch.toggle"]');
+    await page.getByLabel('ショートカットのコマンドを検索').fill(toggleCommand);
+    const row = page.locator(`[data-shortcut-command="${toggleCommand}"]`);
     await row.locator('.applet-shortcut-edit').click();
     const shortcutDialog = page.locator('.applet-shortcut-dialog');
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
@@ -127,11 +138,16 @@ async function until(check, message) {
       (await shortcutDialog.getByRole('switch').getAttribute('aria-checked')) === 'true',
       true,
     );
+    await page.bringToFront();
     await input.focus();
+    await page.waitForFunction(
+      () => document.hasFocus() && document.activeElement?.classList.contains('shortcut-capture'),
+    );
+    await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
     await until(async () => !(await registered(initialKey)), 'Recorder did not release Pause.');
-    send(initialKey);
+    await send(initialKey);
     assert.equal(await visible(), true);
-    send(remapKey);
+    await send(remapKey);
     await until(
       async () => (await input.innerText()) === remapKey,
       'Recorder did not capture single F24.',
@@ -161,7 +177,7 @@ async function until(check, message) {
     await row.getByRole('button', { name: '登録を再試行', exact: true }).click();
     await until(() => registered(initialKey), 'Pause retry after conflict failed.');
     checks.push('conflict appears in settings; retry button registers after release');
-    send(initialKey);
+    await send(initialKey);
     await until(async () => (await visible()) === false, 'Focused AppDock did not toggle Watch.');
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(await visible(), false);
@@ -219,14 +235,14 @@ async function until(check, message) {
     await until(() => registered(remapKey), 'Host command did not register globally.');
     await until(() => registered(backgroundKey), 'TypeScript command did not register globally.');
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
-    send(backgroundKey);
+    await send(backgroundKey);
     await until(
       async () =>
         (await snapshot()).logs.some((entry) => entry.message.includes('Storage / Secrets API')),
       'Background TypeScript command did not execute.',
     );
-    send(remapKey);
-    await page.getByRole('dialog', { name: 'コマンドパレット' }).waitFor();
+    await send(remapKey);
+    await require('./shell-overlay-helper.cjs').overlayPage(page);
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()[0].isVisible(),

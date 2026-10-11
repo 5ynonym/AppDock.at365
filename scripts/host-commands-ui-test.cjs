@@ -104,7 +104,18 @@ let output = '';
           return false;
         }
       });
-      const page = browser.contexts()[0].pages()[0];
+      let page;
+      await until(
+        () =>
+          (page = browser
+            .contexts()[0]
+            .pages()
+            .find(
+              (p) =>
+                p.url().startsWith('appdock://host/index.html') &&
+                !p.url().includes('settingsNotice'),
+            )),
+      );
       await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
       await page.waitForFunction(
         (id) =>
@@ -125,11 +136,12 @@ let output = '';
     const originalHost = events()[0].host;
     const originalWorker = events()[0].worker;
     await page.keyboard.press('Control+p');
-    const search = page.getByRole('combobox', { name: 'コマンドを検索' });
+    let palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    const search = palette.getByRole('combobox', { name: 'コマンドを検索' });
     await search.fill('appdock.restart');
-    await page.getByRole('option').filter({ hasText: '再起動' }).waitFor();
-    await page.screenshot({ path: path.join(profile, 'restart-command.png') });
-    await search.press('Enter');
+    await palette.getByRole('option').filter({ hasText: '再起動' }).waitFor();
+    await palette.screenshot({ path: path.join(profile, 'restart-command.png') });
+    await require('./shell-overlay-helper.cjs').closingAction(search.press('Enter'));
     await until(() => !browser.isConnected());
     page = await connect(2);
     await until(() => !alive(originalHost) && !alive(originalWorker));
@@ -163,9 +175,11 @@ let output = '';
     );
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), saved);
     await page.keyboard.press('Control+p');
-    await page.getByRole('combobox', { name: 'コマンドを検索' }).fill('appdock.quit');
-    await page.getByRole('option').filter({ hasText: '終了' }).waitFor();
-    await page.keyboard.press('Escape');
+    palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await palette.getByRole('combobox', { name: 'コマンドを検索' }).fill('appdock.quit');
+    await palette.getByRole('option').filter({ hasText: '終了' }).waitFor();
+    await require('./shell-overlay-helper.cjs').closingAction(palette.keyboard.press('Escape'));
+    await until(async () => !(await page.evaluate(() => window.dock.snapshot())).overlay.active);
     await page.keyboard.press('Control+Alt+q');
     await until(() => !browser.isConnected());
     await until(
@@ -195,7 +209,13 @@ let output = '';
     process.exitCode = 1;
   } finally {
     if (browser?.isConnected()) {
-      const page = browser.contexts()[0].pages()[0];
+      const page = browser
+        .contexts()[0]
+        .pages()
+        .find(
+          (p) =>
+            p.url().startsWith('appdock://host/index.html') && !p.url().includes('settingsNotice'),
+        );
       await page
         ?.evaluate(() => {
           void window.dock.windowAction('quit');

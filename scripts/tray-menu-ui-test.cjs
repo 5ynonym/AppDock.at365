@@ -145,8 +145,11 @@ const checks = [];
     };
     const choose = async (trigger, id) => {
       await button(trigger).click();
-      await page.getByRole('combobox').fill(id);
-      await page.locator(`[data-command-id="${id}"] .palette-execute`).click();
+      const palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+      await palette.getByRole('combobox').fill(id);
+      await require('./shell-overlay-helper.cjs').closingAction(
+        palette.locator(`[data-command-id="${id}"] .palette-execute`).click(),
+      );
     };
     const select = async (id) => page.locator(`[data-tray-item="${id}"] .tray-select`).click();
     const ids = () =>
@@ -219,9 +222,10 @@ const checks = [];
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
     await save();
     await button('＋ コマンド').click();
-    await page.getByRole('combobox').fill('appdock.quit');
-    assert.equal(await page.locator('[data-command-id="appdock.quit"]').count(), 0);
-    await page.keyboard.press('Escape');
+    const addPalette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await addPalette.getByRole('combobox').fill('appdock.quit');
+    assert.equal(await addPalette.locator('[data-command-id="appdock.quit"]').count(), 0);
+    await require('./shell-overlay-helper.cjs').closingAction(addPalette.keyboard.press('Escape'));
     await choose('トレイクリックのコマンドを選択', 'a.run');
     await choose('トレイダブルクリックのコマンドを選択', 'b.run');
     await save();

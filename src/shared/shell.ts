@@ -1,5 +1,13 @@
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
+/** Only these regions are mounted today. Additional page regions need their own public contract. */
+export type ShellRegion = 'ribbon' | 'overlay.command-palette';
+export function shellView(
+  shell: { ui?: string; views?: Record<string, string> } | undefined,
+  region: ShellRegion,
+) {
+  return shell?.views?.[region] ?? (region === 'ribbon' ? shell?.ui : undefined);
+}
 export interface RibbonView {
   schemaVersion: 1;
   epoch: string;
@@ -34,7 +42,13 @@ export interface ShellConnection {
   bindingId: 'primary';
   snapshot: RibbonView;
 }
-export interface ShellApi {
+export interface ShellAppletApi {
+  /** Execute a command registered by this provider Applet, through the normal dispatcher. */
+  executeCommand(id: string): Promise<unknown>;
+  getSettings(): Promise<Record<string, unknown>>;
+  onSettingsChanged(callback: () => void): () => void;
+}
+export interface ShellApi extends ShellAppletApi {
   focusHost(edge: 'before' | 'after'): Promise<void>;
   onFocus(callback: (edge: 'first' | 'last') => void): () => void;
   connect(): Promise<ShellConnection>;

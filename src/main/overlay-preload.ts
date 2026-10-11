@@ -1,0 +1,20 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import type { ShellOverlayApi, OverlayModel } from '../shared/overlays';
+const api: ShellOverlayApi = {
+  getSettings: () => ipcRenderer.invoke('overlay:getSettings'),
+  onSettingsChanged: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('overlay:settingsChanged', handler);
+    return () => ipcRenderer.removeListener('overlay:settingsChanged', handler);
+  },
+  executeCommand: (id) => ipcRenderer.invoke('overlay:executeCommand', id),
+  connect: () => ipcRenderer.invoke('overlay:connect'),
+  ready: (session) => ipcRenderer.invoke('overlay:ready', session),
+  act: (action) => ipcRenderer.invoke('overlay:act', action),
+  onChanged: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, model: OverlayModel) => callback(model);
+    ipcRenderer.on('overlay:changed', handler);
+    return () => ipcRenderer.removeListener('overlay:changed', handler);
+  },
+};
+contextBridge.exposeInMainWorld('appdockOverlay', api);

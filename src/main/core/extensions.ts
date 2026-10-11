@@ -98,12 +98,25 @@ function readManifest(
     if (
       !isObject(m.shell) ||
       m.shell.apiVersion !== 1 ||
-      typeof m.shell.ui !== 'string' ||
-      !/\.html$/i.test(m.shell.ui) ||
+      (m.shell.ui === undefined &&
+        (!isObject(m.shell.views) || Object.keys(m.shell.views).length === 0)) ||
       !m.capabilities?.includes('shell')
     )
       throw Error('Invalid Shell manifest');
-    contained(folder, m.shell.ui);
+    if (m.shell.ui !== undefined) {
+      if (typeof m.shell.ui !== 'string' || !/\.html$/i.test(m.shell.ui))
+        throw Error('Invalid Shell UI');
+      contained(folder, m.shell.ui);
+    }
+    if (m.shell.views !== undefined) {
+      if (!isObject(m.shell.views) || Object.keys(m.shell.views).length > 32)
+        throw Error('Invalid Shell views');
+      for (const [kind, ui] of Object.entries(m.shell.views)) {
+        if (!/^[a-z][a-z0-9.-]{0,63}$/.test(kind) || typeof ui !== 'string' || !/\.html$/i.test(ui))
+          throw Error('Invalid Shell view');
+        contained(folder, ui);
+      }
+    }
   }
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);

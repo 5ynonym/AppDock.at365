@@ -95,6 +95,7 @@ const checks = [];
     env,
   });
   const page = await app.firstWindow();
+  const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
   page.setDefaultTimeout(12000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -103,7 +104,10 @@ const checks = [];
       ? detailTab('ショートカット')
       : name === '設定項目'
         ? detailTab('設定')
-        : page.getByRole('button', {
+        : (['ホーム', 'Applet', '設定', 'ログ', 'Appletに戻る'].includes(name)
+            ? shell
+            : page
+          ).getByRole('button', {
             name: name === 'Appletに戻る' ? 'Applet' : name,
             exact: true,
           });
@@ -500,6 +504,7 @@ const checks = [];
     await detailTab('説明').click();
     await detailTab('ログ').click();
     await button('ログ').click();
+    await page.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).waitFor();
     assert.equal(
       await page.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).count(),
       1,
@@ -530,16 +535,37 @@ const checks = [];
     );
 
     const searchButton = page.locator('.titlebar-search');
+    let palette;
     await searchButton.click();
-    await page.getByPlaceholder('コマンドを入力…').fill('Welcome');
-    assert.equal(await page.locator('.palette-command').count(), 3);
-    await page.getByPlaceholder('コマンドを入力…').press('ArrowDown');
-    assert.equal(await page.locator('.palette-command[aria-selected="true"]').count(), 1);
-    await page.getByPlaceholder('コマンドを入力…').press('Escape');
+    palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await palette.getByPlaceholder('コマンドを入力…').fill('Welcome');
+    assert.deepEqual(
+      (
+        await palette
+          .locator('.palette-command')
+          .evaluateAll((rows) => rows.map((r) => r.dataset.commandId))
+      ).sort(),
+      [
+        'appdock.welcome.refresh',
+        'appdock.welcome.notify',
+        'appdock.welcome.verify-storage',
+        'appdock.applets.appdock.welcome.enable',
+        'appdock.applets.appdock.welcome.disable',
+        'appdock.applets.appdock.welcome.restart',
+      ].sort(),
+    );
+    await palette.getByPlaceholder('コマンドを入力…').press('ArrowDown');
+    assert.equal(await palette.locator('.palette-command[aria-selected="true"]').count(), 1);
+    await require('./shell-overlay-helper.cjs').closingAction(
+      palette.getByPlaceholder('コマンドを入力…').press('Escape'),
+    );
     assert.equal(await searchButton.evaluate((el) => el === document.activeElement), true);
     await searchButton.click();
-    await page.getByPlaceholder('コマンドを入力…').fill('ウェルカムを更新');
-    await page.getByPlaceholder('コマンドを入力…').press('Enter');
+    palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await palette.getByPlaceholder('コマンドを入力…').fill('ウェルカムを更新');
+    await require('./shell-overlay-helper.cjs').closingAction(
+      palette.getByPlaceholder('コマンドを入力…').press('Enter'),
+    );
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     checks.push('palette owner search / arrows / Enter / focus restoration');
 

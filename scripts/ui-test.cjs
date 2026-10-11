@@ -20,8 +20,9 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
   });
   try {
     const page = await application.firstWindow();
+    const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
     await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
-    assert.deepEqual(await page.locator('.activity-rail .rail-label').allTextContents(), [
+    assert.deepEqual(await shell.locator('.activity-rail .rail-label').allTextContents(), [
       'ホーム',
       'Applet',
       '設定',
@@ -42,7 +43,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length),
       1,
     );
-    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await shell.getByRole('button', { name: 'Applet', exact: true }).click();
     await page
       .getByRole('complementary', { name: 'Applet一覧' })
       .getByRole('button', { name: /.NET Connection Demo/ })
@@ -52,7 +53,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.getByRole('button', { name: '状態を更新', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'dotnet.png') });
-    await page.getByRole('button', { name: '設定', exact: true }).first().click();
+    await shell.getByRole('button', { name: '設定', exact: true }).first().click();
     await page.getByLabel('テーマ', { exact: true }).selectOption('light');
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
@@ -76,7 +77,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('switch', { name: '閉じるとトレイに常駐' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'settings-general.png') });
-    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await shell.getByRole('button', { name: 'Applet', exact: true }).click();
     await page
       .getByRole('complementary', { name: 'Applet一覧' })
       .getByRole('button', { name: /.NET Connection Demo/ })
@@ -91,11 +92,13 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       10,
     );
     await page.keyboard.press('Control+p');
-    await page.getByRole('dialog', { name: 'コマンドパレット' }).waitFor();
-    await page.getByPlaceholder('コマンドを入力…').fill('保存API');
-    await page
-      .locator('[data-command-id="appdock.dotnet-demo.verify-storage"] .palette-execute')
-      .click();
+    const palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await palette.getByPlaceholder('コマンドを入力…').fill('保存API');
+    await require('./shell-overlay-helper.cjs').closingAction(
+      palette
+        .locator('[data-command-id="appdock.dotnet-demo.verify-storage"] .palette-execute')
+        .click(),
+    );
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     // Manual edits are watched and reflected in the UI without restarting.
     const settingsFile = path.join(profile, 'settings.json');
@@ -105,11 +108,11 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     // A malformed manual edit preserves the last valid in-memory state and the file.
     fs.writeFileSync(settingsFile, '{broken');
-    await page.getByRole('button', { name: 'ログ', exact: true }).first().click();
+    await shell.getByRole('button', { name: 'ログ', exact: true }).first().click();
     await page.getByText(/設定ファイルを読み込めません。最後の有効/).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), '{broken');
     fs.writeFileSync(settingsFile, JSON.stringify(config, null, 2));
-    await page.getByRole('button', { name: 'Applet', exact: true }).first().click();
+    await shell.getByRole('button', { name: 'Applet', exact: true }).first().click();
     await page.getByRole('tab', { name: '説明', exact: true }).click();
     await page.getByRole('switch', { name: '.NET Connection Demoを有効にする' }).click();
     await page.getByRole('heading', { name: 'このAppletをDockにつなぐ' }).waitFor();
@@ -119,7 +122,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       ).state,
       'stopped',
     );
-    await page.getByRole('button', { name: 'ホーム', exact: true }).first().click();
+    await shell.getByRole('button', { name: 'ホーム', exact: true }).first().click();
     await page.screenshot({ path: path.join(profile, 'home.png') });
     console.log(
       JSON.stringify(

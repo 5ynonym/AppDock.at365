@@ -11,7 +11,7 @@ import {
   type TrayMenuLeaf,
   type ResolvedTrayItem,
 } from '../shared/tray-menu';
-import { CommandPalette } from './CommandPalette';
+import { CommandPicker } from './CommandPicker';
 
 export function TraySettings({
   draft,
@@ -349,8 +349,7 @@ export function TraySettings({
         </aside>
       </div>
       {picker && (
-        <CommandPalette
-          mode="select"
+        <CommandPicker
           commands={commands.filter(
             (c) => !c.hidden && (picker !== 'add' || !fixedTrayCommands.includes(c.id)),
           )}

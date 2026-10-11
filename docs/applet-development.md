@@ -1,5 +1,7 @@
 # 新しいAppletを作る
 
+リボンやコマンドパレットを自作したい場合は、通常Appletに`shell` capabilityと担当領域の`shell.views`を追加します。Shell Appletは通常のコマンド・設定・ページも併用でき、未実装の領域はDefault Shellが担当します。宣言例と自己設定/コマンドの利用は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください（minimumHostVersion 0.26.41）。
+
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。
 
 新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、端末固有データは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。認証・Storage・Secrets・生成キャッシュはPC専用、登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。

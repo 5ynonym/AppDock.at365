@@ -406,7 +406,8 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await call(client, 'appdock_execute_command', { id: 'appdock.open' });
     await page.bringToFront();
     await call(client, 'appdock_execute_command', { id: 'appdock.commands.search' });
-    const managementPalette = page.getByRole('dialog', { name: 'コマンドパレット' });
+    const palettePage = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    const managementPalette = palettePage.getByRole('dialog', { name: 'コマンドパレット' });
     await managementPalette
       .getByRole('combobox', { name: 'コマンドを検索' })
       .fill(lifecycleId(fixtureId, 'enable'));
@@ -414,8 +415,11 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       () => managementPalette.locator('.palette-execute').isEnabled(),
       'management command available in palette',
     );
-    await page.keyboard.press('Escape');
-    await managementPalette.waitFor({ state: 'hidden' });
+    await require('./shell-overlay-helper.cjs').closingAction(palettePage.keyboard.press('Escape'));
+    await until(
+      async () => !(await page.evaluate(() => window.dock.snapshot())).overlay.active,
+      'palette closed',
+    );
     await page.keyboard.press('Control+Alt+F10');
     await until(
       async () =>
