@@ -102,7 +102,6 @@ export function moveGestureBinding(rows: GestureBinding[], id: string, target: s
   let index = 0;
   return rows.map((r) => (r.gesture === source.gesture ? group[index++] : r));
 }
-export const browserToolsId = 'at365.web-browser-tools';
 export function defaultGestures(): GestureSettings {
   return {
     enabled: true,
@@ -198,47 +197,6 @@ export function parseGestures(value: unknown): GestureSettings {
     bindings,
   };
 }
-/** One-time conversion; an explicitly saved empty list never restores removed assignments. */
-export function migrateGestures(settings: Pick<Settings, 'extensions'>): GestureSettings {
-  const result = defaultGestures(),
-    old = settings.extensions[browserToolsId]?.settings;
-  if (!old) return result;
-  result.enabled = old['gestures.enabled'] !== false;
-  result.browsers = processNames(
-    String(old.browserProcesses ?? result.browsers.join(',')).split(','),
-  );
-  result.requireChromiumWindowClass = old.requireChromiumWindowClass !== false;
-  result.distance = Number(old['gestures.distance'] ?? 50);
-  result.wheelDelayMs = Number(old['gestures.wheel-delay-ms'] ?? 0);
-  result.indicatorOpacity = Number(old['gestures.indicator-opacity'] ?? 0.45);
-  result.indicatorPosition =
-    old['gestures.indicator-position'] === 'browser-center' ? 'window-center' : 'gesture-start';
-  const defaults = [
-    'restore-tab',
-    'reload',
-    'back',
-    'forward',
-    'close-tab',
-    'new-tab',
-    'previous-tab',
-    'next-tab',
-  ];
-  result.bindings = gestureTypes.flatMap(([gesture], i) => {
-    const command = String(old['gestures.' + gesture.replace('move-', '')] ?? defaults[i]);
-    return command === 'none'
-      ? []
-      : [
-          {
-            id: 'migrated.' + gesture,
-            command: browserToolsId + '.' + command,
-            gesture,
-            enabled: true,
-            when: { scope: 'browser' as const, appletIds: [], processes: [] },
-          },
-        ];
-  });
-  return parseGestures(result);
-}
 export interface GestureContext extends ShortcutContext {
   window: string;
 }
@@ -247,7 +205,7 @@ export function initializeGestureDefaults(
   applets: { id: string; defaultGestureBindings?: GestureBinding[] }[],
 ): Settings {
   const initialized = new Set(settings.gestureDefaultsInitialized ?? []);
-  const gestures = structuredClone(settings.gestures ?? migrateGestures(settings));
+  const gestures = structuredClone(settings.gestures ?? defaultGestures());
   const ids = new Set(gestures.bindings.map((row) => row.id));
   let sequence = 0;
   for (const applet of applets) {
@@ -265,18 +223,6 @@ export function initializeGestureDefaults(
     initialized.add(applet.id);
   }
   return { ...settings, gestures, gestureDefaultsInitialized: [...initialized] };
-}
-export function appletInputSettings(settings: Settings, id: string) {
-  const values = settings.extensions[id]?.settings ?? {};
-  if (id !== browserToolsId) return values;
-  const gestures = settings.gestures ?? migrateGestures(settings);
-  return {
-    ...values,
-    'gestures.enabled': false,
-    hostManagedGestures: true,
-    browserProcesses: gestures.browsers.join(','),
-    requireChromiumWindowClass: gestures.requireChromiumWindowClass,
-  };
 }
 export function nativeGestureRows(
   settings: GestureSettings,

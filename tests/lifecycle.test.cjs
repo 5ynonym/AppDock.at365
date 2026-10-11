@@ -7,6 +7,88 @@ const { once } = require('node:events');
 const { SettingsStore } = require('../out/main/main/core/settings.js');
 const { ExtensionManager } = require('../out/main/main/core/extensions.js');
 const root = path.resolve(__dirname, '..');
+
+test('Applet activation and settings notifications pass saved input settings without host overrides', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-input-settings-'));
+  const settings = new SettingsStore(path.join(dir, 'settings.json'));
+  settings.load();
+  const fixtures = path.join(dir, 'extensions');
+  const ids = ['at365.web-browser-tools', 'test.input-settings'];
+  const keys = [
+    'gestures.enabled',
+    'hostManagedGestures',
+    'browserProcesses',
+    'requireChromiumWindowClass',
+    'custom',
+  ];
+  for (const id of ids) {
+    const folder = path.join(fixtures, id);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(
+      path.join(folder, 'extension.json'),
+      JSON.stringify({
+        apiVersion: 1,
+        id,
+        name: id,
+        version: '1.0.0',
+        runtime: 'node',
+        entry: 'index.js',
+        capabilities: ['ui', 'settings'],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(folder, 'index.js'),
+      `exports.activate = async c => {
+      const refresh = () => c.ui.showPanel({ title: 'Settings', description: JSON.stringify(
+        Object.fromEntries(${JSON.stringify(keys)}.map(key => [key, c.settings.get(key)]))
+      ) });
+      c.settings.onChanged(refresh);
+      await refresh();
+    };`,
+    );
+    settings.updateExtension(id, {
+      enabled: true,
+      settings: {
+        'gestures.enabled': true,
+        hostManagedGestures: false,
+        browserProcesses: 'custom.exe',
+        requireChromiumWindowClass: true,
+        custom: { items: ['saved'] },
+      },
+    });
+  }
+  const manager = new ExtensionManager({
+    roots: [fixtures],
+    settings,
+    nodeExecutable: process.execPath,
+    nodeWorker: path.join(root, 'out/main/main/node-worker.js'),
+    api: async (e, method, p) => {
+      if (method === 'host.ui.panel') e.panel = p;
+      return null;
+    },
+    log: () => {},
+  });
+  t.after(async () => {
+    await manager.shutdown();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  manager.discover();
+  await manager.reconcile();
+  for (const id of ids) {
+    const item = manager.items.get(id);
+    assert.equal(item.state, 'running');
+    assert.deepEqual(JSON.parse(item.panel.description), settings.value.extensions[id].settings);
+    // Absent keys must stay absent when settings are replaced and notified.
+    settings.updateExtension(id, { settings: { custom: { items: ['updated'] } } });
+  }
+  await manager.reconcile();
+  for (const id of ids)
+    assert.deepEqual(
+      JSON.parse(manager.items.get(id).panel.description),
+      settings.value.extensions[id].settings,
+    );
+});
+
 test('commands are catalogued before loading; explicit start and legacy alias activate once without delay', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-declared-'));
   const settings = new SettingsStore(path.join(dir, 'settings.json'));

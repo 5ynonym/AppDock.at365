@@ -1,16 +1,16 @@
 # マウスジェスチャー
 
-入力基盤は本体が所有する。ブラウザ操作コマンドと送信キーはWebBrowserToolsに残す。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorのdraft/JSON/revision/atomic writeを共用する。
+入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorのdraft/JSON/revision/atomic writeを共用する。
 
-## 保存と移行
+## 保存と初期値
 
 - `bindings`は最大2000行。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。同じ入力の全一致を順次実行し、同一コマンドIDは1回だけ。
 - gestureは`move-up/down/left/right`、`click-left/middle`、`wheel-up/down`、`key:<キー>`。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使う。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
 - whenは`global/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。Applet条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。
 - `excludedProcesses`は全条件より優先。`enabled`は永続設定。トレイの一時停止は稼働中だけで、再起動で解除する。
-- `gestures`がない旧設定だけ、WebBrowserToolsの8割り当て、ON/OFF、対象exe、Chromium制限、距離、ホイール間隔、表示位置・透明度を取り込む。空の割り当て配列を既定値に戻さない。元のApplet設定を破棄しない。
-- manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。WebBrowserToolsは8操作の初期値を宣言する。
-- hostはWebBrowserToolsへの設定通知で旧`gestures.enabled`を常にfalseにし、`hostManagedGestures=true`と本体の対象ブラウザ設定を渡す。保存済み送信キーとコマンドIDは維持する。旧Appletと本体の二重フックを防ぐ。
+- `gestures`がない場合は`defaultGestures()`の空の割り当てを使う。Applet内の旧ジェスチャー設定は読み取らない。保存済みの本体設定と明示的な空配列を保持する。
+- manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。
+- 起動・設定通知・Shellへの設定取得では、保存済みの各Applet設定をそのまま渡す。入力関連の設定を挿入・上書きしない。Applet側は独自のジェスチャーフックを持たず、本体の入力基盤を使う。
 
 ## 入力・実行
 
@@ -31,7 +31,7 @@
 ## 検証
 
 - Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、GUIの未保存入力との競合を検査する。
-- `tests/gestures.test.cjs`: 移行、明示的な空配列、検証、条件、初期値、共通予約と取消。
+- `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、共通予約と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。

@@ -10,11 +10,11 @@ import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
 import { defaultShellId } from '../shared/shell';
-import { appletInputSettings } from '../shared/gestures';
 import { NativeInput } from './core/native-input';
 import {
   app,
   BrowserWindow,
+  WebContentsView,
   Tray,
   Menu,
   nativeImage,
@@ -1549,7 +1549,7 @@ async function initialize() {
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
     execute: executeShellCommand,
-    settings: (id) => appletInputSettings(settings.value, id),
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
     providers: () => manager.snapshot(),
     selected: () => settings.value.host.shellProvider || defaultShellId,
     safeMode: safeShell,
@@ -1615,7 +1615,7 @@ async function initialize() {
       safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
     route: () => navigation.state.route,
     execute: executeShellCommand,
-    settings: (id) => appletInputSettings(settings.value, id),
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
     changed: () => {
       void syncHotKeys();
       changed();
@@ -1678,7 +1678,7 @@ async function initialize() {
               changed,
             }),
     execute: executeShellCommand,
-    settings: (id) => appletInputSettings(settings.value, id),
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
     shortcut: async (key) => {
       if (!window?.isFocused()) return;
       const normalized = normalizeShortcut(key);
@@ -1918,27 +1918,8 @@ async function runSmoke() {
   try {
     const title = await window!.webContents.executeJavaScript('document.title');
     if (title !== 'AppDock.at365') throw new Error('Renderer did not load');
-    const expectedApplets = process.argv.includes('--smoke-clock') ? ['at365.watch'] : [];
-    if (manager.snapshot().some((e) => !expectedApplets.includes(e.id)))
+    if (manager.snapshot().some((e) => e.sourceKind !== 'builtin'))
       throw new Error('Unexpected applet in a clean smoke profile');
-    let nativeClock:
-      { state: string; commands: number; trayItems: number; visibleSaved: boolean } | undefined;
-    if (process.argv.includes('--smoke-clock')) {
-      const clock = manager.snapshot().find((e) => e.id === 'at365.watch');
-      if (clock?.state !== 'running' || clock.commands.length !== 3 || clock.tray.length)
-        throw new Error(clock?.error || 'Native clock did not activate');
-      await manager.execute('at365.watch.show');
-      await manager.execute('at365.watch.hide');
-      await manager.reconcile();
-      if (settings.value.extensions['at365.watch']?.settings.visible !== false)
-        throw new Error('Native clock visibility was not persisted');
-      nativeClock = {
-        state: clock.state,
-        commands: clock.commands.length,
-        trayItems: clock.tray.length,
-        visibleSaved: true,
-      };
-    }
     await new Promise((r) => setTimeout(r, 400));
     tray!.emit('click');
     if (!window!.isVisible()) throw new Error('Default tray click did not open AppDock');
@@ -1951,9 +1932,15 @@ async function runSmoke() {
     );
     tray!.emit('click');
     await new Promise((r) => setTimeout(r, 250));
+    const settingsSurface = window!.contentView.children.find(
+      (view) =>
+        view instanceof WebContentsView && view.webContents.getURL().endsWith('/settings.html'),
+    );
     if (
-      !(await window!.webContents.executeJavaScript(
-        `Array.from(document.querySelectorAll('h1,h2')).some(element => element.textContent === '設定')`,
+      navigation.state.route !== 'settings' ||
+      !(settingsSurface instanceof WebContentsView) ||
+      !(await settingsSurface.webContents.executeJavaScript(
+        `!!document.querySelector('.settings-surface')`,
       ))
     )
       throw new Error('Selected tray click did not open settings');
@@ -2007,6 +1994,14 @@ async function runSmoke() {
         profile: saved.settings.value.profile, pins: saved.settings.value.pinnedCommands,
         paletteKeys: saved.settings.value.shortcuts['appdock.commands.search'], avatarLoaded};
     })()`);
+    const shellRows = await Promise.all(
+      window!.contentView.children
+        .filter((view) => view instanceof WebContentsView)
+        .map((view) =>
+          view.webContents.executeJavaScript(`document.querySelectorAll('button').length`),
+        ),
+    );
+    result.rows += shellRows.reduce((total, count) => total + count, 0);
     if (result.nodeExposed || !result.bridge || result.rows < 5)
       throw new Error('Preload / React check failed');
     if (
@@ -2042,7 +2037,6 @@ async function runSmoke() {
             .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
           settingsPath: settings.file,
           avatarPath: path.join(baseDirectory, 'data', 'assets', 'profile', 'avatar.png'),
-          nativeClock,
           trayCommands: {
             defaultOpen: true,
             selectedHostCommands: true,

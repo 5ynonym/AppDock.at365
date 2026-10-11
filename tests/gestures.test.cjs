@@ -2,11 +2,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   defaultGestures,
-  migrateGestures,
   parseGestures,
   nativeGestureRows,
   initializeGestureDefaults,
-  appletInputSettings,
   groupGestureBindings,
   moveGestureBinding,
   applyGestureBinding,
@@ -94,7 +92,7 @@ test('gesture groups preserve local execution order without moving unrelated ass
     ['a', 'key', 'b', 'right', 'modified'],
   );
 });
-test('legacy browser gestures preserve all eight bindings, disabled inputs and tuning once', () => {
+test('missing host gestures use defaults without reading or rewriting Applet settings', () => {
   const settings = createDefaultSettings();
   delete settings.gestures;
   settings.extensions['at365.web-browser-tools'] = {
@@ -111,22 +109,26 @@ test('legacy browser gestures preserve all eight bindings, disabled inputs and t
       'gestures.indicator-opacity': 0.8,
     },
   };
-  const migrated = parseSettings(settings);
-  assert.equal(migrated.gestures.bindings.length, 7);
-  assert.equal(migrated.gestures.enabled, false);
-  assert.deepEqual(migrated.gestures.browsers, ['firefox', 'msedge']);
-  assert.equal(migrated.gestures.bindings[0].command, 'at365.web-browser-tools.new-tab');
-  assert.equal(migrated.gestures.distance, 80);
-  assert.equal(migrated.gestures.wheelDelayMs, 250);
-  assert.equal(migrated.gestures.indicatorPosition, 'window-center');
-  assert.equal(migrated.gestures.indicatorOpacity, 0.8);
-  migrated.gestures.bindings = [];
-  assert.deepEqual(parseSettings(migrated).gestures.bindings, []);
-  assert.equal(appletInputSettings(migrated, 'at365.web-browser-tools')['gestures.enabled'], false);
-  assert.equal(
-    appletInputSettings(migrated, 'at365.web-browser-tools').browserProcesses,
-    'firefox,msedge',
+  const parsed = parseSettings(settings);
+  assert.deepEqual(parsed.gestures, defaultGestures());
+  assert.deepEqual(parsed.extensions, settings.extensions);
+  assert.deepEqual(
+    initializeGestureDefaults(settings, [
+      { id: 'at365.web-browser-tools', defaultGestureBindings: [row('default')] },
+    ]).gestures,
+    defaultGestures(),
   );
+  settings.extensions['at365.web-browser-tools'].settings['gestures.distance'] = 'obsolete';
+  assert.deepEqual(parseSettings(settings).gestures, defaultGestures());
+  parsed.gestures = {
+    ...defaultGestures(),
+    enabled: false,
+    distance: 90,
+    bindings: [row('saved')],
+  };
+  assert.deepEqual(parseSettings(parsed).gestures, parsed.gestures);
+  parsed.gestures.bindings = [];
+  assert.deepEqual(parseSettings(parsed).gestures.bindings, []);
 });
 test('gesture validation rejects right-click, malformed scopes, paths and invalid bounds', () => {
   for (const patch of [

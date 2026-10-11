@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
-module.exports = async ({ page, profile, checks, calls, send, until }) => {
-  const snapshot = () => page.evaluate(() => window.dock.snapshot());
+module.exports = async ({ page, host, profile, checks, calls, send, until }) => {
+  const snapshot = () => host.evaluate(() => window.dock.snapshot());
   const filter = page.getByLabel('ジェスチャーのコマンドを検索');
   const status = page.getByLabel('ジェスチャーの絞り込み');
   const row = (id) => page.locator(`[data-shortcut-command="${id}"]`);
@@ -192,7 +192,7 @@ module.exports = async ({ page, profile, checks, calls, send, until }) => {
 
   // An external writer must not be overwritten by either editing panel.
   await page.locator(`[data-binding-id="${b}"] .applet-shortcut-edit`).click();
-  await page.evaluate(async (id) => {
+  await host.evaluate(async (id) => {
     const s = await window.dock.snapshot();
     s.settings.value.gestures.bindings.find((r) => r.id === id).enabled = false;
     await window.dock.saveSettings(s.settings.value, s.settings.revision);
@@ -253,8 +253,8 @@ module.exports = async ({ page, profile, checks, calls, send, until }) => {
   assert.deepEqual(state.gestures.browsers, ['firefox', 'msedge']);
   await page.getByText('動作設定', { exact: false }).click();
   const persisted = structuredClone(state.gestures);
-  await page.reload();
-  await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
+  await host.reload();
+  await host.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
   assert.deepEqual((await snapshot()).settings.value.gestures, persisted);
   checks.push('global tuning and all assignments persist across renderer reload');
 };

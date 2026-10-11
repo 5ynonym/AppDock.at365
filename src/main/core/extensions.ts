@@ -14,7 +14,7 @@ import {
 import { parseSettingActions } from '../../shared/setting-actions';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
-import { appletInputSettings, parseGestures, defaultGestures } from '../../shared/gestures';
+import { parseGestures, defaultGestures } from '../../shared/gestures';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
 import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
@@ -352,7 +352,7 @@ class ExtensionManager extends EventEmitter {
             try {
               await e.peer!.request(
                 'settings.changed',
-                appletInputSettings(this.settings.value, e.manifest.id),
+                this.settings.value.extensions[e.manifest.id]?.settings ?? {},
               );
             } catch (err: any) {
               this.log('warn', e.manifest.id, err.message);
@@ -481,7 +481,7 @@ class ExtensionManager extends EventEmitter {
       });
       const result = await e.peer.request('activate', {
         id: m.id,
-        settings: appletInputSettings(this.settings.value, m.id),
+        settings: this.settings.value.extensions[m.id]?.settings ?? {},
       });
       if (e.error) throw new Error(e.error);
       if (

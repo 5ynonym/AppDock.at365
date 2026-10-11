@@ -1,6 +1,6 @@
 import { parseKeybindings, withKeybindings } from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
-import { parseGestures, migrateGestures, defaultGestures } from './gestures';
+import { parseGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
 import { avatarReference } from './asset-names';
 import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
@@ -210,10 +210,7 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
-    gestures:
-      value.gestures === undefined
-        ? migrateGestures(value as unknown as Settings)
-        : parseGestures(value.gestures),
+    gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
     gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),
     ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),

@@ -3,7 +3,6 @@ import { validCommandId } from '../../shared/commands';
 import { shortcutScopes } from '../../shared/keybindings';
 import {
   defaultGestures,
-  migrateGestures,
   parseGestures,
   normalizeGesture,
   gestureTypes,
@@ -82,7 +81,7 @@ const configurationFields = {
   indicatorPosition: { type: 'string', enum: ['gesture-start', 'window-center'] },
 };
 const gestureSettings = (settings: Settings): GestureSettings => {
-  const source = settings.gestures ?? migrateGestures(settings);
+  const source = settings.gestures ?? defaultGestures();
   // Retain extra persisted fields on save, but expose only the documented settings.
   return structuredClone({
     ...Object.fromEntries(

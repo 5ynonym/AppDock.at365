@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-12: Applet専用ジェスチャー互換処理の撤去（0.28.0）
+
+- main `17cf128296e8ae11cc8868be202e7107a724f39a`、作業ツリーcleanから開始。旧WebBrowserTools設定を読む`migrateGestures`、固定のApplet ID/8コマンド、通知時に設定を上書きする`appletInputSettings`を削除。設定読込・初期割り当て・共通操作APIは、未保存の本体ジェスチャー設定に共通初期値を使う。起動・設定通知・Shell取得は各Appletの保存済み設定をそのまま渡す。宣言による初回割り当て、保存済み本体設定、明示的な空配列は維持する。
+- 本体内のWatch専用`--smoke-clock`経路と試験スクリプトの専用引数も撤去。`src`/`dotnet`に兄弟Appletの固定ID・WebBrowserTools専用設定処理が残っていないことを確認した。実Appletを使う試験fixtureと利用者向け案内は本体の専用処理と区別する。旧設定の移行・旧Appletフックの停止契約を終了する破壊的変更として、本体だけ0.27.2から0.28.0へ更新。WebBrowserToolsは本体入力を使う0.3.2以降を案内する。
+- 発行前レビューで、設定取得5経路・初回宣言・未導入/既存Applet・旧設定の不正値・本体設定保持を確認。旧移行試験を新しい契約へ更新し、実Nodeプロセスの起動/変更通知で入力関連キーが上書き・挿入されない回帰を追加。ジェスチャーGUI試験はSettings Shellと本体APIの参照先を分離した。共通smokeの古い確認も修正し、同梱Shellを外部Appletとして拒否しないことと、実Shellビューの設定表示・描画を確認する。修正後の追加レビューで未解決指摘なし。
+- 最終製品tree `c84a6ee028ca8c017af20aa0691aff2e5e8d4090`で型検査、標準回帰 **310/310**、Shell host **14群**、Shell page **9群**、実入力連携 **4群**が成功。入力連携では現行Node WebBrowserToolsの11コマンドと.NET WindowsTools、許可/拒否、取消、対象保護、MCP境界を確認。最終単一EXEのジェスチャー設定GUI **8群**と共通smokeが成功し、編集・順序・競合・両テーマ3幅・保存/再読込/再起動・EXE隣の設定/アバター保存を確認した。ジェスチャーGUIは`APPDOCK_GESTURE_UI_ONLY=1`で実行し、物理ジェスチャー試験の成功とは扱わない。
+- 制限環境のpnpmストア/NuGet/Electronアクセス失敗は、同じ固定依存・コマンドを通常環境で再実行して成功。入力試験は試験シェル内の`ELECTRON_RUN_AS_NODE`を解除した。Shell host最終回帰は故意rendererクラッシュ直後のホーム待機が一度失敗し、同一tree・同一試験の再実行で14群成功。失敗ログは保持し、製品の入力先保護・再入防止・検査機構は変更していない。最後の入力試験は取消fixtureの前面喪失を検出し、既存試験の開始前の再取得で成功した。
+- 最終publish終了コード0。本体単一EXE **144099362 bytes / SHA256 `9227e0d54241345dfb8366d846d1202e4ad490c79b3ba22decfea99b55252658`**。feedは0.28.0・サイズ・payload hashが一致し、feed SHA256は`cb66461317eade463da37ebb5c14c6e0379414b4de8951c93f9c8f2f3f2e6809`。固定コピーと隔離実行コピーを照合した。全ログ・コマンド/終了コード/時刻/log hash、固定EXE/feed、環境・入力hash・兄弟repo commit/treeは`.artifacts/commit-validation-generic-gestures-0.28.0/`に保存。最終検証前後のtreeとstage/作業ファイルが一致し、検証後の変更は本VERIFICATIONのみとして最終tree/commitを別途記録する。
+- 完了時整理は、成功・終了・パス境界・使用中プロセス・再解析ポイント・既存検証証跡の参照を確認し、同種/同方式の直近3回より古い非保護フォルダー3件だけを削除。結果は`cleanup-plan.json`/`cleanup-result.json`。失敗/不明・参照済み・固定出力・再利用証跡を保持した。物理ジェスチャー全InputTests、無関係な全GUI/兄弟Applet回帰、実ブラウザ/UAC/外部サービスは今回の変更対象外。兄弟Applet再発行・全体ZIP・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-12: グローバルショートカットの前面表示・デスクトップへのキー送信（0.27.2）
 
 - コミット前確認: 利用者から2件の実動作成功の報告あり。型検査、標準回帰 **309/309**、実ホットキー9群、共通入力4群（2Applet、取消/対象保護/MCP）、InputTests **17/17**、固定EXEの前面表示/デスクトップ入力4項目が成功。全ログ・環境・入力hash・再利用元treeと差分は `.artifacts/commit-validation-shortcut-fix-0.27.2/` に保存。製品コードと発行EXEのhashは利用者確認後も変更なし。
