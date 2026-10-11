@@ -334,3 +334,7 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 結果はmenu/clicks/dryRun/changed/revision/warning/applies=trayChanged。completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後のトレイ反映は既存applySettingsが行い、保留中のクリックを取消します。編集自体はコマンド実行ではなく、実クリックの成功を保証しません。ダブル未設定ならシングルを即実行、ダブル設定時はWindowsの判定時間を待ち、ダブル成立時に先行シングルを取消す既存仕様を維持します。
 
 エラーはTRAY_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLE、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否です。automationログへAPI名・コマンドID・結果を記録し、グループ名/項目ID/クリック割当などの引数は記録しません。
+
+## Applet専用操作
+
+0.26.37のinput.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しません。Appletが明示公開するコマンドからの呼出しは全Applet共通の許可で実行できます。[公開先と許可](appdock-api.md)を参照してください。

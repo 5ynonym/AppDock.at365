@@ -1,7 +1,17 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
-type Handler = () => unknown | Promise<unknown>;
+export interface NodeCommandInvocation {
+  signal: AbortSignal;
+  session?: string;
+  window?: string;
+  source?: string;
+}
+type Handler = (invocation?: NodeCommandInvocation) => unknown | Promise<unknown>;
+const execution = new AsyncLocalStorage<{ id?: string; invocation: NodeCommandInvocation }>();
+const activeCommands = new Map<string, { session?: string; controller: AbortController }>();
+const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
   appdock: AppDockClient;
   pages: { open(id: string): Promise<unknown> };
@@ -66,7 +76,12 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
-        appdock: createAppDockClient((method, params) => peer.request(method, params)),
+        appdock: createAppDockClient((method, params) =>
+          peer.request(method, {
+            ...(params as object),
+            ...(execution.getStore()?.id ? { executionId: execution.getStore()!.id } : {}),
+          }),
+        ),
         pages: { open: (id) => peer.request('host.pages.open', { id }) },
         webAccounts: {
           start: () => peer.request('host.webAccounts.start', {}),
@@ -158,7 +173,28 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
     case 'command.execute': {
       const cmd = commands.find((c) => c.id === p.id);
       if (!cmd) throw new Error('Unknown command');
-      return await cmd.handler();
+      const controller = new AbortController();
+      const session = p.invocation?.session;
+      const key = p.executionId ?? session ?? String(Math.random());
+      activeCommands.set(key, { session, controller });
+      if (session && cancelledSessions.has(session)) controller.abort();
+      const invocation = { ...p.invocation, signal: controller.signal };
+      try {
+        return await execution.run({ id: p.executionId, invocation }, () =>
+          cmd.handler(invocation),
+        );
+      } finally {
+        activeCommands.delete(key);
+      }
+    }
+    case 'command.cancel': {
+      cancelledSessions.add(p.session);
+      if (cancelledSessions.size > 256)
+        cancelledSessions.delete(cancelledSessions.values().next().value!);
+      // The host independently cancels pending native input using its trusted context.
+      for (const entry of activeCommands.values())
+        if (entry.session === p.session) entry.controller.abort();
+      return null;
     }
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
@@ -171,6 +207,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       return null;
     }
     case 'deactivate':
+      for (const entry of activeCommands.values()) entry.controller.abort();
       disposables.forEach((d) => d());
       await extension?.deactivate?.();
       setImmediate(() => process.exit(0));

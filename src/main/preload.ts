@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
-  setAppletApiPermissions: (id, permissions) =>
-    ipcRenderer.invoke('dock:appletApiPermissions', id, permissions),
+  setAppletApiPermissions: (permissions) =>
+    ipcRenderer.invoke('dock:appletApiPermissions', permissions),
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
   refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
   restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),

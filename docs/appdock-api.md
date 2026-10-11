@@ -1,19 +1,19 @@
-# AppDock共通操作API（0.26.36以降）
+# AppDock共通操作API（0.26.37）
 
 MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保存処理を使います。機能別の契約は[共通操作APIの各操作](automation.md)を正本とし、この文書はAppletの接続・許可・互換性を説明します。
 
 ## 構造と公開範囲
 
 - `src/main/core/appdock-api.ts`のAppDockApiはMCPの起動状態から独立した単一インスタンスです。MCPはHTTPアダプター、Appletは既存JSON-lines RPCの`host.appdock.call`から呼びます。AppletにHTTPポート・Bearer token・Codex登録は不要です。
-- 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。MCPツール名・説明・入力schemaをここから生成し、Node SDKの操作名にも使います。操作追加時は共通カタログとAppDockApiの処理を追加します。既存のcommands.executeから公開コマンドを増やす場合は、新しいMCPツールやSDKメソッドは不要です。
-- 現在の11操作すべてにAppletから接続できます。公開情報の取得、公開設定、公開コマンド、Applet管理、ショートカット・ジェスチャー・リボン・トレイ編集が対象です。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
+- 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。各操作で`callers`（mcp/applet）、`permissions`、入力JSON SchemaとMCP情報を宣言します。新規処理はAppDockApiのhandlersへ登録し、共通dispatcherが公開先・必要許可・Schemaを検証します。MCP列挙も同じ公開先を使うため、Applet RPC/SDK/MCPの通信実装を追加する必要はありません。既存のcommands.executeから公開コマンドを増やす場合も新しいツールは不要です。
+- Appletは13操作、MCPは11操作を公開します。公開情報・設定・コマンド、Applet管理、ショートカット・ジェスチャー・リボン・トレイ編集に加え、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
 - 自分のStorage/Secrets、通知、UI登録等の既存APIは引き続き用途別の入口を使います。これらをMCPへ自動公開しません。リモートWebページにはこのAPIやホストIPCを渡しません。
 
 ## 宣言と許可
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-Applet詳細の「設定」→「このAppletからのAppDock操作」で許可を変更します。初期値はすべてOFF。変更はその場でPC専用の`applet-api.json`へ保存され、通常設定の未保存draftとは独立しています。Applet IDとインストールフォルダーに紐づくため、異なるフォルダーへの移動後は再度許可します。設定を読み取れない場合はすべて拒否し、画面へエラーを表示します。Codex側の許可設定や登録は変更しません。
+本体の「設定 → 一般 → Appletからの操作許可」で変更します。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。初期値はすべてOFF。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -22,10 +22,28 @@ Applet詳細の「設定」→「このAppletからのAppDock操作」で許可�
 | 公開設定変更・生成ON/OFF/toggle | read + execute + write |
 | Appletの有効・無効・再起動 | read + execute + manageApplets |
 | ショートカット等の編集 | read + execute + write + 対象のeditShortcuts/editGestures/editRibbon/editTray |
+| input.sendKeys / input.appCommand | sendInputのみ（MCPは直接呼出し不可） |
 
 許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。
 
-CodexとAppletの権限は独立しています。MCPから公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、内側の呼出しにはそのAppletの許可を適用します。MCPの設定変更をOFFにしても、設定変更を許可したAppletの処理までは制限しません。Applet作者は外部公開コマンドの作用を説明してください。Appletプロセス自体はOSサンドボックスではなく、信頼できるローカル実装を対象にします。
+CodexとAppletの権限は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、内側には全Applet共通の許可を適用します。MCP起点を理由にApplet専用APIを拒否しません。これにより、MCPには生のキー送信APIを出さず、Appletが定義・公開する具体的な操作を実行できます。これは信頼できる、自分で作成するローカルAppletを前提にした仕様です。Appletプロセス自体はOSサンドボックスではありません。
+
+## Windows入力（0.26.37以降）
+
+最低本体版0.26.37、appdock-api capability、sendInput許可が必要です。
+
+```ts
+await context.appdock.call('input.sendKeys', { keys: 'Ctrl+Shift+T' });
+await context.appdock.call('input.appCommand', { action: 'back' });
+```
+
+.NETでは同じ操作名・引数を`context.AppDock.CallAsync`へ渡します。sendKeysは修飾キーと1キーの組、appCommandはback/forward/reloadだけを受け付けます。キー解析は.NET SDKのInputKeyChordに集約します。本体は既存InputHostをフックなしの入力workerとして必要時に起動し、SendInput/WM_APPCOMMANDの処理を共有します。
+
+可視の最前面を対象にし、物理キー解放を最大2秒待ち、途中の対象変更を拒否します。ジェスチャーは開始HWNDと取消情報を維持します。通常経路の再入防止150msを連続ジェスチャーへ課しません。許可取消・Applet停止・ジェスチャー取消で未送信処理を取り消します。送信済み入力を取り消すものではありません。
+
+成功は`{completion:'inputSubmitted',effectVerified:false}`です。対象アプリの実際の動作成功を保証せず、自動再送しません。対象のアプリによるキー解釈やWindowsの権限制約があります。
+
+Node workerはコマンドごとのAbortSignalを提供し、AsyncLocalStorageでホスト発行executionIdをAPIへ付加します。.NET Runtimeも実行文脈を保持します。本体がApplet/実行寿命/開始対象を照合するので、通信層から任意HWNDを送信先として指定しません。コマンド外の通常呼出しは実行時の最前面を使います。
 
 ## SDK
 
@@ -69,3 +87,5 @@ await context.AppDock.CallAsync("commands.execute", new {
 ## 検証
 
 型検査、`tests/appdock-api.test.cjs`と設定/API回帰を使用します。実プロセス試験は先に`dev.bat run build:dotnet`と`dotnet build tests/fixtures/dotnet/AppDock.Extensions.ApiProbe/AppDock.Extensions.ApiProbe.csproj -c Release`を実行してから、`dev.bat node scripts/applet-api-ui-test.cjs`を直列で実行します。引数に発行EXEを渡すと隔離コピーで検証します。旧SDKでコンパイル済みのDemo DLLを`APPDOCK_TEST_LEGACY_DEMO_DLL`へ指定すると旧DLL互換も検査します。fixtureは製品へ同梱しません。
+
+入力は`tests/node-invocation.test.cjs`、InputTests、専用WinForms fixture `tests/fixtures/dotnet/AppDock.InputTarget`をReleaseビルド後の`scripts/native-input-ui-test.cjs`で検証します。後者は2Appletのpublish出力を隔離profileへコピーし、全11操作・.NET呼出し・許可取消・MCP経由の明示コマンド・対象変更・取消・連続ジェスチャーを確認します。GUIは直列で実行し、引数のEXEはwin-unpacked版を使用します。

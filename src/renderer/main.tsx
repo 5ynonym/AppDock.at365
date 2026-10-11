@@ -784,15 +784,6 @@ function App() {
                             editor={editor}
                             currentRevision={snapshot.settings.revision}
                           />
-                          {detailView === 'settings' && !webManagerSelected && (
-                            <AppletApiPermissions
-                              applet={selectedApplet}
-                              grants={snapshot.appletApi?.grants[selectedApplet.id] ?? {}}
-                              error={snapshot.appletApi?.error}
-                              busy={busy}
-                              run={action}
-                            />
-                          )}
                           {webManagerSelected ? (
                             <div className="applet-settings-panel">
                               <WebAppletSettings
@@ -849,6 +840,7 @@ function App() {
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
               <SettingsPage
+                appletApi={snapshot.appletApi}
                 snapshot={snapshot.settings}
                 launch={snapshot.launch}
                 version={snapshot.version}
@@ -1220,6 +1212,7 @@ function ExtensionDetail({
   );
 }
 function SettingsPage({
+  appletApi,
   snapshot,
   launch,
   version,
@@ -1240,6 +1233,7 @@ function SettingsPage({
   sidebar,
   active,
 }: {
+  appletApi?: HostSnapshot['appletApi'];
   snapshot: SettingsSnapshot;
   launch: HostSnapshot['launch'];
   version: string;
@@ -1628,6 +1622,12 @@ function SettingsPage({
               {category === 'general' && (
                 <>
                   <h3>一般</h3>
+                  <AppletApiPermissions
+                    grants={appletApi?.permissions ?? {}}
+                    error={appletApi?.error}
+                    busy={busy}
+                    run={run}
+                  />
                   <SettingRow
                     title="スタートアップに登録"
                     description="Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。"

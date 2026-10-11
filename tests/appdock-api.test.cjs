@@ -63,15 +63,15 @@ function setup(t) {
     settingsCommands,
     audit,
     call,
-    grant: (p) => access.set(manifest, p),
+    grant: (p) => access.set(p),
   };
 }
-test('Applet grants are default-off, persisted per installation, independent of MCP, and revoked immediately', async (t) => {
+test('Applet grants are default-off, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
   const f = setup(t);
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
   for (const method of automationMethods.filter(
-    (m) => m !== 'commands.execute' && m !== 'applets.get',
+    (m) => !m.startsWith('input.') && m !== 'commands.execute' && m !== 'applets.get',
   ))
     assert.equal((await f.call(method)).ok, true, method);
   assert.equal(f.api.call('system.getInfo').executable, false);
@@ -80,7 +80,10 @@ test('Applet grants are default-off, persisted per installation, independent of 
     execute: true,
     write: true,
   });
-  assert.deepEqual(f.access.get({ ...f.manifest, folder: path.join(f.dir, 'other') }), {});
+  assert.deepEqual(
+    f.access.get({ ...f.manifest, id: 'other', folder: path.join(f.dir, 'other') }),
+    { read: true, execute: true, write: true },
+  );
   f.grant({ read: true });
   assert.equal(
     (await f.call('commands.execute', { id: 'appdock.settings.notifications.off' })).error.code,
@@ -206,7 +209,7 @@ test('Malformed grants fail closed; invalid edits never change stored permission
   const bad = new AppletApiAccess(file);
   assert.ok(bad.error);
   assert.deepEqual(bad.get(f.manifest), {});
-  assert.throws(() => bad.set(f.manifest, { read: true }));
+  assert.throws(() => bad.set({ read: true }));
 });
 test('Node SDK exposes structured error codes and unwraps the same result', async () => {
   const client = createAppDockClient(async (method, args) => {
@@ -217,6 +220,76 @@ test('Node SDK exposes structured error codes and unwraps the same result', asyn
   });
   assert.deepEqual(await client.call('settings.get'), { revision: 'r' });
   await assert.rejects(client.call('system.getInfo'), { code: 'API_DISABLED' });
+});
+
+test('Applet-only operations require only their declared grant and cannot be called or discovered by MCP', async (t) => {
+  const f = setup(t);
+  const { operationsFor } = require('../out/main/shared/appdock-api');
+  const calls = [];
+  f.options.handlers = {
+    'input.sendKeys': async (params, id) => {
+      calls.push({ params, id });
+      return { completion: 'inputSubmitted' };
+    },
+  };
+  assert.ok(!operationsFor('mcp').some(([name]) => name.startsWith('input.')));
+  assert.ok(operationsFor('applet').some(([name]) => name === 'input.sendKeys'));
+  assert.throws(() => f.api.call('input.sendKeys', { keys: 'A' }), { code: 'NOT_FOUND' });
+  assert.equal((await f.call('input.sendKeys', { keys: 'A' })).error.code, 'API_DISABLED');
+  f.grant({ sendInput: true });
+  assert.equal((await f.call('input.sendKeys', { keys: 'A' })).ok, true);
+  for (const params of [{}, { keys: 5 }, { keys: '' }, { keys: 'A', window: '123' }])
+    assert.equal((await f.call('input.sendKeys', params)).error.code, 'INVALID_ARGUMENT');
+  assert.equal(calls.length, 1);
+  f.options.executable = () => true;
+  f.options.commands = () => [{ id: 'test.caller.send', title: 'Send', available: true }];
+  f.options.execute = async () => {
+    assert.equal((await f.call('input.sendKeys', { keys: 'A' })).ok, true);
+  };
+  await f.api.call('commands.execute', { id: 'test.caller.send' });
+  assert.equal(
+    calls.length,
+    2,
+    'explicitly published Applet command may delegate to its permitted input API',
+  );
+  f.grant({});
+  assert.equal((await f.call('input.sendKeys', { keys: 'A' })).error.code, 'API_DISABLED');
+});
+
+test('old per-Applet grants never become a global grant automatically', (t) => {
+  const f = setup(t),
+    file = path.join(f.dir, 'applet-api.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ version: 1, grants: { a: { folder: f.dir, permissions: { read: true } } } }),
+  );
+  const access = new AppletApiAccess(file);
+  assert.equal(access.error, undefined);
+  assert.deepEqual(access.get(), {});
+  access.set({ sendInput: true });
+  assert.equal(JSON.parse(fs.readFileSync(file)).version, 2);
+});
+
+test('host execution context isolates identities, expires on return, and cancels the matching gesture', async () => {
+  const { CommandContexts } = require('../out/main/main/core/command-contexts');
+  const contexts = new CommandContexts();
+  let expired;
+  await contexts.run('a', { session: 'one', window: '123', source: 'gesture' }, async (id) => {
+    expired = id;
+    assert.throws(() => contexts.get('b', id));
+    const ctx = contexts.get('a', id);
+    assert.equal(ctx.window, '123');
+    contexts.cancel('other');
+    assert.equal(ctx.signal.aborted, false);
+    contexts.cancel('one');
+    assert.equal(ctx.signal.aborted, true);
+  });
+  assert.throws(() => contexts.get('a', expired));
+  await contexts.run('b', undefined, async (id) => {
+    const c = contexts.get('b', id);
+    contexts.stop('b');
+    assert.equal(c.signal.aborted, true);
+  });
 });
 
 test('MCP effective permission reporting retains execution and write prerequisites', (t) => {

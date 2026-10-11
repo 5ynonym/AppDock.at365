@@ -1,3 +1,4 @@
+import { NativeInput } from './core/native-input';
 import {
   app,
   BrowserWindow,
@@ -191,7 +192,22 @@ let automation: AutomationService | undefined;
 const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
 const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
   !quitting && (automation?.allowed(key) ?? false);
+let nativeInput: NativeInput | undefined;
+const sendInput =
+  (method: string) =>
+  async (
+    params: Record<string, unknown>,
+    id: string | undefined,
+    context: import('./core/command-contexts').InputInvocation,
+  ) => {
+    if (!id || !nativeInput) throw Error('入力機能は準備中です。');
+    return nativeInput.send(method, params, id, context);
+  };
 const operationApi = new AppDockApi({
+  handlers: {
+    'input.sendKeys': sendInput('input.sendKeys'),
+    'input.appCommand': sendInput('input.appCommand'),
+  },
   settings,
   settingsCommands,
   appletManagement,
@@ -401,7 +417,7 @@ function avatarSignature() {
 function snapshot(): HostSnapshot {
   return {
     appletApi: {
-      grants: Object.fromEntries(allApplets().map((e) => [e.id, appletApiAccess.get(e)])),
+      permissions: appletApiAccess.get(),
       error: appletApiAccess.error,
     },
     launch: launch.state,
@@ -500,12 +516,11 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
-  handle('dock:appletApiPermissions', (id: string, permissions: unknown) => {
+  handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
-    const e = manager.items.get(id);
-    if (!e) throw Error('Appletが見つかりません。');
-    appletApiAccess.set(e.manifest, permissions);
-    log.write('info', e.manifest.id, '[Applet API] permissions updated');
+    appletApiAccess.set(permissions);
+    for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
+    log.write('info', 'host', '[Applet API] shared permissions updated');
     changed();
   });
   handle('dock:automation', (action: AutomationAction) => {
@@ -714,7 +729,10 @@ async function initialize() {
       () => manager.emit('changed'),
       executeCommand,
       path.join(paths.assets, 'applets'),
-      (e, request) => callAppletApi(operationApi, e, request, log.write),
+      (e, request) =>
+        callAppletApi(operationApi, e, request, log.write, (id) =>
+          manager.executions.get(e.manifest.id, id),
+        ),
       settingsCommands,
     ),
     log: log.write,
@@ -810,6 +828,9 @@ async function initialize() {
     sharedDirectory,
     (error) => log.write('error', 'web-accounts', error.message),
   );
+  nativeInput = new NativeInput(
+    path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
+  );
   gestures = new GestureManager(
     path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
     () => {
@@ -827,6 +848,7 @@ async function initialize() {
     shortcutDispatcher,
     executeCommand,
     (session) => {
+      manager.executions.cancel(session);
       for (const item of manager.items.values())
         if (item.peer && !item.peer.closed)
           item.peer.send({ jsonrpc: '2.0', method: 'command.cancel', params: { session } });
@@ -834,6 +856,8 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    for (const e of manager.items.values())
+      if (!['starting', 'running'].includes(e.state)) nativeInput?.cancelApplet(e.manifest.id);
     trayMenu();
     void syncHotKeys();
     changed();
@@ -1344,6 +1368,7 @@ app.on('before-quit', (event) => {
     for (const stop of [
       () => automation?.close(),
       () => gestures?.close(),
+      () => nativeInput?.close(),
       () => hotKeys?.close(),
       () => webApplets.close(),
       () => manager.shutdown(),

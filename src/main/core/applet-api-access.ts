@@ -1,3 +1,4 @@
+import type { InputInvocation } from './command-contexts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -21,49 +22,29 @@ function permissions(value: unknown): AppletApiPermissions {
   return { ...value };
 }
 export class AppletApiAccess {
-  private grants: Record<string, { folder: string; permissions: AppletApiPermissions }> = {};
+  private grants: AppletApiPermissions = {};
   error?: string;
   constructor(private file: string) {
     try {
       if (!fs.existsSync(file)) return;
       if (fs.statSync(file).size > 262144) throw Error();
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (saved.version !== 1 || !isObject(saved.grants)) throw Error();
-      const next: typeof this.grants = {};
-      for (const [id, grant] of Object.entries(saved.grants)) {
-        if (!isObject(grant) || typeof grant.folder !== 'string' || !path.isAbsolute(grant.folder))
-          throw Error();
-        Object.defineProperty(next, id, {
-          value: { folder: grant.folder, permissions: permissions(grant.permissions) },
-          enumerable: true,
-          configurable: true,
-          writable: true,
-        });
-      }
-      this.grants = next;
+      // Existing per-Applet grants are not broadened to every installed Applet.
+      if (saved.version === 1 && isObject(saved.grants)) return;
+      if (saved.version !== 2) throw Error();
+      this.grants = permissions(saved.permissions);
     } catch {
       this.error = 'Applet操作の許可設定を読み取れません。applet-api.jsonを確認してください。';
     }
   }
-  get(applet: { id: string; folder: string; capabilities?: string[] }): AppletApiPermissions {
-    if (this.error || !applet.capabilities?.includes('appdock-api')) return {};
-    const grant = Object.hasOwn(this.grants, applet.id) ? this.grants[applet.id] : undefined;
-    return grant?.folder === path.resolve(applet.folder).toLowerCase()
-      ? { ...grant.permissions }
-      : {};
+  get(applet?: { capabilities?: string[] }): AppletApiPermissions {
+    if (this.error || (applet && !applet.capabilities?.includes('appdock-api'))) return {};
+    return { ...this.grants };
   }
-  set(applet: { id: string; folder: string; capabilities?: string[] }, value: unknown) {
+  set(value: unknown) {
     if (this.error) throw Error(this.error);
-    if (!applet.capabilities?.includes('appdock-api'))
-      throw Error('このAppletはAppDock操作APIを宣言していません。');
-    const next = {
-      ...this.grants,
-      [applet.id]: {
-        folder: path.resolve(applet.folder).toLowerCase(),
-        permissions: permissions(value),
-      },
-    };
-    atomicWrite(this.file, JSON.stringify({ version: 1, grants: next }, null, 2) + '\n');
+    const next = permissions(value);
+    atomicWrite(this.file, JSON.stringify({ version: 2, permissions: next }, null, 2) + '\n');
     this.grants = next;
   }
 }
@@ -73,6 +54,7 @@ export async function callAppletApi(
   applet: ExtensionInstance,
   request: unknown,
   audit: (level: string, source: string, message: string) => void,
+  invocation?: (executionId: unknown) => InputInvocation,
 ): Promise<AppDockReply> {
   const method =
     isObject(request) &&
@@ -85,7 +67,7 @@ export async function callAppletApi(
   try {
     if (
       !isObject(request) ||
-      Object.keys(request).some((k) => !['method', 'params'].includes(k)) ||
+      Object.keys(request).some((k) => !['method', 'params', 'executionId'].includes(k)) ||
       method === 'unknown'
     )
       throw new AutomationError('INVALID_ARGUMENT', '対応するmethodとparamsを指定してください。');
@@ -94,7 +76,12 @@ export async function callAppletApi(
     if (!['starting', 'running'].includes(applet.state))
       throw new AutomationError('UNAVAILABLE', 'Appletは停止しています。');
     audit('info', applet.manifest.id, `${context} result=started`);
-    const value = await api.call(method, request.params ?? {}, applet.manifest.id);
+    const value = await api.call(
+      method,
+      request.params ?? {},
+      applet.manifest.id,
+      invocation?.(request.executionId),
+    );
     audit(
       'info',
       applet.manifest.id,

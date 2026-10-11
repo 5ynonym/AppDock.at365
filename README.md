@@ -1,6 +1,6 @@
 # AppDock.at365
 
-0.26.36から、対応AppletがAppDockの公開機能を操作できます。Applet詳細の「設定」→「このAppletからのAppDock操作」で、このPCでの許可を選びます。初期値はOFFで、Codex連携とは別に管理します。既存Appletの使い方は変わりません。
+0.26.37では「設定 → 一般 → Appletからの操作許可」で、全Applet共通の許可を操作の種類ごとに選べます。Codex連携とは別に管理し、初期値はOFFです。WebBrowserTools 0.3.2とWindowsTools 0.1.3のキー操作には「Windowsへのキー・操作メッセージ送信」をONにしてください。旧版のApplet個別許可は引き継がないため、必要な項目をこの画面で選び直してください。
 
 自作の常駐ツールを**Applet**としてまとめて使う、Windows x64向けのアプリです。Appletの有効化、設定、ショートカット、トレイ操作をひとつの画面で管理できます。
 

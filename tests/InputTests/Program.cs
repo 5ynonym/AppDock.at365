@@ -56,7 +56,7 @@ internal static class Program
                 rows=triggers.Select((g,i)=>new{id="r"+i,command="test.run",gesture=g,title="Test "+g,window,when=new{scope,appletIds=Array.Empty<string>(),processes=new[]{process}}}).ToArray()},CancellationToken.None);
             await Task.Delay(70);
         }
-        async Task Begin(){form.Activate();SetForegroundWindow(form.Handle);await Task.Delay(80);Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
+        async Task Begin(){FocusTarget(form);await Task.Delay(80);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
         async Task End(){Mouse(16);await Task.Delay(150);}
         void Check(bool condition,string name){Console.WriteLine((condition?"PASS ":"FAIL ")+name);if(!condition)failures++;}
         try{
@@ -81,6 +81,16 @@ internal static class Program
         }finally{child.StandardInput.Close();await reading;await child.WaitForExitAsync();Console.Write(await errors);}
     }
     private sealed class Probe:Form {public int RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
+    private static void FocusTarget(Form form) {
+        form.Show(); form.Activate();
+        var thread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        var own = GetCurrentThreadId();
+        var attached = thread != 0 && thread != own && AttachThreadInput(own, thread, true);
+        try { SetForegroundWindow(form.Handle); }
+        finally { if(attached) AttachThreadInput(own, thread, false); }
+    }
+    [DllImport("kernel32.dll")]private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")]private static extern bool AttachThreadInput(uint a,uint b,bool attach);
     private static void Mouse(uint flags,int data=0){if(SendInput(1,[new(){Union=new(){Mouse=new(){Flags=flags,Data=unchecked((uint)data)}}}],Marshal.SizeOf<Input>())!=1)throw new Exception("SendInput mouse failed: "+Marshal.GetLastWin32Error());}
     private static void Key(ushort key,bool up=false)=>SendInput(1,[new(){Type=1,Union=new(){Key=new(){Key=key,Flags=up?2u:0}}}],Marshal.SizeOf<Input>());
     [StructLayout(LayoutKind.Sequential)]private struct Input{public uint Type;public Union Union;}

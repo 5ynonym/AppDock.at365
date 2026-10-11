@@ -159,7 +159,7 @@ export interface LogEntry {
 }
 export interface HostSnapshot {
   appletApi?: {
-    grants: Record<string, import('./appdock-api').AppletApiPermissions>;
+    permissions: import('./appdock-api').AppletApiPermissions;
     error?: string;
   };
   launch: LaunchState;
@@ -187,10 +187,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
-  setAppletApiPermissions(
-    id: string,
-    permissions: import('./appdock-api').AppletApiPermissions,
-  ): Promise<void>;
+  setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,
   ): Promise<import('./automation').AutomationReply>;

@@ -1,3 +1,4 @@
+import { CommandContexts } from './command-contexts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -151,6 +152,7 @@ interface ManagerOptions {
   log: (level: string, source: string, message: string) => void;
 }
 class ExtensionManager extends EventEmitter {
+  readonly executions = new CommandContexts();
   roots: string[];
   settings: SettingsStore;
   nodeExecutable: string;
@@ -460,6 +462,7 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   crashed(e: ExtensionInstance, message: string) {
+    this.executions.stop(e.manifest.id);
     if (e.state === 'stopping') return;
     void closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
@@ -473,6 +476,7 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async stop(e: ExtensionInstance) {
+    this.executions.stop(e.manifest.id);
     this.cancelStart(e);
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
@@ -517,7 +521,13 @@ class ExtensionManager extends EventEmitter {
     );
     if (running) {
       if (!running.peer || running.peer.closed) throw new Error('拡張との接続が終了しました。');
-      return running.peer.request('command.execute', { id, ...(invocation ? { invocation } : {}) });
+      return this.executions.run(running.manifest.id, invocation, (executionId) =>
+        running.peer!.request('command.execute', {
+          id,
+          executionId,
+          ...(invocation ? { invocation } : {}),
+        }),
+      );
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));
     if (!e) throw new Error('このコマンドは現在利用できません。');
@@ -539,7 +549,13 @@ class ExtensionManager extends EventEmitter {
           e.peer.closed
         )
           throw new Error(e.error ?? 'Appletがコマンドを登録できませんでした。');
-        return e.peer.request('command.execute', { id, ...(invocation ? { invocation } : {}) });
+        return this.executions.run(e.manifest.id, invocation, (executionId) =>
+          e.peer!.request('command.execute', {
+            id,
+            executionId,
+            ...(invocation ? { invocation } : {}),
+          }),
+        );
       });
     this.queue = execution.then(
       () => {},

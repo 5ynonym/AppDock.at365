@@ -16,10 +16,13 @@ internal static class Program
         using var engine = new GestureEngine(app.Dispatcher);
         _ = Task.Run(async () => {
             await using var peer = new JsonRpcConnection(Console.In, output);
+            using var inputSender = new InputSender();
             engine.Invoke = p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime);
             engine.Cancel = id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); };
             try {
                 await peer.ReadAsync(async (method, p) => {
+                    if (method == "input.cancel") { inputSender.Cancel(p.GetProperty("id").GetString()!); return null; }
+                    if (method is "input.sendKeys" or "input.appCommand") return await inputSender.ExecuteAsync(method, p, peer.Lifetime);
                     if (method == "gestures.valid") return await app.Dispatcher.InvokeAsync(() => engine.Valid(p.GetProperty("session").GetString()!,p.GetProperty("window").GetString()!));
                     if (method != "gestures.sync") throw new ArgumentException("Unknown input method.");
                     var config = p.Deserialize<Configuration>(JsonRpcConnection.Json) ?? throw new ArgumentException("Missing configuration.");

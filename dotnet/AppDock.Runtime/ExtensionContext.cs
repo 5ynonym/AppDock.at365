@@ -17,10 +17,11 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private JsonElement configuration = settings;
     private readonly object sync = new();
     public string ExtensionId => id;
+    internal static readonly AsyncLocal<string?> ExecutionId = new();
     public IAppDockService AppDock => this;
     async Task<JsonElement> IAppDockService.CallAsync(string method, object? parameters, CancellationToken cancellationToken)
     {
-        var reply = await connection.RequestAsync("host.appdock.call", new { method, @params = parameters ?? new { } }, cancellationToken);
+        var reply = await connection.RequestAsync("host.appdock.call", new { method, @params = parameters ?? new { }, executionId = ExecutionId.Value }, cancellationToken);
         if (!reply.GetProperty("ok").GetBoolean()) {
             var error = reply.GetProperty("error");
             throw new AppDockApiException(error.GetProperty("code").GetString()!, error.GetProperty("message").GetString()!);

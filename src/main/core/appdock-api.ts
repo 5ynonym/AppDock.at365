@@ -1,5 +1,12 @@
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
+import type { InputInvocation } from './command-contexts';
 import type { AppletApiPermissions } from '../../shared/appdock-api';
-import { appDockMethods } from '../../shared/appdock-api';
+import {
+  appDockMethods,
+  appDockOperations,
+  operationsFor,
+  type AppDockMethod,
+} from '../../shared/appdock-api';
 import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import type { SettingsStore } from './settings';
 import type { AutomationApplet, AutomationCommand } from './automation-commands';
@@ -22,6 +29,13 @@ export class AutomationError extends Error {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const automationMethods = appDockMethods;
+const schemaValidator = new AjvJsonSchemaValidator();
+const inputValidators = new Map(
+  Object.entries(appDockOperations).map(([method, operation]) => [
+    method,
+    schemaValidator.getValidator(operation.inputSchema),
+  ]),
+);
 export class AppDockApi {
   private executing = 0;
   private settingsCommands: SettingsCommands;
@@ -31,6 +45,16 @@ export class AppDockApi {
   private ribbon: RibbonCommands;
   constructor(
     private options: {
+      handlers?: Partial<
+        Record<
+          AppDockMethod,
+          (
+            params: Record<string, unknown>,
+            appletId: string | undefined,
+            context: InputInvocation,
+          ) => Promise<Record<string, unknown>>
+        >
+      >;
       settings: SettingsStore;
       appletPermissions?(id: string): AppletApiPermissions;
       save(value: Settings, revision: number): SettingsSnapshot;
@@ -124,16 +148,27 @@ export class AppDockApi {
     method: string,
     params: unknown = {},
     appletId?: string,
+    context: InputInvocation = {},
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     const permissions = this.permissions(appletId);
-    if (!permissions.read)
-      throw new AutomationError(
-        'API_DISABLED',
-        'このAppletのAppDock操作を設定画面で許可してください。',
-      );
+    const definition = Object.hasOwn(appDockOperations, method)
+      ? appDockOperations[method as AppDockMethod]
+      : undefined;
+    const caller = appletId === undefined ? 'mcp' : 'applet';
+    if (!definition || !(definition.callers as readonly string[]).includes(caller))
+      throw new AutomationError('NOT_FOUND', '対応していない操作です。');
+    for (const permission of definition.permissions)
+      if (!permissions[permission])
+        throw new AutomationError('API_DISABLED', 'この操作を設定画面で許可してください。');
     if (!this.options.ready())
       throw new AutomationError('NOT_READY', 'AppDockは起動中または終了中です。');
     if (!object(params)) throw new AutomationError('INVALID_ARGUMENT', '引数はオブジェクトです。');
+    const handler = this.options.handlers?.[method as AppDockMethod];
+    if (handler) {
+      if (!inputValidators.get(method)!(params).valid)
+        throw new AutomationError('INVALID_ARGUMENT', '引数が操作の形式に一致しません。');
+      return handler(params, appletId, context);
+    }
     if (
       !['settings.get', 'settings.getSchema', 'applets.get', 'commands.execute'].includes(method) &&
       Object.keys(params).length
@@ -150,7 +185,7 @@ export class AppDockApi {
           shortcutEditingAllowed: permissions.editShortcuts === true,
           version: this.options.version,
           instanceId: this.options.instanceId,
-          methods: automationMethods,
+          methods: operationsFor(caller).map(([method]) => method),
           writable: permissions.write === true,
           executable: permissions.execute === true,
         };

@@ -1,4 +1,4 @@
-import { appDockOperations } from '../../shared/appdock-api';
+import { operationsFor } from '../../shared/appdock-api';
 import http, { type IncomingMessage } from 'node:http';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -6,7 +6,9 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { AutomationApi, AutomationError, automationMethods } from './automation-api';
 
-const definitions = Object.values(appDockOperations);
+const entries = operationsFor('mcp');
+const definitions = entries.map(([, { callers, permissions, ...tool }]) => tool);
+const methods = entries.map(([method]) => method);
 const names: string[] = definitions.map((d) => d.name);
 function tools() {
   return definitions.map((d) => structuredClone(d));
@@ -95,7 +97,7 @@ export class AutomationMcp {
       sdk.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools() }));
       sdk.setRequestHandler(CallToolRequestSchema, async (request) => {
         const index = names.indexOf(request.params.name);
-        const method = index < 0 ? 'unknown' : automationMethods[index];
+        const method = index < 0 ? 'unknown' : methods[index];
         const requestId = randomUUID();
         const started = Date.now();
         const target = this.api.auditTarget(method, request.params.arguments ?? {});
@@ -103,10 +105,7 @@ export class AutomationMcp {
         if (method === 'commands.execute') this.audit('info', `${context} result=started`);
         try {
           if (index < 0) throw new AutomationError('NOT_FOUND', '対応していないツールです。');
-          const value = await this.api.call(
-            automationMethods[index],
-            request.params.arguments ?? {},
-          );
+          const value = await this.api.call(methods[index], request.params.arguments ?? {});
           this.audit(
             'info',
             `${context} result=success${method === 'commands.execute' ? ` completion=${value.completion}` : ''} durationMs=${Date.now() - started}`,

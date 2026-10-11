@@ -243,3 +243,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 ## 設定コマンド（0.26.30）
 
 変更操作はcommands.executeのid/argsに統一し、旧settings.patchを削除。読取りはsettings.get/getSchemaに任意appletIdを追加しました。設定定義のautomation/generateCommandsから本体・Appletの更新schemaと引数なしコマンドを生成します。仕様と利用例は[共通操作API](docs/automation.md#設定宣言と自動生成コマンド)、保存競合は[設定同期](docs/settings-sync.md)を正本とします。主な回帰はtests/settings-commands.test.cjs、tests/automation.test.cjs、scripts/automation-ui-test.cjsです。
+
+## 共通入力API（0.26.37）
+
+Windowsのキー・操作メッセージ送信を本体InputHostへ集約し、WebBrowserToolsとWindowsToolsから呼びます。公開先・全Applet共通許可・SDK・取消・試験手順は[共通操作API](docs/appdock-api.md)を参照してください。Node実行文脈の回帰はtests/node-invocation.test.cjs、実入力はscripts/native-input-ui-test.cjsです。依存パッケージを追加せず既存MCP SDKのSchema検証器を使います。

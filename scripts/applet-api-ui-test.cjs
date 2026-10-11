@@ -180,10 +180,10 @@ async function probe(id, action, mcp = false) {
   }, 'probe ' + action);
 }
 async function grant(id, permissions) {
-  await page.evaluate(
-    ({ id, permissions }) => window.dock.setAppletApiPermissions(id, permissions),
-    { id, permissions },
-  );
+  await page.evaluate(({ id, permissions }) => window.dock.setAppletApiPermissions(permissions), {
+    id,
+    permissions,
+  });
 }
 (async () => {
   try {
@@ -212,12 +212,8 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-denied Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    await page.evaluate(() => window.dock.executeCommand('appdock.applets.open'));
-    await page
-      .getByRole('button', { name: /test.api-node/ })
-      .first()
-      .click();
-    await page.getByRole('tab', { name: '設定', exact: true }).click();
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await page.getByRole('button', { name: '一般', exact: true }).click();
     const panel = page.locator('.applet-api-permissions');
     for (const label of ['公開情報の取得', '公開コマンドの実行', '公開設定の変更']) {
       await panel.getByRole('switch', { name: label, exact: true }).click();
@@ -276,7 +272,7 @@ async function grant(id, permissions) {
     }
     await grant(ids[0], { read: true, execute: true });
     assert.equal((await probe(ids[0], 'write', true)).code, 'WRITE_DISABLED');
-    assert.equal((await probe(ids[1], 'write', true)).completion, 'settingsSaved');
+    assert.equal((await probe(ids[1], 'write', true)).code, 'WRITE_DISABLED');
     await grant(ids[0], {});
     assert.equal((await probe(ids[0], 'read')).code, 'API_DISABLED');
     assert.ok(
@@ -288,7 +284,7 @@ async function grant(id, permissions) {
       ),
     );
     checks.push(
-      'MCP -> Node/.NET -> shared API reentry, per-caller grants/revocation, public-only readback and audit',
+      'MCP -> Node/.NET -> shared API reentry, shared Applet grants/revocation, public-only readback and audit',
     );
     await grant(ids[0], { read: true, execute: true, write: true });
     for (const theme of ['light', 'dark']) {

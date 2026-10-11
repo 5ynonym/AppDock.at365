@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-11: Applet専用入力API・全Applet共通許可（0.26.37）
+
+- 操作カタログにcallers/permissionsを追加し、MCPとAppletの公開先・許可を共通dispatcherで判定。新規handlerのJSON Schema検証も共通化。既存11操作に加えinput.sendKeys/input.appCommandをApplet専用で公開し、MCPの列挙・直接実行には出さない。明示公開されたAppletコマンドからの呼出しはApplet側の許可で実行する。
+- Applet操作許可を「設定→一般」の全Applet共通カテゴリへ変更。PC専用applet-api.json v2、初期OFF、Codexと独立。旧個別許可を全体へ拡大せずOFFから選び直す。監査は操作名/呼出元/結果を記録し引数は非記録。
+- InputHostへWindows入力を集約。物理キー待機・対象変更拒否・再入抑止・取消を維持し、通常150msをジェスチャーへ追加しない。Node/.NETのホスト発行実行IDと開始対象を伝播。SDK/RuntimeのAssemblyVersion 0.10.0.0を維持。WebBrowserTools 0.3.2をTypeScript/Node化し、WindowsTools 0.1.3のキー送信も共通APIへ移行。既存11 ID/キー設定/ジェスチャーを保持。
+- 型検査/本体標準276件/WindowsTools 11件/WebBrowserTools 2群成功。source Applet設定GUI各成功。最終単一EXEで旧DLL＋Node/.NET共通API GUI5群、既存MCP GUI15群（実Codex11ツール、推論なし）成功。両テーマ3幅・画像確認成功。
+- 最終win-unpackedと最終2Appletで専用WinFormsへの全11キー/操作メッセージと.NET送信、既定拒否・全体許可・取消・MCP非公開/明示Applet委譲・対象変更を確認。連続gesture入力3回14ms。発行InputHostの物理ジェスチャー17項目成功。既存設定UIはUI_ONLY=1で7群成功、物理入力試験とは区別する。実ブラウザー/実利用アプリの意味上の効果は未確認。
+- 初回の既存回帰で同期/非同期エラー契約の差を検出し、既存操作の検証経路を維持して修正。試験側の旧ナビゲーション・動的登録待ち・フォーカス取得を修正後成功。失敗ログ/profileは保持。依存/lockfile/toolchain更新なし。
+- ローカルpublish完了。本体144063925 bytes、SHA256 62176788f1892400f7ceeec3725997d2563871baf3d6191834fd7ff980242f11。Applet ZIPは各repoのfeedと一致。証跡[validation.json](.artifacts/native-api-20261011/validation.json)、完全ログは同フォルダー。最終SDK applet-api-portable-1791701401707、MCP automation-portable-1791701442894、入力native-input-ui-1791701515610、UI gestures-ui-1791701492997。
+- テストプロセス残存0。整理候補は直近3回または過去コミット検証の参照資料に該当し削除なし。失敗・不明資料は保持。実装は未コミット。外部公開/実利用deploy/未変更Applet発行/全体ZIP/App Server組込みなし。
+
 ## 2026-10-11: 共通操作API・SDKのコミット前確認
 
 - 対象34ファイル・依存状態・単一EXEを実装時の証跡と照合してstage。型検査、標準272/272、固定単一EXEの新旧SDK/API GUI5群とMCP GUI15群を再実行し全終了0。旧SDKでコンパイル済みのDLL、Node/.NET別プロセス、独立許可、再入、設定保存、実Codex隔離接続を確認。
@@ -1375,3 +1386,9 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 今回typecheckと標準dev.bat testを実行し211/211成功（供給元ポリシー/起動スクリプト回帰を含む）。固定発行版GUI9群と実Codex8ツール操作成功: .artifacts/automation-portable-1791663497295。Gmail21/21とMCP表示GUI、壁紙標準回帰と実EXE/RPC試験も成功。実サービス認証/実壁紙変更/モデル推論なし。
 - 証跡.artifacts/commit-validation-automation-20261011。全Git追跡入力299件、各ログ、lockfile/toolchain、既存配布物をハッシュ記録。検証版0.26.29 EXE/feedのsize/hash不変。検証後の追記は各repoのVERIFICATIONだけ、最終tree/commitは証跡へ保存。再発行/追加版更新なし。
 - 旧成功本体automation-portable-1791660107886/Gmail portable-1791458903951を使用中/境界/再解析検査後整理、各最新3件を保持。TEMP40ファイルをhash照合して証跡へ移し元を削除。失敗/不明/固定/再利用資料保持、試験プロセス残存0。push/Release/deployなし。
+
+## 2026-10-11: 共通入力APIのコミット前検証
+
+今回の変更を実装時の記録と照合して固定し、本体276件・型検査、WindowsTools11件、WebBrowserTools2群、両Appletの配布版GUI、固定EXEの新旧SDK/API5群・MCP15群、共通入力4群、物理ジェスチャー17項目、設定UI7群、文書リンク177件を確認しました。製品/発行物の追加変更はありません。実入力試験では想定外Sキー/送信先変化と開始直後の3項目不一致があり、同一内容で再確認後成功。入力外乱の可能性がありますが個別原因は未特定、失敗ログを保持します。実ブラウザーの効果/実OSロック・消灯は対象外。
+
+検証tree: `b2acb7e0e030426146ea467fac50bb4381c13fb5`。完全な証跡は`.artifacts/commit-validation-native-api-20261011/`。試験プロセス残存0、既存の最新3回・参照済み検証資料・失敗/不明資料を保持して削除なし。ローカルコミットのみでpushは行いません。

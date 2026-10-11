@@ -39,9 +39,11 @@ public static class AppletSession
                             try {
                                 if (invocation is not null && cancelledInvocations.ContainsKey(invocation.Session)) commandLifetime.Cancel();
                                 CommandExecution.Current = invocation;
+                                ExtensionContext.ExecutionId.Value = parameters.TryGetProperty("executionId", out var executionId) ? executionId.GetString() : null;
                                 await context.ExecuteAsync(parameters.GetProperty("id").GetString()!, commandLifetime.Token);
                             } finally {
                                 CommandExecution.Current = null;
+                                ExtensionContext.ExecutionId.Value = null;
                                 if (invocation is not null) invocations.TryRemove(invocation.Session, out _);
                             }
                         }
