@@ -218,3 +218,5 @@ AppDock 0.19.0ではページボタンを上寄せ/下寄せへ利用者が配�
 設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。AppDock 0.26.30以降、settings capabilityと明示の公開・生成宣言が必要です。
 
 0.26.37の入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
+
+ログだけを差し替えるShell AppletはminimumHostVersion 0.26.42以上でpage.logsを宣言できます。モデル・操作・フォーカス・復旧の契約は[Shellのページ表示](shell-pages.md)を参照してください。

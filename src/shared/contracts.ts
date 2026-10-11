@@ -193,6 +193,14 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  shellPage(
+    request: import('./shell-pages').ShellPageRequest,
+    bounds: import('./shell-pages').ShellPageViewport | null,
+  ): Promise<void>;
+  closeShellPage(id: string): Promise<void>;
+  focusShellPage(id: string, edge: 'first' | 'last'): Promise<void>;
+  onShellPageFocusHost(callback: (id: string, edge: 'before' | 'after') => void): () => void;
+  onLogSourceChanged(callback: (source: string) => void): () => void;
   focusShell(edge: 'first' | 'last'): Promise<void>;
   onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
   navigate(route: string): Promise<void>;

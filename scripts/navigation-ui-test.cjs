@@ -482,17 +482,24 @@ const checks = [];
       1,
     );
     assert.equal(await page.locator('.sidebar[aria-label="Applet一覧"]').count(), 1);
-    assert.equal(await page.getByLabel('ログのApplet').count(), 0);
-    assert((await page.locator('.detail-logs .log-row').count()) > 0);
-    for (const source of await page.locator('.log-row > div > span').allTextContents())
+    let logsPage = await require('./shell-overlay-helper.cjs').logsPage(page, {
+      type: 'applet',
+      id: 'appdock.welcome',
+    });
+    assert.equal(await logsPage.getByLabel('ログのApplet').count(), 0);
+    assert((await logsPage.locator('.log-row').count()) > 0);
+    for (const source of await logsPage.locator('.log-row > div > span').allTextContents())
       assert.equal(source, 'appdock.welcome');
-    await page.getByLabel('ログを検索').fill('no-such-log-entry');
-    await page.getByText('該当するログはありません。', { exact: true }).waitFor();
-    await page.getByLabel('ログを検索').fill('');
-    await page.getByLabel('ログレベル').selectOption('error');
-    for (const level of await page.locator('.log-row .log-level').allTextContents())
+    await logsPage.getByLabel('ログを検索').fill('no-such-log-entry');
+    await logsPage.getByText('該当するログはありません。', { exact: true }).waitFor();
+    await logsPage.getByLabel('ログを検索').fill('');
+    await logsPage.getByLabel('ログレベル').selectOption('error');
+    await logsPage.waitForFunction(() =>
+      [...document.querySelectorAll('.log-level')].every((e) => e.textContent === 'error'),
+    );
+    for (const level of await logsPage.locator('.log-row .log-level').allTextContents())
       assert.equal(level, 'error');
-    await page.getByLabel('ログレベル').selectOption('all');
+    await logsPage.getByLabel('ログレベル').selectOption('all');
     await page.screenshot({ path: path.join(profile, 'inline-applet-logs.png') });
     await detailTab('説明').click();
     assert.equal(await page.locator('.detail-logs').count(), 0);
@@ -504,21 +511,30 @@ const checks = [];
     await detailTab('説明').click();
     await detailTab('ログ').click();
     await button('ログ').click();
-    await page.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).waitFor();
+    logsPage = await require('./shell-overlay-helper.cjs').logsPage(page, { type: 'all' });
+    await logsPage.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).waitFor();
     assert.equal(
-      await page.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).count(),
+      await logsPage.getByRole('heading', { name: 'ログ', exact: true, level: 1 }).count(),
       1,
     );
-    assert.equal(await page.getByLabel('ログのApplet').inputValue(), '');
-    await page.getByLabel('ログのApplet').selectOption('host');
+    assert.equal(await logsPage.getByLabel('ログのApplet').inputValue(), '');
+    await logsPage.getByLabel('ログのApplet').selectOption('host');
     await button('Applet').click();
-    for (const source of await page.locator('.detail-logs .log-row > div > span').allTextContents())
+    logsPage = await require('./shell-overlay-helper.cjs').logsPage(page, {
+      type: 'applet',
+      id: 'appdock.welcome',
+    });
+    for (const source of await logsPage.locator('.log-row > div > span').allTextContents())
       assert.equal(source, 'appdock.welcome');
     await page.getByLabel('Appletを検索', { exact: true }).fill('検証Applet 01');
     await page.locator('.sidebar-extensions button').click();
     assert.equal(await page.locator('.detail-logs').count(), 1);
     assert.equal(await detailTab('ログ').getAttribute('aria-selected'), 'true');
-    for (const source of await page.locator('.detail-logs .log-row > div > span').allTextContents())
+    logsPage = await require('./shell-overlay-helper.cjs').logsPage(page, {
+      type: 'applet',
+      id: 'test.applet-1',
+    });
+    for (const source of await logsPage.locator('.log-row > div > span').allTextContents())
       assert.equal(source, 'test.applet-1');
     await detailTab('設定').click();
     await page.getByLabel('検証項目 0', { exact: true }).fill('ログ切替で保持する下書き');

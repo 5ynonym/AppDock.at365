@@ -1,3 +1,4 @@
+import { ShellPageSlot } from './ShellPageSlot';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { Icon, type IconName } from './Icon';
 import { Toggle } from './Toggle';
@@ -98,7 +99,7 @@ function App() {
         const selector =
           edge === 'before'
             ? '.titlebar button'
-            : '.sidebar button, main button, main input, main select';
+            : '.sidebar button, main button, main input, main select, main .shell-page-slot';
         const elements = [...document.querySelectorAll<HTMLElement>(selector)].filter(
           (e) => e.getClientRects().length && !e.matches(':disabled'),
         );
@@ -214,6 +215,7 @@ function App() {
     editor.draft.appletOrder,
   );
   const [logSource, setLogSource] = useRestartView<string>('logSource', '');
+  useEffect(() => window.dock.onLogSourceChanged(setLogSource), []);
   const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
     try {
@@ -816,12 +818,14 @@ function App() {
                     }
                     logsPanel={
                       detailView === 'logs' && selectedApplet ? (
-                        <LogsPage
+                        <ShellPageSlot
                           key={selectedApplet.id}
-                          snapshot={snapshot}
-                          run={action}
-                          source={selectedApplet.id}
-                          webManager={webManagerSelected}
+                          scope={
+                            webManagerSelected
+                              ? { type: 'web' }
+                              : { type: 'applet', id: selectedApplet.id }
+                          }
+                          navigationRequest={snapshot.navigation.request}
                         />
                       ) : undefined
                     }
@@ -857,11 +861,10 @@ function App() {
               />
             </div>
             {page === 'logs' && (
-              <LogsPage
-                snapshot={snapshot}
-                run={action}
+              <ShellPageSlot
+                scope={{ type: 'all' }}
                 source={logSource}
-                onSource={setLogSource}
+                navigationRequest={snapshot.navigation.request}
               />
             )}
           </div>
@@ -1769,98 +1772,6 @@ function SettingRow({
       </div>
       {children}
     </div>
-  );
-}
-function LogsPage({
-  snapshot,
-  run,
-  source,
-  onSource,
-  webManager = false,
-}: {
-  snapshot: HostSnapshot;
-  run: Run;
-  source: string;
-  onSource?(value: string): void;
-  webManager?: boolean;
-}) {
-  const [filter, setFilter] = useState('');
-  const [level, setLevel] = useState('all');
-  const logs = snapshot.logs.filter(
-    (l) =>
-      (webManager
-        ? l.source.startsWith('web.') || l.source === 'web-applets'
-        : !source || l.source === source) &&
-      (level === 'all' || level === l.level) &&
-      `${l.source} ${l.message}`.toLowerCase().includes(filter.toLowerCase()),
-  );
-  return (
-    <>
-      <div className="page-heading compact">
-        {onSource ? <h1>ログ</h1> : <h3>ログ</h3>}
-        <button className="secondary" onClick={() => void run(() => window.dock.openPath('logs'))}>
-          <Icon name="folder" size={16} />
-          保存先を開く
-        </button>
-      </div>
-      <div className="log-toolbar">
-        <Icon name="search" size={16} />
-        <input
-          aria-label="ログを検索"
-          placeholder="ログを検索…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        {onSource && (
-          <select
-            aria-label="ログのApplet"
-            value={source}
-            onChange={(event) => onSource(event.target.value)}
-          >
-            <option value="">すべてのログ</option>
-            {[
-              ...new Set([
-                ...snapshot.extensions.map((e) => e.id),
-                ...snapshot.logs.map((entry) => entry.source),
-                ...(source ? [source] : []),
-              ]),
-            ].map((id) => (
-              <option key={id} value={id}>
-                {snapshot.extensions.find((e) => e.id === id)?.displayName ?? id}
-              </option>
-            ))}
-          </select>
-        )}
-        <select aria-label="ログレベル" value={level} onChange={(e) => setLevel(e.target.value)}>
-          <option value="all">すべてのレベル</option>
-          <option value="info">Info</option>
-          <option value="warn">Warning</option>
-          <option value="error">Error</option>
-        </select>
-        <span>{logs.length} 件</span>
-      </div>
-      <div className="log-table">
-        <div className="log-head">
-          <span>TIME</span>
-          <span>LEVEL</span>
-          <span>SOURCE / MESSAGE</span>
-        </div>
-        {[...logs].reverse().map((l, i) => (
-          <div className="log-row" key={i}>
-            <time>{new Date(l.time).toLocaleTimeString('ja-JP')}</time>
-            <span className={`log-level ${l.level}`}>{l.level}</span>
-            <div>
-              <span>{l.source}</span>
-              <p>{l.message}</p>
-            </div>
-          </div>
-        ))}
-        {logs.length === 0 && <div className="empty">該当するログはありません。</div>}
-      </div>
-      <p className="footnote">
-        画面には直近500件を表示します。ファイルログは1MBでローテーションします。
-      </p>
-    </>
   );
 }
 createRoot(document.getElementById('root')!).render(

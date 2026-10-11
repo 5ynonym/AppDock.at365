@@ -107,6 +107,8 @@ async function start() {
   );
   dock.setDefaultTimeout(15000);
   await until(async () => (await snapshot()).startupReady, 'startup ready');
+  await dock.evaluate(() => window.dock.executeCommand('appdock.open'));
+  await until(async () => (await snapshot()).windowVisible, 'window shown');
 }
 async function stop() {
   if (!browser) return;
@@ -117,7 +119,11 @@ async function stop() {
   browser = undefined;
 }
 async function addAndReassign() {
-  await dock.locator('[data-ribbon-id="settings"]').click();
+  await (
+    await require('./shell-overlay-helper.cjs').ribbonPage(dock)
+  )
+    .locator('[data-ribbon-id="settings"]')
+    .click();
   await dock
     .locator('.settings-categories')
     .getByRole('button', { name: 'Webアカウント', exact: true })
@@ -128,7 +134,11 @@ async function addAndReassign() {
     return s.webAccounts.length === 1 ? s : null;
   }, 'first account added');
   const id = state.webAccounts[0].id;
-  await dock.locator('[data-ribbon-id="extensions"]').click();
+  await (
+    await require('./shell-overlay-helper.cjs').ribbonPage(dock)
+  )
+    .locator('[data-ribbon-id="extensions"]')
+    .click();
   await dock
     .locator('.applet-select')
     .filter({ has: dock.locator('span[title="WebApplet"]') })
@@ -180,9 +190,14 @@ async function addAndReassign() {
   for (const channel of ['dock:renameWebAccount', 'dock:deleteWebAccount'])
     assert.equal(logs.filter((l) => l.message.includes(channel)).length, 1);
   assert(!logs.some((l) => l.message.includes('unlogged argument')));
-  await dock.locator('[data-ribbon-id="logs"]').click();
+  await (
+    await require('./shell-overlay-helper.cjs').ribbonPage(dock)
+  )
+    .locator('[data-ribbon-id="logs"]')
+    .click();
+  const logPage = await require('./shell-overlay-helper.cjs').logsPage(dock, { type: 'all' });
   for (const channel of ['dock:renameWebAccount', 'dock:deleteWebAccount'])
-    await dock.locator('.log-row').filter({ hasText: channel }).waitFor();
+    await logPage.locator('.log-row').filter({ hasText: channel }).waitFor();
   const disk = fs.readFileSync(path.join(local, 'logs/host.log'), 'utf8');
   assert(disk.includes('dock:renameWebAccount') && disk.includes('dock:deleteWebAccount'));
   await dock.screenshot({ path: path.join(output, 'errors-in-log-page.png') });
@@ -215,7 +230,46 @@ async function addAndReassign() {
   fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
 })()
-  .catch((error) => {
+  .catch(async (error) => {
+    if (browser && dock && !dock.isClosed()) {
+      fs.writeFileSync(
+        path.join(output, 'diagnostic.json'),
+        JSON.stringify(
+          {
+            navigation: (await snapshot()).navigation,
+            pages: await Promise.all(
+              browser
+                .contexts()
+                .flatMap((c) => c.pages())
+                .map(async (p) => ({
+                  url: p.url(),
+                  text: await p
+                    .locator('body')
+                    .innerText()
+                    .catch(() => ''),
+                  geometry: await p
+                    .evaluate(() => ({
+                      width: innerWidth,
+                      height: innerHeight,
+                      hidden: document.hidden,
+                      elements: [
+                        ...document.querySelectorAll('main,.shell-page-slot,.log-toolbar'),
+                      ].map((e) => ({
+                        tag: e.className,
+                        rect: e.getBoundingClientRect().toJSON(),
+                        display: getComputedStyle(e).display,
+                        visibility: getComputedStyle(e).visibility,
+                      })),
+                    }))
+                    .catch(() => null),
+                })),
+            ),
+          },
+          null,
+          2,
+        ),
+      );
+    }
     fs.writeFileSync(
       path.join(output, 'result.json'),
       JSON.stringify({ ok: false, error: error.stack, checks }, null, 2),

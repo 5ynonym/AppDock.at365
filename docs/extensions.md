@@ -218,3 +218,5 @@ manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣
 設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。AppDock 0.26.30以降、settings capabilityと明示の公開・生成宣言が必要です。
 
 0.26.37では公開先をAPIごとのcallers宣言から判定し、Applet専用入力API2件を追加しました。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
+
+0.26.42のpage.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参照してください。Shell Appletの自己設定/自己コマンドAPIも共用します。

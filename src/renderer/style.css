@@ -1360,78 +1360,6 @@ main {
   background: var(--bg);
   tab-size: 2;
 }
-.log-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 19px;
-  color: var(--muted);
-}
-.log-toolbar input {
-  flex: 1;
-  font-size: 11px;
-}
-.log-toolbar select {
-  font-size: 11px;
-}
-.log-toolbar > span {
-  font-size: 10px;
-}
-.log-table {
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--panel);
-  overflow: hidden;
-}
-.log-head,
-.log-row {
-  display: grid;
-  grid-template-columns: 83px 70px minmax(0, 1fr);
-  gap: 12px;
-  padding: 14px 18px;
-}
-.log-head {
-  font-size: 9px;
-  letter-spacing: 1px;
-  background: var(--side);
-  color: var(--faint);
-}
-.log-row {
-  border-top: 1px solid var(--border);
-  font-size: 10px;
-  align-items: start;
-}
-.log-row time {
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  line-height: 1.8;
-}
-.log-level {
-  font-size: 9px;
-  text-transform: uppercase;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 3px 5px;
-  width: fit-content;
-  color: var(--blue);
-}
-.log-level.warn {
-  color: #d8b577;
-}
-.log-level.error {
-  color: #e37c8f;
-}
-.log-row > div > span {
-  color: var(--faint);
-  font-size: 9px;
-}
-.log-row p {
-  margin-top: 4px;
-  color: var(--text);
-  font-size: 10px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 .footnote {
   font-size: 10px;
   margin-top: 17px;
@@ -2124,22 +2052,6 @@ summary {
 .shortcut-row-actions button {
   font-size: 11px;
 }
-.log-toolbar {
-  flex-wrap: wrap;
-}
-.log-toolbar input {
-  min-width: 150px;
-}
-.log-toolbar select {
-  max-width: 100%;
-}
-.log-row,
-.log-row p,
-.log-row > div > span {
-  font-size: 12px;
-}
-.log-head,
-.log-level,
 .state,
 .statusbar,
 .statusbar > button {
@@ -3975,4 +3887,11 @@ summary {
 
 .shell-ribbon-slot {
   min-height: 0;
+}
+
+.shell-page-slot {
+  width: 100%;
+  min-width: 0;
+  min-height: 140px;
+  outline: none;
 }

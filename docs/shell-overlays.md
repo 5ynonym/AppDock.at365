@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-現在の公開領域は`ribbon`と`overlay.command-palette`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
+0.26.41の公開領域は`ribbon`と`overlay.command-palette`。0.26.42では[ページ表示](shell-pages.md)の`page.logs`も利用できる。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -28,7 +28,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読できる。例えば`compact`設定をコマンドから通常のsettings APIで変更すれば、リボンとオーバーレイはその設定に応じて描画を更新できる。両bridgeに同じ`ShellAppletApi`を適用する。
 
-`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、この版で未対応の領域は描画しない。`page.logs`を記述するだけで既存ログページが差し替わるわけではない。
+`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、この版で未対応の領域は描画しない。`page.logs`は0.26.42以上で[ページ用bridge](shell-pages.md)を実装すると利用できる。
 
 従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
 
@@ -68,8 +68,8 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 ready期限は10秒。読込失敗・renderer終了/応答不能で同じ要求をDefault Shellへつなぎ直す。パレットの故障で稼働中のリボンを切り替えない。故障したパレット提供元の同版は当該プロセス中再利用せず、「Shellを再試行」または提供元の新版で再試行できる。意図的な停止/無効化は故障記録に含めない。オーバーレイは開いた時点の提供元に結び、設定のShell選択変更は次回表示から適用する。リボンの再起動をまたぐ故障記録は既存[Shell API](shell-api.md)に従う。
 
-Default Shellも利用できない場合は要求を取消して最小ネイティブ通知を出し、本体の操作停止を解除する。`--safe-shell`では両領域をDefault Shellへ固定する。
+Default Shellも利用できない場合は要求を取消して最小ネイティブ通知を出し、本体の操作停止を解除する。`--safe-shell`では各領域をDefault Shellへ固定する。
 
-次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログページはログの取得/購読・フィルター・消去等の公開契約と本文領域のHostを先に整え、`page.logs`だけで提供できる単位として移行する。ログ移行、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
+次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログページは0.26.42で本文領域のHostと取得/購読・絞り込み契約を整え、`page.logs`として移行した。詳細は[Shellのページ表示](shell-pages.md)。過去ログ・日付検索・消去、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
 
 関連検証: `tests/command-palette.test.cjs`、manifest/boundary/presentation回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、既存Shell/トレイ/ページ/設定通知/ホストコマンド試験。実測は[VERIFICATION](../VERIFICATION.md)。

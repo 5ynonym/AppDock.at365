@@ -36,3 +36,31 @@ exports.overlayPage = async (host) => {
   }
   throw Error('Shell overlay did not become ready');
 };
+exports.logsPage = async (host, scope) => {
+  const end = Date.now() + 15000;
+  let detail = '';
+  while (Date.now() < end) {
+    for (const page of host
+      .context()
+      .pages()
+      .filter((p) => p.url().endsWith('/logs.html'))) {
+      try {
+        const model = await page.evaluate(
+          async () => (await window.appdockPage.connect()).snapshot,
+        );
+        detail = JSON.stringify(model.content.scope);
+        if (
+          scope &&
+          (model.content.scope.type !== scope.type || model.content.scope.id !== scope.id)
+        )
+          continue;
+        await page.locator('.log-toolbar').waitFor({ timeout: 1000 });
+        return page;
+      } catch (e) {
+        detail = String(e);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw Error('Shell log page did not become ready: ' + detail);
+};

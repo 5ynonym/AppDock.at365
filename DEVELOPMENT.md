@@ -265,3 +265,5 @@ WebApplet提供元の公開宣言を共通SettingsCommandsとコマンドカタ�
 0.26.40からの公開契約・ビルド境界は[Shell API](docs/shell-api.md)。Default Shellのソースは`shells/default`、本体側は`src/main/core/shell-host.ts`と`ui-presentation.ts`。新たなUIは機能状態・操作・表示モデルを本体側へ置き、Shellは公開モデルを描画する。移行した描画を本体rendererへ重複実装しない。
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
+
+0.26.42の[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.logsの公開モデル/操作/購読、Default Shellへのログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/log-page.test.cjsとscripts/shell-page-ui-test.cjs [固定EXE]。過去ログや日付検索は後続。

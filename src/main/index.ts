@@ -1,5 +1,7 @@
 import { ShellHost } from './core/shell-host';
 import { OverlayHost } from './core/overlay-host';
+import { ShellPageHost } from './core/shell-page-host';
+import { LogPageSession } from './core/log-page';
 import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
@@ -164,6 +166,7 @@ let window: BrowserWindow | null = null;
 let settingsNotice: SettingsNotice | undefined;
 let shellHost: ShellHost | undefined;
 let overlayHost: OverlayHost | undefined;
+let shellPageHost: ShellPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(() => changed());
@@ -317,6 +320,7 @@ const changed = () => {
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
     shellHost?.refresh();
+    shellPageHost?.refresh();
     overlayHost?.refresh();
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
   }, 60);
@@ -648,6 +652,9 @@ function registerIpc() {
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
   handle('dock:navigate', (route: string) => navigation.navigate(route));
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
+  handle('dock:shellPage', (request, bounds) => shellPageHost?.mount(request, bounds));
+  handle('dock:closeShellPage', (id) => shellPageHost?.close(id));
+  handle('dock:focusShellPage', (id, edge) => shellPageHost?.focus(id, edge));
   handle('dock:retryShell', async () => {
     const selected = safeShell
       ? defaultShellId
@@ -656,6 +663,7 @@ function registerIpc() {
       if (manager.items.get(id)?.state === 'error') await manager.restart(id);
     shellHost?.retry();
     overlayHost?.retry();
+    shellPageHost?.retry();
   });
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
@@ -1225,6 +1233,44 @@ async function initialize() {
         void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
     },
   });
+  shellPageHost = new ShellPageHost({
+    window,
+    preload: path.join(__dirname, 'shell-page-preload.js'),
+    providers: () => manager.snapshot(),
+    selected: () =>
+      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    route: () => navigation.state.route,
+    ready: () => startupReady && !quitting,
+    create: (request) =>
+      new LogPageSession(request, {
+        entries: () => log.entries,
+        sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+        dark: () => nativeTheme.shouldUseDarkColors,
+        openDirectory: async () => {
+          const error = await shell.openPath(log.directory);
+          if (error) throw Error(error);
+        },
+        sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+        changed,
+      }),
+    execute: executeShellCommand,
+    settings: (id) => appletInputSettings(settings.value, id),
+    shortcut: async (key) => {
+      if (!window?.isFocused()) return;
+      const normalized = normalizeShortcut(key);
+      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
+      return dispatchShortcut(normalized);
+    },
+    layer: () => {
+      settingsNotice?.layout();
+      overlayHost?.layout();
+    },
+    failed: (message, unavailable) => {
+      log.write('error', 'shell-page', message);
+      if (unavailable)
+        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
+    },
+  });
   configurePageHost({
     overlay: () => {
       settingsNotice?.layout();
@@ -1611,6 +1657,7 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   shellHost?.dispose();
   overlayHost?.dispose();
+  shellPageHost?.dispose();
   void (async () => {
     for (const stop of [
       () => automation?.close(),

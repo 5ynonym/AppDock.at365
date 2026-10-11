@@ -145,3 +145,5 @@ A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示
 ## タスクトレイの外部編集
 
 - `tray.get`/`appdock.tray.update`と既定OFFの`allowEditTray`を使う。メニューとクリック割当を共通revision/dryRunで原子的に保存し、新しい割当は公開済み引数なしコマンドへ限定する。既存の非公開/未知コマンドを保持し、移動/削除可能にする。固定の設定/終了、1段グループ、ungroupでの子保持、既存クリック判定を維持する。正本は[共通操作API](docs/automation.md#タスクトレイ編集02635以降)。
+
+- 0.26.42の本文領域とログ移行は[Shellのページ表示](docs/shell-pages.md)を正本とする。ShellPageHostは表示寿命と復旧、内容Controllerはモデルと操作を所有する。page.logsは全体/詳細/Web管理のログを同じ描画で提供し、本体へログUIを戻さない。未提供/故障時はDefault Shellへ復帰する。新しいページは公開モデルと操作を定義してから領域へ追加し、ホストへ内容固有処理を混ぜない。

@@ -1,6 +1,6 @@
 # AppDock.at365
 
-0.26.41では、リボンとコマンドパレットを本体同梱のDefault Shellが描画します。「設定 → 表示 → Shell」で有効なShell Appletを選ぶと、そのAppletが担当する領域だけを差し替えます。残りの領域と故障した領域はDefault Shellを使い、保存した選択や設定を維持します。Shell Appletは通常のコマンド・設定・Appletページも提供できます。起動時に困った場合は`--safe-shell`でDefault Shellを使用できます。ログページなどの差し替えは今後の対応です。
+0.26.42では、リボン・コマンドパレット・ログ画面を本体同梱のDefault Shellが描画します。「設定 → 表示 → Shell」で有効なShell Appletを選ぶと、そのAppletが担当する領域だけを差し替えます。残りの領域と故障した領域はDefault Shellを使い、保存した選択や設定を維持します。Shell Appletは通常のコマンド・設定・Appletページも提供できます。起動時に困った場合は`--safe-shell`でDefault Shellを使用できます。ログだけを提供するShell Appletも利用できます。全体のログとApplet詳細のログは同じShellが表示します。ログの検索・絞り込み・保存方法は従来どおりです。
 
 0.26.39から、登録したWebAppletの「開く・戻る・進む・リロード・開始ページへ」と、名前・既定の表示先をApplet/MCPから操作できます。「設定 → 操作の許可」で許可を変更できます。新規環境のApplet側は全項目ON、MCP側は接続と操作許可がOFFです。保存済みの許可・拒否は引き継ぎます。MCPの情報取得は連携ON時に利用でき、Windowsへの生のキー送信は直接公開しません。
 

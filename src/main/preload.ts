@@ -1,6 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  shellPage: (request, bounds) => ipcRenderer.invoke('dock:shellPage', request, bounds),
+  closeShellPage: (id) => ipcRenderer.invoke('dock:closeShellPage', id),
+  focusShellPage: (id, edge) => ipcRenderer.invoke('dock:focusShellPage', id, edge),
+  onShellPageFocusHost: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, id: string, edge: 'before' | 'after') =>
+      callback(id, edge);
+    ipcRenderer.on('dock:shellPageFocusHost', handler);
+    return () => ipcRenderer.removeListener('dock:shellPageFocusHost', handler);
+  },
+  onLogSourceChanged: (callback) => {
+    const handler = (_: Electron.IpcRendererEvent, source: string) => callback(source);
+    ipcRenderer.on('dock:logSourceChanged', handler);
+    return () => ipcRenderer.removeListener('dock:logSourceChanged', handler);
+  },
   onPaletteExecuted: (callback) => {
     const handler = () => callback();
     ipcRenderer.on('dock:paletteExecuted', handler);

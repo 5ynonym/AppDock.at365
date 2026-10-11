@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-11: 0.26.42 コミット前回帰
+
+- 最終stageのtree `cc53f21903eef730f0153e83b03dad6aac32e629`で型検査・標準回帰292/292が成功。source GUIはShellページ、navigation、settings-notice、overlay、Shell Host、Webアカウント復旧、Applet/Gmailページ、ホスト再起動/終了、基本UIの9種類、固定発行EXEのShellページGUIも成功。環境取得を含む13コマンドの終了0と検証前後tree一致を記録した。
+- 基本UI試験に残っていた本体DOM内のログ参照を独立Shellへ修正し、最終treeで必要回帰を再実行した。初回失敗時にもhost.logへの記録は正常だった。制限環境では標準回帰のファイル置換・ローカル接続等がEPERM/EACCES、Electron起動が失敗したため、失敗ログを保持し、同じ検証を通常ユーザー権限で完了した。
+- このコミット工程で製品ソース・版・依存・発行物の追加変更はない。0.26.42のEXEは144087729 bytes、SHA256 `bf8613beb88b2c4b7a944c00291fcc32302c1cc1d8b0b66126517a6b854bea6b`のまま。feed・EXE版・同梱Shell14ファイル・隔離コピーを照合。実サービス認証、物理IME/混在DPI、複数Windowは検証範囲外。
+- 証跡は`.artifacts/commit-validation-shell-pages-20261011/verified.json`、unit.json、gui.json、inputs.json、artifact-and-docs.jsonと完全ログ。Node/pnpm/.NET/OS、試験入力148ファイル、Gmail参照commit/tree、GUI profile10件、文書リンク192件を記録。検証後の変更は本VERIFICATION追記のみとし、文書差分・最終tree・コミットSHAを同証跡へ保存する。
+- テストprofile410件を列挙し、種類/方式別の最新3回、再利用証跡、失敗/状態不明を保持。古い成功1件を絶対パス・再解析ポイント・使用プロセス検査後に整理し、cleanup-deleted.jsonへ記録。隔離テストプロセスの残存0。push/Release/実利用deployは行わない。
+
+## 2026-10-11: ページ表示基盤とDefault Shellへのログ移行（0.26.42）
+
+- ShellPageHostが本文1枠の遅延生成・表示領域/zoom・IPC境界・ready/終了・重なり順・フォーカス・復旧を管理し、ShellPageController/LogPageSessionが内容と操作を管理する。全体ログ・Applet詳細・WebApplet管理のログをDefault Shellへ移し、本体のLogsPageとログ専用CSSを撤去した。page.logsだけを提供するShell Appletで差し替えられ、リボン/パレットの未提供領域はDefault Shellを使う。
+- 既存のApplet/source・レベル・文字検索、直近500件、保存先を開く操作、ファイル保存形式を維持。検索条件は提供元切替/故障復旧で保持する。過去ファイル閲覧・日付検索・保持期間変更・複数Shell/Window・MCPログ照会は追加していない。契約の正本は[Shellのページ表示](docs/shell-pages.md)。
+- 型検査・ビルド・関連33/33回帰が成功（log-page/logging/boundaries/core/presentation/palette/applet-pages）。source GUIはページ9群、navigation17群、settings-notice9群、overlay7群、Shell Host14群、Webアカウント復旧5群が成功。全体/詳細/Web管理、検索・source固定・自己設定/自己コマンド、古い操作/他所有者の拒否、renderer故障・10秒ready期限・再試行・意図的な停止/再有効化・safe起動、共有draft、両テーマ、実Windowサイズ変更、Tab出入りを確認。ページ/保存通知/パレットのnative View順も確認した。
+- 初回の記録済みsource回帰後、リボンから本文へTabを送る候補へShell表示枠を追加。型検査/ビルドと専用source GUIを再実行し、同一route再要求で検索条件が残ることも確認した。最終sourceページはshell-page-1791728279594、navigation-1791728171027、settings-notice-1791728182666、shell-overlay-1791728187242、shell-host-1791728201170、web-account-recovery-1791728881468。発行EXEのページGUI9群もshell-page-1791728476325で成功した。
+- 既存Web管理試験は本体DOMに残っていたリボン/ログ参照を独立Shellへ変更し、実ウィンドウを表示してwindowVisibleを待つよう修正。非表示時に寸法0のログViewを可視として待っていた試験失敗を解消した。専用ページ試験の初期件数固定を実際の開始ログも含む条件へ修正。診断結果と失敗profileは保持する。製品の全標準回帰・実サービス認証・物理IME/混在DPI・複数Windowは今回未実施。
+- 版更新後のfrozen-lockfile確認は制限環境のpnpm STATUS_STACK_OVERFLOW後、同じ操作を通常権限で成功。依存版・lockfile・toolchainは不変。publishの.NET工程も制限環境の終了1を記録し、同じ発行手順を通常権限で成功させた。変更は本体0.26.42だけを通常発行し、Default Shellを単一EXEへ同梱。EXE 144087729 bytes / SHA256 `bf8613beb88b2c4b7a944c00291fcc32302c1cc1d8b0b66126517a6b854bea6b`。feed・EXEの版/サイズ/hash・隔離コピー・Shell同梱14ファイルを照合した。
+- 証跡は`.artifacts/shell-page-validation-20261011/`のsource.json、portable.json、published.json、完全ログ、inputs.json。ローカル文書リンク176件成功、差分/追加成果物の会話名検査成功。テストprofile390件を列挙し、直近3回/方式・再利用証跡・失敗/状態不明を保護した結果、削除候補0件。CIM読取を通常権限で行い、残存する隔離テストプロセス0を確認した。未コミット、push/Release/実利用deploy/全体ZIP作成/未変更Applet再発行なし。
+
+
 ## 2026-10-11: 0.26.41 コミット前回帰
 
 - コミット対象をstageしたtree `1c4c3ec2bc350fc9aabeca72de345a2a1bc498ae`で、型検査・標準回帰288/288と関連GUIを完了。sourceはShell Host、overlay、Applet/Gmailページ、設定通知、トレイ、ホスト再起動/終了、画面遷移、設定保持、Windowsホットキー、条件付きキー、MCP操作、ジェスチャー、基本UIの13種類すべて成功。固定単一EXEでもoverlay・トレイ・再起動/終了の3種類が成功し、計18コマンドの終了0と検証前後tree一致を記録した。

@@ -109,7 +109,8 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     // A malformed manual edit preserves the last valid in-memory state and the file.
     fs.writeFileSync(settingsFile, '{broken');
     await shell.getByRole('button', { name: 'ログ', exact: true }).first().click();
-    await page.getByText(/設定ファイルを読み込めません。最後の有効/).waitFor();
+    const logs = await require('./shell-overlay-helper.cjs').logsPage(page, { type: 'all' });
+    await logs.getByText(/設定ファイルを読み込めません。最後の有効/).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), '{broken');
     fs.writeFileSync(settingsFile, JSON.stringify(config, null, 2));
     await shell.getByRole('button', { name: 'Applet', exact: true }).first().click();
