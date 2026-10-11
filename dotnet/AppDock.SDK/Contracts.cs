@@ -12,6 +12,7 @@ public interface IPanelActionHandler
 public interface IExtensionContext
 {
     string ExtensionId { get; }
+    IAppDockService AppDock => throw new NotSupportedException("AppDock operations require AppDock 0.26.36 or later.");
     ICommandService Commands { get; }
     ITrayService Tray { get; }
     ISettingsService Settings { get; }

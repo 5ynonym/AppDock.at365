@@ -4085,3 +4085,10 @@ summary {
 .codex-settings summary {
   cursor: pointer;
 }
+
+.applet-api-permissions {
+  margin-bottom: 28px;
+}
+.applet-api-permissions > .setting-row {
+  gap: 16px;
+}

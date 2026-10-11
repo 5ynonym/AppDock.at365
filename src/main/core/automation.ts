@@ -136,6 +136,20 @@ export class AutomationService {
     }
     atomicWrite(this.file, JSON.stringify(this.config, null, 2) + '\n');
   }
+  allowed(
+    key:
+      | 'allowWrite'
+      | 'allowExecute'
+      | 'allowManageApplets'
+      | 'allowEditShortcuts'
+      | 'allowEditGestures'
+      | 'allowEditRibbon'
+      | 'allowEditTray',
+  ) {
+    if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
+    if (key === 'allowWrite' || key === 'allowExecute') return true;
+    return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
+  }
   private block() {
     return registrationBlock(
       this.id,

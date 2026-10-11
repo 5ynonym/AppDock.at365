@@ -1,5 +1,7 @@
 # AppletのためにAppDockへ機能を追加する
 
+新しい公開操作は[AppDock共通操作API](appdock-api.md)へ実装し、MCPとAppletから同じ処理を使います。操作カタログを共有し、通信アダプターへ機能の処理を複製しません。
+
 0.26.26以降の共通操作API・MCP・Codex登録は[専用仕様](automation.md)を参照してください。Applet向けJSON-RPCとは別の入口です。
 
 0.26.29以降の外部コマンド公開は各Appletのmanifest宣言を使います。ホストへApplet固有IDの許可一覧を追加せず、runtimeの登録と宣言を照合して、実行権限・稼働状態・監査ログを共通管理します。[公開宣言](automation.md#appletによる公開宣言)を参照してください。

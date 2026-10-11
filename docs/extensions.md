@@ -1,5 +1,7 @@
 # Applet API v1
 
+0.26.36から、Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作APIを利用できます。宣言・PC専用許可・再入制約・既存自己設定APIの互換性は[AppDock共通操作API](appdock-api.md)を参照してください。
+
 0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 ## v0.4.0: 動的コマンドとキー送信の一覧設定

@@ -1,3 +1,4 @@
+import { appDockOperations } from '../../shared/appdock-api';
 import http, { type IncomingMessage } from 'node:http';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -5,62 +6,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { AutomationApi, AutomationError, automationMethods } from './automation-api';
 
-const names = [
-  'appdock_get_info',
-  'appdock_list_applets',
-  'appdock_get_settings_schema',
-  'appdock_get_settings',
-  'appdock_get_applet',
-  'appdock_list_commands',
-  'appdock_execute_command',
-  'appdock_get_shortcuts',
-  'appdock_get_gestures',
-  'appdock_get_ribbon',
-  'appdock_get_tray',
-];
-const descriptions = [
-  'AppDockの版・接続先・対応APIを取得します。',
-  'Appletの基本情報と稼働状態を取得します。設定や認証情報は含みません。',
-  '公開された設定の型・適用タイミングを取得します。appletId省略時は本体設定です。',
-  '公開された設定と変更番号を取得します。appletId省略時は本体設定です。変更前に呼んでください。',
-  '指定したAppletの説明・状態・エラー概要・外部公開コマンドを取得します。認証情報や全設定は含みません。',
-  '外部公開を許可したコマンドと現在の実行可否を取得します。実行前に確認してください。',
-  'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可、Appletの有効・無効・再起動はApplet管理許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
-  'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
-  'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
-  'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。コマンド実行・設定変更・リボン編集の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
-  'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。実行・設定変更・タスクトレイ編集の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
-];
+const definitions = Object.values(appDockOperations);
+const names: string[] = definitions.map((d) => d.name);
 function tools() {
-  return names.map((name, i) => ({
-    name,
-    description: descriptions[i],
-    inputSchema: {
-      type: 'object' as const,
-      properties:
-        i === 2 || i === 3
-          ? { appletId: { type: 'string', maxLength: 200 } }
-          : i === 4
-            ? { id: { type: 'string', maxLength: 200 } }
-            : i === 6
-              ? {
-                  id: { type: 'string', maxLength: 200 },
-                  args: {
-                    type: 'object',
-                    description: 'commands.listで取得したinputSchemaに従う引数',
-                  },
-                }
-              : {},
-      ...(i === 4 || i === 6 ? { required: ['id'] } : {}),
-      additionalProperties: false,
-    },
-    annotations: {
-      readOnlyHint: i !== 6,
-      destructiveHint: i === 6,
-      idempotentHint: i !== 6,
-      openWorldHint: i === 6,
-    },
-  }));
+  return definitions.map((d) => structuredClone(d));
 }
 function body(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {

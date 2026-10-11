@@ -2,4 +2,8 @@
   <ItemGroup><ProjectReference Include="../AppDock.SDK/AppDock.SDK.csproj" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="AppDock.InputHost" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="AppDock.InputTests" /></ItemGroup>
+  <PropertyGroup>
+    <Version>0.26.36</Version>
+    <AssemblyVersion>0.10.0.0</AssemblyVersion>
+  </PropertyGroup>
 </Project>

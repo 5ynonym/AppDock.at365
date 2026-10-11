@@ -1,3 +1,4 @@
+import { AppletApiPermissions } from './AppletApiPermissions';
 import { Icon, type IconName } from './Icon';
 import { Toggle } from './Toggle';
 import { CommandPalette } from './CommandPalette';
@@ -783,6 +784,15 @@ function App() {
                             editor={editor}
                             currentRevision={snapshot.settings.revision}
                           />
+                          {detailView === 'settings' && !webManagerSelected && (
+                            <AppletApiPermissions
+                              applet={selectedApplet}
+                              grants={snapshot.appletApi?.grants[selectedApplet.id] ?? {}}
+                              error={snapshot.appletApi?.error}
+                              busy={busy}
+                              run={action}
+                            />
+                          )}
                           {webManagerSelected ? (
                             <div className="applet-settings-panel">
                               <WebAppletSettings

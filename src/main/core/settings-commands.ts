@@ -54,6 +54,39 @@ export class SettingsCommands {
         })),
     ];
   }
+  // Compatibility path: self-owned settings include private/undeclared keys and work during activation.
+  // The caller identity and settings capability are checked by the Applet RPC adapter.
+  setOwnSetting(
+    owner: { id: string; settings?: SettingDefinition[] },
+    key: string,
+    value: unknown,
+  ) {
+    const changes = { [key]: value };
+    this.validateChanges(owner.settings ?? [], changes, false);
+    const store = this.options.settings;
+    const next = structuredClone(store.value);
+    this.applyAppletChanges(next, owner.id, changes);
+    store.save(next, store.revision);
+  }
+  private validateChanges(
+    fields: SettingDefinition[],
+    changes: Record<string, unknown>,
+    declared: boolean,
+  ) {
+    for (const [key, value] of Object.entries(changes)) {
+      const field = fields.find((f) => f.key === key);
+      if (!field && declared)
+        throw new SettingsCommandError(
+          'INVALID_ARGUMENT',
+          '公開された設定項目と値を確認してください。',
+        );
+      if (field) validateSettingValue(field, value);
+    }
+  }
+  private applyAppletChanges(next: Settings, id: string, changes: Record<string, unknown>) {
+    const current = next.extensions[id] ?? { enabled: false, settings: {} };
+    next.extensions[id] = { ...current, settings: { ...current.settings, ...changes } };
+  }
   revision() {
     return `${this.epoch}:${this.options.settings.revision}`;
   }
@@ -232,21 +265,14 @@ export class SettingsCommands {
   ) {
     if (!owner.available)
       throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効・稼働中である必要があります。');
-    for (const [key, value] of Object.entries(changes)) {
-      const field = fields.find((f) => f.key === key);
-      if (!field)
-        throw new SettingsCommandError(
-          'INVALID_ARGUMENT',
-          '公開された設定項目と値を確認してください。',
-        );
-      try {
-        validateSettingValue(field, value);
-      } catch {
-        throw new SettingsCommandError(
-          'INVALID_ARGUMENT',
-          '設定値の型・範囲・選択肢を確認してください。',
-        );
-      }
+    try {
+      this.validateChanges(fields, changes, true);
+    } catch (error) {
+      if (error instanceof SettingsCommandError) throw error;
+      throw new SettingsCommandError(
+        'INVALID_ARGUMENT',
+        '設定値の型・範囲・選択肢を確認してください。',
+      );
     }
     this.checkRevision(revision);
     const store = this.options.settings,
@@ -258,7 +284,7 @@ export class SettingsCommands {
       const extension = next.extensions[owner.id];
       if (!extension?.enabled)
         throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効である必要があります。');
-      Object.assign(extension.settings, changes);
+      this.applyAppletChanges(next, owner.id, changes);
     }
     if (!dryRun && changed.length) {
       try {

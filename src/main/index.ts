@@ -79,7 +79,8 @@ import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
 import { SettingsNotice } from './core/settings-notice';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
-import { AutomationApi } from './core/automation-api';
+import { AppDockApi } from './core/appdock-api';
+import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
 import { automationApplets, automationCommands } from './core/automation-commands';
 import type { AutomationAction } from '../shared/automation';
 
@@ -187,6 +188,40 @@ let avatarPoll: ReturnType<typeof setInterval> | undefined;
 let updater: PortableUpdates;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
+const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
+const mcpAllowed = (key: Parameters<AutomationService['allowed']>[0]) =>
+  !quitting && (automation?.allowed(key) ?? false);
+const operationApi = new AppDockApi({
+  settings,
+  settingsCommands,
+  appletManagement,
+  appletPermissions: (id) => {
+    const e = manager?.items.get(id);
+    return e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
+  },
+  writable: () => mcpAllowed('allowWrite'),
+  executable: () => mcpAllowed('allowExecute'),
+  manageable: () => mcpAllowed('allowManageApplets'),
+  shortcutsEditable: () => mcpAllowed('allowEditShortcuts'),
+  gesturesEditable: () => mcpAllowed('allowEditGestures'),
+  ribbonEditable: () => mcpAllowed('allowEditRibbon'),
+  trayEditable: () => mcpAllowed('allowEditTray'),
+  ribbonApplets: allApplets,
+  trayApplets: allApplets,
+  shortcutStatus: () => hotKeys?.statuses ?? [],
+  save: (value, revision) => commitSettings(prepareSettings(value), revision),
+  applets: () => automationApplets(allApplets()),
+  commands: () => automationCommands(allApplets()),
+  execute: executeCommand,
+  version: app.getVersion(),
+  instanceId:
+    'appdock_' +
+    createHash('sha256')
+      .update(path.resolve(baseDirectory).toLowerCase())
+      .digest('hex')
+      .slice(0, 16),
+  ready: () => startupReady && !quitting,
+});
 const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
@@ -365,6 +400,10 @@ function avatarSignature() {
 }
 function snapshot(): HostSnapshot {
   return {
+    appletApi: {
+      grants: Object.fromEntries(allApplets().map((e) => [e.id, appletApiAccess.get(e)])),
+      error: appletApiAccess.error,
+    },
     launch: launch.state,
     startupReady,
     windowVisible: !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
@@ -461,6 +500,14 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:appletApiPermissions', (id: string, permissions: unknown) => {
+    if (!startupReady || quitting) throw Error('AppDockは準備中です。');
+    const e = manager.items.get(id);
+    if (!e) throw Error('Appletが見つかりません。');
+    appletApiAccess.set(e.manifest, permissions);
+    log.write('info', e.manifest.id, '[Applet API] permissions updated');
+    changed();
+  });
   handle('dock:automation', (action: AutomationAction) => {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
     return automation.action(action);
@@ -667,6 +714,8 @@ async function initialize() {
       () => manager.emit('changed'),
       executeCommand,
       path.join(paths.assets, 'applets'),
+      (e, request) => callAppletApi(operationApi, e, request, log.write),
+      settingsCommands,
     ),
     log: log.write,
   });
@@ -1056,45 +1105,7 @@ async function initialize() {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
     changed,
     audit: (level, message) => log.write(level, 'automation', message),
-    createApi: (
-      writable,
-      instanceId,
-      executable,
-      manageable,
-      shortcutsEditable,
-      gesturesEditable,
-      ribbonEditable,
-      trayEditable,
-    ) =>
-      new AutomationApi({
-        settings,
-        settingsCommands,
-        appletManagement,
-        manageable,
-        shortcutsEditable,
-        gesturesEditable,
-        ribbonEditable,
-        ribbonApplets: allApplets,
-        trayApplets: allApplets,
-        trayEditable,
-        shortcutStatus: () => hotKeys?.statuses ?? [],
-        save: (value, revision) => {
-          try {
-            return commitSettings(prepareSettings(value), revision);
-          } catch {
-            log.write('error', 'automation', '基本設定を保存できませんでした。');
-            throw Error('設定保存失敗');
-          }
-        },
-        applets: () => automationApplets(allApplets()),
-        commands: () => automationCommands(allApplets()),
-        execute: executeCommand,
-        executable,
-        version: app.getVersion(),
-        instanceId,
-        writable,
-        ready: () => startupReady && !quitting,
-      }),
+    createApi: () => operationApi,
   });
   await automation.initialize();
   changed();

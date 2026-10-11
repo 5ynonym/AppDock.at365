@@ -6,7 +6,7 @@ namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
     IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
-    IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
+    IAppDockService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
@@ -17,6 +17,16 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private JsonElement configuration = settings;
     private readonly object sync = new();
     public string ExtensionId => id;
+    public IAppDockService AppDock => this;
+    async Task<JsonElement> IAppDockService.CallAsync(string method, object? parameters, CancellationToken cancellationToken)
+    {
+        var reply = await connection.RequestAsync("host.appdock.call", new { method, @params = parameters ?? new { } }, cancellationToken);
+        if (!reply.GetProperty("ok").GetBoolean()) {
+            var error = reply.GetProperty("error");
+            throw new AppDockApiException(error.GetProperty("code").GetString()!, error.GetProperty("message").GetString()!);
+        }
+        return reply.GetProperty("value").Clone();
+    }
     public ICommandService Commands => this;
     public ITrayService Tray => this;
     public ISettingsService Settings => this;

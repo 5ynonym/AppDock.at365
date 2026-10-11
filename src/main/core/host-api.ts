@@ -1,3 +1,4 @@
+import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
@@ -29,6 +30,12 @@ export function createHostApi(
   commandsChanged: () => void = changed,
   executeCommand: (id: string) => Promise<unknown> = async () => {},
   assetRoot = path.join(dataRoot, 'registered-assets'),
+  appdockCall?: (e: ExtensionInstance, request: unknown) => Promise<unknown>,
+  settingsCommands = new SettingsCommands({
+    settings,
+    applets: () => [],
+    save: (value, revision) => settings.save(value, revision),
+  }),
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -63,6 +70,9 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.appdock.call':
+        if (!appdockCall) throw Error('AppDock操作APIは準備中です。');
+        return appdockCall(e, p);
       case 'host.pages.open': {
         requireCapability('pages');
         const page = e.manifest.pages?.find((page) => page.id === p.id);
@@ -254,10 +264,7 @@ export function createHostApi(
       case 'host.settings.set': {
         requireCapability('settings');
         const k = key();
-        const definition = e.manifest.settings?.find((s) => s.key === k);
-        if (definition) validateSettingValue(definition, p.value);
-        const current = settings.value.extensions[id]?.settings ?? {};
-        settings.updateExtension(id, { settings: { ...current, [k]: p.value } });
+        settingsCommands.setOwnSetting(e.manifest, k, p.value);
         return null;
       }
       case 'host.settings.options': {

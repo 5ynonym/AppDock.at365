@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-11: 共通操作API・SDKのコミット前確認
+
+- 対象34ファイル・依存状態・単一EXEを実装時の証跡と照合してstage。型検査、標準272/272、固定単一EXEの新旧SDK/API GUI5群とMCP GUI15群を再実行し全終了0。旧SDKでコンパイル済みのDLL、Node/.NET別プロセス、独立許可、再入、設定保存、実Codex隔離接続を確認。
+- 共通SDKの影響確認として既存WatchのRelease buildと回帰8/8が成功。配布済みWatch EXEと本体win-unpackedのGUI7群で表示、MCP設定反映、保存、ショートカット、再起動、停止を確認。元のGUI試験はキーボード確認で2回時間切れ。入力前にウィンドウ表示・focus・bringToFront・focus確認待ちを追加した証跡内のラッパーで全検査成功。失敗ログを保持し、製品や兄弟repoのソースは変更していない。焦点移動と描画待ちのどちらが原因かは未分離。
+- 証跡は.artifacts/commit-validation-shared-api-20261011/。本体GUI profileはapplet-api-portable-1791695765632、automation-portable-1791695787809。Watch成功profileは同repoのui-1791695949280、失敗はui-1791695822273とui-1791695890026。検証tree/入力/fixture/兄弟repo/コマンド/終了コード/完全ログとhashを保存。
+- 検証後の差分は本記録のみ。製品・発行物は不変、文書差分と最終tree/commitを記録。古い成功試験の整理候補なし、最新3回・再利用証跡・失敗/不明資料を保持。物理キー入力や実サービスは今回対象外。ローカルコミットのみ。
+
+## 2026-10-11: AppletとMCPの共通操作API（0.26.36）
+
+- AppDockApiの単一インスタンスをMCP起動から独立させ、MCPと既存Applet RPCのhost.appdock.callから利用。公開11操作の名前・引数・結果・revision/dryRun/保存を共有し、操作カタログからMCPツールを生成。旧AutomationApi importは互換exportを維持。
+- appdock-api capabilityとPC専用applet-api.jsonのApplet ID/フォルダー別許可を導入。初期全OFF、読取り/実行/設定変更/管理/各編集をCodexと独立して設定画面で即時保存。接続から呼出元を決定し自己許可のAPIは公開しない。読取失敗時は拒否、監査はApplet ID付きで引数を記録しない。MCPからAppletを呼んだ後のAPI呼出しはApplet自身の許可を適用する仕様を文書化。
+- Node context.appdock.callと.NET IExtensionContext.AppDock.CallAsync、共通結果/エラーコードを追加。SDK/Runtime 0.26.36、AssemblyVersion 0.10.0.0を維持。旧settings.set/Settings.SetAsyncの検証と変更適用をSettingsCommandsへ集約し、非公開/未宣言の自己設定・activate時更新・既存settings capabilityを維持。
+- MCP→Applet→同期設定変更の再入を許可し、非同期コマンドの再入はBUSY、自身の通常コマンド/管理はSELF_CALLで拒否。MCPの編集可否表示の前提許可も従来と同じ条件へ統一。
+- 型検査・標準272/272成功（新規8件）。公開/非公開・独立権限・取消・ID偽装拒否・保存/競合/dryRun・再入・旧自己設定・破損許可ファイル・MCP表示条件を検証。source GUI5群はapplet-api-source-1791692799887。初期試験の起動完了/非同期チェック反映待ちを修正し、失敗2profile/logは保持。
+- 最終単一EXEで新旧SDK/API GUI5群（applet-api-portable-1791693234891）と既存MCP GUI15群（automation-portable-1791693256722）が成功。Node/.NET別プロセス、11操作、MCP停止時利用、許可画面と取消、MCP→Applet往復、再起動保持、旧SDKコンパイル済みDLLのロード/実行、GUI保存/draft競合と監査を確認。両テーマ1280/960/700幅を検査し画面を確認。実Codex隔離接続で11ツール、モデル推論なし。
+- publish終了0。0.26.36単一EXEは144055110bytes、SHA256 919262d0efe476167eb9852ce06fc045274ea7815d08de016960279498f38409。feedと隔離コピー一致。依存/lockfile/toolchain変更なし。制限環境のHTTP EACCES/pnpm STATUS_STACK_OVERFLOWは同一コマンドの通常権限実行で成功、供給元検査は維持。自動承認のローカルpublish拒否は現行共通指示とpublish:neverを確認・提示して解消。
+- 証跡.artifacts/shared-api-20261011/validation.json。文書リンク188件/整形/diff確認成功。今回の試験方式を整理対象として確認し、最新3回・commit/Release参照・失敗記録を除く古い成功候補なし。残存試験プロセス0。未変更Appletの再発行、実サービス/認証、物理ジェスチャー/通知領域入力、App Server製品組込みは対象外。未コミット、push/Release/実利用deploy/全体ZIPなし。
 ## 2026-10-11: タスクトレイ外部編集のコミット前確認
 
 - 対象20ファイル・依存状態・発行物を前回証跡と照合してstage。型検査、標準264/264、固定単一EXEのMCP/GUI15群、既存トレイsource GUI5群・portable GUI4群を再実行し全終了0。sourceでは実Electron Trayイベントとsingle/double dispatchを検査し、物理通知領域のクリックは対象外。

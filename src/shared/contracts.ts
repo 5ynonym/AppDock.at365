@@ -158,6 +158,10 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  appletApi?: {
+    grants: Record<string, import('./appdock-api').AppletApiPermissions>;
+    error?: string;
+  };
   launch: LaunchState;
   webAccounts: import('./web-applets').WebProfile[];
   webPages: Record<string, import('./web-applets').WebPageState>;
@@ -183,6 +187,10 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  setAppletApiPermissions(
+    id: string,
+    permissions: import('./appdock-api').AppletApiPermissions,
+  ): Promise<void>;
   automation(
     action: import('./automation').AutomationAction,
   ): Promise<import('./automation').AutomationReply>;
