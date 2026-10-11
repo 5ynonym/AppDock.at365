@@ -245,3 +245,45 @@ export const defaultWebShortcutDefaults = (): WebShortcutDefault[] => [
   { command: 'back', key: 'Alt+Left', enabled: true, when: { scope: 'owner', appletIds: [] } },
   { command: 'forward', key: 'Alt+Right', enabled: true, when: { scope: 'owner', appletIds: [] } },
 ];
+
+/** Merge discovered defaults without overwriting edits made during discovery. */
+export function mergeWebDefaults(
+  current: WebApplet,
+  before: WebApplet,
+  result: WebDefaults,
+): WebApplet {
+  // Preserve fields changed by the user while the request was in flight.
+  const updated = { ...current };
+  const previous = current.imported;
+  if (
+    result.name &&
+    current.name === before.name &&
+    (previous?.name !== undefined
+      ? current.name === previous.name
+      : current.name === '新しいWebApplet')
+  )
+    updated.name = result.name;
+  if (
+    result.icon &&
+    current.icon === before.icon &&
+    (previous?.icon !== undefined ? current.icon === previous.icon : !current.icon)
+  )
+    updated.icon = result.icon;
+  if (result.url && (!previous?.url || current.url === previous.url)) updated.url = result.url;
+  if (
+    result.navigation &&
+    current.navigation === before.navigation &&
+    (previous?.navigation !== undefined
+      ? current.navigation === previous.navigation
+      : current.navigation === 'same-origin')
+  )
+    updated.navigation = result.navigation;
+  updated.imported = {
+    ...previous,
+    ...(result.name ? { name: result.name } : {}),
+    ...(result.icon ? { icon: result.icon } : {}),
+    ...(result.url ? { url: result.url } : {}),
+    ...(result.navigation ? { navigation: result.navigation } : {}),
+  };
+  return updated;
+}

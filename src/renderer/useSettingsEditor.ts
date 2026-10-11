@@ -1,144 +1,132 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ExtensionSnapshot, Settings, SettingsSnapshot } from '../shared/contracts';
-import { createDefaultSettings, parseSettings } from '../shared/settings-schema';
-import { validateAppletSettings } from '../shared/setting-definitions';
+import type { SettingsEdit, SettingsEditingState } from '../shared/settings-editing';
+import { createDefaultSettings } from '../shared/settings-schema';
 
-const initialSnapshot: SettingsSnapshot = {
-  value: createDefaultSettings(),
-  revision: -1,
-  path: '',
-};
-/** One editing session survives navigation between both settings surfaces. */
+/** Input queue and optimistic rendering only; the accepted session belongs to main. */
 export function useSettingsEditor(
   current: SettingsSnapshot | undefined,
-  extensions: ExtensionSnapshot[],
+  _extensions: ExtensionSnapshot[],
   run: (work: () => Promise<unknown>, message?: string) => Promise<void>,
 ) {
-  const snapshot = current ?? initialSnapshot;
-  const [draft, setDraft] = useState<Settings>(snapshot.value);
-  const [text, setText] = useState(JSON.stringify(snapshot.value, null, 2));
-  const [revision, setRevision] = useState(snapshot.revision);
-  const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<'form' | 'json'>('form');
-  const [parseError, setParseError] = useState('');
-  const [saveError, setSaveError] = useState('');
-  const [avatarDraft, setAvatarDraft] = useState<Uint8Array | null | undefined>(undefined);
-  const [avatarPreview, setAvatarPreview] = useState<string | null | undefined>(undefined);
-  const [avatarLoading, setAvatarLoading] = useState(false);
-  const [avatarName, setAvatarName] = useState<string>();
-  const [pending, setPending] = useState(false);
-  const operation = useRef(false);
-  const latest = useRef(snapshot);
-  latest.current = snapshot;
-  const switchToForm = () => {
-    if (mode === 'json') {
-      try {
-        setDraft(parseSettings(JSON.parse(text)));
-        setParseError('');
-      } catch (error) {
-        setParseError('JSONの内容を修正してからフォームを開いてください。' + String(error));
-        return false;
-      }
+  const [state, setState] = useState<SettingsEditingState>(() => ({
+    sessionId: '',
+    editRevision: -1,
+    revision: current?.revision ?? -1,
+    draft: current?.value ?? createDefaultSettings(),
+    text: '',
+    mode: 'form',
+    dirty: false,
+    parseError: '',
+    saveError: '',
+    pending: false,
+    avatarLoading: false,
+    avatarChanged: false,
+    pageId: 'appearance',
+    buffers: {},
+  }));
+  const local = useRef(state);
+  local.current = state;
+  const accepted = useRef<SettingsEditingState | undefined>(undefined);
+  const queue = useRef(Promise.resolve());
+  const queued = useRef(0);
+  const live = useRef(true);
+  const runRef = useRef(run);
+  runRef.current = run;
+  const receive = (next: SettingsEditingState) => {
+    if (accepted.current && next.editRevision < accepted.current.editRevision) return;
+    accepted.current = next;
+    if (live.current && queued.current === 0) {
+      local.current = next;
+      setState(next);
     }
-    setMode('form');
-    return true;
   };
   useEffect(() => {
-    if (!dirty) {
-      setDraft(snapshot.value);
-      setText(JSON.stringify(snapshot.value, null, 2));
-      setRevision(snapshot.revision);
-    }
-  }, [snapshot.revision, dirty]);
-  const edit = (value: Settings) => {
-    setDraft(value);
-    setText(JSON.stringify(value, null, 2));
-    setDirty(true);
-  };
-  const reset = () => {
-    const snapshot = latest.current;
-    setDirty(false);
-    setDraft(snapshot.value);
-    setText(JSON.stringify(snapshot.value, null, 2));
-    setRevision(snapshot.revision);
-    setParseError('');
-    setSaveError('');
-    setAvatarDraft(undefined);
-    setAvatarName(undefined);
-    setAvatarPreview(undefined);
-  };
-  const discard = async () => {
-    if (operation.current || avatarLoading || !dirty) return;
-    operation.current = true;
-    setPending(true);
-    try {
-      if (await window.dock.confirmDiscardSettings()) reset();
-    } finally {
-      operation.current = false;
-      setPending(false);
-    }
-  };
-  const save = async () => {
-    if (operation.current || avatarLoading || !dirty) return;
-    setSaveError('');
-    let value: Settings;
-    try {
-      value = parseSettings(mode === 'json' ? JSON.parse(text) : draft);
-      validateAppletSettings(value, extensions);
-      setParseError('');
-    } catch (e) {
-      setParseError(
-        `${mode === 'json' ? 'JSONの形式' : '設定の内容'}を確認してください。${e instanceof Error ? e.message : e}`,
-      );
-      return;
-    }
-    operation.current = true;
-    setPending(true);
-    try {
-      await run(async () => {
-        let result: SettingsSnapshot;
-        try {
-          result = await window.dock.saveSettings(value, revision, avatarDraft, avatarName);
-        } catch (error) {
-          setSaveError(error instanceof Error ? error.message : String(error));
-          throw error;
-        }
-        setRevision(result.revision);
-        setDirty(false);
-        setAvatarDraft(undefined);
-        setAvatarName(undefined);
-        setAvatarPreview(undefined);
-      }, '設定を保存しました。');
-    } finally {
-      operation.current = false;
-      setPending(false);
-    }
-  };
-  return {
-    draft,
-    text,
-    setText,
-    revision,
-    dirty,
-    setDirty,
-    mode,
-    setMode,
-    parseError,
-    saveError,
-    setParseError,
-    avatarDraft,
-    avatarPreview,
-    setAvatarDraft,
-    setAvatarName,
-    setAvatarPreview,
-    avatarLoading,
-    setAvatarLoading,
-    edit,
-    reset,
-    discard,
-    pending,
-    save,
-    switchToForm,
-  };
+    live.current = true;
+    const refresh = () => {
+      void window.dock.settingsEditing().then(receive);
+    };
+    const unsubscribe = window.dock.onSettingsEditingChanged(refresh);
+    refresh();
+    return () => {
+      live.current = false;
+      unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    void window.dock.settingsEditing().then(receive);
+  }, [current?.revision]);
+  const api = useMemo(() => {
+    const optimistic = (patch: Partial<SettingsEditingState>) => {
+      local.current = { ...local.current, ...patch };
+      setState(local.current);
+    };
+    const send = (action: SettingsEdit, patch?: Partial<SettingsEditingState>) => {
+      if (patch) optimistic(patch);
+      queued.current++;
+      const work = queue.current.then(async () => {
+        const base =
+          action.type === 'mode' || !accepted.current
+            ? await window.dock.settingsEditing()
+            : accepted.current;
+        const next = await window.dock.editSettings({
+          sessionId: base.sessionId,
+          editRevision: base.editRevision,
+          operationId: crypto.randomUUID(),
+          action,
+        });
+        receive(next);
+      });
+      queue.current = work
+        .catch(async (error) => {
+          accepted.current = await window.dock.settingsEditing();
+          optimistic({ saveError: error instanceof Error ? error.message : String(error) });
+        })
+        .finally(() => {
+          queued.current--;
+          if (!queued.current && accepted.current && !local.current.saveError)
+            receive(accepted.current);
+        });
+      return work;
+    };
+    const ignore = (work: Promise<unknown>) => {
+      void work.catch(() => {});
+    };
+    const setMode = (value: 'form' | 'json') =>
+      ignore(send({ type: 'mode', value }, { mode: value }));
+    const discard = () => runRef.current(() => send({ type: 'discard' }, { saveError: '' }));
+    return {
+      edit: (value: Settings) =>
+        ignore(
+          send(
+            { type: 'draft', value },
+            {
+              draft: value,
+              text: JSON.stringify(value, null, 2),
+              dirty: true,
+              parseError: '',
+              saveError: '',
+            },
+          ),
+        ),
+      setMode,
+      selectPage: (pageId: string) => ignore(send({ type: 'select-page', pageId })),
+      switchToForm: () => {
+        if (local.current.mode === 'json' && local.current.parseError) return false;
+        if (local.current.mode !== 'form') setMode('form');
+        return true;
+      },
+      setAvatar: (bytes: Uint8Array | null, name?: string) =>
+        ignore(send({ type: 'avatar', bytes, name })),
+      setAvatarLoading: (value: boolean) =>
+        ignore(send({ type: 'avatar-loading', value }, { avatarLoading: value })),
+      save: () =>
+        runRef.current(() => send({ type: 'save' }, { saveError: '' }), '設定を保存しました。'),
+      discard,
+      reset: () => ignore(send({ type: 'reload' }, { saveError: '' })),
+      flush: () => queue.current,
+    };
+  }, []);
+  return { ...state, ...api, avatarDraft: state.avatarChanged ? true : undefined };
 }
 export type SettingsEditor = ReturnType<typeof useSettingsEditor>;

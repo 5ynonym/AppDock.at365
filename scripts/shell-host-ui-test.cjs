@@ -1,3 +1,4 @@
+const { settingsPage: getSettingsPage, deferred } = require('./settings-shell-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -203,15 +204,16 @@ async function close() {
     await dock.waitForFunction(() => document.activeElement?.closest('.titlebar'));
     checks.push('Tab and Shift+Tab cross renderer boundary');
     await rail.getByRole('button', { name: '設定', exact: true }).click();
-    await dock.getByLabel('テーマ', { exact: true }).waitFor();
-    const oldTheme = await dock.getByLabel('テーマ', { exact: true }).inputValue();
+    const setting = deferred(() => getSettingsPage(dock));
+    await setting.getByLabel('テーマ', { exact: true }).waitFor();
+    const oldTheme = await setting.getByLabel('テーマ', { exact: true }).inputValue();
     const newTheme = oldTheme === 'light' ? 'dark' : 'light';
-    await dock.getByLabel('テーマ', { exact: true }).selectOption(newTheme);
+    await setting.getByLabel('テーマ', { exact: true }).selectOption(newTheme);
     await rail.getByRole('button', { name: 'ホーム', exact: true }).click();
     await require('./shell-overlay-helper.cjs').homePage(dock);
     await rail.getByRole('button', { name: '設定', exact: true }).click();
-    assert.equal(await dock.getByLabel('テーマ', { exact: true }).inputValue(), newTheme);
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    assert.equal(await setting.getByLabel('テーマ', { exact: true }).inputValue(), newTheme);
+    await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.theme === newTheme,
@@ -230,15 +232,15 @@ async function close() {
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     await until(
       async () =>
-        (await dock.getByLabel('Shell', { exact: true }).inputValue()) === 'missing.shell',
+        (await setting.getByLabel('Shell', { exact: true }).inputValue()) === 'missing.shell',
       'missing provider selection',
     );
     assert.match(
-      await dock.getByLabel('Shell', { exact: true }).locator('option:checked').innerText(),
+      await setting.getByLabel('Shell', { exact: true }).locator('option:checked').innerText(),
       /未導入/,
     );
-    await dock.getByLabel('Shell', { exact: true }).selectOption('appdock.default-shell');
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await setting.getByLabel('Shell', { exact: true }).selectOption('appdock.default-shell');
+    await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider ===

@@ -8,26 +8,41 @@ export function ShellPageSlot({
   appletOrder = [],
   source = '',
   navigationRequest,
+  settingsContext,
+  settingsPageId,
+  sidebarWidth,
 }: {
   scope?: LogScope;
-  kind?: 'logs' | 'home';
+  kind?: 'logs' | 'home' | 'settings';
+  settingsContext?: 'full' | 'applet';
+  settingsPageId?: string;
+  sidebarWidth?: number;
   appletOrder?: string[];
   source?: string;
   navigationRequest: number;
 }) {
   const slot = useRef<HTMLDivElement>(null);
   const request = useRef<ShellPageRequest>(
-    kind === 'home'
-      ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
-      : {
+    kind === 'settings'
+      ? {
           id: crypto.randomUUID(),
-          route: scope!.type === 'all' ? 'logs' : 'extensions',
-          kind: 'logs',
-          scope: scope!,
-          source,
-        },
+          route: settingsContext === 'applet' ? 'extensions' : 'settings',
+          kind: 'settings',
+          context: settingsContext ?? 'full',
+          pageId: settingsPageId,
+        }
+      : kind === 'home'
+        ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
+        : {
+            id: crypto.randomUUID(),
+            route: scope!.type === 'all' ? 'logs' : 'extensions',
+            kind: 'logs',
+            scope: scope!,
+            source,
+          },
   );
   if (request.current.kind === 'home') request.current.appletOrder = appletOrder;
+  if (request.current.kind === 'settings') request.current.sidebarWidth = sidebarWidth;
   const [error, setError] = useState('');
   const refresh = useRef(() => {});
   useLayoutEffect(() => {
@@ -35,6 +50,7 @@ export function ShellPageSlot({
     const main = element.closest('main')!;
     let live = true;
     const update = () => {
+      if (request.current.kind === 'settings') request.current.hostWidth = window.innerWidth;
       const m = main.getBoundingClientRect();
       const top = element.getBoundingClientRect().top;
       element.style.height = `${Math.max(140, m.bottom - top - 36)}px`;
@@ -82,13 +98,19 @@ export function ShellPageSlot({
       void window.dock.closeShellPage(request.current.id);
     };
   }, []);
-  useLayoutEffect(() => refresh.current(), [navigationRequest, appletOrder]);
+  useLayoutEffect(() => refresh.current(), [navigationRequest, appletOrder, sidebarWidth]);
   return (
     <div
       ref={slot}
       className="shell-page-slot"
       tabIndex={0}
-      aria-label={kind === 'home' ? 'ホーム画面に移動' : 'ログ画面に移動'}
+      aria-label={
+        kind === 'settings'
+          ? '設定画面に移動'
+          : kind === 'home'
+            ? 'ホーム画面に移動'
+            : 'ログ画面に移動'
+      }
       onFocus={(event) => {
         const from = event.relatedTarget;
         const before =

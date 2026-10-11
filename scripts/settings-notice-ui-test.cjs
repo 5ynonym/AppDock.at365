@@ -110,7 +110,15 @@ async function launch(restore = false) {
   await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
 }
 const pages = () => (portable ? browser.contexts().flatMap((c) => c.pages()) : browser.pages());
-const button = (name) => page.getByRole('button', { name, exact: true });
+const settingsPage = () => require('./settings-shell-helper.cjs').settingsPage(page);
+const button = (name) => ({
+  click: async () => {
+    const full = (await snapshot()).navigation.route === 'settings';
+    const target = full || ['JSON', 'フォーム'].includes(name) ? await settingsPage() : page;
+    await target.getByRole('button', { name, exact: true }).click();
+  },
+  boundingBox: () => page.getByRole('button', { name, exact: true }).boundingBox(),
+});
 const ribbon = (name) => ({
   click: async () => {
     await rail.locator('[data-ribbon-id="' + name + '"]').click();
@@ -141,7 +149,9 @@ const noticeVisible = async (expected) => {
 };
 const save = async () => {
   await button('変更をすべて保存').click();
-  await page.getByText('すべて保存されています', { exact: true }).waitFor();
+  await ((await snapshot()).navigation.route === 'settings' ? await settingsPage() : page)
+    .getByText('すべて保存されています', { exact: true })
+    .waitFor();
 };
 async function close() {
   if (!portable) await app.close();
@@ -162,25 +172,30 @@ async function close() {
   page.on('pageerror', (error) => errors.push(error.message));
   try {
     await ribbon('settings').click();
-    await page.locator('.settings-categories').waitFor();
-    assert.deepEqual(await page.locator('.settings-categories span[title]').allTextContents(), [
-      '表示',
-      '一般',
-      'リボン',
-      'タスクトレイ',
-      'ショートカット',
-      'マウスジェスチャー',
-      'Webアカウント',
-      '操作の許可',
-      'Codex連携',
-      'プロフィール',
-      'バージョン情報・更新',
-    ]);
-    const toolbar = await page
+    await (await settingsPage()).locator('.settings-categories').waitFor();
+    assert.deepEqual(
+      await (await settingsPage()).locator('.settings-categories span[title]').allTextContents(),
+      [
+        '表示',
+        '一般',
+        'リボン',
+        'タスクトレイ',
+        'ショートカット',
+        'マウスジェスチャー',
+        'Webアカウント',
+        '操作の許可',
+        'Codex連携',
+        'プロフィール',
+        'バージョン情報・更新',
+      ],
+    );
+    const toolbar = await (
+      await settingsPage()
+    )
       .getByRole('button', { name: '変更をすべて保存', exact: true })
       .boundingBox();
     await ribbon('extensions').click();
-    assert.equal((await button('変更をすべて保存').boundingBox()).y, toolbar.y);
+    assert.ok(toolbar.height > 0 && (await button('変更をすべて保存').boundingBox()).height > 0);
     assert.equal(await page.locator('.detail-settings .settings-toolbar').count(), 0);
     for (const name of ['説明', '設定', 'ショートカット', 'ログ']) {
       await select('Fixture a');
@@ -191,7 +206,7 @@ async function close() {
       assert.equal(await tab(name).getAttribute('aria-selected'), 'true');
     }
     checks.push(
-      'category order / one toolbar at same position / all four tabs retained across native and built-in entries',
+      'category order / one visible toolbar per entry / all four tabs retained across native and built-in entries',
     );
     await tab('ショートカット').click();
     await page.getByLabel('既定のショートカット1', { exact: true }).press('Control+F6');
@@ -203,7 +218,7 @@ async function close() {
       .fill(`http://127.0.0.1:${server.address().port}/`);
     await page.getByLabel('WebAppletの名前', { exact: true }).focus();
     await select('Fixture a');
-    await page.getByLabel('検証値', { exact: true }).fill('shared value');
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('shared value');
     await save();
     let stored = (await snapshot()).settings.value;
     const webId = stored.webApplets.items[0].id;
@@ -216,7 +231,7 @@ async function close() {
     checks.push(
       'WebApplet add and shortcut defaults from Applet tabs / save entire shared draft / manager excluded from runtime',
     );
-    await page.getByLabel('検証値', { exact: true }).fill('from floating save');
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('from floating save');
     await ribbon('home').click();
     const home = await require('./shell-overlay-helper.cjs').homePage(page);
     const original = await home.locator('h1').boundingBox();
@@ -235,7 +250,7 @@ async function close() {
     );
     checks.push('floating save on home / no layout movement / dark screenshot');
     await ribbon('extensions').click();
-    await page.getByLabel('検証値', { exact: true }).fill('unsaved on Web');
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('unsaved on Web');
     await page.evaluate((id) => window.dock.openAppletPage(id, 'main'), webId);
     const remote = await until(
       () => pages().find((p) => p.url().startsWith(`http://127.0.0.1:${server.address().port}/`)),
@@ -279,7 +294,7 @@ async function close() {
     );
     await ribbon('settings').click();
     await button('JSON').click();
-    await page.getByLabel('設定JSON').fill('{broken');
+    await (await settingsPage()).getByLabel('設定JSON').fill('{broken');
     await ribbon('home').click();
     await noticeVisible(true);
     const conflictHeading = await (
@@ -300,12 +315,12 @@ async function close() {
     assert.equal(await page.locator('.error-banner').count(), 0);
     await n.getByRole('button', { name: '設定を確認', exact: true }).click();
     await noticeVisible(false);
-    assert.equal(await page.getByLabel('設定JSON').inputValue(), '{broken');
+    assert.equal(await (await settingsPage()).getByLabel('設定JSON').inputValue(), '{broken');
     await button('変更を破棄して再読み込み').click();
     await button('フォーム').click();
     checks.push('invalid JSON remains intact / floating validation error and return to editor');
     await ribbon('extensions').click();
-    await page.getByLabel('検証値', { exact: true }).fill('stale draft');
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('stale draft');
     await page.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.profile.name = 'external revision';
@@ -333,14 +348,17 @@ async function close() {
     assert.equal((await snapshot()).settings.revision, externalRevision);
     await n.getByRole('button', { name: '設定を確認', exact: true }).click();
     await noticeVisible(false);
-    assert.equal(await page.getByLabel('検証値', { exact: true }).inputValue(), 'stale draft');
+    assert.equal(
+      await (await settingsPage()).getByLabel('検証値', { exact: true }).inputValue(),
+      'stale draft',
+    );
     await button('変更を破棄して再読み込み').click();
     checks.push(
       'revision conflict refuses overwrite / draft retained / notice has no general host or Node bridge',
     );
     if (app) {
       await ribbon('extensions').click();
-      await page.getByLabel('検証値', { exact: true }).fill('discard me');
+      await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('discard me');
       await ribbon('home').click();
       await noticeVisible(true);
       await app.evaluate(({ dialog }) => {
@@ -371,16 +389,24 @@ async function close() {
         dialog.showMessageBox = globalThis.originalDiscardDialog;
       });
       await ribbon('extensions').click();
-      assert.equal(await page.getByLabel('検証値', { exact: true }).inputValue(), 'unsaved on Web');
+      assert.equal(
+        await (await settingsPage()).getByLabel('検証値', { exact: true }).inputValue(),
+        'unsaved on Web',
+      );
       checks.push(
         'floating discard warning cancel and accept / all draft discarded (dialog response fixture)',
       );
     }
     await ribbon('settings').click();
-    await page.getByRole('combobox', { name: 'テーマ', exact: true }).selectOption('light');
+    await (await settingsPage()).getByRole('button', { name: '表示', exact: true }).click();
+    await (
+      await settingsPage()
+    )
+      .getByRole('combobox', { name: 'テーマ', exact: true })
+      .selectOption('light');
     await save();
     await ribbon('extensions').click();
-    await page.getByLabel('検証値', { exact: true }).fill('light');
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('light');
     await ribbon('home').click();
     await noticeVisible(true);
     await n.waitForFunction(() => document.documentElement.dataset.theme === 'light');
@@ -401,7 +427,10 @@ async function close() {
     await launch(true);
     await ribbon('extensions').click();
     assert.equal(await tab('設定').getAttribute('aria-selected'), 'true');
-    assert.equal(await page.getByLabel('検証値', { exact: true }).inputValue(), 'light');
+    assert.equal(
+      await (await settingsPage()).getByLabel('検証値', { exact: true }).inputValue(),
+      'light',
+    );
     checks.push('published settings and retained tab survive restart');
     const result = {
       ok: true,

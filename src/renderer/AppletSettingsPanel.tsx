@@ -1,8 +1,9 @@
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { UiCommand } from '../shared/commands';
-import { AppletSettings } from './AppletSettings';
-import { WebAppletSettings } from './WebAppletSettings';
-import { AppletShortcutOverview } from './AppletShortcutOverview';
+import { ShellPageSlot } from './ShellPageSlot';
+import { appletSettingsPageId } from '../shared/settings-catalog';
+import { WebAppletSettings } from '../shared/settings-ui/WebAppletSettings';
+import { AppletShortcutOverview } from '../shared/settings-ui/AppletShortcutOverview';
 import type { SettingsEditor } from './useSettingsEditor';
 import type { WebProfile } from '../shared/web-applets';
 import { useLayoutEffect, useRef } from 'react';
@@ -33,18 +34,13 @@ export function AppletSettingsPanel({
   return (
     <div className="applet-settings-panel" ref={panel}>
       {tab === 'settings' ? (
-        applet.runtime === 'web' ? (
-          <WebAppletSettings
-            key={applet.id}
-            editor={editor}
-            itemId={applet.id}
-            onAccounts={onWebAccounts}
-            accounts={webAccounts}
-            applets={applets}
-          />
-        ) : (
-          <AppletSettings key={applet.id} applet={applet} draft={draft} onChange={edit} />
-        )
+        <ShellPageSlot
+          key={applet.id}
+          kind="settings"
+          settingsContext="applet"
+          settingsPageId={appletSettingsPageId(applet.id)}
+          navigationRequest={0}
+        />
       ) : (
         <AppletShortcutOverview
           key={applet.id}

@@ -1,6 +1,6 @@
 # Shellのページ表示
 
-設定ページを追加する次期計画は[設定基盤とDefault Shellへの移行設計](settings-foundation.md)を参照する。設定用の領域・公開モデル・操作は未実装であり、以下は現行のホーム・ログページ契約を記載する。
+ホーム・ログ・設定は共通の本文契約を使います。設定のデータ範囲と編集状態は[設定基盤](settings-foundation.md)を参照してください。
 
 全体のログページ・Applet詳細のログタブ・WebApplet管理のログタブはDefault Shellで描画する。本体rendererにログの描画は残さない。既存の起動後500件、Applet/source・レベル・文字検索、保存先を開く操作、ファイルの1MBローテーションは維持する。過去ファイルの閲覧、日付フィルター、保存期間変更は未実装。
 
@@ -24,6 +24,8 @@
 | `HostLog` | ログの記録、起動中の直近500件、既存ファイル保存 |
 | `HomePageSession` | ホーム用の統計・ピン・カード、表示順の投影、操作ID・可否 |
 | `HomeCommandExecution` | Window内で共有するホームの実行中・結果・通知。通常コマンド実行経路へ委譲 |
+| `SettingsPageSession` | 選択ページの投影・操作ID・共有編集セッションへの接続 |
+| `SettingsEditingSession` | Viewより長寿命の共有下書き・入力バッファ・部分JSON・画像・保存revision |
 | `LogPageSession` | 表示対象、検索条件、表示モデル、操作の検証。表示用のコピーだけを公開 |
 | `ShellPageHost` | primary本文の1枠、提供元選択、遅延生成、ready、寸法・zoom、IPC送信元、表示順序、復旧、破棄 |
 | 本体の`ShellPageSlot` | 空の表示枠、領域報告、Tabによるフォーカス移動。本文UIを持たない |
@@ -46,9 +48,9 @@
 
 `act({ id, type: 'invoke', actionId })`は本体が発行した不透明IDだけを受け付ける。実行直前に現在のピン・Applet・コマンド可否を再照合し、旧ページ、消失済み項目、任意コマンドID、実行中の重複コマンドを拒否する。既存の`executeCommand`経路と共有ナビゲーションに接続し、成功・失敗をモデルへ反映する。成功通知は従来同様3.5秒で消える。実行中もカード・ログ・一覧・パレットへの移動は可能で、画面を開くだけの操作は実行中状態や結果を上書きしない。表示を閉じても受付済みのコマンドを巻き戻さない。
 
-共有設定draftの正本は現行の`useSettingsEditor`だけ。ホーム用の本体slot要求に`appletOrder`の読み取り専用投影だけを付け、`HomePageSession.update`で受け取る。全設定・全HostSnapshot・全draft・保存機能をShellへ公開しない。投影から設定を保存せず、ピンは従来どおり保存済み設定から取る。未保存通知の保存・競合・破棄は既存の共有editorに戻す。
+共有設定draftの正本はmainの`SettingsEditingSession`。HomePageSessionはそのappletOrderを読み取り、全設定・全HostSnapshot・全draft・保存機能をホームShellへ公開しない。ピンは従来どおり保存済み設定から取る。
 
-設定基盤の後続移行で共有編集セッションがmainへ移ったら、この表示順の入力をそのサービスから取得するアダプターへ置き換える。ホームControllerと公開表示モデルは編集状態の所有者にならない。設定用カタログ・検索・部分JSON・設定Shellは今回未実装のまま。
+ホームControllerと公開表示モデルは編集状態の所有者にならない。設定も同じ編集サービスを利用する。
 
 提供元切替・故障復旧では同じControllerと操作ID・順序投影・実行状態を保持する。ページを離れるとControllerの操作IDとViewを破棄する。実行中の状態はWindow内のHomeCommandExecutionで保持し、ホームへの戻り直しでも重複受付を拒否する。別画面でコマンドが完了した場合は本体の既存toast/エラー表示へ通知する。成功表示のタイマーはWindow終了時に回収する。内容の更新はControllerの任意`update`、解放は任意`dispose`へ委譲し、ShellPageHostはホームの内容を解釈しない。
 
@@ -80,3 +82,11 @@ ready期限は10秒。読込失敗・renderer終了/応答不能では同じCont
 `tests/home-page.test.cjs`は限定モデル・順序・変更revision・可否再検査・古い操作・重複防止・終了時回収を確認する。`scripts/shell-home-ui-test.cjs [固定EXE]`はホームのみの差し替え、共有draft、変更通知、実行結果、実行中の故障復旧、ready期限、safe起動、テーマ、リサイズ、zoom、フォーカスを確認する。
 
 `tests/log-page.test.cjs`は絞り込み・範囲固定・500件・revision・古い操作の拒否を確認する。`scripts/shell-page-ui-test.cjs [固定EXE]`は全体/詳細/Web管理・部分差し替え・自己コマンド/設定・復旧・ready期限・safe起動・テーマ・寸法・フォーカスを隔離profileで確認する。既存navigation、Shell、overlay、settings-noticeの回帰も影響範囲に含む。実行結果と未確認事項は[VERIFICATION](../VERIFICATION.md)へ記録する。
+
+## 設定の公開契約
+
+`page.settings` は `SettingsPageModel` と `SettingsPageAction` を使用する。全体ページ（full）とApplet詳細（applet）は同じSettingsPageSession・Default Shell本文を共用し、fullだけが左インデックスを表示する。選択ページの値、項目定義、表示に必要な補助モデル、発行済みの不透明な操作IDだけを渡す。全Settings・HostSnapshotを公開しない。
+
+`sessionId`・`editRevision` は共有編集の競合検査、`operationId` は512件の再送抑止に用いる。JSONはUTF-8で1MiB、画像は5MiB。独立したキー配列で範囲を判定し、ドットを含むApplet ID・設定キーを分解しない。フォームの途中入力はmainのページ別バッファで保持する。保存・確認付き破棄は全編集内容を対象とする。
+
+Shellの`onFlush`/`flushed`はViewを切り替える前に受理待ち入力を送る通知で、3秒以内に完了する。選択ページ・不正JSON・画像・revision・保存失敗はView破棄から独立して保持する。画像プレビューはセッション限定appdock URLで渡す。設定のファイル保存・即時操作は既存サービスを使用し、Shellで直接保存しない。

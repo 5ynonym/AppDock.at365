@@ -1,6 +1,6 @@
 # 設定基盤とDefault Shellへの移行設計
 
-設計状態: 未実装。2026-10-11時点の0.26.42を出発点とする。実装順序は、設定基盤の整理、既存設定画面のDefault Shellへの移行、Appletインデックス・横断検索の追加とする。先に部分JSONを含む3機能の契約を定義する。部分JSONだけは、Shellへ全設定を渡す暫定APIを作らず既存のJSON編集機能を引き継ぐため、Shell移行の完了時に提供する。
+実装状態: 段階1の設定基盤は0.26.44で実装・固定EXE確認済み。段階2は0.27.0としてShell移行・部分JSONを実装。Appletインデックスと検索UIは段階3。作業開始時の0.26.43（ホームShell化済み）を基準とする。実装順序は、設定基盤の整理、既存設定画面のDefault Shellへの移行、Appletインデックス・横断検索の追加とする。先に部分JSONを含む3機能の契約を定義する。部分JSONだけは、Shellへ全設定を渡す暫定APIを作らず既存のJSON編集機能を引き継ぐため、Shell移行の完了時に提供する。
 
 設定ページを本体とAppletに共通する入口へ拡張する。左の検索結果から目的の設定へ移動でき、右ではその設定を含むページ全体を編集できる。Applet詳細の設定タブも残し、どちらの入口でも同じ画面・下書き・保存結果を使う。
 
@@ -8,9 +8,9 @@
 
 対象は設定の項目定義、共有編集セッション、設定ページ全体とApplet詳細の設定本文のShell描画、ページ単位のJSON編集、設定検索と項目への移動。Applet詳細の説明・ショートカット・ログの構成、設定保存先、起動や入力処理の意味は維持する。
 
-現状と新しい設計を区別する。
+移行前（0.26.43）と新しい設計を区別する。
 
-| 現状 | この設計での変更 |
+| 移行前 | この設計での変更 |
 | --- | --- |
 | `useSettingsEditor`が本体rendererで下書き・全体JSON・revision・保存を共有 | 編集状態の正本を本体mainのサービスへ移し、rendererのフックは購読・操作のアダプターにする |
 | 本体カテゴリ・表示・変更マークの判定が`main.tsx`に分散 | カテゴリと項目のカタログ、JSONの対象範囲、変更判定を共通化する |
@@ -20,7 +20,7 @@
 | Applet設定の検索は本文を絞り込む | 横断検索は左に結果を出し、右はページ全体を表示する |
 | Shellの本文契約は`page.logs`と`page.home` | 設定用のモデルと操作を追加し、全体ページと詳細内で共用する |
 
-本設計は、[設定パネルの共用](host-development.md#applet設定パネルの共用)と[Shellのページ表示](shell-pages.md)を拡張する計画であり、現行版で新機能が利用できることを示さない。Shellの共通経路と依存境界は[Shell基盤](shell-foundation.md)、保存分類は[設定同期](settings-sync.md)、操作許可は[共通操作API](appdock-api.md)を正本とする。
+本設計の段階1・2の実装は、[設定パネルの共用](host-development.md#applet設定パネルの共用)と[Shellのページ表示](shell-pages.md)を拡張する。段階3は後続。Shellの共通経路と依存境界は[Shell基盤](shell-foundation.md)、保存分類は[設定同期](settings-sync.md)、操作許可は[共通操作API](appdock-api.md)を正本とする。
 
 ## 画面と操作
 
@@ -188,3 +188,16 @@ Appletインデックス、横断検索と項目移動を順に提供し、本�
 ## 実装開始時に確定する事項
 
 進める順序、編集セッションの所有権、両入口の共用、JSONの更新境界、検索の基本動作は本設計を基準にする。APIの正確な型名・操作名・サイズ上限、カタログの全キー表、専用コントロールごとの移動先は、段階1の型設計と段階2の領域実証で確定し、この文書へ反映する。新しい必須manifestや依存追加、保存形式の全面変更、複数Window、未保存入力の再起動後復元は前提にしない。
+
+### 段階1で確定した内部契約
+
+`SettingsEditingSession`をprimaryに1つ設け、`SettingsEditingState`と`SettingsEditRequest`を本体renderer専用IPCで取得・更新する。これはShellの公開モデルではない。`sessionId`、`operationId`、`editRevision`で古い入力を拒否し、直近512操作を再実行しない。保存revisionはSettingsStoreのrevisionを別に保持する。JSONはUTF-8で1MiB、画像は従来どおり5MiBが上限。終了をまたぐ下書き永続化は追加しない。
+
+ページと許可パスは`src/shared/settings-catalog.ts`の`settingsPaths`を正本とする。安定項目IDはページIDとキーを個別にURL符号化して結合し、実データの更新はセグメント配列で行う。部分JSONはページを既定設定上で検証して、許可した葉だけを元のdraftへ戻す。Appletのsettings内部は自由なキーの追加・削除を許可し、宣言済み値は既存検証を適用する。WebApplet配列は対象IDの1要素のみを受け付け、他ID・enabled・imported等は保持する。
+
+ホームの順序入力はmainの編集サービスから直接取得する。既存requestのappletOrderは互換性のため受け付けるが、実ホストでは編集サービスの投影を優先する。段階1ではUIの全体JSONを維持し、部分JSONの変換基盤だけを追加する。
+## 実装時に確定した契約
+
+編集の正本はSettingsEditingSession、公開投影はSettingsPageSession / SettingsPageModel / SettingsPageAction。settings-catalog.tsがページ・項目ID・JSON範囲・変更判定を定義する。IDはページIDとキーを個別にencodeURIComponentして結合し、階層は文字列分割せずキー配列で扱う。JSON上限はUTF-8 1MiB、画像5MiB、操作再送履歴512件。
+
+ホームShell化に合わせ、ホームのappletOrderもmainの共有編集から読み取る。ページ寿命を管理するShellPageHostへ設定固有の判断を入れず、requiresFlushのControllerだけView切替前に入力完了を待つ。フォーム部品はsrc/shared/settings-ui、設定専用本文はshells/default/settingsへ分離した。保存ファイル・操作許可・即時保存先は追加変更しない。

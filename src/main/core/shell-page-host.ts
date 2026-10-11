@@ -31,6 +31,7 @@ export class ShellPageHost {
   private unavailable = false;
   private disposed = false;
   private pendingFocus?: 'first' | 'last';
+  private flushes = new Map<string, () => void>();
   constructor(
     private options: {
       window: BrowserWindow;
@@ -82,6 +83,10 @@ export class ShellPageHost {
       bound(event, true);
       return this.current!.act(action);
     });
+    ipcMain.handle('shell-page:flushed', (event, id) => {
+      bound(event, true);
+      this.flushes.get(id)?.();
+    });
     ipcMain.handle('shell-page:executeCommand', (event, command) =>
       options.execute(bound(event, true).provider, command),
     );
@@ -117,6 +122,27 @@ export class ShellPageHost {
     } else this.current.update?.(request);
     this.bounds = bounds;
     this.refresh();
+  }
+  async flush() {
+    if (
+      !this.current?.requiresFlush ||
+      !this.surface?.ready ||
+      this.current.route !== this.options.route()
+    )
+      return;
+    const id = randomUUID();
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.flushes.delete(id);
+        reject(Error('設定画面の入力受付を確認できませんでした。もう一度お試しください。'));
+      }, 3000);
+      this.flushes.set(id, () => {
+        clearTimeout(timer);
+        this.flushes.delete(id);
+        resolve();
+      });
+      this.surface!.view.webContents.send('shell-page:flush', id);
+    });
   }
   close(id?: string) {
     if (id !== undefined && id !== this.current?.id) return;
@@ -216,6 +242,8 @@ export class ShellPageHost {
     const s = this.surface;
     this.surface = undefined;
     if (!s) return;
+    // The closed view cannot acknowledge further requests; accepted edits already live in main.
+    for (const complete of this.flushes.values()) complete();
     if (this.current && !s.view.webContents.isDestroyed() && s.view.webContents.isFocused())
       this.pendingFocus = 'first';
     clearTimeout(s.timer);
@@ -289,6 +317,7 @@ export class ShellPageHost {
       'connect',
       'ready',
       'act',
+      'flushed',
       'executeCommand',
       'getSettings',
       'shortcut',

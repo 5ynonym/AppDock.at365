@@ -12,7 +12,8 @@
     "views": {
       "overlay.command-palette": "overlay.html",
       "page.logs": "logs.html",
-      "page.home": "home.html"
+      "page.home": "home.html",
+      "page.settings": "settings.html"
     }
   }
 }

@@ -4,17 +4,33 @@ import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/shell';
 
 export class NavigationCoordinator {
+  private requestSequence = 0;
   state: NavigationState = { route: 'home', request: 0 };
-  constructor(private changed: () => void) {}
+  constructor(
+    private changed: () => void,
+    private beforeNavigate?: () => Promise<void>,
+    private failed?: (error: unknown) => void,
+  ) {}
   navigate(route: string, section?: NavigationState['section'], appletId?: string) {
     if (
       !['home', 'extensions', 'settings', 'logs'].includes(route) &&
       !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
     )
       throw Error('Unknown route');
+    const sequence = ++this.requestSequence;
     if (route === this.state.route && !section && !appletId) return;
-    this.state = { route, section, appletId, request: this.state.request + 1 };
-    this.changed();
+    const apply = () => {
+      if (sequence !== this.requestSequence) return;
+      this.state = { route, section, appletId, request: this.state.request + 1 };
+      this.changed();
+    };
+    if (this.beforeNavigate)
+      return this.beforeNavigate()
+        .then(apply)
+        .catch((error) => {
+          this.failed?.(error);
+        });
+    apply();
   }
 }
 type Action = {
@@ -174,7 +190,7 @@ export class UiPresentation {
       if (execute) return execute(action);
       if (action.command) return this.options.execute(action.command);
       if (action.theme) return this.options.theme();
-      this.options.navigation.navigate(action.route!, action.section);
+      await this.options.navigation.navigate(action.route!, action.section);
       return { accepted: true };
     });
     const entry = { action: request.actionId, promise, completed: false, expires: Infinity };

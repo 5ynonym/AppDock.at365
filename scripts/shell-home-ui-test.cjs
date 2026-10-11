@@ -1,3 +1,4 @@
+const { settingsPage: getSettingsPage } = require('./settings-shell-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -196,12 +197,17 @@ const invoke = (p, actionId) =>
       'shared draft order, notice, card navigation and pin execution preserve input',
       async () => {
         await navigate('settings');
-        await dock.getByRole('button', { name: 'JSON', exact: true }).click();
-        const editor = dock.locator('textarea').first();
-        const draft = JSON.parse(await editor.inputValue());
-        draft.appletOrder = ['fixture.home', 'fixture.stalled'];
-        await editor.fill(JSON.stringify(draft, null, 2));
-        await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
+        const draft = await dock.evaluate(async () => {
+          const s = await window.dock.settingsEditing();
+          s.draft.appletOrder = ['fixture.home', 'fixture.stalled'];
+          await window.dock.editSettings({
+            sessionId: s.sessionId,
+            editRevision: s.editRevision,
+            operationId: crypto.randomUUID(),
+            action: { type: 'draft', value: s.draft },
+          });
+          return s.draft;
+        });
         await navigate('home');
         let p = await home();
         await until(
@@ -232,12 +238,10 @@ const invoke = (p, actionId) =>
         await p.getByRole('button', { name: /Fail/ }).click();
         await p.getByRole('alert').filter({ hasText: 'Home fixture error' }).waitFor();
         await navigate('settings');
-        await dock.getByRole('button', { name: 'JSON', exact: true }).click();
         assert.deepEqual(
-          JSON.parse(await dock.locator('textarea').first().inputValue()).appletOrder,
+          (await dock.evaluate(() => window.dock.settingsEditing())).draft.appletOrder,
           draft.appletOrder,
         );
-        await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
         await navigate('home');
       },
     );
@@ -420,19 +424,27 @@ const invoke = (p, actionId) =>
       const fallback = await home();
       assert.equal((await model(fallback)).content.applets[0].id, 'fixture.home');
       await navigate('settings');
-      await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-      await dock.getByRole('alert').filter({ hasText: '別の場所で設定が変わりました' }).waitFor();
+      const setting = await getSettingsPage(dock);
+      await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+      await setting
+        .getByRole('alert')
+        .filter({ hasText: '別の場所で設定が変わりました' })
+        .waitFor();
       assert.deepEqual(
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder,
         settings.appletOrder,
       );
-      await dock.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
-      await dock.getByRole('button', { name: 'JSON', exact: true }).click();
-      const editor = dock.getByLabel('設定JSON'),
-        draft = JSON.parse(await editor.inputValue());
-      draft.appletOrder = ['fixture.home', 'fixture.stalled'];
-      await editor.fill(JSON.stringify(draft));
-      await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
+      await setting.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+      await dock.evaluate(async () => {
+        const s = await window.dock.settingsEditing();
+        s.draft.appletOrder = ['fixture.home', 'fixture.stalled'];
+        await window.dock.editSettings({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: crypto.randomUUID(),
+          action: { type: 'draft', value: s.draft },
+        });
+      });
       await navigate('home');
       const again = await home();
       assert.equal((await model(again)).content.applets[0].id, 'fixture.home');

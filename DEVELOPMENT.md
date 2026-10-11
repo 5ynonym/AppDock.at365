@@ -15,7 +15,7 @@
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
-| 未実装の設定拡張 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
+| 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 
 本体はTypeScript、描画はReactです。C#/.NETとNode.jsのAppletは別プロセスで実行し、独自WPF/WinForms画面はnative Appletが所有します。設定/APIの内部名extensionsは維持します。ページ共通の保存・未保存通知・詳細タブの契約は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照してください。
@@ -215,4 +215,8 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.home/page.logsの公開モデル/操作/購読、Default Shellへのホーム・ログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。ホームの表示順は既存共有draftからの限定投影を使い、設定移行時は編集サービスへ接続し直す。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.home/page.logs/page.settingsの公開モデル/操作/購読、Default Shellへのホーム・ログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。ホームの表示順はmainのSettingsEditingSessionから読み取ります。過去ログや日付検索は後続。
+
+設定の受理済み編集はmainのSettingsEditingSessionが保持します。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
+
+設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。

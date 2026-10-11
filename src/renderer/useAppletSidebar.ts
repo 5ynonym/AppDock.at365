@@ -28,6 +28,7 @@ export function useAppletSidebar() {
   };
   return {
     width,
+    resize,
     separatorProps: {
       role: 'separator',
       tabIndex: 0,

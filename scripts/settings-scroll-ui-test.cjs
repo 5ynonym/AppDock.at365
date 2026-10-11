@@ -20,63 +20,67 @@ let application;
     const page = await application.firstWindow();
     await require('./shell-overlay-helper.cjs').homePage(page);
     await page.keyboard.press('Control+,');
+    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(page);
     for (const width of [1280, 900, 760]) {
-      await page.setViewportSize({ width, height: 600 });
-      await page.getByRole('button', { name: '一般', exact: true }).click();
-      const heading = await page
-        .locator('.settings-page:not([hidden]) .page-heading')
+      await application.evaluate(
+        ({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 600),
+        width,
+      );
+      await settingsPage.getByRole('button', { name: '一般', exact: true }).click();
+      await settingsPage.getByLabel('スタートアップに登録', { exact: true }).waitFor();
+      const heading = await settingsPage.locator('.settings-surface .page-heading').boundingBox();
+      const toolbar = await settingsPage
+        .locator('.settings-surface .settings-toolbar')
         .boundingBox();
-      const toolbar = await page
-        .locator('.settings-page:not([hidden]) .settings-toolbar')
-        .boundingBox();
-      const form = await page.locator('.settings-form').boundingBox();
-      const scrollTop = await page
-        .locator('.settings-page:not([hidden]) .settings-body')
+      const form = await settingsPage.locator('.settings-form').boundingBox();
+      const scrollTop = await settingsPage
+        .locator('.settings-surface .settings-body')
         .evaluate((element) => {
           element.scrollTop = element.scrollHeight;
           return element.scrollTop;
         });
       assert.ok(scrollTop > 0, `long category scrolls at ${width}`);
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
         toolbar,
       );
-      await page.getByRole('button', { name: '表示', exact: true }).click();
+      await settingsPage.getByRole('button', { name: '表示', exact: true }).click();
+      await settingsPage.getByLabel('テーマ', { exact: true }).waitFor();
       assert.equal(
-        await page
-          .locator('.settings-page:not([hidden]) .settings-body')
+        await settingsPage
+          .locator('.settings-surface .settings-body')
           .evaluate((element) => element.scrollTop),
         0,
       );
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
         toolbar,
       );
-      const shortForm = await page.locator('.settings-form').boundingBox();
+      const shortForm = await settingsPage.locator('.settings-form').boundingBox();
       assert.equal(shortForm.x, form.x);
       assert.equal(shortForm.width, form.width);
-      assert.equal(await page.locator('main').evaluate((element) => element.scrollTop), 0);
-      await page.getByRole('button', { name: 'JSON', exact: true }).click();
-      await page.locator('.settings-page:not([hidden]) .settings-body').evaluate((element) => {
+      assert.equal(await settingsPage.locator('main').evaluate((element) => element.scrollTop), 0);
+      await settingsPage.getByRole('button', { name: 'JSON', exact: true }).click();
+      await settingsPage.locator('.settings-surface .settings-body').evaluate((element) => {
         element.scrollTop = element.scrollHeight;
       });
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await page.locator('.settings-page:not([hidden]) .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
         toolbar,
       );
-      await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+      await settingsPage.getByRole('button', { name: 'フォーム', exact: true }).click();
       await page.screenshot({ path: path.join(profile, `settings-${width}.png`) });
     }
     console.log(

@@ -193,6 +193,13 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  settingsEditing(): Promise<import('./settings-editing').SettingsEditingState>;
+  flushSettings(): Promise<void>;
+  onSettingsSidebarWidth(callback: (width: number) => void): () => void;
+  editSettings(
+    request: import('./settings-editing').SettingsEditRequest,
+  ): Promise<import('./settings-editing').SettingsEditingState>;
+  onSettingsEditingChanged(callback: () => void): () => void;
   shellPage(
     request: import('./shell-pages').ShellPageRequest,
     bounds: import('./shell-pages').ShellPageViewport | null,

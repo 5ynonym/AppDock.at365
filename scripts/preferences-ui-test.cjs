@@ -58,6 +58,7 @@ async function waitPins(page, pins) {
   try {
     let page = await launch();
     let palette;
+    const settingsPage = () => require('./settings-shell-helper.cjs').settingsPage(page);
     await page.keyboard.press('Control+p');
     palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
     await (
@@ -90,14 +91,21 @@ async function waitPins(page, pins) {
     );
     await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     await page.keyboard.press('Control+,');
-    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: 'ショートカット', exact: true })
+      .click();
     const setShortcut = async (commandId, key) => {
-      const row = page.locator(`.shortcuts-editor [data-shortcut-command="${commandId}"]`);
+      const row = (await settingsPage()).locator(
+        `.shortcuts-editor [data-shortcut-command="${commandId}"]`,
+      );
+      await row.waitFor();
       const existing = row.locator('.applet-shortcut-edit').first();
       const adding = !(await existing.count());
       if (adding) await row.getByRole('button', { name: /に割り当てを追加/ }).click();
       else await existing.click();
-      const panel = page.locator('.applet-shortcut-dialog');
+      const panel = (await settingsPage()).locator('.applet-shortcut-dialog');
       await panel.getByText('押して入力', { exact: true }).waitFor();
       await panel.getByRole('button', { name: 'ショートカットキーを入力', exact: true }).press(key);
       await panel.getByLabel('割り当てのいつ・どこで').selectOption('app');
@@ -105,8 +113,12 @@ async function waitPins(page, pins) {
     };
     await setShortcut('appdock.commands.search', 'Control+Alt+p');
     await setShortcut('appdock.welcome.refresh', 'Control+Alt+p');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.getByText('すべて保存されています', { exact: true }).waitFor();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
+    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
         'appdock.commands.search'
@@ -114,8 +126,12 @@ async function waitPins(page, pins) {
       true,
     );
     await setShortcut('appdock.welcome.refresh', 'Control+Alt+r');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.getByRole('status').filter({ hasText: '設定を保存' }).waitFor();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
+    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
@@ -148,7 +164,11 @@ async function waitPins(page, pins) {
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.keyboard.press('Control+,');
     await setShortcut('appdock.dotnet-demo.refresh', 'Control+Alt+d');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
     const before = (await page.evaluate(() => window.dock.snapshot())).extensions
       .find((e) => e.id === 'appdock.dotnet-demo')
       .panel.facts.find((f) => f.label === 'Refresh').value;
@@ -176,10 +196,18 @@ async function waitPins(page, pins) {
     );
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
     await shell.locator('[data-ribbon-id="profile"]').click();
-    await page.getByLabel('ユーザー名').fill('検証ユーザー');
-    await page.getByLabel('アバター画像を選択').setInputFiles(path.join(root, 'assets/icon.png'));
-    await page.getByAltText('プロフィール画像').waitFor();
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await (await settingsPage()).getByLabel('ユーザー名').fill('検証ユーザー');
+    await (
+      await settingsPage()
+    )
+      .getByLabel('アバター画像を選択')
+      .setInputFiles(path.join(root, 'assets/icon.png'));
+    await (await settingsPage()).getByAltText('プロフィール画像').waitFor();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
     await shell.locator('.avatar img').waitFor();
     await shell.waitForFunction(() => {
       const img = document.querySelector('.avatar img');
@@ -190,22 +218,40 @@ async function waitPins(page, pins) {
       '検証ユーザー',
     );
     const firstHash = hash();
-    await page.getByLabel('アバター画像を選択').setInputFiles(path.join(profile, 'pins.png'));
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.getByText('すべて保存されています', { exact: true }).waitFor();
+    await (
+      await settingsPage()
+    )
+      .getByLabel('アバター画像を選択')
+      .setInputFiles(path.join(profile, 'pins.png'));
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
+    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
     assert.notEqual(hash(), firstHash);
     const finalHash = hash();
     const conflict = path.join(profile, 'conflict', 'icon.png');
     fs.mkdirSync(path.dirname(conflict), { recursive: true });
     fs.copyFileSync(path.join(profile, 'pins.png'), conflict);
-    await page.getByLabel('アバター画像を選択').setInputFiles(conflict);
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page
+    await (await settingsPage()).getByLabel('アバター画像を選択').setInputFiles(conflict);
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更をすべて保存', exact: true })
+      .click();
+    await (
+      await settingsPage()
+    )
       .getByText(/同名の別画像が登録されています/)
       .first()
       .waitFor();
     assert.equal(hash(), finalHash);
-    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    await (
+      await settingsPage()
+    )
+      .getByRole('button', { name: '変更を破棄して再読み込み', exact: true })
+      .click();
     assert.deepEqual(fs.readdirSync(path.join(profile, 'data/assets/profile')).sort(), [
       'icon.png',
       'pins.png',

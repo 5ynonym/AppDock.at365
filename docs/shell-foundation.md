@@ -20,6 +20,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | --- | --- | --- |
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
+| page.settings | SettingsPageSessionとSettingsEditingSession | [設定基盤](settings-foundation.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 
@@ -57,7 +58,7 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 ## 後続計画
 
-[設定基盤とDefault Shellへの移行設計](settings-foundation.md)に従い、共有編集セッションと項目カタログを整理してから設定の左右領域とApplet詳細の設定本文を移す。設定のShell APIと検索は未実装であり、現行Shell APIに存在するものとして使用しない。
+設定の左右領域とApplet詳細の設定本文は`page.settings`で共用する。選択ページの値だけを配信し、入力の受付・保存はmainの共有編集セッションへ接続する。境界は[設定基盤](settings-foundation.md)を参照する。Appletインデックスと横断検索は段階3で追加する。
 
 複数Window・複数Shellの同時表示は未実装。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 

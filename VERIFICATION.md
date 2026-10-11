@@ -1,5 +1,25 @@
 # 検証記録
 
+## 2026-10-12: 設定Shell・部分JSON、段階1・2の完了（0.27.0）
+
+- 設定全11カテゴリとApplet詳細の設定本文をDefault Shellへ移行。page.settingsの公開モデルには選択ページの値・定義・必要な補助情報・不透明な操作IDだけを渡す。mainの共有編集、既存保存先・即時保存・許可・互換変換を使用し、全体JSON画面と本体側の重複描画を撤去した。
+- 発行前レビューで、ページ投影の範囲外値、入力順・View切替のflush、画像の寿命、停止中アクション、外部revision競合、部分JSONの未知キー保持を確認。補助Applet情報をページ別に縮小し、未保存Webアカウント参照の削除ガード、未完成数値バッファ、一般操作のエラー処理、sidebar幅・再起動時カテゴリの既存保存先利用を修正した。旧試験の全体JSON/本体DOM参照を新契約へ更新した。
+- 最終型検査と標準回帰306/306が成功。ソース隔離GUIはsettings-shell（10群）、settings-notice（9群）、preferences（7群）、settings-scroll、navigation（17群）、applet-sidebar（6群）、shell-home（7群）、shell-page（9群）、shell-host（14群）、shell-overlay（7群）の10本が全成功。即時保存・数値途中入力・画像・dotted key・停止中Applet・両入口・JSON保持・公開API fixture・故障/ready timeout/safe-shellを確認した。設定の両テーマと700/900/1280幅、ホームzoomも確認した。
+- 検証tree `f77651b2e8a9e35fb7e9581f102ae3ea06f6eeea` が最終回帰前後で一致し、作業ファイルとstageの一致を確認。完全ログ・時刻・終了コード・入力hashは `.artifacts/commit-validation-settings-stage2/`。最終検証後の変更はこのVERIFICATIONのみ。初回標準回帰の制限環境EPERMと固定依存確認のstack overflowは、同一コマンドの通常環境再実行で成功。依存版・lockfile・検査機構は変更していない。
+- 全体JSONからページ単位JSONへの操作契約変更をマイナー更新と判定し、本体0.27.0へ更新。publish終了コード0、EXE 144095387 bytes、SHA256 `8ac98557b90f5c486dae961d192e54cf2b9b5440939ed9480ee58bac24c70bde`。feedの版・size・hashと固定コピーが一致。固定出力 `.artifacts/settings-stage2-0.27.0/`。未変更Applet・全体ZIPは発行していない。
+- 固定EXEのsettings-shell 9群（settings-shell-1791742273491）、settings-notice 8群（settings-notice-1791742308279）、shell-home 7群（shell-home-1791742332895）が成功。各profileは.artifacts配下。固定settings-shellは初期Window寸法・ready timeout復旧・safe-shellを確認し、renderer強制crashと3幅切替はソース試験の結果と区別する。
+- 未確認: 物理日本語IME変換、複数モニターの実DPI切替、実利用アカウント/外部サービス、UAC登録・実更新適用。IMEは合成compositionイベントによる契約確認。検索・Appletインデックス・項目強調は段階3。ネイティブ入力フック/全兄弟Applet/全Release回帰は今回の変更対象外として一律実行していない。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-12: 設定基盤・段階1（0.26.44）
+
+- mainの共有編集セッション、旧画面アダプター、カタログ・部分JSON変換基盤を実装。ホームのApplet順序はmainの共有編集状態から投影する。部分JSON・検索UI・設定Shellはこの段階では未提供。
+- 発行前に編集所有権・保存先/即時反映境界・操作順・JSON対象範囲・既存画面への影響をレビューした。外部更新直後の表示モード切替で古い編集revisionを使う問題、再読込時に全体エラーを消す退行、開始遅延の空欄をNaNとして送る問題を修正。JSON表示切替は最新状態を取得し、設定の書込みはrevision検証を維持した。GUIの再読込確認はmainの処理完了を待つよう更新した。
+- 型検査・ビルド、settings-editing/home-page/applet-settings/settings-commandsの関連回帰21件が成功。範囲外拒否・未知キー/未導入ID保持・WebApplet ID保持・検索正規化・不正JSON・画像・保存失敗・競合・再送を含む。
+- 隔離GUI成功: settings-notice 9群（`.artifacts/settings-notice-1791738172800/result.json`）、preferences 7群（`.artifacts/preferences-1791738208472/result.json`）、navigation 17群（`.artifacts/navigation-1791738415869/result.json`）。両テーマ・700/900/1280幅、画像・既存ショートカット・Applet詳細・Web管理・未保存通知・競合・再起動を確認。初回失敗は上記修正と処理完了待ちの再検証で解消した。
+- 設定項目・保存ファイル・外部公開APIの互換性変更を含まない内部基盤整理としてパッチ版0.26.44へ更新。未変更Applet/全体ZIPは発行しない。コミットは段階2の完了後にまとめる。
+- 制限環境のElectron起動失敗、版更新後のfrozen-lockfile確認のSTATUS_STACK_OVERFLOW、publishの.NET段階終了コード1は、同じコマンドを通常環境で切り分けた。依存更新・検証無効化は行っていない。
+- この段階でShell経由の設定編集/復旧、部分JSON/検索の実GUI、物理IME/DPI切替は未確認。固定EXEのsettings-noticeは8群成功（`.artifacts/settings-notice-1791738679211/result.json`）、shell-homeは7群成功（`.artifacts/shell-home-1791738712170/result.json`）。publish終了コード0、144086107 bytes、SHA256 `420da5e5483bab8c249420b9ac7497046816ba987227b213bf899d46db60b62a`。feedと隔離コピーの一致を確認し、`.artifacts/settings-stage1-0.26.44/`へEXE/feedを固定保存した。
+
 ## 2026-10-12: 0.26.43 ホームShell移行のレビュー・コミット前回帰
 
 - レビューで、ホームのコマンド実行中にカード・ログ・一覧・パレットへの移動まで拒否する退行を修正した。画面移動は既存の実行経路へ直接委譲し、実行中状態・結果を上書きしない。ピンの実行可否検査とWindow寿命の重複実行ガードは維持。単体試験と、実行中のカード移動→ホーム復帰→ログ移動→完了通知の実画面試験で確認した。

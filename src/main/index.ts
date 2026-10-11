@@ -1,3 +1,6 @@
+import type { ExtensionSnapshot } from '../shared/contracts';
+import type { SettingsPageDefinition } from '../shared/settings-catalog';
+import type { SettingsPageAuxiliary } from '../shared/settings-page';
 import { ShellHost } from './core/shell-host';
 import { OverlayHost } from './core/overlay-host';
 import { ShellPageHost } from './core/shell-page-host';
@@ -32,6 +35,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
 import { SettingsCommands } from './core/settings-commands';
+import { SettingsEditingSession } from './core/settings-editing-session';
+import { SettingsPageSession } from './core/settings-page';
 import { dataPaths } from './core/data-paths';
 import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
@@ -87,6 +92,7 @@ import {
 } from './core/applet-pages';
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
+import { mergeWebDefaults } from '../shared/web-applets';
 import { SettingsNotice } from './core/settings-notice';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
@@ -170,7 +176,13 @@ let overlayHost: OverlayHost | undefined;
 let shellPageHost: ShellPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 const safeShell = process.argv.includes('--safe-shell');
-const navigation = new NavigationCoordinator(() => changed());
+const navigation = new NavigationCoordinator(
+  () => changed(),
+  async () => {
+    await shellPageHost?.flush();
+  },
+  (error) => log.write('error', 'navigation', String(error)),
+);
 const presentation = new UiPresentation({
   settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
   applets: () => (manager ? allApplets() : []),
@@ -198,6 +210,35 @@ async function toggleTheme() {
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
+const settingsEditing = new SettingsEditingSession({
+  current: () => settings.snapshot(),
+  applets: () => (manager ? allApplets() : []),
+  save: async (value, revision, avatar, name) => {
+    const next = prepareSettings(value);
+    return launch.save(
+      next.host,
+      settings.value.host,
+      () => settings.assertRevision(revision),
+      () => commitSettings(next, revision, avatar, name),
+    );
+  },
+  confirmDiscard: async () =>
+    (
+      await dialog.showMessageBox(window!, {
+        type: 'warning',
+        message: '未保存の変更をすべて破棄しますか？',
+        detail:
+          '設定・ショートカット・Appletの並び順など、すべての未保存変更を破棄します。即時反映操作は対象外です。',
+        buttons: ['キャンセル', 'すべて破棄'],
+        defaultId: 0,
+        cancelId: 0,
+      })
+    ).response === 1,
+  changed: () => {
+    if (window && !window.isDestroyed()) window.webContents.send('dock:settingsEditingChanged');
+    changed();
+  },
+});
 let webApplets: WebAppletManager;
 const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
 const appletManagement = new AppletManagement({
@@ -419,13 +460,26 @@ function executeShellCommand(provider: string, command: string) {
     throw Error('Command is not available from this Shell Applet');
   return executeCommand(command);
 }
-function uiCommands() {
-  return [
+const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[number]>();
+function uiCommands(): import('../shared/commands').UiCommand[] {
+  const commands = [
     ...hostCommands.map((c) => ({ ...c, extensionId: null })),
     ...appletManagementCommands(allApplets()),
     ...allApplets().flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
     ),
+  ];
+  for (const command of commands) knownSettingsCommands.set(command.id, command);
+  return commands;
+}
+function settingsUiCommands() {
+  const commands = uiCommands(),
+    ids = new Set(commands.map((c) => c.id));
+  return [
+    ...commands,
+    ...[...knownSettingsCommands.values()]
+      .filter((c) => !ids.has(c.id))
+      .map((c) => ({ ...c, available: false })),
   ];
 }
 function openCommandPalette(request: CommandPaletteRequest) {
@@ -623,6 +677,318 @@ function commitSettings(
 ) {
   return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
 }
+function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
+  const host = snapshot();
+  const state = settingsEditing.snapshot();
+  const id = page.id;
+  const summary = (a: ExtensionSnapshot): ExtensionSnapshot => ({
+    apiVersion: 1,
+    id: a.id,
+    name: a.name,
+    displayName: a.displayName,
+    version: id === 'about' ? a.version : '',
+    runtime: a.runtime,
+    entry: '',
+    folder: '',
+    state: a.state,
+    error: null,
+    enabled: a.enabled,
+    commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
+    tray: id === 'tray' ? a.tray : [],
+    panel: null,
+    settingOptions: {},
+    pages: page.kind === 'applet' || ['ribbon', 'gestures'].includes(id) ? a.pages : undefined,
+    shell: id === 'appearance' ? a.shell : undefined,
+    updateRepository: id === 'about' ? a.updateRepository : undefined,
+  });
+  const applets = allApplets();
+  if (page.kind === 'applet') {
+    const a = applets.find((a) => a.id === page.owner)!;
+    return {
+      applets: [
+        {
+          ...summary(a),
+          settings: a.settings,
+          settingActions: a.settingActions,
+          settingOptions: a.settingOptions,
+          startupDelaySeconds: a.startupDelaySeconds,
+        },
+      ],
+    };
+  }
+  if (page.kind === 'web') return { accounts: host.webAccounts };
+  if (id === 'appearance') return { applets: applets.filter((a) => a.shell).map(summary) };
+  if (id === 'general') return { launch: host.launch };
+  if (id === 'ribbon') return { applets: applets.map(summary) };
+  if (['shortcuts', 'gestures', 'tray'].includes(id))
+    return {
+      applets: applets.map(summary),
+      commands: settingsUiCommands(),
+      statuses: id === 'shortcuts' ? host.globalHotKeys : undefined,
+    };
+  if (id === 'about')
+    return {
+      version: host.version,
+      runtime: host.runtime,
+      updates: host.updates,
+      applets: applets.filter((a) => a.sourceKind !== 'builtin').map(summary),
+    };
+  if (id === 'profile')
+    return {
+      avatarUrl: state.avatarChanged
+        ? state.avatarPreview === null
+          ? null
+          : `appdock://host/draft-avatar?session=${state.sessionId}&v=${state.editRevision}`
+        : host.avatarUrl,
+    };
+  if (id === 'web-accounts')
+    return {
+      accounts: host.webAccounts,
+      accountReferences: {
+        saved: settings.value.webApplets.items.map(({ id, name, accountId }) => ({
+          id,
+          name,
+          accountId,
+        })),
+        draft: state.draft.webApplets.items.map(({ id, name, accountId }) => ({
+          id,
+          name,
+          accountId,
+        })),
+      },
+    };
+  if (id === 'permissions') return { permissions: host.appletApi };
+  return {};
+}
+let settingsRecording = false;
+let settingsPalette: string | undefined;
+function releaseSettingsView() {
+  if (settingsRecording) {
+    settingsRecording = false;
+    shortcutRecording = false;
+    void syncHotKeys();
+  }
+  if (settingsPalette && paletteSession?.request.requestId === settingsPalette)
+    paletteSession.cancel('owner-disposed');
+  settingsPalette = undefined;
+}
+function settingsPageActions(
+  page: SettingsPageDefinition,
+): Record<string, (args: unknown[]) => Promise<unknown>> {
+  const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  const string = (v: unknown) => {
+    if (typeof v !== 'string') throw Error('入力が不正です。');
+    return v;
+  };
+  if (page.json)
+    actions['open-settings'] = async () => {
+      const error = await shell.openPath(settings.file);
+      if (error) throw Error(error);
+    };
+  if (page.id === 'general') {
+    actions.refreshLaunchState = async () => {
+      const result = await launch.refresh();
+      changed();
+      return result;
+    };
+    actions.restartAsAdministrator = async () => {
+      if (settingsEditing.snapshot().dirty) throw Error('設定を保存してください。');
+      await launch.restartElevated([
+        ...launch.args,
+        '--restore-view',
+        '--appdock-elevation-attempt',
+      ]);
+      quitHost();
+    };
+  }
+  if (['shortcuts', 'gestures'].includes(page.id)) {
+    actions.setShortcutRecording = async ([value]) => {
+      if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
+      settingsRecording = value;
+      shortcutRecording = value && !!window?.isFocused();
+      await syncHotKeys();
+    };
+    actions.retryGlobalHotKeys = async () => syncHotKeys(true);
+  }
+  if (['shortcuts', 'gestures', 'tray'].includes(page.id)) {
+    actions.openCommandPalette = async ([request]) => {
+      const value = request as CommandPaletteRequest;
+      if (!value || value.mode !== 'select') throw Error('選択操作だけを利用できます。');
+      settingsPalette = value.requestId;
+      return openCommandPalette(value);
+    };
+    actions.cancelCommandPalette = async ([id]) => {
+      if (paletteSession && paletteSession.request.requestId === id)
+        paletteSession.cancel('owner-disposed');
+    };
+  }
+  if (page.id === 'about') {
+    const target = (value: unknown, groups = false) => {
+      if (value === undefined) return undefined;
+      const id = string(value);
+      if (
+        !allApplets().some((a) => a.id === id) &&
+        !(groups && ['all', 'host', 'applets'].includes(id))
+      )
+        throw Error('更新対象が不正です。');
+      return id;
+    };
+    actions.checkUpdates = async ([id]) => {
+      const selected = target(id);
+      await updater.check([selected ?? 'host']);
+      return updater.state.results.find((r) => r.id === (selected ?? 'host'));
+    };
+    actions.checkAllUpdates = async () => updater.check();
+    actions.cancelUpdates = async () => updater.cancel();
+    actions.installUpdates = async ([id]) => {
+      if (settingsEditing.snapshot().dirty) throw Error('設定を保存してください。');
+      return updater.install(target(id, true)!);
+    };
+    actions.openReleases = async ([id]) => {
+      const selected = target(id);
+      const url = updater.state.results.find((r) => r.id === (selected ?? 'host'))?.releaseUrl;
+      if (!url || !/^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/releases$/.test(url))
+        throw Error('更新元を確認してください。');
+      await shell.openExternal(url);
+    };
+  }
+  if (page.id === 'web-accounts') {
+    actions.createWebAccount = async ([name]) => webApplets.addAccount(name);
+    actions.renameWebAccount = async ([id, name]) => webApplets.renameAccount(string(id), name);
+    actions.deleteWebAccount = async ([id]) => {
+      const target = string(id);
+      if (settingsEditing.draft.webApplets.items.some((a) => a.accountId === target))
+        throw Error('編集中のWebAppletがこのアカウントを使用しています。');
+      return webApplets.deleteAccount(target);
+    };
+    actions.clearWebAccount = async ([id]) => webApplets.clearAccount(string(id));
+  }
+  if (['permissions', 'codex'].includes(page.id)) {
+    actions.automation = async ([action]) => {
+      const value = action as AutomationAction;
+      const permitted =
+        page.id === 'permissions'
+          ? [
+              'status',
+              'configure',
+              'setExecution',
+              'setAppletManagement',
+              'setShortcutEditing',
+              'setGestureEditing',
+              'setRibbonEditing',
+              'setTrayEditing',
+            ]
+          : [
+              'status',
+              'configure',
+              'register',
+              'unregister',
+              'test',
+              'rotateToken',
+              'selectConfig',
+              'selectName',
+            ];
+      if (!value || !permitted.includes(value.kind))
+        throw Error('このページでは利用できない操作です。');
+      return automation!.action(value);
+    };
+    if (page.id === 'permissions')
+      actions.setAppletApiPermissions = async ([value]) => {
+        appletApiAccess.set(value);
+        for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
+        changed();
+      };
+  }
+  if (page.kind === 'applet') {
+    const a = allApplets().find((a) => a.id === page.owner);
+    for (const item of a?.settingActions ?? [])
+      if (
+        a?.enabled &&
+        a.state === 'running' &&
+        a.commands.some((c) => c.id === item.command && c.available)
+      )
+        actions[`settingAction:${item.command}`] = async () => {
+          const current = allApplets().find((a) => a.id === page.owner);
+          if (
+            !current?.settingActions?.some((s) => s.command === item.command) ||
+            !current.commands.some((c) => c.id === item.command && c.available)
+          )
+            throw Error('操作は現在利用できません。');
+          return executeCommand(item.command);
+        };
+    if (
+      a?.settings?.some(
+        (s) => s.type === 'object-list' && s.fields?.some((f) => f.format === 'directory'),
+      )
+    )
+      actions.chooseDirectory = async () => {
+        const result = await dialog.showOpenDialog(window!, {
+          title: '画像ソースフォルダーを選ぶ',
+          properties: ['openDirectory'],
+        });
+        return result.canceled ? null : (result.filePaths[0] ?? null);
+      };
+  }
+  if (page.kind === 'web') {
+    actions.importWebDefaults = async () => {
+      const before = settingsEditing.draft.webApplets.items.find((a) => a.id === page.owner);
+      if (!before) throw Error('設定対象が見つかりません。');
+      const result = await discoverWebDefaults(before.url);
+      const state = settingsEditing.snapshot(),
+        value = state.draft;
+      const current = value.webApplets.items.find((a) => a.id === page.owner);
+      if (!current || current.url !== before.url) throw Error('読取中に設定が変更されました。');
+      value.webApplets.items = value.webApplets.items.map((a) =>
+        a.id === page.owner ? mergeWebDefaults(current, before, result) : a,
+      );
+      await settingsEditing.act({
+        sessionId: state.sessionId,
+        editRevision: state.editRevision,
+        operationId: randomUUID(),
+        action: { type: 'draft', value },
+      });
+      return `${result.message} 内容を確認して保存してください。`;
+    };
+    actions.openWebAccounts = async () => {
+      const state = settingsEditing.snapshot();
+      await settingsEditing.act({
+        sessionId: state.sessionId,
+        editRevision: state.editRevision,
+        operationId: randomUUID(),
+        action: { type: 'select-page', pageId: 'web-accounts' },
+      });
+      navigation.navigate('settings');
+    };
+    actions.deleteWebApplet = async () => {
+      const state = settingsEditing.snapshot();
+      const value = state.draft;
+      value.webApplets.items = value.webApplets.items.filter((a) => a.id !== page.owner);
+      await settingsEditing.act({
+        sessionId: state.sessionId,
+        editRevision: state.editRevision,
+        operationId: randomUUID(),
+        action: { type: 'draft', value },
+      });
+      const next = settingsEditing.snapshot();
+      await settingsEditing.act({
+        sessionId: next.sessionId,
+        editRevision: next.editRevision,
+        operationId: randomUUID(),
+        action: { type: 'select-page', pageId: 'appearance' },
+      });
+      navigation.navigate('extensions', undefined, 'appdock.web-manager');
+    };
+  }
+  return Object.fromEntries(
+    Object.entries(actions).map(([key, run]) => [
+      key,
+      async (args: unknown[]) => {
+        if (!startupReady || quitting) throw Error('AppDockは準備中です。');
+        return run(args);
+      },
+    ]),
+  );
+}
 function registerIpc() {
   const updateTarget = (id?: string) => {
     if (id === undefined) return { version: app.getVersion(), repository: '5ynonym/AppDock.at365' };
@@ -653,6 +1019,15 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:settingsEditing', () => settingsEditing.snapshot());
+  handle('dock:flushSettings', () => shellPageHost?.flush());
+  handle('dock:editSettings', async (request) => {
+    if (['save', 'discard', 'reload', 'select-page', 'mode'].includes(request?.action?.type)) {
+      await shellPageHost?.flush();
+      request = { ...request, editRevision: settingsEditing.snapshot().editRevision };
+    }
+    return settingsEditing.act(request);
+  });
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
   handle('dock:navigate', (route: string) => navigation.navigate(route));
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
@@ -1062,6 +1437,19 @@ async function initialize() {
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
+    if (url.host === 'host' && url.pathname === '/draft-avatar') {
+      if (url.searchParams.get('session') !== settingsEditing.snapshot().sessionId)
+        return new Response('Not found', { status: 404 });
+      const bytes = settingsEditing.avatarData();
+      return bytes
+        ? new Response(bytes as BodyInit, {
+            headers: {
+              'Content-Type': bytes[0] === 137 ? 'image/png' : 'image/jpeg',
+              'Cache-Control': 'no-store',
+            },
+          })
+        : new Response('Not found', { status: 404 });
+    }
     if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
       const image = [...manager.items.values()]
         .flatMap((extension) => extension.panel?.images ?? [])
@@ -1255,27 +1643,38 @@ async function initialize() {
     route: () => navigation.state.route,
     ready: () => startupReady && !quitting,
     create: (request) =>
-      request.kind === 'home'
-        ? new HomePageSession(request, {
-            applets: allApplets,
-            commands: uiCommands,
-            pins: () => settings.value.pinnedCommands,
-            dark: () => nativeTheme.shouldUseDarkColors,
-            execution: homeExecution,
-            navigate: executeCommand,
-            openApplet: (id) => navigation.navigate('extensions', undefined, id),
-          })
-        : new LogPageSession(request, {
-            entries: () => log.entries,
-            sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-            dark: () => nativeTheme.shouldUseDarkColors,
-            openDirectory: async () => {
-              const error = await shell.openPath(log.directory);
-              if (error) throw Error(error);
-            },
-            sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+      request.kind === 'settings'
+        ? new SettingsPageSession(request, {
+            editor: settingsEditing,
+            host: snapshot,
             changed,
-          }),
+            auxiliary: settingsPageAuxiliary,
+            actions: settingsPageActions,
+            release: releaseSettingsView,
+            resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
+          })
+        : request.kind === 'home'
+          ? new HomePageSession(request, {
+              applets: allApplets,
+              commands: uiCommands,
+              pins: () => settings.value.pinnedCommands,
+              appletOrder: () => settingsEditing.draft.appletOrder,
+              dark: () => nativeTheme.shouldUseDarkColors,
+              execution: homeExecution,
+              navigate: executeCommand,
+              openApplet: (id) => navigation.navigate('extensions', undefined, id),
+            })
+          : new LogPageSession(request, {
+              entries: () => log.entries,
+              sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+              dark: () => nativeTheme.shouldUseDarkColors,
+              openDirectory: async () => {
+                const error = await shell.openPath(log.directory);
+                if (error) throw Error(error);
+              },
+              sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+              changed,
+            }),
     execute: executeShellCommand,
     settings: (id) => appletInputSettings(settings.value, id),
     shortcut: async (key) => {

@@ -14,6 +14,7 @@ export default defineConfig({
         overlay: path.resolve('shells/default/overlay.html'),
         logs: path.resolve('shells/default/logs.html'),
         home: path.resolve('shells/default/home.html'),
+        settings: path.resolve('shells/default/settings.html'),
       },
     },
   },

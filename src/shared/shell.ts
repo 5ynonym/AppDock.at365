@@ -1,7 +1,8 @@
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Only these regions are mounted today. Additional page regions need their own public contract. */
-export type ShellRegion = 'ribbon' | 'overlay.command-palette' | 'page.logs' | 'page.home';
+export type ShellRegion =
+  'ribbon' | 'overlay.command-palette' | 'page.logs' | 'page.home' | 'page.settings';
 export function shellView(
   shell: { ui?: string; views?: Record<string, string> } | undefined,
   region: ShellRegion,

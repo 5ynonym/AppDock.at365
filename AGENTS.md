@@ -6,7 +6,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 
 - 現行仕様は現在のコードと[開発ガイド](DEVELOPMENT.md)から参照する機能別文書を正本とする。導入版ごとの説明を現行文書へ積み重ねない。実測・未確認事項・成果物のhashはVERIFICATIONへ記録し、過去の成功を現在の動作確認とみなさない。
 - 利用者向けREADME、開発手順、検証記録の分担は[文書方針](docs/documentation.md)に従う。共通仕様を各Appletへ複製せず、変更時は参照先・関連する型・試験を整合させる。
-- 未実装の設定拡張は[設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md)に分離する。基盤整理→Shell移行と部分JSON→Appletインデックス・検索の順とし、実装済みと扱わない。
+- 設定基盤と段階的な拡張は[設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md)に分離する。基盤整理→Shell移行と部分JSON→Appletインデックス・検索の順とし、実装状態は設計書とVERIFICATIONで区別する。
 
 ## 実装と配布
 
@@ -33,8 +33,8 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。複数の同時Shell/Windowは未実装。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
-- 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いuseSettingsEditorで共有する。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
-- 現在のApplet設定入口は詳細タブ。設定ページにも入口を追加する変更は上記の未実装設計に従い、同じ本文と編集状態を共用する。
+- 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いmainのSettingsEditingSessionで共有し、useSettingsEditorは本体用アダプターとする。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
+- 現在のApplet設定入口は詳細タブ。設定ページにも入口を追加する変更は上記の設計に従い、同じ本文と編集状態を共用する。
 - 更新・通常再起動は--restore-viewと画面選択を復元し、終了中のselected(null)でホームへ上書きしない。Appletの復元はstartupReadyと対象runningを待つ。
 
 ## 共通APIと設定保存

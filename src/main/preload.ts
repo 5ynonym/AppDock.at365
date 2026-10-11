@@ -1,6 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  settingsEditing: () => ipcRenderer.invoke('dock:settingsEditing'),
+  flushSettings: () => ipcRenderer.invoke('dock:flushSettings'),
+  onSettingsSidebarWidth: (callback) => {
+    const listener = (_: Electron.IpcRendererEvent, width: number) => callback(width);
+    ipcRenderer.on('dock:settingsSidebarWidth', listener);
+    return () => ipcRenderer.removeListener('dock:settingsSidebarWidth', listener);
+  },
+  editSettings: (request) => ipcRenderer.invoke('dock:editSettings', request),
+  onSettingsEditingChanged: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('dock:settingsEditingChanged', handler);
+    return () => ipcRenderer.removeListener('dock:settingsEditingChanged', handler);
+  },
   onHomeCommandResult: (callback) => {
     const handler = (
       _: Electron.IpcRendererEvent,

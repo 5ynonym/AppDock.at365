@@ -1,12 +1,11 @@
+import { configureSettingsControls } from '../shared/settings-ui/api';
 import { ShellPageSlot } from './ShellPageSlot';
-import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { Icon, type IconName } from './Icon';
-import { Toggle } from './Toggle';
+import { Toggle } from '../shared/settings-ui/Toggle';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createPortal } from 'react-dom';
 import type {
   DockApi,
   HostSnapshot,
@@ -18,26 +17,18 @@ import type {
 import './style.css';
 import { hostCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { appletManagementCommands } from '../shared/applet-management';
-import { ShortcutsEditor } from './ShortcutsEditor';
-import { GesturesEditor } from './GesturesEditor';
-import { TraySettings } from './TraySettings';
-import { ProfileEditor } from './ProfileEditor';
 import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { AppletIndex } from './AppletIndex';
 import { orderApplets } from '../shared/applet-order';
 import { SettingsToolbar, SettingsMessages } from './SettingsActions';
 import { SettingsNotice } from './SettingsNotice';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
-import { VersionCheck } from './VersionCheck';
+import { VersionCheck } from '../shared/settings-ui/VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
-import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 import { defaultShellId } from '../shared/shell';
-import { RibbonSettings } from './RibbonSettings';
-import { WebAppletSettings } from './WebAppletSettings';
-import { WebAccountSettings } from './WebAccountSettings';
-import { CodexSettings } from './CodexSettings';
+import { WebAppletSettings } from '../shared/settings-ui/WebAppletSettings';
 declare global {
   interface Window {
     dock: DockApi;
@@ -79,7 +70,7 @@ function StateBadge({ extension }: { extension: ExtensionSnapshot }) {
 }
 function App() {
   const appletSidebar = useAppletSidebar();
-  const [settingsSidebarHost, setSettingsSidebarHost] = useState<HTMLDivElement | null>(null);
+  useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
   const [page, setLocalPage] = useRestartView<Page>(
     'page',
@@ -89,7 +80,6 @@ function App() {
       /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
   );
   const setPage = (next: Page) => {
-    setLocalPage(next);
     void window.dock.navigate(next).catch((e) => setError(String(e)));
   };
   const ribbonSlot = useRef<HTMLDivElement>(null);
@@ -176,6 +166,38 @@ function App() {
   );
   const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
   const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
+  const settingsViewRestored = useRef(false);
+  useEffect(() => {
+    if (!snapshot?.startupReady || !editor.sessionId) return;
+    const key = 'appdock.restart-view.category';
+    if (!settingsViewRestored.current) {
+      settingsViewRestored.current = true;
+      if (new URLSearchParams(location.search).get('restoreView') === '1') {
+        try {
+          const saved: unknown = JSON.parse(localStorage.getItem(key) ?? 'null');
+          if (typeof saved === 'string' && saved.length < 200 && saved !== editor.pageId) {
+            editor.selectPage(saved);
+            return;
+          }
+        } catch {}
+      }
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(editor.pageId));
+    } catch {}
+  }, [snapshot?.startupReady, editor.sessionId, editor.pageId]);
+  useEffect(() => {
+    if (profileRequest) editor.selectPage('profile');
+  }, [profileRequest]);
+  useEffect(() => {
+    if (updatesRequest) editor.selectPage('about');
+  }, [updatesRequest]);
+  useEffect(() => {
+    if (ribbonRequest) editor.selectPage('ribbon');
+  }, [ribbonRequest]);
+  useEffect(() => {
+    if (webAccountsRequest) editor.selectPage('web-accounts');
+  }, [webAccountsRequest]);
   const noticeError = editor.parseError || editor.saveError;
   const lastEditorPage = useRef<Page>('settings');
   if (page === 'settings' || page === 'extensions') lastEditorPage.current = page;
@@ -202,15 +224,6 @@ function App() {
     }
   };
   useEffect(() => window.dock.onSettingsNoticeAction((kind) => noticeAction.current(kind)), []);
-  useLayoutEffect(() => {
-    // The retained detail view may be revisited after editing the shared JSON draft.
-    if (page === 'extensions' && detailSettings && editor.mode === 'json') {
-      if (!editor.switchToForm()) {
-        setDetailView('description');
-        setError('設定ページのJSONの内容を修正してから、Appletの設定を開いてください。');
-      }
-    }
-  }, [page, detailSettings, editor.mode]);
   const orderedApplets = orderApplets(
     snapshot?.extensions.filter((e) => e.sourceKind !== 'builtin') ?? [],
     editor.draft.appletOrder,
@@ -376,7 +389,17 @@ function App() {
       setBusy(false);
     }
   }
-  const goExtension = (id: string) => {
+  const goExtension = async (id: string) => {
+    if (editor.mode === 'json' && editor.parseError && editor.pageId !== 'applet:' + id) {
+      setError('JSONの内容を修正してからAppletを切り替えてください。');
+      return;
+    }
+    try {
+      await window.dock.flushSettings();
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
     setSelected(id);
     setPage('extensions');
   };
@@ -463,7 +486,7 @@ function App() {
   const active = orderedApplets.filter((e) => e.state === 'running').length;
   return (
     <div
-      className={`shell ${page === 'extensions' || page === 'settings' ? 'with-sidebar' : ''}`}
+      className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}
       data-route={page}
       style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
     >
@@ -524,11 +547,6 @@ function App() {
           <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
         </aside>
       )}
-      <div
-        className="settings-sidebar-slot"
-        ref={setSettingsSidebarHost}
-        hidden={page !== 'settings'}
-      />
       <main
         className={
           page === 'settings'
@@ -673,13 +691,21 @@ function App() {
                     extension={selectedApplet}
                     view={detailView}
                     onView={(view) => {
-                      if ((view === 'settings' || view === 'shortcuts') && !editor.switchToForm()) {
+                      if (
+                        (view === 'shortcuts' && !editor.switchToForm()) ||
+                        (view === 'settings' &&
+                          editor.parseError &&
+                          editor.pageId !== 'applet:' + selectedApplet?.id)
+                      ) {
                         setError(
                           '設定ページのJSONの内容を修正してから、Appletの設定を開いてください。',
                         );
                         return false;
                       }
-                      setDetailView(view);
+                      void window.dock
+                        .flushSettings()
+                        .then(() => setDetailView(view))
+                        .catch((e) => setError(String(e)));
                       return true;
                     }}
                     settingsPanel={
@@ -746,28 +772,13 @@ function App() {
               </>
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
-              <SettingsPage
-                appletApi={snapshot.appletApi}
-                snapshot={snapshot.settings}
-                launch={snapshot.launch}
-                version={snapshot.version}
-                runtime={snapshot.runtime}
-                extensions={orderedApplets}
-                run={action}
-                busy={busy}
-                commands={shortcutCommands}
-                avatarUrl={snapshot.avatarUrl}
-                profileRequest={profileRequest}
-                updatesRequest={updatesRequest}
-                ribbonRequest={ribbonRequest}
-                webAccountsRequest={webAccountsRequest}
-                webAccounts={snapshot.webAccounts}
-                editor={editor}
-                globalHotKeys={snapshot.globalHotKeys}
-                sidebarHost={settingsSidebarHost}
-                sidebar={appletSidebar}
-                active={page === 'settings'}
-              />
+              {page === 'settings' && (
+                <ShellPageSlot
+                  kind="settings"
+                  sidebarWidth={appletSidebar.width}
+                  navigationRequest={snapshot.navigation.request}
+                />
+              )}
             </div>
             {page === 'logs' && (
               <ShellPageSlot
@@ -1106,583 +1117,7 @@ function ExtensionDetail({
     </section>
   );
 }
-function SettingsPage({
-  appletApi,
-  snapshot,
-  launch,
-  version,
-  runtime,
-  extensions,
-  run,
-  busy,
-  commands,
-  avatarUrl,
-  profileRequest,
-  updatesRequest,
-  ribbonRequest,
-  webAccountsRequest,
-  webAccounts,
-  globalHotKeys,
-  editor,
-  sidebarHost,
-  sidebar,
-  active,
-}: {
-  appletApi?: HostSnapshot['appletApi'];
-  snapshot: SettingsSnapshot;
-  launch: HostSnapshot['launch'];
-  version: string;
-  runtime: HostSnapshot['runtime'];
-  extensions: ExtensionSnapshot[];
-  run: Run;
-  busy: boolean;
-  commands: UiCommand[];
-  avatarUrl: string | null;
-  profileRequest: number;
-  updatesRequest: number;
-  ribbonRequest: number;
-  webAccountsRequest: number;
-  webAccounts: HostSnapshot['webAccounts'];
-  editor: SettingsEditor;
-  globalHotKeys: GlobalHotKeyStatus[];
-  sidebarHost: HTMLDivElement | null;
-  sidebar: ReturnType<typeof useAppletSidebar>;
-  active: boolean;
-}) {
-  const {
-    draft,
-    text,
-    setText,
-    dirty,
-    setDirty,
-    mode,
-    setMode,
-    setParseError,
-    avatarDraft,
-    avatarPreview,
-    setAvatarDraft,
-    setAvatarName,
-    setAvatarPreview,
-    setAvatarLoading,
-    edit,
-    switchToForm,
-  } = editor;
-  const [category, setCategory] = useRestartView<
-    | 'appearance'
-    | 'tray'
-    | 'general'
-    | 'shortcuts'
-    | 'gestures'
-    | 'profile'
-    | 'about'
-    | 'ribbon'
-    | 'web-accounts'
-    | 'codex'
-    | 'permissions'
-  >('category', 'appearance', [
-    'appearance',
-    'tray',
-    'general',
-    'shortcuts',
-    'gestures',
-    'profile',
-    'about',
-    'ribbon',
-    'web-accounts',
-    'codex',
-    'permissions',
-  ]);
-  const settingsBody = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    // Reset before paint so the next category never appears at the previous offset.
-    if (settingsBody.current) settingsBody.current.scrollTop = 0;
-  }, [category, mode]);
-  const changed = (part: unknown, original: unknown) =>
-    JSON.stringify(part) !== JSON.stringify(original);
-  const categoryChanged = (id: string) =>
-    id === 'tray'
-      ? changed(draft.trayMenu, snapshot.value.trayMenu) ||
-        draft.host.trayClickCommand !== snapshot.value.host.trayClickCommand ||
-        draft.host.trayDoubleClickCommand !== snapshot.value.host.trayDoubleClickCommand
-      : id === 'gestures'
-        ? changed(draft.gestures, snapshot.value.gestures)
-        : id === 'web-accounts'
-          ? false
-          : id === 'ribbon'
-            ? changed(draft.ribbon, snapshot.value.ribbon)
-            : id === 'about'
-              ? changed(draft.updates, snapshot.value.updates) ||
-                extensions.some(
-                  (e) =>
-                    draft.extensions[e.id]?.updateSource !==
-                    snapshot.value.extensions[e.id]?.updateSource,
-                )
-              : id === 'appearance'
-                ? draft.host.theme !== snapshot.value.host.theme ||
-                  draft.host.shellProvider !== snapshot.value.host.shellProvider
-                : id === 'general'
-                  ? changed(
-                      {
-                        ...draft.host,
-                        theme: '',
-                        trayClickCommand: '',
-                        trayDoubleClickCommand: null,
-                      },
-                      {
-                        ...snapshot.value.host,
-                        theme: '',
-                        trayClickCommand: '',
-                        trayDoubleClickCommand: null,
-                      },
-                    )
-                  : id === 'profile'
-                    ? changed(draft.profile, snapshot.value.profile) || avatarDraft !== undefined
-                    : id === 'shortcuts'
-                      ? changed(getKeybindings(draft), getKeybindings(snapshot.value)) ||
-                        changed(draft.globalShortcutCommands, snapshot.value.globalShortcutCommands)
-                      : false;
-  useEffect(() => {
-    if (profileRequest) {
-      setCategory('profile');
-      switchToForm();
-    }
-  }, [profileRequest]);
-  useEffect(() => {
-    if (updatesRequest && switchToForm()) setCategory('about');
-  }, [updatesRequest]);
-  useEffect(() => {
-    if (ribbonRequest) {
-      setCategory('ribbon');
-      switchToForm();
-    }
-  }, [ribbonRequest]);
-  useEffect(() => {
-    if (webAccountsRequest) setCategory('web-accounts');
-  }, [webAccountsRequest]);
-  const navigateSettings = () =>
-    (['web-accounts', 'codex', 'permissions'].includes(category) && mode === 'json') ||
-    switchToForm();
-  if (!active) return null;
-  return (
-    <>
-      {active &&
-        sidebarHost &&
-        createPortal(
-          <aside className="sidebar settings-categories" aria-label="設定一覧">
-            <h2>設定</h2>
-            <div className="sidebar-extensions">
-              {(
-                [
-                  ['appearance', '表示'],
-                  ['general', '一般'],
-                  ['ribbon', 'リボン'],
-                  ['tray', 'タスクトレイ'],
-                  ['shortcuts', 'ショートカット'],
-                  ['gestures', 'マウスジェスチャー'],
-                  ['web-accounts', 'Webアカウント'],
-                  ['permissions', '操作の許可'],
-                  ['codex', 'Codex連携'],
-                  ['profile', 'プロフィール'],
-                  ['about', 'バージョン情報・更新'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  aria-current={category === id ? 'true' : undefined}
-                  className={category === id ? 'selected' : ''}
-                  key={id}
-                  onClick={() => {
-                    if (
-                      id === 'web-accounts' ||
-                      id === 'codex' ||
-                      id === 'permissions' ||
-                      navigateSettings()
-                    )
-                      setCategory(id);
-                  }}
-                >
-                  <span title={label}>{label}</span>
-                  {categoryChanged(id) && (
-                    <small className="unsaved-mark" aria-label="未保存">
-                      ●
-                    </small>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div
-              className="sidebar-resizer"
-              {...sidebar.separatorProps}
-              aria-label="設定一覧の幅を変更"
-            />
-          </aside>,
-          sidebarHost,
-        )}
-      <PageHeading
-        title="設定"
-        action={
-          ['web-accounts', 'codex', 'permissions'].includes(category) ? undefined : (
-            <button
-              className="secondary"
-              onClick={() => void run(() => window.dock.openPath('settings'))}
-            >
-              <Icon name="folder" size={16} />
-              ファイルを開く
-            </button>
-          )
-        }
-      />
-      {(category !== 'permissions' || dirty) && (
-        <SettingsToolbar editor={editor} busy={busy}>
-          {!['web-accounts', 'codex', 'permissions'].includes(category) && (
-            <div className="tabs">
-              <button
-                className={mode === 'form' ? 'selected' : ''}
-                onClick={() => {
-                  if (mode === 'json') switchToForm();
-                }}
-              >
-                フォーム
-              </button>
-              <button
-                className={mode === 'json' ? 'selected' : ''}
-                onClick={() => {
-                  if (mode !== 'json') {
-                    setText(JSON.stringify(draft, null, 2));
-                    setMode('json');
-                  }
-                }}
-              >
-                JSON
-              </button>
-            </div>
-          )}
-        </SettingsToolbar>
-      )}
-      <div className="settings-body" ref={settingsBody}>
-        <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
-        {category === 'codex' ? (
-          <div className="settings-layout">
-            <div className="settings-form">
-              <CodexSettings onOpenPermissions={() => setCategory('permissions')} />
-            </div>
-          </div>
-        ) : category === 'permissions' ? (
-          <div className="settings-layout">
-            <div className="settings-form">
-              <ApiPermissionsSettings
-                grants={appletApi?.permissions ?? {}}
-                error={appletApi?.error}
-                busy={busy}
-                onOpenCodex={() => setCategory('codex')}
-              />
-            </div>
-          </div>
-        ) : category === 'web-accounts' ? (
-          <div className="settings-layout">
-            <div className="settings-form">
-              <WebAccountSettings
-                accounts={webAccounts}
-                savedItems={snapshot.value.webApplets.items}
-                draftItems={draft.webApplets.items}
-              />
-            </div>
-          </div>
-        ) : mode === 'json' ? (
-          <div className="json-editor">
-            <div>
-              <span>settings.json</span>
-              <span>JSON · UTF-8</span>
-            </div>
-            <textarea
-              spellCheck={false}
-              aria-label="設定JSON"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setDirty(true);
-              }}
-            />
-          </div>
-        ) : (
-          <div className="settings-layout">
-            <div className="settings-form">
-              {category === 'gestures' && (
-                <GesturesEditor
-                  settings={draft}
-                  onChange={edit}
-                  commands={commands}
-                  applets={extensions}
-                />
-              )}
-              {category === 'ribbon' && (
-                <RibbonSettings draft={draft} extensions={extensions} onChange={edit} />
-              )}
-              {category === 'about' && (
-                <section className="about-page" aria-label="バージョン情報・更新">
-                  <div className="about-host">
-                    <span className="section-label">APPDOCK</span>
-                    <h2>
-                      AppDock.at365 <span>v{version}</span>
-                    </h2>
-                    <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
-                    <VersionCheck details disabled={dirty} />
-                    <UpdateSettings
-                      draft={draft}
-                      edit={edit}
-                      appletCount={extensions.length}
-                      dirty={dirty}
-                    />
-                    <details className="update-disclosure">
-                      <summary>実行環境の詳細</summary>
-                      <dl className="runtime-versions">
-                        <div>
-                          <dt>Electron</dt>
-                          <dd>{runtime.electron}</dd>
-                        </div>
-                        <div>
-                          <dt>Chromium</dt>
-                          <dd>{runtime.chrome}</dd>
-                        </div>
-                        <div>
-                          <dt>Node.js</dt>
-                          <dd>{runtime.node}</dd>
-                        </div>
-                        <div>
-                          <dt>実行環境</dt>
-                          <dd>
-                            {runtime.platform} / {runtime.arch}
-                          </dd>
-                        </div>
-                      </dl>
-                    </details>
-                  </div>
-                  <h3>インストール済みのApplet</h3>
-                  <p className="muted">
-                    Appletごとに更新できます。更新元を変えるときは各欄の設定を開いてください。
-                  </p>
-                  {extensions.length === 0 && <p>Appletはインストールされていません。</p>}
-                  <div className="about-applets">
-                    {extensions
-                      .filter((e) => e.runtime !== 'web')
-                      .map((e) => (
-                        <article key={e.id}>
-                          <div>
-                            <strong>{e.displayName}</strong>
-                            <span className="muted">v{e.version}</span>
-                          </div>
-                          <VersionCheck id={e.id} details disabled={dirty} />
-                          <AppletUpdateSource extension={e} draft={draft} edit={edit} />
-                        </article>
-                      ))}
-                  </div>
-                </section>
-              )}
-              {category === 'shortcuts' && (
-                <ShortcutsEditor
-                  key={category}
-                  commands={commands}
-                  settings={draft}
-                  onChange={edit}
-                  applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
-                  statuses={globalHotKeys}
-                />
-              )}
-              {category === 'profile' && (
-                <ProfileEditor
-                  name={draft.profile.name}
-                  avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
-                  busy={busy}
-                  onLoading={setAvatarLoading}
-                  onName={(name) => edit({ ...draft, profile: { ...draft.profile, name } })}
-                  onAvatar={(bytes, preview, name) => {
-                    setAvatarDraft(bytes);
-                    setAvatarName(name);
-                    setAvatarPreview(preview);
-                    edit({
-                      ...draft,
-                      profile: { ...draft.profile, avatar: bytes ? 'avatar.png' : null },
-                    });
-                  }}
-                />
-              )}
-              {category === 'appearance' && (
-                <>
-                  <h3>表示</h3>
-                  <SettingRow
-                    title="Shell"
-                    description="Shell Appletが担当する領域だけを差し替え、ほかの領域はDefault Shellを使います。有効にしてから選択してください。"
-                  >
-                    <select
-                      aria-label="Shell"
-                      value={draft.host.shellProvider || defaultShellId}
-                      onChange={(e) =>
-                        edit({ ...draft, host: { ...draft.host, shellProvider: e.target.value } })
-                      }
-                    >
-                      <option value={defaultShellId}>Default Shell</option>
-                      {draft.host.shellProvider &&
-                        draft.host.shellProvider !== defaultShellId &&
-                        !extensions.some((e) => e.shell && e.id === draft.host.shellProvider) && (
-                          <option value={draft.host.shellProvider} disabled>
-                            未導入のShell ({draft.host.shellProvider})
-                          </option>
-                        )}
-                      {extensions
-                        .filter((e) => e.shell && e.id !== defaultShellId)
-                        .map((e) => (
-                          <option key={e.id} value={e.id} disabled={!e.enabled}>
-                            {e.displayName}
-                          </option>
-                        ))}
-                    </select>
-                  </SettingRow>
-                  <SettingRow title="テーマ" description="ワークスペースの配色を選びます。">
-                    <select
-                      aria-label="テーマ"
-                      value={draft.host.theme}
-                      onChange={(e) =>
-                        edit({
-                          ...draft,
-                          host: {
-                            ...draft.host,
-                            theme: e.target.value as Settings['host']['theme'],
-                          },
-                        })
-                      }
-                    >
-                      <option value="dark">Dark</option>
-                      <option value="light">Light</option>
-                      <option value="system">System</option>
-                    </select>
-                  </SettingRow>
-                </>
-              )}
-              {category === 'tray' && (
-                <TraySettings
-                  draft={draft}
-                  extensions={extensions}
-                  commands={commands}
-                  onChange={edit}
-                />
-              )}
-              {category === 'general' && (
-                <>
-                  <h3>一般</h3>
-                  <SettingRow
-                    title="Applet・MCPからの操作"
-                    description="操作ごとの許可は、専用の画面でまとめて設定できます。"
-                  >
-                    <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
-                  </SettingRow>
-                  <SettingRow
-                    title="スタートアップに登録"
-                    description="Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。"
-                  >
-                    <Toggle
-                      label="スタートアップに登録"
-                      checked={draft.host.startAtLogon}
-                      disabled={!launch.supported}
-                      onChange={(v) => edit({ ...draft, host: { ...draft.host, startAtLogon: v } })}
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    title="常に管理者として起動"
-                    description="次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。"
-                  >
-                    <Toggle
-                      label="常に管理者として起動"
-                      checked={draft.host.runAsAdministrator}
-                      disabled={!launch.supported}
-                      onChange={(v) =>
-                        edit({ ...draft, host: { ...draft.host, runAsAdministrator: v } })
-                      }
-                    />
-                  </SettingRow>
-                  <SettingRow
-                    title="現在の起動状態"
-                    description={
-                      launch.supported
-                        ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
-                        : '起動設定はWindowsの発行版AppDockで使用できます。'
-                    }
-                  >
-                    <div className="button-row">
-                      <button
-                        disabled={!launch.supported || busy}
-                        onClick={() => void run(() => window.dock.refreshLaunchState())}
-                      >
-                        状態を確認
-                      </button>
-                      <button
-                        disabled={!launch.supported || launch.elevated || dirty || busy}
-                        onClick={() => void run(() => window.dock.restartAsAdministrator())}
-                      >
-                        管理者として再起動
-                      </button>
-                    </div>
-                  </SettingRow>
-                  {launch.error && <p role="alert">{launch.error}</p>}
-                  {launch.supported && (
-                    <p className="muted">
-                      起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。再起動する前に、編集中の設定を保存してください。
-                    </p>
-                  )}
-                  {(
-                    [
-                      [
-                        'closeToTray',
-                        '閉じるとトレイに常駐',
-                        'ウィンドウを閉じた後もAppletを動かします。',
-                      ],
-                      ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
-                      [
-                        'hardwareAcceleration',
-                        'ハードウェアアクセラレーション',
-                        'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
-                      ],
-                      [
-                        'startMinimized',
-                        'トレイから起動',
-                        '次の起動時はウィンドウを表示せず、トレイに常駐します。',
-                      ],
-                    ] as const
-                  ).map(([key, title, description]) => (
-                    <SettingRow key={key} title={title} description={description}>
-                      <Toggle
-                        label={title}
-                        checked={draft.host[key]}
-                        onChange={(v) => edit({ ...draft, host: { ...draft.host, [key]: v } })}
-                      />
-                    </SettingRow>
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-function SettingRow({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="setting-row">
-      <div>
-        <strong>{title}</strong>
-        <p>{description}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
+configureSettingsControls(window.dock);
 createRoot(document.getElementById('root')!).render(
   new URLSearchParams(location.search).has('settingsNotice') ? <SettingsNotice /> : <App />,
 );

@@ -65,7 +65,7 @@ window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
-Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイルを使います。幅はAppで一度だけ呼ぶ`useAppletSidebar`の状態と既存の`appdock.applet-sidebar-width`で共有し、各画面で独立した幅を持たせません。設定一覧はportalでshellの左パネルへ表示しますが、SettingsPage自体は画面移動時も保持して未保存のdraftを失わないようにします。ショートカットの検索と状態フィルターは`.shortcut-filters`で一行にそろえ、表示領域不足時のみ折り返します。状態フィルターは「すべて／登録エラー」の排他的な2つのボタンで、選択状態を`aria-pressed`へ反映します。`scripts/applet-sidebar-ui-test.cjs`と`scripts/navigation-ui-test.cjs`で共通幅・再起動・編集保持・絞り込みとキーボード操作・両テーマと狭い画面の配置を確認できます。
+Applet一覧は本体renderer、設定カテゴリはDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsEditingSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
 
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
@@ -169,7 +169,7 @@ portableランチャーは更新間で実行パスを固定し、tray-identity.t
 
 ## Appletページとリボン
 
-契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、renderer/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
+契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、shells/default/settings/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
 リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
@@ -180,13 +180,13 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 - ページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/操作の許可/Codex連携/プロフィール/バージョン情報・更新です。
 - 他ページで未保存の場合、`core/settings-notice.ts`が小さな透明背景のWebContentsViewを本体Window上部へ重ねます。Viewの追加後とリサイズ時に通知を最前面へ戻し、背景Webの領域/入力/寿命は変えません。通知は時間で消えず、設定/Appletへ戻る・保存成功・破棄確定で非表示になります。表示でfocusしません。通知と専用preloadは通知状態/操作/高さだけを公開し、IPCはそのViewのmainFrameとURLを照合します。通常host IPCを通知やリモートページへ許可しません。
-- draft/JSON/画像/revisionはhost rendererの`useSettingsEditor`だけが所有します。通知の保存/破棄はhostへ戻し、pendingとrefで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
+- draft/JSON/画像/revisionはmainの`SettingsEditingSession`が所有し、host rendererの`useSettingsEditor`は購読と直列入力のアダプターです。通知の保存/破棄はhostへ戻し、pendingとrefで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
 - `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
 
-- `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
-- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて`AppletSettings`/`AppletShortcutOverview`（専用のAppletShortcutDialogで追加・編集）を描画します。設定ページはShortcutsEditorで全コマンドを平坦に表示します。両方がShortcutCommandListとAppletShortcutDialogを共用します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
+- `useSettingsEditor.ts`は`App`で一度だけ生成する編集アダプターです。受理済み編集はmainに保持し、画面の寿命と分離します。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
+- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じてShellPageSlot（page.settings）/`AppletShortcutOverview`（専用のAppletShortcutDialogで追加・編集）を描画します。設定ページはShortcutsEditorで全コマンドを平坦に表示します。両方がShortcutCommandListとAppletShortcutDialogを共用します。全体ページと詳細の保存操作は同じSettingsEditingSessionへ戻し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
 - `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログはShellの`page.logs`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
-- JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
+- 詳細タブと全体設定は同じ部分JSONを表示します。不正なJSONがある場合は別範囲への設定内移動を拒否し、同じページで修正できます。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
 - 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
 
 ## Appletの表示順

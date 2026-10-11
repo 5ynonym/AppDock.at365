@@ -1,0 +1,81 @@
+import type { ExtensionSnapshot, GlobalHotKeyStatus, HostSnapshot, Settings } from './contracts';
+import type { UiCommand } from './commands';
+import type { SettingsPageDefinition, SettingsItem } from './settings-catalog';
+import type { SettingsEdit } from './settings-editing';
+export interface SettingsPageRequest {
+  id: string;
+  route: 'settings' | 'extensions';
+  kind: 'settings';
+  context: 'full' | 'applet';
+  pageId?: string;
+  sidebarWidth?: number;
+  hostWidth?: number;
+}
+/** Page values are an allowlisted projection, never Settings or HostSnapshot. */
+export interface SettingsPageModel {
+  schemaVersion: 1;
+  id: string;
+  contextId: 'primary';
+  kind: 'settings';
+  revision: number;
+  dark: boolean;
+  content: {
+    context: SettingsPageRequest['context'];
+    sidebarWidth: number;
+    hostWidth: number;
+    page: SettingsPageDefinition;
+    values: Record<string, unknown>;
+    navigation: { id: string; title: string; dirty: boolean; owner?: string }[];
+    query: string;
+    results: SettingsItem[];
+    move?: { id: string; itemId: string };
+    editing: {
+      sessionId: string;
+      editRevision: number;
+      dirty: boolean;
+      pending: boolean;
+      conflict: boolean;
+      error: string;
+      mode: 'form' | 'json';
+      text: string;
+      avatarChanged: boolean;
+      avatarLoading: boolean;
+    };
+    actions: Record<string, string>;
+    auxiliary: SettingsPageAuxiliary;
+  };
+}
+export interface SettingsPageAuxiliary {
+  applets?: ExtensionSnapshot[];
+  commands?: UiCommand[];
+  statuses?: GlobalHotKeyStatus[];
+  launch?: HostSnapshot['launch'];
+  runtime?: HostSnapshot['runtime'];
+  version?: string;
+  updates?: HostSnapshot['updates'];
+  accounts?: HostSnapshot['webAccounts'];
+  accountReferences?: {
+    saved: Pick<Settings['webApplets']['items'][number], 'id' | 'name' | 'accountId'>[];
+    draft: Pick<Settings['webApplets']['items'][number], 'id' | 'name' | 'accountId'>[];
+  };
+  permissions?: HostSnapshot['appletApi'];
+  avatarUrl?: string | null;
+}
+export type SettingsPageOperation =
+  | {
+      kind: 'edit';
+      action: Exclude<SettingsEdit, { type: 'draft' | 'text' | 'buffer' | 'select-page' }>;
+    }
+  | { kind: 'invoke'; actionId: string; args?: unknown[] }
+  | { kind: 'select'; pageId: string }
+  | { kind: 'sidebar-width'; width: number }
+  | { kind: 'search'; text: string }
+  | { kind: 'move'; itemId: string };
+export interface SettingsPageAction {
+  id: string;
+  type: 'settings';
+  sessionId: string;
+  editRevision: number;
+  operationId: string;
+  operation: SettingsPageOperation;
+}

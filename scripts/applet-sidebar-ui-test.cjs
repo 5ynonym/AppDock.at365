@@ -7,6 +7,7 @@ async function clickRibbon(page, name) {
   const rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
   await rail.getByRole('button', { name, exact: true }).click();
   if (name === 'ホーム') await require('./shell-overlay-helper.cjs').homePage(page);
+  else if (name === '設定') await require('./settings-shell-helper.cjs').settingsPage(page);
   else if (name === 'ログ') await require('./shell-overlay-helper.cjs').logsPage(page);
   else await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
 }
@@ -53,7 +54,16 @@ async function launch() {
 }
 (async () => {
   let { app, page } = await launch();
-  const width = () => page.locator('.sidebar').evaluate((el) => el.getBoundingClientRect().width);
+  const body = require('./settings-shell-helper.cjs').deferred(() =>
+    require('./settings-shell-helper.cjs').settingsPage(page),
+  );
+  const width = async () =>
+    ((await page.evaluate(() => window.dock.snapshot())).navigation.route === 'settings'
+      ? body
+      : page
+    )
+      .locator('.sidebar')
+      .evaluate((el) => el.getBoundingClientRect().width);
   try {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -122,7 +132,7 @@ async function launch() {
     });
     await clickRibbon(page, '設定');
     assert.equal(await width(), 350, 'settings uses the Applet width');
-    const settingsStyle = await page
+    const settingsStyle = await body
       .locator('.settings-categories button.selected')
       .evaluate((el) => {
         const style = getComputedStyle(el);
@@ -139,22 +149,26 @@ async function launch() {
         ];
       });
     assert.deepEqual(settingsStyle, appletStyle, 'both selectors share their appearance');
-    const settingsSeparator = page.getByRole('separator', { name: '設定一覧の幅を変更' });
+    const settingsSeparator = body.getByRole('separator', { name: '設定一覧の幅を変更' });
     const settingsBounds = await settingsSeparator.boundingBox();
-    await page.mouse.move(settingsBounds.x + settingsBounds.width / 2, settingsBounds.y + 60);
-    await page.mouse.down();
-    await page.mouse.move(settingsBounds.x + settingsBounds.width / 2 - 40, settingsBounds.y + 60, {
+    await (
+      await require('./settings-shell-helper.cjs').settingsPage(page)
+    ).mouse.move(settingsBounds.x + settingsBounds.width / 2, settingsBounds.y + 60);
+    await (await require('./settings-shell-helper.cjs').settingsPage(page)).mouse.down();
+    await (
+      await require('./settings-shell-helper.cjs').settingsPage(page)
+    ).mouse.move(settingsBounds.x + settingsBounds.width / 2 - 40, settingsBounds.y + 60, {
       steps: 8,
     });
-    await page.mouse.up();
+    await (await require('./settings-shell-helper.cjs').settingsPage(page)).mouse.up();
     assert.equal(await width(), 310, 'settings can resize the shared sidebar');
     await settingsSeparator.focus();
     await settingsSeparator.press('ArrowRight');
     assert.equal(await width(), 320);
-    await page.getByRole('button', { name: '一般', exact: true }).click();
-    await page.getByRole('switch', { name: 'デスクトップ通知', exact: true }).click();
-    assert.equal(await page.getByText('未保存の変更があります', { exact: true }).count(), 1);
-    assert.equal(await page.locator('.settings-categories .unsaved-mark').count(), 1);
+    await body.getByRole('button', { name: '一般', exact: true }).click();
+    await body.getByRole('switch', { name: 'デスクトップ通知', exact: true }).click();
+    assert.equal(await body.getByText('未保存の変更があります', { exact: true }).count(), 1);
+    assert.equal(await body.locator('.settings-categories .unsaved-mark').count(), 1);
     for (const size of [
       { width: 1280, height: 840 },
       { width: 900, height: 620 },
@@ -171,7 +185,7 @@ async function launch() {
     assert.equal(await page.locator('.page-heading p').count(), 0);
     await clickRibbon(page, '設定');
     assert.equal(
-      await page
+      await body
         .getByRole('switch', { name: 'デスクトップ通知', exact: true })
         .getAttribute('aria-checked'),
       'true',

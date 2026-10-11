@@ -103,3 +103,28 @@ test('navigation changes never execute a page command and repeated focus section
   assert.deepEqual(f.executions, []);
   assert.throws(() => f.nav.navigate('private:route'));
 });
+
+test('navigation waits for pending input and only applies the latest request', async () => {
+  const releases = [],
+    errors = [];
+  let changes = 0;
+  const nav = new NavigationCoordinator(
+    () => changes++,
+    () => new Promise((resolve, reject) => releases.push({ resolve, reject })),
+    (e) => errors.push(e),
+  );
+  const first = nav.navigate('settings'),
+    second = nav.navigate('logs');
+  assert.equal(nav.state.route, 'home');
+  releases[1].resolve();
+  await second;
+  releases[0].resolve();
+  await first;
+  assert.equal(nav.state.route, 'logs');
+  assert.equal(changes, 1);
+  const failure = nav.navigate('home');
+  releases[2].reject(Error('pending input'));
+  await failure;
+  assert.equal(nav.state.route, 'logs');
+  assert.equal(errors.length, 1);
+});

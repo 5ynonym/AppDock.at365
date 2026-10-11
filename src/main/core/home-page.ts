@@ -94,6 +94,7 @@ export class HomePageSession implements ShellPageController {
       applets(): ExtensionSnapshot[];
       commands(): UiCommand[];
       pins(): string[];
+      appletOrder?(): string[];
       dark(): boolean;
       execution: HomeCommandExecution;
       navigate(command: string): Promise<unknown>;
@@ -118,7 +119,7 @@ export class HomePageSession implements ShellPageController {
     };
     const applets = orderApplets(
       this.options.applets().filter((e) => e.sourceKind !== 'builtin'),
-      this.request.appletOrder,
+      this.options.appletOrder?.() ?? this.request.appletOrder,
     );
     const commands = this.options.commands();
     const pins = this.options.pins();
