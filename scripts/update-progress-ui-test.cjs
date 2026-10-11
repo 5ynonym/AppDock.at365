@@ -86,7 +86,7 @@ let app;
     });
     const page = await app.firstWindow();
     page.setDefaultTimeout(15000);
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     await page.getByRole('button', { name: '設定', exact: true }).click();
     await page
       .locator('.settings-categories')

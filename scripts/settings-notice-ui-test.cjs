@@ -218,12 +218,13 @@ async function close() {
     );
     await page.getByLabel('検証値', { exact: true }).fill('from floating save');
     await ribbon('home').click();
-    const original = await page.locator('h1').boundingBox();
+    const home = await require('./shell-overlay-helper.cjs').homePage(page);
+    const original = await home.locator('h1').boundingBox();
     const n = await noticeVisible(true);
     assert.equal(await n.evaluate(() => typeof window.dock), 'undefined');
     assert.equal(await n.evaluate(() => typeof require), 'undefined');
     n.on('pageerror', (error) => errors.push(error.message));
-    assert.deepEqual(await page.locator('h1').boundingBox(), original);
+    assert.deepEqual(await home.locator('h1').boundingBox(), original);
     await page.screenshot({ path: path.join(profile, 'home-dark.png') });
     await n.screenshot({ path: path.join(profile, 'notice-dark.png') });
     await n.getByRole('button', { name: 'すべて保存', exact: true }).click();
@@ -281,10 +282,21 @@ async function close() {
     await page.getByLabel('設定JSON').fill('{broken');
     await ribbon('home').click();
     await noticeVisible(true);
-    const conflictHeading = await page.locator('h1').boundingBox();
+    const conflictHeading = await (
+      await require('./shell-overlay-helper.cjs').homePage(page)
+    )
+      .locator('h1')
+      .boundingBox();
     await n.getByRole('button', { name: 'すべて保存', exact: true }).click();
     await n.getByText('変更を保存できません', { exact: true }).waitFor();
-    assert.deepEqual(await page.locator('h1').boundingBox(), conflictHeading);
+    assert.deepEqual(
+      await (
+        await require('./shell-overlay-helper.cjs').homePage(page)
+      )
+        .locator('h1')
+        .boundingBox(),
+      conflictHeading,
+    );
     assert.equal(await page.locator('.error-banner').count(), 0);
     await n.getByRole('button', { name: '設定を確認', exact: true }).click();
     await noticeVisible(false);
@@ -302,10 +314,21 @@ async function close() {
     const externalRevision = (await snapshot()).settings.revision;
     await ribbon('home').click();
     await noticeVisible(true);
-    const staleHeading = await page.locator('h1').boundingBox();
+    const staleHeading = await (
+      await require('./shell-overlay-helper.cjs').homePage(page)
+    )
+      .locator('h1')
+      .boundingBox();
     await n.getByRole('button', { name: 'すべて保存', exact: true }).click();
     await n.getByText('変更を保存できません', { exact: true }).waitFor();
-    assert.deepEqual(await page.locator('h1').boundingBox(), staleHeading);
+    assert.deepEqual(
+      await (
+        await require('./shell-overlay-helper.cjs').homePage(page)
+      )
+        .locator('h1')
+        .boundingBox(),
+      staleHeading,
+    );
     assert.equal(await page.locator('.error-banner').count(), 0);
     assert.equal((await snapshot()).settings.revision, externalRevision);
     await n.getByRole('button', { name: '設定を確認', exact: true }).click();

@@ -2,12 +2,12 @@ import type { LogEntry } from '../../shared/contracts';
 import type {
   LogFilters,
   ShellPageAction,
-  ShellPageModel,
-  ShellPageRequest,
+  LogPageModel,
+  LogPageRequest,
 } from '../../shared/shell-pages';
 import type { ShellPageController } from './shell-page-controller';
 
-export function parseLogPageRequest(value: ShellPageRequest): ShellPageRequest {
+export function parseLogPageRequest(value: LogPageRequest): LogPageRequest {
   if (
     !value ||
     typeof value.id !== 'string' ||
@@ -35,7 +35,7 @@ export class LogPageSession implements ShellPageController {
   private revision = 0;
   private signature = '';
   constructor(
-    private request: ShellPageRequest,
+    private request: LogPageRequest,
     private options: {
       entries(): LogEntry[];
       sources(): { id: string; title: string }[];
@@ -59,7 +59,7 @@ export class LogPageSession implements ShellPageController {
       text: '',
     };
   }
-  snapshot(): ShellPageModel {
+  snapshot(): LogPageModel {
     const entries = this.options.entries().slice(-500);
     const sources = new Map(this.options.sources().map((s) => [s.id, s.title]));
     for (const e of entries) if (!sources.has(e.source)) sources.set(e.source, e.source);

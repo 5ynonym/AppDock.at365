@@ -16,7 +16,7 @@ import type {
   GlobalHotKeyStatus,
 } from '../shared/contracts';
 import './style.css';
-import { hostCommands, rankCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
+import { hostCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { appletManagementCommands } from '../shared/applet-management';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
@@ -125,6 +125,7 @@ function App() {
       return;
     }
     setLocalPage(nav.route as Page);
+    if (nav.appletId) setSelected(nav.appletId);
     if (nav.section === 'profile') setProfileRequest((v) => v + 1);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
   }, [snapshot?.navigation]);
@@ -234,6 +235,14 @@ function App() {
     });
   }, []);
   useEffect(() => window.dock.onPaletteExecuted(() => setToast('コマンドを実行しました。')), []);
+  useEffect(
+    () =>
+      window.dock.onHomeCommandResult(({ message, error }) => {
+        if (message) setToast(message);
+        if (error) setError(error);
+      }),
+    [],
+  );
   useEffect(
     () =>
       window.dock.onAppletPage((key) => {
@@ -408,7 +417,6 @@ function App() {
         available: false,
       })),
   ];
-  const pins = snapshot?.settings.value.pinnedCommands ?? [];
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
     if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
@@ -624,111 +632,12 @@ function App() {
               </div>
             )}
             {page === 'home' && (
-              <>
-                <PageHeading title="ホーム" />
-                <div className="stats">
-                  <div>
-                    <span className="stat-icon green">
-                      <Icon name="play" />
-                    </span>
-                    <div>
-                      <span>実行中のApplet</span>
-                      <strong>
-                        {active}
-                        <small> / {orderedApplets.length}</small>
-                      </strong>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="stat-icon blue">
-                      <Icon name="command" />
-                    </span>
-                    <div>
-                      <span>使えるコマンド</span>
-                      <strong>{commands.length}</strong>
-                    </div>
-                    <button onClick={() => void openPalette()} aria-label="コマンド一覧">
-                      <Icon name="arrow" />
-                    </button>
-                  </div>
-                  <div>
-                    <span className="stat-icon purple">
-                      <Icon name="logs" />
-                    </span>
-                    <div>
-                      <span>エラーのApplet</span>
-                      <strong>{orderedApplets.filter((e) => e.state === 'error').length}</strong>
-                    </div>
-                    <button
-                      aria-label="ログを開く"
-                      onClick={() => {
-                        setLogSource('');
-                        setPage('logs');
-                      }}
-                    >
-                      <Icon name="arrow" />
-                    </button>
-                  </div>
-                </div>
-                <section className="home-pins" aria-label="よく使うコマンド">
-                  <h2>よく使うコマンド</h2>
-                  <div className="actions">
-                    {rankCommands(
-                      commands.filter((c) => pins.includes(c.id)),
-                      pins,
-                    ).map((c) => (
-                      <button
-                        key={c.id}
-                        className="secondary"
-                        disabled={busy || !c.available}
-                        onClick={() => void execute(c.id)}
-                      >
-                        {c.title}
-                        <small className="command-id" title={c.extension}>
-                          {c.id}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                  {!commands.some((c) => pins.includes(c.id)) && (
-                    <p>コマンド検索の☆から、よく使う操作をピン留めできます。</p>
-                  )}
-                </section>
-                <div className="section-heading">
-                  <h3>
-                    Applet<span>{orderedApplets.length}</span>
-                  </h3>
-                  <button className="text-button" onClick={() => setPage('extensions')}>
-                    すべて見る
-                    <Icon name="arrow" size={14} />
-                  </button>
-                </div>
-                <div className="extension-grid">
-                  {orderedApplets.map((e) => (
-                    <button className="extension-card" key={e.id} onClick={() => goExtension(e.id)}>
-                      <div className="card-top">
-                        <span className={`extension-icon ${e.runtime}`}>
-                          <Icon name={e.runtime === 'node' ? 'command' : 'extensions'} size={23} />
-                        </span>
-                        <StateBadge extension={e} />
-                      </div>
-                      <h3>{e.displayName}</h3>
-                      <p>{e.description}</p>
-                      <div className="card-bottom">
-                        <span>
-                          {e.runtime === 'web'
-                            ? 'WebApplet'
-                            : e.runtime === 'node'
-                              ? 'TypeScript'
-                              : '.NET 10'}
-                          <span className="divider">/</span>v{e.version}
-                        </span>
-                        <Icon name="arrow" size={16} />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
+              <ShellPageSlot
+                key="home"
+                kind="home"
+                appletOrder={editor.draft.appletOrder}
+                navigationRequest={snapshot.navigation.request}
+              />
             )}
             {page === 'extensions' && (
               <>

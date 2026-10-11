@@ -13,6 +13,7 @@ export default defineConfig({
         ribbon: path.resolve('shells/default/index.html'),
         overlay: path.resolve('shells/default/overlay.html'),
         logs: path.resolve('shells/default/logs.html'),
+        home: path.resolve('shells/default/home.html'),
       },
     },
   },

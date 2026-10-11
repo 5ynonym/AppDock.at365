@@ -64,3 +64,20 @@ exports.logsPage = async (host, scope) => {
   }
   throw Error('Shell log page did not become ready: ' + detail);
 };
+
+exports.homePage = async (host) => {
+  const end = Date.now() + 15000;
+  while (Date.now() < end) {
+    for (const page of host
+      .context()
+      .pages()
+      .filter((p) => p.url().endsWith('/home.html'))) {
+      try {
+        await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor({ timeout: 500 });
+        return page;
+      } catch {}
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw Error('Shell home page did not become ready');
+};

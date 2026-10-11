@@ -60,7 +60,7 @@ async function launch() {
         .find((p) => p.url().startsWith('appdock://host')),
     'host page',
   );
-  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await require('./shell-overlay-helper.cjs').homePage(page);
   await page.waitForFunction(async () => (await window.dock.snapshot()).startupReady);
   page.setDefaultTimeout(12000);
   await page.locator('[data-ribbon-id="settings"]').click();

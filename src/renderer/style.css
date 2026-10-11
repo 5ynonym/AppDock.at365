@@ -826,30 +826,6 @@ main {
   bottom: 31px;
   background: #959ddb;
 }
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.25fr;
-  gap: 12px;
-  margin: 18px 0 28px;
-}
-.stats > div {
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 9px;
-  padding: 17px 15px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 80px;
-}
-.stat-icon {
-  display: grid;
-  place-items: center;
-  width: 33px;
-  height: 33px;
-  border-radius: 8px;
-  background: var(--raised);
-}
 .green {
   color: var(--accent);
 }
@@ -858,78 +834,6 @@ main {
 }
 .purple {
   color: var(--purple);
-}
-.stats > div > div > span {
-  font-size: 9px;
-  color: var(--muted);
-}
-.stats strong {
-  display: block;
-  font-size: 24px;
-  font-weight: 500;
-  margin-top: 3px;
-  line-height: 1.1;
-}
-.stats strong small {
-  font-size: 12px;
-  color: var(--faint);
-}
-.stats .stat-text {
-  font-size: 14px;
-  margin-top: 8px;
-}
-.stat-note {
-  font-size: 8px;
-  line-height: 1.7;
-  color: var(--faint);
-  margin-left: auto;
-  text-align: right;
-  max-width: 66px;
-}
-.stats button {
-  margin-left: auto;
-  color: var(--faint);
-}
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 13px;
-}
-.section-heading h3 {
-  font-size: 13px;
-  font-weight: 500;
-}
-.section-heading h3 span {
-  font-size: 9px;
-  color: var(--faint);
-  margin-left: 9px;
-}
-.extension-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-.extension-card {
-  display: block;
-  text-align: left;
-  padding: 19px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  transition:
-    border-color 0.15s,
-    transform 0.15s;
-}
-.extension-card:hover {
-  border-color: var(--faint);
-  transform: translateY(-2px);
-}
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
 }
 .extension-icon {
   height: 39px;
@@ -947,25 +851,6 @@ main {
 .extension-icon.native {
   color: var(--purple);
   background: #69549525;
-}
-.extension-card h3 {
-  font-size: 13px;
-  font-weight: 500;
-}
-.extension-card > p {
-  font-size: 10px;
-  margin-top: 8px;
-  min-height: 37px;
-}
-.card-bottom {
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 15px;
-  padding-top: 12px;
-  font-size: 9px;
-  color: var(--faint);
 }
 .state {
   display: inline-flex;
@@ -1450,16 +1335,6 @@ main {
   .hero h2 {
     font-size: 22px;
   }
-  .stats > div {
-    padding: 14px 11px;
-    gap: 8px;
-  }
-  .stat-note {
-    display: none;
-  }
-  .stats {
-    grid-template-columns: 1fr 1fr 1.2fr;
-  }
   .extensions-layout {
     grid-template-columns: 190px minmax(0, 1fr);
     gap: 13px;
@@ -1869,24 +1744,6 @@ summary {
 .detail-meta > div {
   margin-top: 12px;
 }
-.home-pins {
-  margin: 24px 0;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-}
-.home-pins h2 {
-  font-size: 16px;
-  margin-bottom: 15px;
-}
-.home-pins p,
-.home-pins small {
-  font-size: 12px;
-}
-.home-pins small {
-  color: var(--muted);
-}
 .settings-main {
   overflow: hidden;
   display: flex;
@@ -2057,10 +1914,6 @@ summary {
 .statusbar > button {
   font-size: 11px;
 }
-.extension-card p,
-.card-bottom {
-  font-size: 12px;
-}
 .text-button,
 .tabs button {
   font-size: 12px;
@@ -2126,12 +1979,6 @@ summary {
   }
   .titlebar-search kbd {
     display: none;
-  }
-  .stats {
-    grid-template-columns: 1fr;
-  }
-  .extension-grid {
-    grid-template-columns: 1fr;
   }
 }
 /* Editable SendKey command definitions supplied by an applet. */

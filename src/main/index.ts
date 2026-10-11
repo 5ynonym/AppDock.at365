@@ -1,6 +1,7 @@
 import { ShellHost } from './core/shell-host';
 import { OverlayHost } from './core/overlay-host';
 import { ShellPageHost } from './core/shell-page-host';
+import { HomePageSession, HomeCommandExecution } from './core/home-page';
 import { LogPageSession } from './core/log-page';
 import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
@@ -418,16 +419,19 @@ function executeShellCommand(provider: string, command: string) {
     throw Error('Command is not available from this Shell Applet');
   return executeCommand(command);
 }
+function uiCommands() {
+  return [
+    ...hostCommands.map((c) => ({ ...c, extensionId: null })),
+    ...appletManagementCommands(allApplets()),
+    ...allApplets().flatMap((e) =>
+      e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
+    ),
+  ];
+}
 function openCommandPalette(request: CommandPaletteRequest) {
   if (!startupReady || quitting || !overlayHost) throw Error('AppDockは準備中です。');
   const session = new CommandPaletteSession(request, {
-    commands: () => [
-      ...hostCommands.map((c) => ({ ...c, extensionId: null })),
-      ...appletManagementCommands(allApplets()),
-      ...allApplets().flatMap((e) =>
-        e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
-      ),
-    ],
+    commands: uiCommands,
     pins: () => settings.value.pinnedCommands,
     shortcuts: () => settings.value.shortcuts,
     dark: () => nativeTheme.shouldUseDarkColors,
@@ -1233,6 +1237,15 @@ async function initialize() {
         void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
     },
   });
+  const homeExecution = new HomeCommandExecution({
+    execute: executeCommand,
+    changed,
+    completed: (result) => {
+      if (!quitting && window && !window.isDestroyed() && navigation.state.route !== 'home')
+        window.webContents.send('dock:homeCommandResult', result);
+    },
+  });
+  window.once('closed', () => homeExecution.dispose());
   shellPageHost = new ShellPageHost({
     window,
     preload: path.join(__dirname, 'shell-page-preload.js'),
@@ -1242,17 +1255,27 @@ async function initialize() {
     route: () => navigation.state.route,
     ready: () => startupReady && !quitting,
     create: (request) =>
-      new LogPageSession(request, {
-        entries: () => log.entries,
-        sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-        dark: () => nativeTheme.shouldUseDarkColors,
-        openDirectory: async () => {
-          const error = await shell.openPath(log.directory);
-          if (error) throw Error(error);
-        },
-        sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
-        changed,
-      }),
+      request.kind === 'home'
+        ? new HomePageSession(request, {
+            applets: allApplets,
+            commands: uiCommands,
+            pins: () => settings.value.pinnedCommands,
+            dark: () => nativeTheme.shouldUseDarkColors,
+            execution: homeExecution,
+            navigate: executeCommand,
+            openApplet: (id) => navigation.navigate('extensions', undefined, id),
+          })
+        : new LogPageSession(request, {
+            entries: () => log.entries,
+            sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+            dark: () => nativeTheme.shouldUseDarkColors,
+            openDirectory: async () => {
+              const error = await shell.openPath(log.directory);
+              if (error) throw Error(error);
+            },
+            sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+            changed,
+          }),
     execute: executeShellCommand,
     settings: (id) => appletInputSettings(settings.value, id),
     shortcut: async (key) => {

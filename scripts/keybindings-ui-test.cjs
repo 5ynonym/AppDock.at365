@@ -484,7 +484,14 @@ const expectCalls = async (before, expected) => {
     )
       .locator('[data-ribbon-id="home"]')
       .click();
-    assert.equal(await dock.locator('.home-pins .command-id').textContent(), 'test.keys.a');
+    assert.equal(
+      await (
+        await require('./shell-overlay-helper.cjs').homePage(dock)
+      )
+        .locator('.home-pins .command-id')
+        .textContent(),
+      'test.keys.a',
+    );
     await dock.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
     const palette = await require('./shell-overlay-helper.cjs').overlayPage(dock);
     await palette.getByPlaceholder('コマンドを入力…').fill('test.keys.a');

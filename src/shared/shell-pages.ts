@@ -8,20 +8,28 @@ export interface LogFilters {
   text: string;
 }
 /** Requests belong to a mounted host slot, not to the presentation provider. */
-export interface ShellPageRequest {
+export interface LogPageRequest {
   id: string;
   route: string;
   kind: 'logs';
   scope: LogScope;
   source: string;
 }
+export interface HomePageRequest {
+  id: string;
+  route: 'home';
+  kind: 'home';
+  /** Read-only projection from the host's shared editor, never a second draft. */
+  appletOrder: string[];
+}
+export type ShellPageRequest = LogPageRequest | HomePageRequest;
 export interface ShellPageViewport {
   x: number;
   y: number;
   width: number;
   height: number;
 }
-export interface ShellPageModel {
+export interface LogPageModel {
   schemaVersion: 1;
   id: string;
   contextId: 'primary';
@@ -36,8 +44,40 @@ export interface ShellPageModel {
     limit: number;
   };
 }
+export interface HomePageModel {
+  schemaVersion: 1;
+  id: string;
+  contextId: 'primary';
+  kind: 'home';
+  revision: number;
+  dark: boolean;
+  content: {
+    stats: { running: number; errors: number; applets: number; commands: number };
+    pins: { id: string; title: string; extension: string; available: boolean; actionId: string }[];
+    applets: {
+      id: string;
+      title: string;
+      description: string;
+      state: 'waiting' | 'running' | 'stopped' | 'starting' | 'stopping' | 'error';
+      runtime: 'node' | 'dotnet' | 'native' | 'web';
+      version: string;
+      actionId: string;
+    }[];
+    actions: { palette: string; logs: string; applets: string };
+    busy: boolean;
+    error: string;
+    message: string;
+  };
+}
+export type ShellPageModel = LogPageModel | HomePageModel;
+export interface HomeCommandResult {
+  message: string;
+  error: string;
+}
 export type ShellPageAction =
-  { id: string; type: 'filters'; filters: LogFilters } | { id: string; type: 'open-directory' };
+  | { id: string; type: 'filters'; filters: LogFilters }
+  | { id: string; type: 'open-directory' }
+  | { id: string; type: 'invoke'; actionId: string };
 export interface ShellPageApi extends ShellAppletApi {
   connect(): Promise<{ sessionId: string; providerAppletId: string; snapshot: ShellPageModel }>;
   ready(sessionId: string): Promise<void>;

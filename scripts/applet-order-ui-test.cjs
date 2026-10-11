@@ -136,7 +136,13 @@ async function launch() {
     page.on('pageerror', (error) => errors.push(error.message));
     page.setDefaultTimeout(12000);
     await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
-    const button = (name) => page.getByRole('button', { name, exact: true });
+    let rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
+    const button = (name) =>
+      (['Applet', '設定'].includes(name) ? rail : page).getByRole('button', { name, exact: true });
+    const navigate = async (name) => {
+      await button(name).click();
+      await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+    };
     const tab = (name) => page.getByRole('tab', { name, exact: true });
     const ids = () =>
       page.locator('[data-applet-id]').evaluateAll((rows) => rows.map((r) => r.dataset.appletId));
@@ -145,7 +151,7 @@ async function launch() {
     assert.equal(initial.version, require('../package.json').version);
     const originalBindings = initial.settings.value.keybindings;
     const originalRibbon = initial.settings.value.ribbon;
-    await button('Applet').click();
+    await navigate('Applet');
     assert.deepEqual(await ids(), [
       'test.a',
       'test.b',
@@ -212,7 +218,7 @@ async function launch() {
       'toggle / up button / native drag / keyboard move / WebApplet order / shared draft save / dispatcher and ribbon unchanged',
     );
     await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
-    await button('設定').click();
+    await navigate('設定');
     assert.equal(await page.getByText('Applet別の設定').count(), 0);
     await page
       .locator('.settings-categories')
@@ -226,7 +232,7 @@ async function launch() {
       .getByRole('button', { name: 'ショートカットキーを入力', exact: true })
       .press('Control+F9');
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
-    await button('Applet').click();
+    await navigate('Applet');
     await tab('ショートカット').click();
     assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F9');
     assert.equal(await page.locator('.applet-shortcuts input').count(), 0);
@@ -236,7 +242,7 @@ async function launch() {
       'flat commands independent of Applet order / shared draft displayed and discarded in Applet overview',
     );
     for (const theme of ['dark', 'light']) {
-      await button('設定').click();
+      await navigate('設定');
       await page
         .locator('.settings-categories')
         .getByRole('button', { name: '表示', exact: true })
@@ -249,7 +255,7 @@ async function launch() {
       );
       for (const width of [1280, 900, 700]) {
         await page.setViewportSize({ width, height: 720 });
-        await button('Applet').click();
+        await navigate('Applet');
         await tab('設定').click();
         assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
         assert(
@@ -263,7 +269,7 @@ async function launch() {
             .evaluate((el) => el.scrollWidth <= el.clientWidth),
         );
         await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
-        await button('設定').click();
+        await navigate('設定');
         await page
           .locator('.settings-categories')
           .getByRole('button', { name: 'ショートカット', exact: true })
@@ -280,7 +286,8 @@ async function launch() {
     app = await launch();
     page = await app.firstWindow();
     await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
-    await button('Applet').click();
+    rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
+    await navigate('Applet');
     assert.deepEqual(await ids(), [
       'web.11111111-1111-1111-1111-111111111111',
       'test.b',

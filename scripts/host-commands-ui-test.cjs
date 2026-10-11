@@ -116,7 +116,6 @@ let output = '';
                 !p.url().includes('settingsNotice'),
             )),
       );
-      await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
       await page.waitForFunction(
         (id) =>
           window.dock
@@ -124,6 +123,9 @@ let output = '';
             .then((s) => s.extensions.some((e) => e.id === id && e.state === 'running')),
         fixtureId,
       );
+      // Exercise the public show command before waiting for a visible native page surface.
+      await page.evaluate(() => window.dock.executeCommand('appdock.open'));
+      await require('./shell-overlay-helper.cjs').homePage(page);
       assert.equal(
         await page.evaluate(() => window.dock.snapshot().then((s) => s.dataDirectory)),
         path.join(profile, 'data'),

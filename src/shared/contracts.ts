@@ -242,6 +242,9 @@ export interface DockApi {
   setShortcutRecording(recording: boolean): Promise<void>;
   onHostCommand(callback: (id: string) => void): () => void;
   onPaletteExecuted(callback: () => void): () => void;
+  onHomeCommandResult(
+    callback: (result: import('./shell-pages').HomeCommandResult) => void,
+  ): () => void;
   snapshot(): Promise<HostSnapshot>;
   saveSettings(
     value: Settings,

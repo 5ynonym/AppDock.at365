@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
+公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`と`page.home`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -29,6 +29,8 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読できる。例えば`compact`設定をコマンドから通常のsettings APIで変更すれば、リボンとオーバーレイはその設定に応じて描画を更新できる。両bridgeに同じ`ShellAppletApi`を適用する。
 
 `views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、未対応の領域は描画しない。`page.logs`は0.26.42以上で[ページ用bridge](shell-pages.md)を実装すると利用できる。
+
+`page.home`は0.26.43以上でホーム用モデル・操作を実装すると利用できる。ホーム専用Appletでも他の領域はDefault Shellが描画する。
 
 従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
 

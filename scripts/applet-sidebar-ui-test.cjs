@@ -3,6 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
+async function clickRibbon(page, name) {
+  const rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
+  await rail.getByRole('button', { name, exact: true }).click();
+  if (name === 'ホーム') await require('./shell-overlay-helper.cjs').homePage(page);
+  else if (name === 'ログ') await require('./shell-overlay-helper.cjs').logsPage(page);
+  else await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+}
 const profile = path.join(root, '.artifacts', `applet-sidebar-${Date.now()}`);
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 settings.host.notifications = false;
@@ -39,8 +46,8 @@ async function launch() {
   });
   const page = await app.firstWindow();
   page.setDefaultTimeout(12000);
-  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Applet', exact: true }).click();
+  await require('./shell-overlay-helper.cjs').homePage(page);
+  await clickRibbon(page, 'Applet');
   await page.locator('.sidebar-extensions button').first().waitFor();
   return { app, page };
 }
@@ -53,6 +60,7 @@ async function launch() {
     assert.equal(await width(), 280);
     assert.equal(await page.locator('.sidebar-extensions i').count(), 0);
     assert.deepEqual(await page.locator('.sidebar-extensions button > span').allTextContents(), [
+      'WebApplet',
       'Watch',
       'WindowsMover',
       'WindowsTools',
@@ -64,7 +72,7 @@ async function launch() {
         return { x: range.getBoundingClientRect().x, align: getComputedStyle(el).textAlign };
       }),
     );
-    assert.equal(starts.length, 3);
+    assert.equal(starts.length, 4);
     assert(starts.every((item) => item.x === starts[0].x && item.align === 'left'));
     const separator = page.getByRole('separator', { name: 'Applet一覧の幅を変更' });
     const bounds = await separator.boundingBox();
@@ -112,7 +120,7 @@ async function launch() {
         side.borderRight,
       ];
     });
-    await page.getByRole('button', { name: '設定', exact: true }).click();
+    await clickRibbon(page, '設定');
     assert.equal(await width(), 350, 'settings uses the Applet width');
     const settingsStyle = await page
       .locator('.settings-categories button.selected')
@@ -158,10 +166,10 @@ async function launch() {
       await page.screenshot({ path: path.join(profile, `settings-sidebar-${size.width}.png`) });
     }
     await page.setViewportSize({ width: 1280, height: 840 });
-    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await clickRibbon(page, 'Applet');
     assert.equal(await width(), 320, 'settings resize is reflected in Applet');
     assert.equal(await page.locator('.page-heading p').count(), 0);
-    await page.getByRole('button', { name: '設定', exact: true }).click();
+    await clickRibbon(page, '設定');
     assert.equal(
       await page
         .getByRole('switch', { name: 'デスクトップ通知', exact: true })
@@ -169,19 +177,19 @@ async function launch() {
       'true',
       'unsaved draft survives page switches',
     );
-    await page.getByRole('button', { name: 'ログ', exact: true }).click();
+    await clickRibbon(page, 'ログ');
     assert.equal(await page.locator('.page-heading p').count(), 0);
-    await page.getByRole('button', { name: 'ホーム', exact: true }).click();
+    await clickRibbon(page, 'ホーム');
     assert.equal(await page.locator('.page-heading p').count(), 0);
     assert.deepEqual(errors, []);
     await app.close();
     ({ app, page } = await launch());
     assert.equal(await width(), 320, 'shared width survives an Electron restart');
-    await page.getByRole('button', { name: '設定', exact: true }).click();
+    await clickRibbon(page, '設定');
     assert.equal(await width(), 320, 'settings restores the shared width after restart');
     await page.evaluate(() => localStorage.setItem('appdock.applet-sidebar-width', 'broken'));
     await page.reload();
-    await page.getByRole('button', { name: 'Applet', exact: true }).click();
+    await clickRibbon(page, 'Applet');
     assert.equal(await width(), 280, 'invalid saved width falls back to default');
     console.log(
       JSON.stringify(

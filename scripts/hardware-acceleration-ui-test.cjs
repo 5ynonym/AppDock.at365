@@ -20,7 +20,7 @@ async function launch() {
     timeout: 30000,
   });
   const page = await application.firstWindow();
-  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await require('./shell-overlay-helper.cjs').homePage(page);
   await application.evaluate(async ({ app }) => {
     await app.getGPUInfo('basic');
   });

@@ -5,6 +5,7 @@ import type {
   ShellPageAction,
   ShellPageApi,
   ShellPageModel,
+  LogPageModel,
 } from '../../src/shared/shell-pages';
 import { shortcutFromEvent } from '../../src/shared/commands';
 import './logs.css';
@@ -15,7 +16,7 @@ declare global {
 }
 const api = window.appdockPage;
 function App() {
-  const [model, setModel] = useState<ShellPageModel>();
+  const [model, setModel] = useState<LogPageModel>();
   const [session, setSession] = useState('');
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<LogFilters>({ source: '', level: 'all', text: '' });
@@ -24,7 +25,7 @@ function App() {
   useEffect(() => {
     let live = true;
     const accept = (next: ShellPageModel) => {
-      if (live) {
+      if (live && next.kind === 'logs') {
         if (latest.current?.id === next.id && latest.current.revision > next.revision) return;
         latest.current = next;
         setModel(next);

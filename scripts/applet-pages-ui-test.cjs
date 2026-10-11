@@ -132,7 +132,7 @@ async function launch() {
     return !!rail;
   }, 'Shell renderer');
   await rail.locator('[data-ribbon-id="home"]').waitFor();
-  await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await require('./shell-overlay-helper.cjs').homePage(dock);
   await app.evaluate(({ app }) => {
     app.on('session-created', (ses) => {
       if (!ses.isPersistent()) return;
@@ -339,7 +339,7 @@ async function launch() {
       await app.evaluate(({ webContents }) => webContents.getFocusedWebContents()?.id),
       homeFocus,
     );
-    await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(dock);
     await remote(
       account,
       'document.querySelector(\'tbody\').insertAdjacentHTML(\'afterbegin\', \'<tr class="zA zE"><td class="yW"><span name="Fixture">Fixture</span></td><td><span class="bog" data-legacy-thread-id="new">背景で到着</span></td></tr>\')',

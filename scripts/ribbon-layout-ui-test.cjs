@@ -61,7 +61,7 @@ async function launch() {
   });
   dock = await app.firstWindow();
   dock.setDefaultTimeout(15000);
-  await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await require('./shell-overlay-helper.cjs').homePage(dock);
   await until(() => {
     rail = app
       .context()

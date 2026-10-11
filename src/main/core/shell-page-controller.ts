@@ -1,4 +1,4 @@
-import type { ShellPageAction, ShellPageModel } from '../../shared/shell-pages';
+import type { ShellPageAction, ShellPageModel, ShellPageRequest } from '../../shared/shell-pages';
 
 /** Content is independent of its WebContents, provider and native bounds. */
 export interface ShellPageController {
@@ -7,4 +7,6 @@ export interface ShellPageController {
   readonly kind: ShellPageModel['kind'];
   snapshot(): ShellPageModel;
   act(action: ShellPageAction): Promise<void>;
+  update?(request: ShellPageRequest): void;
+  dispose?(): void;
 }

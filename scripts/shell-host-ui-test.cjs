@@ -194,7 +194,10 @@ async function close() {
       () => document.activeElement?.getAttribute('data-ribbon-id') === 'profile',
     );
     await rail.keyboard.press('Tab');
-    await dock.waitForFunction(() => document.activeElement?.tagName === 'BUTTON');
+    const home = await require('./shell-overlay-helper.cjs').homePage(dock);
+    await home.waitForFunction(
+      () => document.hasFocus() && document.activeElement?.tagName === 'BUTTON',
+    );
     await rail.getByRole('button', { name: 'ホーム', exact: true }).focus();
     await rail.keyboard.press('Shift+Tab');
     await dock.waitForFunction(() => document.activeElement?.closest('.titlebar'));
@@ -205,7 +208,7 @@ async function close() {
     const newTheme = oldTheme === 'light' ? 'dark' : 'light';
     await dock.getByLabel('テーマ', { exact: true }).selectOption(newTheme);
     await rail.getByRole('button', { name: 'ホーム', exact: true }).click();
-    await dock.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(dock);
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     assert.equal(await dock.getByLabel('テーマ', { exact: true }).inputValue(), newTheme);
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();

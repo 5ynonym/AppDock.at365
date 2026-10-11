@@ -94,7 +94,7 @@ async function connect(port) {
         await browser.close();
         throw Error('host renderer not ready');
       }
-      await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor({ timeout: 3000 });
+      await require('./shell-overlay-helper.cjs').homePage(page);
       return { browser, page };
     } catch (error) {
       last = error;

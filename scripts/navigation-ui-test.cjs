@@ -154,7 +154,7 @@ const checks = [];
     await detailTab(view === 'shortcuts' ? 'ショートカット' : '設定').click();
   };
   try {
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     await page.waitForFunction(() =>
       window.dock
         .snapshot()

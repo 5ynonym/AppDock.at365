@@ -11,7 +11,8 @@
     "ui": "index.html",
     "views": {
       "overlay.command-palette": "overlay.html",
-      "page.logs": "logs.html"
+      "page.logs": "logs.html",
+      "page.home": "home.html"
     }
   }
 }

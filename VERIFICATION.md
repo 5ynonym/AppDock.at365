@@ -1,5 +1,50 @@
 # 検証記録
 
+## 2026-10-12: 0.26.43 ホームShell移行のレビュー・コミット前回帰
+
+- レビューで、ホームのコマンド実行中にカード・ログ・一覧・パレットへの移動まで拒否する退行を修正した。画面移動は既存の実行経路へ直接委譲し、実行中状態・結果を上書きしない。ピンの実行可否検査とWindow寿命の重複実行ガードは維持。単体試験と、実行中のカード移動→ホーム復帰→ログ移動→完了通知の実画面試験で確認した。
+- Applet並べ替え/サイドバー試験の旧リボン参照と遷移待機を修正し、既存WebApplet管理行を期待値へ反映。Window試験の非表示起動は起動完了を待ち、可視のときだけホームを検査する。本体コマンド試験は公開の本体表示コマンドでWindowを開いてからホームの可視性を待つ。初回失敗・切り分けログは削除せず保存した。
+- 最終の型検査、標準 `dev.bat test` **297/297**、変更したCJS 21ファイルの構文検査が成功。ソースGUI **15本すべて成功**: shell-home、shell-page、shell-host、shell-overlay、settings-notice、navigation、applet-pages、applet-order、keybindings、ui、preferences、window-state、ribbon-layout、applet-sidebar、host-commands。GUIは隔離profileで直列実行した。
+- 検証treeは `8cf26efbbe23d5d4809a290265fa269e6073a95b`。前後のtree一致、stageと作業ファイルの一致、未追跡入力なしを確認。検証後の追記はこのVERIFICATIONだけとし、文書差分・最終tree・コミット後SHAを `.artifacts/commit-validation-home-shell-20261012/validation.json` に記録する。完全なログ、終了コード、時刻、ログSHA256は同フォルダーの `verified-*.log` と `runs.jsonl`。
+- 実環境はWindows 11 x64 10.0.26300、Node 24.21.0、pnpm 12.10.1、Electron 44.6.0、.NET SDK 10.0.401。lockfile/toolchain、生成fixture、SDK/Runtime情報を同フォルダーへ保存。Gmail連携試験で利用した既存発行物8ファイルは3つの試験profileとのSHA256一致を確認し、兄弟repoのcommit/treeとともに `gmail-input.json` へ記録した。兄弟repoの変更・再発行は行っていない。
+- `publish.bat` は終了コード0。同じ未公開変更の修正なので版は **0.26.43** を維持し、本体単一EXEとupdate.jsonだけを再発行した。最新EXEは **144091167 bytes / SHA256 `6bfc75e230c85af66488032ae50d0807deb662c67f73f5dbcaa99facb9bc53fa`**。update.jsonのSHA256は `57e547a755276c625c8449258d489253688a2d40d9e4888e506640d340f9f246`。feedの版・サイズ・payload SHA256と一致し、同フォルダーへEXEを固定した。下の初回実装記録の発行ハッシュは履歴として残す。
+
+| 固定EXEの隔離試験 | 結果 | profile（.artifacts配下） |
+| --- | --- | --- |
+| shell-home-ui-test | 7群成功。修正した実行中の画面移動を含む | shell-home-1791735879876 |
+| shell-page-ui-test | 9群成功 | shell-page-1791735920239 |
+| settings-notice-ui-test | 8群成功。source専用ダイアログfixtureはsource試験で確認 | settings-notice-1791735954251 |
+| host-commands-ui-test | 再起動、新PID、再入防止、設定保持、終了/deactivate待機、残存プロセスなし | host-commands-1791735978084 |
+
+- 完了時整理では、成功済みかつ直近3回より古い非保護フォルダー4件（applet-order 2、ribbon-layout 1、shell-home 1）だけを削除。実パス・再解析ポイント・使用中プロセスを検査し、直近分、失敗/不明、固定出力、再利用証跡は保持した。削除名と確認結果は `cleanup-plan.json` / `cleanup-result.json`。一時切り分けスクリプトも削除済み。
+- レビュー指摘と必要回帰の失敗は解消した。push・GitHub Release・実利用先deploy・全体ZIP作成は行っていない。
+
+## 2026-10-12: 0.26.43 ホームをDefault Shellへ移行
+
+- 開始時はmain `a34027f55d21d08d6b979a55adc4b7893f6b5053`、作業ツリーclean（既存の未push設計commitは保持）。`page.home`の限定モデル・操作ID・変更通知、HomePageSession、Window寿命のHomeCommandExecutionを追加。ホームの描画・専用CSSをDefault Shellへ移し、本体の重複描画を撤去した。ShellPageHostは内容を解釈せずViewとControllerの寿命を接続する。
+- 統計・保存済みピンの順序/実行可否/結果・Appletカード・共有draftのApplet順・詳細/ログ/パレットへの遷移を維持。実行直前の再検査、古い/任意操作ID拒否、同時実行・ページを離れて戻った際の重複防止を確認した。共有editorから表示順だけを投影し、全HostSnapshot/全設定のShell公開や第二のdraftは作成していない。設定移行時の入力アダプター差し替えを設計書へ記載した。設定画面・検索・部分JSONは未実装のまま。
+- 最終型検査と関連39/39単体回帰が成功（home-page/log-page/shell-boundaries/command-palette/ui-presentation/applet-order/applet-pages/core）。型検査・単体試験・publish・GUIログと発行情報は `.artifacts/home-migration/`。全標準回帰や無関係な機能のGUIを一律には実行していない。
+
+| 試験 | 実行方式・結果 | 証跡（.artifacts配下） |
+| --- | --- | --- |
+| shell-home-ui-test | 最終source 7群成功。部分差し替え、状態通知、draft順、成功/失敗、ページ移動をまたぐ実行ガード/結果、実行中のrenderer故障、再試行/停止/復帰、ready期限、safe、テーマ、resize/zoom、Tab/Shift+Tab/Ctrl+P | shell-home-1791733591320 |
+| shell-page-ui-test | source 9群成功。全体/詳細/Web管理、検索固定、変更/自己API/古い要求、故障、寸法/テーマ/フォーカス | shell-page-1791733191072 |
+| shell-host-ui-test | source 14群成功。リボン境界、共有draft、通常Applet/API、切替/故障/ready期限/safe | shell-host-1791733405550 |
+| shell-overlay-ui-test | source 7群成功。パレット、選択、ピン、ページ/通知の重なり、入力保持、故障、テーマ/寸法 | shell-overlay-1791733421254 |
+| settings-notice-ui-test | source 9群成功。共有編集、save/discard、JSON、競合、Web上の通知、再起動 | settings-notice-1791733435248 |
+| navigation-ui-test | source 17群成功。Appletタブ/設定/ショートカット、共有draft/JSON/競合、ログ、パレット、両テーマと各幅 | navigation-1791733439994 |
+| applet-pages-ui-test | source 7群成功。ページの生存、表示先切替、Web/Gmail fixtureの入力/session、リボン、再起動 | applet-pages-1791733451384 |
+| shell-home-ui-test | 固定0.26.43 EXE 7群成功 | shell-home-1791733804522 |
+| shell-page-ui-test | 固定0.26.43 EXE 9群成功 | shell-page-1791733843820 |
+| settings-notice-ui-test | 固定0.26.43 EXE 8群成功（native dialogの応答差し替え試験はsourceのみ） | settings-notice-1791733877228 |
+| 追加寸法確認 | sourceの900×650 Window・zoom 1.25。home native bounds 765×489、CSS innerWidth 612/scrollWidth 600。native画像で右端の操作とスクロールを確認 | home-layout-1791733929341 |
+
+- 最後の実行状態分離は、上記の既存GUI回帰成功後に追加し、関連単体39件・最終sourceホーム・固定EXEホーム/ログ/通知で再検証した。ホームだけを提供する外部fixtureは、出荷Shell成果物を通常Appletとして複製して公開bridgeのみで起動する。実サービス認証、物理IME、混在DPI、複数Windowは今回未確認。
+- 初回GUI試験の通知ボタン名・60ms集約通知待ち・外部更新後のrevision競合期待を修正。既存GUIの本体ホームDOM参照とTabの移動先を独立Shell Viewへ更新した。sourceのPlaywright画像はzoomで切り取り差があったため、native capturePageと実寸法で追加確認した。失敗profileは診断用に保持。
+- 制限環境ではElectron起動、設定置換（EPERM）、pnpm（STATUS_STACK_OVERFLOW）、.NETを含むpublishが失敗。同じコマンドを通常ユーザー権限で再実行して成功。版更新後の `dev.bat install --frozen-lockfile` は既存lockfile/依存版・7日待機・完全版例外を維持し、新規ダウンロード0件。Node 24.21.0 / pnpm 12.10.1 / Electron 44.6.0を使用。
+- `publish.bat`終了コード0。本体portable EXE 144,096,049 bytes、SHA256 `f9fd4407e3c2e462ff7e9a707cace5ba71b50a5db8d3bb95626d77f4f8864c67`。update.jsonはversion 0.26.43、payloadのsize/hash一致、feed SHA256 `95aa2b3babe8bda9a3947115542c06ab006c2b308326c8a3199751e38ee587ca`。固定コピー `.artifacts/home-migration/AppDock.at365.exe` と各隔離コピーの同一hashを照合した。
+- テスト整理では対象7種類の成功記録・既存検証参照・プロセスを照合。成功114件中103件が検証資料から参照され、保護分と方式別直近3回を除いた削除候補は0件（cleanup-plan.json）。失敗/不明状態・固定出力・他作業を保持。未変更Appletの再発行・全体ZIP作成/整理、commit、push、Release、実利用先deployは実施していない。
+
 ## 2026-10-12: 現行仕様への文書整理と設定拡張設計
 
 - AppDock 0.26.42のコード（起点commit `f767640d6b1306ab8b632a6ea05fd3b44aaafea1`）と照合し、AGENTS・開発ガイド・機能別文書を現在の仕様に整理した。導入版ごとの追記と実装に合わない旧設計を削除し、旧ショートカット設計書の現行部分はkeybindingsへ統合した。最低対応版、現在も動く互換処理、期限付き依存例外は保持した。

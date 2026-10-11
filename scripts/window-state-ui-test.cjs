@@ -16,7 +16,11 @@ async function launch() {
     timeout: 30000,
   });
   const page = await application.firstWindow();
-  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await page.waitForFunction(async () => (await window.dock.snapshot()).startupReady);
+  if (
+    await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())
+  )
+    await require('./shell-overlay-helper.cjs').homePage(page);
 }
 async function waitFor(check) {
   for (let i = 0; i < 100; i++) {

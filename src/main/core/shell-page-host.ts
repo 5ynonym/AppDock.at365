@@ -114,12 +114,13 @@ export class ShellPageHost {
       const controller = this.options.create(request);
       this.close();
       this.current = controller;
-    }
+    } else this.current.update?.(request);
     this.bounds = bounds;
     this.refresh();
   }
   close(id?: string) {
     if (id !== undefined && id !== this.current?.id) return;
+    this.current?.dispose?.();
     this.current = undefined;
     this.bounds = null;
     this.unavailable = false;

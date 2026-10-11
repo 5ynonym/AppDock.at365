@@ -33,7 +33,7 @@ async function launch() {
     timeout: 30000,
   });
   const page = await application.firstWindow();
-  await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  await require('./shell-overlay-helper.cjs').homePage(page);
   await application.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().startsWith('appdock:'),
@@ -123,7 +123,7 @@ async function waitPins(page, pins) {
       .getByRole('button', { name: 'ホーム', exact: true })
       .first()
       .click();
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     await page.keyboard.press('Control+p');
     assert.equal((await page.evaluate(() => window.dock.snapshot())).overlay.active, false);
     await page.keyboard.press('Control+Alt+p');
@@ -158,7 +158,7 @@ async function waitPins(page, pins) {
       .getByRole('button', { name: 'ホーム', exact: true })
       .first()
       .click();
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     await page.keyboard.press('Control+Alt+d');
     await page.waitForFunction(
       (previous) =>

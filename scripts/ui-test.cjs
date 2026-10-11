@@ -21,7 +21,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
   try {
     const page = await application.firstWindow();
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     assert.deepEqual(await shell.locator('.activity-rail .rail-label').allTextContents(), [
       'ホーム',
       'Applet',

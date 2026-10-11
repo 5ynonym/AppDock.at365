@@ -6,14 +6,14 @@ import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/
 export class NavigationCoordinator {
   state: NavigationState = { route: 'home', request: 0 };
   constructor(private changed: () => void) {}
-  navigate(route: string, section?: NavigationState['section']) {
+  navigate(route: string, section?: NavigationState['section'], appletId?: string) {
     if (
       !['home', 'extensions', 'settings', 'logs'].includes(route) &&
       !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
     )
       throw Error('Unknown route');
-    if (route === this.state.route && !section) return;
-    this.state = { route, section, request: this.state.request + 1 };
+    if (route === this.state.route && !section && !appletId) return;
+    this.state = { route, section, appletId, request: this.state.request + 1 };
     this.changed();
   }
 }

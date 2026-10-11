@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ログ本文はShellが描画する。未移行の設定等は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
+本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ本文はShellが描画する。未移行の設定等は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界
 
@@ -20,6 +20,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | --- | --- | --- |
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
+| page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 
 選択はhost.shellProviderの1件、表示コンテキストはprimary、本体Windowは1つ。各領域で選択Appletの宣言を解決し、未提供領域はDefault Shellを使う。複数の提供元を領域ごとに同時選択する設定はない。通常Appletのcommands/settings/pagesとの併用は可能で、Shell未選択でも有効Appletの通常機能は動作する。
@@ -60,12 +61,12 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 複数Window・複数Shellの同時表示は未実装。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 
-タイトルバー・ホーム等の残りの画面、過去ログ/日付検索、内蔵会話UIはこの基盤だけでは提供しない。追加時に個別の目的と公開契約を決める。
+タイトルバー等の残りの画面、過去ログ/日付検索、内蔵会話UIはこの基盤だけでは提供しない。追加時に個別の目的と公開契約を決める。
 
 ## 検証
 
-公開モデル・操作・入力検証・古い要求拒否はui-presentation、command-palette、log-pageの単体試験で確認する。内部import禁止はtests/shell-boundaries.test.cjsで確認する。
+公開モデル・操作・入力検証・古い要求拒否はui-presentation、command-palette、home-page、log-pageの単体試験で確認する。内部import禁止はtests/shell-boundaries.test.cjsで確認する。
 
-scripts/shell-host-ui-test.cjs、shell-overlay-ui-test.cjs、shell-page-ui-test.cjsで領域ごとの切替/未提供/ready期限/故障/safe起動、両テーマ、サイズ/zoom、フォーカス、既存ページとの合成を検証する。既存navigation・設定通知・リボンの回帰も変更範囲に含める。GUIは直列・隔離profileで行い、本体とDefault Shellを含む固定単一EXEでも確認する。
+scripts/shell-host-ui-test.cjs、shell-overlay-ui-test.cjs、shell-page-ui-test.cjs、shell-home-ui-test.cjsで領域ごとの切替/未提供/ready期限/故障/safe起動、両テーマ、サイズ/zoom、フォーカス、既存ページとの合成を検証する。既存navigation・設定通知・リボンの回帰も変更範囲に含める。GUIは直列・隔離profileで行い、本体とDefault Shellを含む固定単一EXEでも確認する。
 
 scripts/shell-metrics.cjsは比較する固定配布物を指定し、起動時間・メモリ・待機CPUを測定する。Viewや購読の増加、未表示領域の不要起動を確認する。実測・未確認条件は[VERIFICATION](../VERIFICATION.md)へ記録する。

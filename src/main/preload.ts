@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  onHomeCommandResult: (callback) => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      result: import('../shared/shell-pages').HomeCommandResult,
+    ) => callback(result);
+    ipcRenderer.on('dock:homeCommandResult', handler);
+    return () => ipcRenderer.removeListener('dock:homeCommandResult', handler);
+  },
   shellPage: (request, bounds) => ipcRenderer.invoke('dock:shellPage', request, bounds),
   closeShellPage: (id) => ipcRenderer.invoke('dock:closeShellPage', id),
   focusShellPage: (id, edge) => ipcRenderer.invoke('dock:focusShellPage', id, edge),

@@ -18,7 +18,7 @@ let application;
       env,
     });
     const page = await application.firstWindow();
-    await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+    await require('./shell-overlay-helper.cjs').homePage(page);
     await page.keyboard.press('Control+,');
     for (const width of [1280, 900, 760]) {
       await page.setViewportSize({ width, height: 600 });
