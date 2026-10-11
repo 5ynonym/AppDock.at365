@@ -41,6 +41,8 @@ await context.appdock.call('input.appCommand', { action: 'back' });
 
 可視の最前面を対象にし、物理キー解放を最大2秒待ち、途中の対象変更を拒否します。ジェスチャーは開始HWNDと取消情報を維持します。通常経路の再入防止150msを連続ジェスチャーへ課しません。許可取消・Applet停止・ジェスチャー取消で未送信処理を取り消します。送信済み入力を取り消すものではありません。
 
+sendKeysはデスクトップが最前面でも使用でき、Win+EなどのWindows共通キーを送れます。ウィンドウ宛てのappCommandではデスクトップ/Shellの除外を維持します。キー待機中の前面変更はデスクトップでも取消対象です。
+
 成功は`{completion:'inputSubmitted',effectVerified:false}`です。対象アプリの実際の動作成功を保証せず、自動再送しません。対象のアプリによるキー解釈やWindowsの権限制約があります。
 
 Node workerはコマンドごとのAbortSignalを提供し、AsyncLocalStorageでホスト発行executionIdをAPIへ付加します。.NET Runtimeも実行文脈を保持します。本体がApplet/実行寿命/開始対象を照合するので、通信層から任意HWNDを送信先として指定しません。コマンド外の通常呼出しは実行時の最前面を使います。

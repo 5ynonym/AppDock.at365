@@ -51,8 +51,10 @@ async function until(fn, label) {
   throw Error(label);
 }
 async function focus() {
-  await targetPeer.request('focus');
   return until(async () => {
+    // Startup surfaces can briefly take foreground after the fixture is shown.
+    // Retry acquisition only here, before starting an input/cancellation case.
+    await targetPeer.request('focus');
     const s = await targetPeer.request('snapshot');
     return s.focused && s;
   }, 'target focus');
@@ -279,6 +281,10 @@ async function execute(id) {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(output, null, 2));
     console.log(JSON.stringify(output, null, 2));
   } catch (error) {
+    fs.writeFileSync(
+      path.join(profile, 'failure-state.json'),
+      JSON.stringify((await targetPeer?.request('snapshot').catch(() => null)) ?? null, null, 2),
+    );
     await page?.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     console.error(error);
     process.exitCode = 1;

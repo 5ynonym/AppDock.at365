@@ -123,11 +123,12 @@ async function until(check, message) {
       window.focus();
     });
     await page.keyboard.press('Control+,');
-    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    await page.getByLabel('ショートカットのコマンドを検索').fill(toggleCommand);
-    const row = page.locator(`[data-shortcut-command="${toggleCommand}"]`);
+    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(page);
+    await settingsPage.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    await settingsPage.getByLabel('ショートカットのコマンドを検索').fill(toggleCommand);
+    const row = settingsPage.locator(`[data-shortcut-command="${toggleCommand}"]`);
     await row.locator('.applet-shortcut-edit').click();
-    const shortcutDialog = page.locator('.applet-shortcut-dialog');
+    const shortcutDialog = settingsPage.locator('.applet-shortcut-dialog');
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
     const input = shortcutDialog.getByRole('button', {
       name: 'ショートカットキーを入力',
@@ -138,9 +139,9 @@ async function until(check, message) {
       (await shortcutDialog.getByRole('switch').getAttribute('aria-checked')) === 'true',
       true,
     );
-    await page.bringToFront();
+    await settingsPage.bringToFront();
     await input.focus();
-    await page.waitForFunction(
+    await settingsPage.waitForFunction(
       () => document.hasFocus() && document.activeElement?.classList.contains('shortcut-capture'),
     );
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
@@ -153,7 +154,7 @@ async function until(check, message) {
       'Recorder did not capture single F24.',
     );
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settingsPage.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(() => registered(remapKey), 'F24 remapping did not register.');
     assert.equal((await contender.sync([initialKey]))[0].registered, true);
     checks.push('recording suspends Pause; single F24 remapping releases Pause');
@@ -163,7 +164,7 @@ async function until(check, message) {
     await shortcutDialog.getByRole('button', { name: '特殊キーから選ぶ' }).click();
     await shortcutDialog.getByRole('button', { name: initialKey, exact: true }).click();
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settingsPage.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () =>
         (await snapshot()).globalHotKeys.some(
@@ -172,7 +173,7 @@ async function until(check, message) {
       'Conflict status not displayed.',
     );
     await row.getByRole('alert').waitFor();
-    await page.screenshot({ path: path.join(profile, 'conflict.png') });
+    await settingsPage.screenshot({ path: path.join(profile, 'conflict.png') });
     await contender.sync([]);
     await row.getByRole('button', { name: '登録を再試行', exact: true }).click();
     await until(() => registered(initialKey), 'Pause retry after conflict failed.');
@@ -187,7 +188,7 @@ async function until(check, message) {
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
     await shortcutDialog.getByLabel('割り当てのいつ・どこで').selectOption('app');
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settingsPage.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(
       async () => !(await registered(initialKey)),
       'Global opt-out did not release Pause.',
@@ -198,9 +199,9 @@ async function until(check, message) {
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
     await shortcutDialog.getByLabel('割り当てのいつ・どこで').selectOption('global');
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settingsPage.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
     await until(() => registered(initialKey), 'Global scope did not restore Pause.');
-    await page.screenshot({ path: path.join(profile, 'registered.png') });
+    await settingsPage.screenshot({ path: path.join(profile, 'registered.png') });
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', false));
     await until(async () => !(await registered(initialKey)), 'Applet stop did not release Pause.');
     assert.equal((await contender.sync([initialKey]))[0].registered, true);

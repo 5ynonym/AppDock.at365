@@ -61,7 +61,14 @@ internal static class Program
         void Check(bool condition,string name){Console.WriteLine((condition?"PASS ":"FAIL ")+name);if(!condition)failures++;}
         try{
             await Sync();
-            var n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();Check(Count()==n+1 && invocations[^1]=="move-left","single stroke on release");
+            var n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
+            // The first WPF indicator/pipe round trip can outlast the fixed key-release wait.
+            // Await its result without sending the gesture again.
+            var firstDeadline=Environment.TickCount64+2000;
+            while(Count()==n && Environment.TickCount64<firstDeadline)await Task.Delay(20);
+            GetWindowThreadProcessId(GetForegroundWindow(),out var firstForegroundPid);
+            Console.WriteLine($"First stroke: received={Count()-n}, foreground={GetForegroundWindow()==form.Handle}, foregroundProcess={Process.GetProcessById((int)firstForegroundPid).ProcessName}");
+            Check(Count()==n+1 && invocations[^1]=="move-left","single stroke on release");
             var right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"ordinary right click replay");
             n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(30);Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-80);await Task.Delay(40);await End();Check(Count()==n,"direction change cancels");
             n=Count();var left=form.LeftUps;await Begin();Mouse(2);await Task.Delay(100);await End();Mouse(4);await Task.Delay(60);Check(Count()==n+1 && form.LeftUps==left,"left click and release after right are consumed");

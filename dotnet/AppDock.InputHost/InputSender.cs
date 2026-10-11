@@ -41,7 +41,10 @@ internal sealed class InputSender : IDisposable
             entered = await gate.WaitAsync(0, token);
             if (!entered) return new { ok = false, code = "INPUT_BUSY", message = "別の入力操作を処理中です。" };
             var target = GetForegroundWindow();
-            if (target == 0 || target == GetDesktopWindow() || target == GetShellWindow() || !IsWindowVisible(target))
+            // System key chords (for example Win+E) also work with the desktop focused.
+            // Window-directed app commands retain their ordinary-window restriction.
+            if (target == 0 || !IsWindowVisible(target) ||
+                (method == "input.appCommand" && (target == GetDesktopWindow() || target == GetShellWindow())))
                 throw new InvalidOperationException("操作対象のウィンドウを最前面にしてください。");
             var expected = new nint(long.Parse(p.GetProperty("window").GetString()!));
             if (expected != 0 && expected != target) throw new InvalidOperationException("開始時のウィンドウが最前面ではないため中止しました。");

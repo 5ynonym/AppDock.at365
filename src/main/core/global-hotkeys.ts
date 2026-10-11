@@ -45,7 +45,7 @@ export class WindowsHotKeyBackend implements HotKeyBackend {
       });
       child.on('exit', () => peer.close());
     }
-    return this.peer.request('hotkeys.sync', { shortcuts });
+    return this.peer.request('hotkeys.sync', { shortcuts, foregroundProcessId: process.pid });
   }
   async close() {
     const child = this.child;

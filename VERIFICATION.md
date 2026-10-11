@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-12: グローバルショートカットの前面表示・デスクトップへのキー送信（0.27.2）
+
+- コミット前確認: 利用者から2件の実動作成功の報告あり。型検査、標準回帰 **309/309**、実ホットキー9群、共通入力4群（2Applet、取消/対象保護/MCP）、InputTests **17/17**、固定EXEの前面表示/デスクトップ入力4項目が成功。全ログ・環境・入力hash・再利用元treeと差分は `.artifacts/commit-validation-shortcut-fix-0.27.2/` に保存。製品コードと発行EXEのhashは利用者確認後も変更なし。
+- 追加修正は試験のみ。hotkeys-ui-testが移行前の本体DOMで設定部品を探して失敗したため、既存settings-shell-helperで設定Shellを参照するよう修正して9群成功。native-input-ui-testの最初のキー受信待ちが一度失敗したため、失敗時の前面/受信イベント記録を追加し、同じ入力検証4群の成功を確認。InputTestsは初回通知を再送せず最大2秒待ち、前面プロセスを記録するようにした。診断でEmEditorへの前面切替を確認し、利用者の入力を止めた時間に17/17と固定EXE4項目が成功した。試験途中の失敗ログは保持する。入力先保護や製品側の待機は変更していない。
+- 成功済みの型検査・309件・ホットキーは、以後の変更がそれらから参照されない実入力試験の診断だけであること、残りのソース/依存/fixture/発行物hashの一致を照合して再利用した。検証後の追記はVERIFICATIONのみとして記録。コミット対象に製品の追加変更がないため0.27.2の再発行・重ねた版更新は行わない。
+
+- 原因: WM_HOTKEYを受け取る.NET補助プロセスからElectron本体へ前面化権限を引き渡していなかった。内部hotkeys.syncで本体PIDを渡し、受信時にそのPIDへAllowSetForegroundWindowを実行してから通知する。もう1件はInputSenderがGetShellWindow/GetDesktopWindowをキー送信でも拒否していたため、sendKeysだけデスクトップを許可した。
+- 修正前の固定配布物0.27.1で両方を再現。`.artifacts/shortcut-foreground-1791744534741/` は背後からの前面化失敗、`shortcut-foreground-1791744576862/` はExplorer未起動と `data/logs/host.log` の `input.sendKeys result=failed code=INPUT_FAILED` を記録。旧EXEと失敗証跡を保持した。
+- 発行前レビュー: 製品差分3ファイル、入力対象保護、再入防止、取消、ホットキー登録/解除、設定・保存・公開APIの互換性、テストと文書を確認。許可先は特定PIDのみで全プロセス指定を拒否。appCommandのデスクトップ除外、キー解放待ち中の前面変更拒否、150msの再入防止を維持。製品の追加修正を要する指摘なし。設定・保存形式・公開契約の変更がないためパッチ版0.27.2とした。試験fixtureは製品に同梱しない。
+- 成功: `dev.bat run typecheck`、`dev.bat exec node --test tests/keybindings.test.cjs tests/shortcut-commands.test.cjs tests/node-invocation.test.cjs tests/appdock-api.test.cjs` **36/36**、InputTargetのRelease build警告/エラー0、`dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe` **17/17**。
+- `scripts/native-input-ui-test.cjs` 成功（`.artifacts/native-input-ui-1791744717588/result.json`）。WebBrowserToolsの全11操作、WindowsToolsの.NET入力、許可拒否/取消、MCPの生入力非公開・明示コマンド経由、前面変更拒否、押下中取消、連続ジェスチャー3回13msを確認。初回は入力開始前のfixtureフォーカス取得で失敗したため、準備段階だけ前面取得を再試行するよう修正。送信開始後の対象保護は緩和していない。
+- 新しい `scripts/shortcut-foreground-ui-test.cjs` は独立ネイティブfixtureからCtrl+Shift+F23/F24を送信し、GetForegroundWindowの実HWNDで背後・最小化・非表示からの復帰を判定する。実WindowsToolsのpublishを使い、Progmanが最前面の状態からWin+Eで新しいExplorerが開いたこととAPI成功ログを確認。CDPから本体をfocusしない。
+- ソース試験成功（`shortcut-foreground-1791744520217`）。発行EXEの初回は非表示復帰に失敗（`shortcut-foreground-1791744874829`）。試験用押下/解放に20ms、各状態切替後に150msの待ちを入れた。次回は実動作4項目を通過後、150ms再入防止終了前のログ照合で失敗（`shortcut-foreground-1791744950547`）したため、成功ログの到着を待つよう修正。前者の瞬時入力での失敗原因は確定していない。製品への追加待機はない。最終fixtureの完成EXE試験は **2回連続で4項目成功**（`shortcut-foreground-1791744988110/result.json`、`shortcut-foreground-1791745023414/result.json`）。
+- `publish.bat` 終了コード0。単一EXE **144095763 bytes / SHA256 `ae47d1b2f2770e0dbfab2fcbd8951618b262c75474537a0b9cbb1fda5de5ffc5`**。package/feed/実行時は0.27.2、feedのsize/hashと隔離コピーのhash一致。固定配布物・feed・発行ログは `.artifacts/shortcut-fix-0.27.2/`。本体のみ発行し、未変更Appletと全体ZIPは再発行していない。
+- 制限環境の.NET発行は終了1、Electron試験はCDP起動待ち失敗、版更新後のfrozen installはstack overflowで失敗。同じコマンドを通常ユーザー環境で再実行して成功。依存359件再利用/download 0、依存版・lockfile・検査機構は変更していない。最終試験後に今回の隔離profileの残存AppDock/InputTargetプロセス0を確認。
+- 整理削除0件。新試験は成功分が各方式3回以下で、失敗・旧版比較・固定配布物を保持。既存native-inputの古い結果は起動方式を結果JSONだけでは区別できず、過去検証参照もあるため保持した。通常回帰全体・全兄弟Applet・Release/更新適用は今回の限定修正では再実行していない。物理キーボード、実利用設定、昇格アプリ、別Windows環境は未確認。commit・push・GitHub Release・実利用先deployは未実施。
+
 ## 2026-10-12: Appletインデックス・設定横断検索、段階3の完了（0.27.1）
 
 - 設定左側に本体カテゴリ・Applet一覧と横断検索を追加。mainの静的カタログをNFKC・AND・安定順位で検索し、結果からページ全体のフォームを表示、安定IDで折りたたみ展開・スクロール・フォーカス・約2秒の強調を行う。検索値やスクロールはJSON範囲を変更せず、停止Appletの起動や操作実行を伴わない。検索語と最新移動要求は同一起動中のmainに保持する。

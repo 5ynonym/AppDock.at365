@@ -14,7 +14,8 @@ public static class WindowsHotKeySession
         using var loop = new HotKeyLoop(shortcut => NotifyAsync(rpc, shortcut));
         await loop.Ready;
         await rpc.ReadAsync(async (method, parameters) => method == "hotkeys.sync"
-            ? await loop.SyncAsync(parameters.GetProperty("shortcuts").Deserialize<string[]>() ?? [])
+            ? await loop.SyncAsync(parameters.GetProperty("shortcuts").Deserialize<string[]>() ?? [],
+                parameters.TryGetProperty("foregroundProcessId", out var pid) ? pid.GetUInt32() : 0)
             : throw new InvalidOperationException("Unknown hotkey method."));
     }
 
@@ -34,6 +35,7 @@ public static class WindowsHotKeySession
         private readonly Action<string> pressed;
         private uint threadId;
         private int sequence;
+        private uint foregroundProcessId;
         public Task Ready => ready.Task;
 
         public HotKeyLoop(Action<string> pressed)
@@ -58,7 +60,12 @@ public static class WindowsHotKeySession
                     else if (message.Message == 0x0312)
                     {
                         var shortcut = registered.FirstOrDefault(pair => pair.Value == (int)message.WParam).Key;
-                        if (shortcut is not null) pressed(shortcut);
+                        if (shortcut is not null) {
+                            // WM_HOTKEY grants this worker foreground activation rights. Pass
+                            // them to the Electron host before notifying it over the pipe.
+                            if (foregroundProcessId != 0) AllowSetForegroundWindow(foregroundProcessId);
+                            pressed(shortcut);
+                        }
                     }
                 }
                 if (result < 0) Console.Error.WriteLine($"GetMessage failed: {Marshal.GetLastWin32Error()}");
@@ -70,13 +77,15 @@ public static class WindowsHotKeySession
             }
         }
 
-        public Task<object?> SyncAsync(string[] shortcuts)
+        public Task<object?> SyncAsync(string[] shortcuts, uint hostProcessId)
         {
             var completion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
             work.Enqueue(() =>
             {
                 try
                 {
+                    if (hostProcessId == uint.MaxValue) throw new ArgumentException("A specific host process is required.");
+                    foregroundProcessId = hostProcessId;
                     foreach (var shortcut in registered.Keys.Except(shortcuts).ToArray())
                     {
                         UnregisterHotKey(0, registered[shortcut]);
@@ -166,6 +175,7 @@ public static class WindowsHotKeySession
         public readonly uint Message => MessageId;
     }
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool AllowSetForegroundWindow(uint processId);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(nint window, int id);
     [DllImport("user32.dll", SetLastError = true)] private static extern int GetMessage(out NativeMessage message, nint window, uint min, uint max);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out NativeMessage message, nint window, uint min, uint max, uint remove);

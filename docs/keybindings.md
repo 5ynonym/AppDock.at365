@@ -27,6 +27,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - main/core/shortcut-dispatcherは開始前に全対象を予約する。コマンドによるキー送信の再入・同じキーの実行中再押下を抑止し、逐次awaitする。コマンド失敗は記録して続行し、終了・再起動では打ち切る。
 - mainの本体IPCとpageHostShortcutが共通resolver/dispatcherを呼ぶ。PageHostはSurfaceの可視状態と実Windowフォーカスを参照し、別Windowと埋め込み表示で同じApplet IDを使う。Surface破棄時に登録を除去する。native Appletの独自Windowは含めない。
 - WindowsHotKeyBackendはキーを重複除去して一度だけ登録。OSイベント時にはglobalを含む条件一致行を全評価する。同じキーがOS登録済みならローカル経路では実行しない。登録エラーは既存statusとして表示する。
+- hotkeys.syncはElectron本体のPIDも内部パイプで渡す。WindowsHotKeySessionはWM_HOTKEY受信時、通知より先にAllowSetForegroundWindowでそのPIDだけへ前面化の許可を渡す。表示コマンドは既存のrestore/show/focusを使い、常時最前面化や合成Alt入力を加えない。全プロセスへの許可は拒否する。根拠は[Windowsの前面化許可](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)と[WM_HOTKEYの前面化権限](https://devblogs.microsoft.com/oldnewthing/20090226-00/?p=19013)。
 - ショートカット編集dialogを開くと誤実行防止のため全グローバル登録を一時解除し、statusesを空にする。dialogを閉じると保存済み設定で再登録する。正常時の「登録済み／未登録」を表示せず、有効なglobal行で利用可能なコマンドの登録エラーだけを示す。空のstatusesは記録/再同期の一時状態でもあるため、直近の非空statusを表示専用に保持し、同じコマンド/キーのエラーを再検査結果が届くまで表示する。エラーの絞り込みも同じ表示statusを使う。無効行/別scope/利用不能コマンドへ古いエラーを表示しない。backendの登録状態/入力判定や設定draftへこの表示用キャッシュを戻さない。
 - 同じキーの複数割り当ては正常な使い方なので、行ごとの「同じキーの割り当てあり」を表示しない。共通の説明で全一致/順次実行を案内する。一覧には実行順操作・番号を置かず、専用パネルで変更した保存順序で実行する。
 - ローカル入力はkeyDownのみ、repeat/IME中/記録中を除く。本体はDOMの入力先判定を保つ。Applet Web画面はCtrl/Alt付きまたはF1〜F24/Pauseに限定して文字入力を守る。リモートへのpreload/IPC追加は行わない。グローバルはOS登録でありIME状態は参照できない。
