@@ -214,13 +214,72 @@ async function grant(id, permissions) {
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: '一般', exact: true }).click();
-    const panel = page.locator('.applet-api-permissions');
+    assert.equal(await page.getByRole('switch', { name: /^Applet：/ }).count(), 0);
+    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    assert.equal(await page.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
+    await page.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
+    const panel = page.getByRole('region', { name: '操作の許可', exact: true });
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 7);
+    await panel.getByText('直接公開なし', { exact: true }).waitFor();
+    await panel.getByText('連携中は許可', { exact: true }).waitFor();
+    const mcpWrite = panel.getByRole('switch', {
+      name: 'Codexからの設定変更を許可する',
+      exact: true,
+    });
+    await mcpWrite.click();
+    await until(
+      async () =>
+        (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.allowWrite,
+      'prepare permission while MCP off',
+    );
+    assert.equal((await snapshot()).appletApi.permissions.write, undefined);
+    assert.equal(
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
+      false,
+    );
+    await until(() => mcpWrite.isEnabled(), 'save complete');
+    await mcpWrite.click();
+    await until(
+      async () =>
+        !(await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.allowWrite &&
+        (await mcpWrite.isEnabled()),
+      'revoke while MCP off',
+    );
+    // A PC-local permission save must not discard an unrelated settings.json draft.
+    await page.getByRole('button', { name: '一般', exact: true }).click();
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    const draftText = (await page.getByRole('textbox', { name: '設定JSON' }).inputValue()) + '\n ';
+    await page.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
+    await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+    await page.getByText('未保存の変更があります', { exact: true }).waitFor();
+    const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
+    await childGrant.click();
+    await panel.getByText(/未有効：公開情報の取得・公開コマンドの実行・公開設定の変更/).waitFor();
+    assert.equal((await snapshot()).appletApi.permissions.read, undefined);
+    await until(() => childGrant.isEnabled(), 'save child grant');
+    await childGrant.click();
+    await until(
+      async () => !(await childGrant.isChecked()) && (await childGrant.isEnabled()),
+      'revoke child grant',
+    );
+    await page.getByRole('button', { name: '一般', exact: true }).click();
+    assert.equal(await page.getByRole('textbox', { name: '設定JSON' }).inputValue(), draftText);
+    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+    checks.push(
+      'one permissions page; independent Applet/MCP settings, MCP-off preparation, unmet prerequisites and revocation, fixed read/input exposure, unrelated JSON draft preserved',
+    );
     for (const label of ['公開情報の取得', '公開コマンドの実行', '公開設定の変更']) {
-      await panel.getByRole('switch', { name: label, exact: true }).click();
+      await panel.getByRole('switch', { name: 'Applet：' + label, exact: true }).click();
       await until(
         async () =>
-          (await panel.getByRole('switch', { name: label, exact: true }).isChecked()) &&
-          !(await panel.getByRole('switch', { name: label, exact: true }).isDisabled()),
+          (await panel
+            .getByRole('switch', { name: 'Applet：' + label, exact: true })
+            .isChecked()) &&
+          !(await panel
+            .getByRole('switch', { name: 'Applet：' + label, exact: true })
+            .isDisabled()),
         'permission save',
       );
     }
@@ -301,6 +360,13 @@ async function grant(id, permissions) {
           'horizontal overflow',
         );
         await page.screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
+        if (width === 700) {
+          await panel.getByText('直接公開なし', { exact: true }).scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: path.join(profile, `permissions-${theme}-${width}-input.png`),
+          });
+          await panel.getByRole('heading', { name: '操作の許可' }).scrollIntoViewIfNeeded();
+        }
       }
     }
     await client.close();

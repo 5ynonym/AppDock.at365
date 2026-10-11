@@ -218,6 +218,20 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const section = page.getByRole('region', { name: 'Codex連携' });
+    async function togglePermission(name) {
+      await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+      const control = page
+        .getByRole('region', { name: '操作の許可', exact: true })
+        .getByRole('switch', { name, exact: true });
+      await until(() => control.isEnabled(), 'permission state loaded');
+      const next = !(await control.isChecked());
+      await control.click();
+      await until(
+        async () => (await control.isChecked()) === next && (await control.isEnabled()),
+        'permission saved',
+      );
+      await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    }
     await section.getByRole('textbox', { name: 'Codexの設定ファイル' }).fill(configFile);
     await section.getByRole('button', { name: '設定先を変更', exact: true }).click();
     await until(
@@ -308,7 +322,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'EXECUTION_DISABLED',
     );
     assert.equal(fs.existsSync(path.join(fixtureRoot, 'calls.json')), false);
-    await section.getByRole('switch', { name: 'Codexからのコマンド実行を許可する' }).click();
+    await togglePermission('Codexからのコマンド実行を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).executable,
       'command permission',
@@ -330,7 +344,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'APPLET_MANAGEMENT_DISABLED',
     );
-    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await togglePermission('CodexからのApplet管理を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management permission',
@@ -363,7 +377,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     assert.equal(fs.readFileSync(activationFile, 'utf8'), stoppedActivations);
     // Local commands share the service but do not depend on external permissions.
-    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await togglePermission('CodexからのApplet管理を許可する');
     await until(
       async () => !(await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management revoked',
@@ -396,7 +410,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         (await call(client, 'appdock_get_applet', { id: fixtureId })).applet.state === 'running',
       'local management keyboard enables disabled Applet',
     );
-    await section.getByRole('switch', { name: 'CodexからのApplet管理を許可する' }).click();
+    await togglePermission('CodexからのApplet管理を許可する');
     await until(
       async () => (await call(client, 'appdock_get_info')).appletManagementAllowed,
       'management restored',
@@ -487,7 +501,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     checks.push(
       'explicit execution permission; real fixture command and WebApplet open; API outcomes in log UI and host.log without secret values',
     );
-    await section.getByRole('switch', { name: 'Codexからの設定変更を許可する' }).click();
+    await togglePermission('Codexからの設定変更を許可する');
     await until(
       async () =>
         (await page.evaluate(async () => (await window.dock.automation({ kind: 'status' })).state))
@@ -531,7 +545,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'SHORTCUT_EDITING_DISABLED',
     );
-    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await togglePermission('Codexからのショートカット編集を許可する');
     await until(
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing grant',
@@ -592,7 +606,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         !(await readShortcuts()).globalHotKeys.some((s) => s.commandId === `${fixtureId}.next`),
       'OS registration removed',
     );
-    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await togglePermission('Codexからのショートカット編集を許可する');
     await until(
       async () => !(await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing revoked',
@@ -612,7 +626,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       ).structuredContent.code,
       'SHORTCUT_EDITING_DISABLED',
     );
-    await section.getByRole('switch', { name: 'Codexからのショートカット編集を許可する' }).click();
+    await togglePermission('Codexからのショートカット編集を許可する');
     await until(
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing regranted',
@@ -651,7 +665,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       client,
       call,
       until,
-      section,
+      togglePermission,
       profile,
       fixtureId,
     });
@@ -663,7 +677,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       client,
       call,
       until,
-      section,
+      togglePermission,
       profile,
       webId,
       manage,
@@ -676,7 +690,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       client,
       call,
       until,
-      section,
+      togglePermission,
       profile,
       fixtureId,
       fixtureRoot,

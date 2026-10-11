@@ -1,7 +1,15 @@
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path');
-module.exports = async function ({ page, client, call, until, section, profile, fixtureId }) {
+module.exports = async function ({
+  page,
+  client,
+  call,
+  until,
+  togglePermission,
+  profile,
+  fixtureId,
+}) {
   const read = () => call(client, 'appdock_get_gestures');
   const edit = async (operations, extras = {}) =>
     call(client, 'appdock_execute_command', {
@@ -18,8 +26,7 @@ module.exports = async function ({ page, client, call, until, section, profile, 
         },
       })
     ).structuredContent;
-  const grant = () =>
-    section.getByRole('switch', { name: 'Codexからのジェスチャー編集を許可する' }).click();
+  const grant = () => togglePermission('Codexからのジェスチャー編集を許可する');
   const original = await read();
   assert.equal(original.gestureEditingAllowed, false);
   const additions = ['next', 'start'].map((name, i) => ({

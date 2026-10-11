@@ -1,5 +1,7 @@
 # AppDockの作業ルール
 
+- 0.26.38の操作許可UIは設定の専用「操作の許可」へ集約する。Applet/MCPを独立した列で編集し、PC専用即時保存と共有draftの保持を維持する。接続/登録はCodex連携へ残す。前提不足時は保存済みON/OFFを保って理由を表示し、他の許可を自動変更しない。仕様と回帰は[共通操作API](docs/appdock-api.md)を参照する。
+
 - 0.26.36以降のMCP/Applet共通操作は[AppDock共通操作API](docs/appdock-api.md)を正本とする。AppDockApiの単一インスタンスと操作カタログを共有し、Codexの許可と全Applet共通のPC専用許可を分離する。操作定義のcallers/permissions/schemaで公開先・許可・入力を管理し、入力APIはApplet専用とする。明示公開されたAppletコマンド経由の呼出しは許可する。AppletのHTTP接続や秘密token共有は不要。host.appdock.callの呼出元は接続から決定する。既存自己設定のcapability/非公開キー/activate時の契約を保ち、共通SettingsCommandsを通す。再入時の同期設定変更・非同期BUSY・自身の実行/管理SELF_CALL、Node/.NET SDK、旧DLL互換は専用回帰で確認する。
 
 A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示](../AGENTS.md)を読む。このファイルはAppDockリポジトリ全体に適用する。

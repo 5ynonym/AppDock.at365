@@ -247,3 +247,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 ## 共通入力API（0.26.37）
 
 Windowsのキー・操作メッセージ送信を本体InputHostへ集約し、WebBrowserToolsとWindowsToolsから呼びます。公開先・全Applet共通許可・SDK・取消・試験手順は[共通操作API](docs/appdock-api.md)を参照してください。Node実行文脈の回帰はtests/node-invocation.test.cjs、実入力はscripts/native-input-ui-test.cjsです。依存パッケージを追加せず既存MCP SDKのSchema検証器を使います。
+
+## 操作許可の統合UI（0.26.38）
+
+Applet/MCPの許可をApiPermissionsSettingsへ集約し、一般/Codex接続ページから重複スイッチを除きました。PC専用保存・設定draft・MCPの固定公開範囲は[共通操作API](docs/appdock-api.md)を参照してください。GUI回帰は新旧SDK試験とMCP試験で移動後のスイッチを実操作します。

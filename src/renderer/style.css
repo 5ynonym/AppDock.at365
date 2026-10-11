@@ -4086,9 +4086,133 @@ summary {
   cursor: pointer;
 }
 
-.applet-api-permissions {
-  margin-bottom: 28px;
+.api-permissions {
+  min-width: 0;
 }
-.applet-api-permissions > .setting-row {
+.settings-form .api-permissions h3 {
+  color: var(--text);
+  font-size: 18px;
+  margin: 0;
+}
+.permission-heading,
+.permission-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
+}
+.permission-heading > span {
+  font-size: 12px;
+}
+.api-permissions > p,
+.permission-help {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.permission-connection {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.permission-connection p {
+  flex: 1;
+  margin: 0;
+}
+.permission-save-status {
+  min-height: 22px;
+  color: var(--muted);
+}
+.permission-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+.permission-table thead th {
+  color: var(--muted);
+  font-weight: 500;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.permission-table thead th:first-child {
+  width: 46%;
+  text-align: left;
+}
+.permission-table tbody th {
+  text-align: left;
+  font-weight: 400;
+  padding: 22px 12px 22px 0;
+  border-bottom: 1px solid var(--border);
+}
+.permission-table tbody th p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.permission-table td {
+  padding: 20px 12px;
+  text-align: center;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.permission-pending {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.permission-fixed {
+  color: var(--muted);
+  line-height: 24px;
+}
+.permission-help {
+  margin-top: 24px;
+  color: var(--muted);
+}
+.permission-help summary {
+  cursor: pointer;
+  color: var(--text);
+}
+@media (max-width: 1100px) {
+  .permission-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .permission-table,
+  .permission-table tbody {
+    display: block;
+  }
+  .permission-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .permission-table tbody th {
+    grid-column: 1 / -1;
+    border: 0;
+    padding: 0 0 18px;
+  }
+  .permission-table td {
+    border: 0;
+    padding: 0 12px;
+  }
+  .permission-table td + td {
+    border-left: 1px solid var(--border);
+  }
+  .permission-table td::before {
+    content: attr(data-caller);
+    display: block;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
 }

@@ -1,7 +1,16 @@
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path');
-module.exports = async function ({ page, client, call, until, section, profile, webId, manage }) {
+module.exports = async function ({
+  page,
+  client,
+  call,
+  until,
+  togglePermission,
+  profile,
+  webId,
+  manage,
+}) {
   const read = () => call(client, 'appdock_get_ribbon');
   const edit = async (operations, extras = {}) =>
     call(client, 'appdock_execute_command', {
@@ -18,8 +27,7 @@ module.exports = async function ({ page, client, call, until, section, profile, 
         },
       })
     ).structuredContent;
-  const grant = () =>
-    section.getByRole('switch', { name: 'Codexからのリボン編集を許可する' }).click();
+  const grant = () => togglePermission('Codexからのリボン編集を許可する');
   assert.equal((await read()).ribbonEditingAllowed, false);
   assert.equal((await denied([{ kind: 'reset' }])).code, 'RIBBON_EDITING_DISABLED');
   await grant();

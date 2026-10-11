@@ -13,7 +13,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 一般 → Appletからの操作許可」で変更します。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。初期値はすべてOFF。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+0.26.38以降は本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。0.26.37の共通許可は変更せず引き継ぎます。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。初期値はすべてOFF。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -89,3 +89,9 @@ await context.AppDock.CallAsync("commands.execute", new {
 型検査、`tests/appdock-api.test.cjs`と設定/API回帰を使用します。実プロセス試験は先に`dev.bat run build:dotnet`と`dotnet build tests/fixtures/dotnet/AppDock.Extensions.ApiProbe/AppDock.Extensions.ApiProbe.csproj -c Release`を実行してから、`dev.bat node scripts/applet-api-ui-test.cjs`を直列で実行します。引数に発行EXEを渡すと隔離コピーで検証します。旧SDKでコンパイル済みのDemo DLLを`APPDOCK_TEST_LEGACY_DEMO_DLL`へ指定すると旧DLL互換も検査します。fixtureは製品へ同梱しません。
 
 入力は`tests/node-invocation.test.cjs`、InputTests、専用WinForms fixture `tests/fixtures/dotnet/AppDock.InputTarget`をReleaseビルド後の`scripts/native-input-ui-test.cjs`で検証します。後者は2Appletのpublish出力を隔離profileへコピーし、全11操作・.NET呼出し・許可取消・MCP経由の明示コマンド・対象変更・取消・連続ジェスチャーを確認します。GUIは直列で実行し、引数のEXEはwin-unpacked版を使用します。
+
+## 操作許可の画面（0.26.38）
+
+ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCP情報取得は連携中許可の固定表示、入力は直接公開なしの固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsに残し相互リンクします。
+
+従来のPC専用APIで即時保存し、共有settings.jsonのdraft/revisionとは独立します。この画面にはJSON切替を出さず、別項目の未保存変更がある場合だけ既存の保存ツールバーを表示します。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。

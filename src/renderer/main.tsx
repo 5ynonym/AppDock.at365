@@ -1,4 +1,4 @@
-import { AppletApiPermissions } from './AppletApiPermissions';
+import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { Icon, type IconName } from './Icon';
 import { Toggle } from './Toggle';
 import { CommandPalette } from './CommandPalette';
@@ -1283,6 +1283,7 @@ function SettingsPage({
     | 'ribbon'
     | 'web-accounts'
     | 'codex'
+    | 'permissions'
   >('category', 'appearance', [
     'appearance',
     'tray',
@@ -1294,6 +1295,7 @@ function SettingsPage({
     'ribbon',
     'web-accounts',
     'codex',
+    'permissions',
   ]);
   const settingsBody = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -1362,7 +1364,8 @@ function SettingsPage({
     if (webAccountsRequest) setCategory('web-accounts');
   }, [webAccountsRequest]);
   const navigateSettings = () =>
-    (['web-accounts', 'codex'].includes(category) && mode === 'json') || switchToForm();
+    (['web-accounts', 'codex', 'permissions'].includes(category) && mode === 'json') ||
+    switchToForm();
   if (!active) return null;
   return (
     <>
@@ -1381,6 +1384,7 @@ function SettingsPage({
                   ['shortcuts', 'ショートカット'],
                   ['gestures', 'マウスジェスチャー'],
                   ['web-accounts', 'Webアカウント'],
+                  ['permissions', '操作の許可'],
                   ['codex', 'Codex連携'],
                   ['profile', 'プロフィール'],
                   ['about', 'バージョン情報・更新'],
@@ -1391,7 +1395,12 @@ function SettingsPage({
                   className={category === id ? 'selected' : ''}
                   key={id}
                   onClick={() => {
-                    if (id === 'web-accounts' || id === 'codex' || navigateSettings())
+                    if (
+                      id === 'web-accounts' ||
+                      id === 'codex' ||
+                      id === 'permissions' ||
+                      navigateSettings()
+                    )
                       setCategory(id);
                   }}
                 >
@@ -1415,7 +1424,7 @@ function SettingsPage({
       <PageHeading
         title="設定"
         action={
-          ['web-accounts', 'codex'].includes(category) ? undefined : (
+          ['web-accounts', 'codex', 'permissions'].includes(category) ? undefined : (
             <button
               className="secondary"
               onClick={() => void run(() => window.dock.openPath('settings'))}
@@ -1426,37 +1435,50 @@ function SettingsPage({
           )
         }
       />
-      <SettingsToolbar editor={editor} busy={busy}>
-        {!['web-accounts', 'codex'].includes(category) && (
-          <div className="tabs">
-            <button
-              className={mode === 'form' ? 'selected' : ''}
-              onClick={() => {
-                if (mode === 'json') switchToForm();
-              }}
-            >
-              フォーム
-            </button>
-            <button
-              className={mode === 'json' ? 'selected' : ''}
-              onClick={() => {
-                if (mode !== 'json') {
-                  setText(JSON.stringify(draft, null, 2));
-                  setMode('json');
-                }
-              }}
-            >
-              JSON
-            </button>
-          </div>
-        )}
-      </SettingsToolbar>
+      {(category !== 'permissions' || dirty) && (
+        <SettingsToolbar editor={editor} busy={busy}>
+          {!['web-accounts', 'codex', 'permissions'].includes(category) && (
+            <div className="tabs">
+              <button
+                className={mode === 'form' ? 'selected' : ''}
+                onClick={() => {
+                  if (mode === 'json') switchToForm();
+                }}
+              >
+                フォーム
+              </button>
+              <button
+                className={mode === 'json' ? 'selected' : ''}
+                onClick={() => {
+                  if (mode !== 'json') {
+                    setText(JSON.stringify(draft, null, 2));
+                    setMode('json');
+                  }
+                }}
+              >
+                JSON
+              </button>
+            </div>
+          )}
+        </SettingsToolbar>
+      )}
       <div className="settings-body" ref={settingsBody}>
         <SettingsMessages editor={editor} currentRevision={snapshot.revision} />
         {category === 'codex' ? (
           <div className="settings-layout">
             <div className="settings-form">
-              <CodexSettings />
+              <CodexSettings onOpenPermissions={() => setCategory('permissions')} />
+            </div>
+          </div>
+        ) : category === 'permissions' ? (
+          <div className="settings-layout">
+            <div className="settings-form">
+              <ApiPermissionsSettings
+                grants={appletApi?.permissions ?? {}}
+                error={appletApi?.error}
+                busy={busy}
+                onOpenCodex={() => setCategory('codex')}
+              />
             </div>
           </div>
         ) : category === 'web-accounts' ? (
@@ -1622,12 +1644,12 @@ function SettingsPage({
               {category === 'general' && (
                 <>
                   <h3>一般</h3>
-                  <AppletApiPermissions
-                    grants={appletApi?.permissions ?? {}}
-                    error={appletApi?.error}
-                    busy={busy}
-                    run={run}
-                  />
+                  <SettingRow
+                    title="Applet・MCPからの操作"
+                    description="操作ごとの許可は、専用の画面でまとめて設定できます。"
+                  >
+                    <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
+                  </SettingRow>
                   <SettingRow
                     title="スタートアップに登録"
                     description="Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。"

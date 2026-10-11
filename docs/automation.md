@@ -61,7 +61,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
-編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。Codex連携画面で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
+編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
 
 ```json
 {
@@ -106,7 +106,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
 
-編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。allowEditShortcutsはPC専用automation.jsonに保存し、初期値/旧設定での省略時はfalse。「Codex連携」の「ショートカット編集を許可する」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
+編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。allowEditShortcutsはPC専用automation.jsonに保存し、初期値/旧設定での省略時はfalse。「操作の許可」のMCP列の「ショートカットの編集」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
 
 ```json
 {
@@ -152,7 +152,7 @@ revisionは本体/各Applet設定と共通です。他の設定編集・再起�
 - 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未保存draftを混同しません。
 - 成功応答はcompletion=lifecycleApplied、changed（enabledの保存有無）、applet（id/enabled/state）、effectVerified=falseです。waitingは予約状態で、起動完了を意味しません。起動失敗はLIFECYCLE_FAILEDになり、保存済みenabledは巻き戻しません。失敗/通信切断後は状態とログを確認します。
 
-PC専用automation.jsonに `allowManageApplets` を追加しました。初期値と既存設定に項目がない場合はfalseです。「Codex連携」の「Applet管理を許可する」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
+PC専用automation.jsonに `allowManageApplets` を追加しました。初期値と既存設定に項目がない場合はfalseです。「操作の許可」のMCP列の「Appletの有効・無効・再起動」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
 
 カタログのpermission=applets.manageと、system.getInfo/commands.listのappletManagementAllowedで管理権限を確認できます。拒否はAPPLET_MANAGEMENT_DISABLEDです。取消は次の要求から有効で、開始済みの処理を中断しません。ローカル操作に外部操作の許可は不要です。MCPツールは既存の7件を維持し、管理操作もcommands.execute経由で監査ログへ記録します。
 
@@ -258,7 +258,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。0.26.35ではトレイ取得を含めMCP全11ツール。更新後はCodexを再読み込みしてください。
 
-編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。Codex連携画面で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
+編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
 取得結果のlayoutはorder/hidden/bottom/separatorsだけ、itemsはid/title/kind（builtin/page/separator）/appletId/pageId/placement/visible/enabled/displayedです。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
 
@@ -296,7 +296,7 @@ revisionは全設定で共通です。古いrevision、プロセス再起動前�
 
 取得は`tray.get`（MCP `appdock_get_tray`）、変更は`commands.execute`の`appdock.tray.update`です。MCPは11ツール。更新後はCodexを再読み込みしてください。
 
-編集にはallowExecute・allowWrite・allowEditTrayの3許可が必要です。PC専用automation.jsonのallowEditTrayは新規/旧省略ともfalse。Codex連携画面で即時変更し、MCPから許可自体は変更できません。permissionはtray.write、実効許可はgetInfo/commands.list/tray.getのtrayEditingAllowed。他の編集許可とは独立しています。
+編集にはallowExecute・allowWrite・allowEditTrayの3許可が必要です。PC専用automation.jsonのallowEditTrayは新規/旧省略ともfalse。操作の許可画面のMCP列で即時変更し、MCPから許可自体は変更できません。permissionはtray.write、実効許可はgetInfo/commands.list/tray.getのtrayEditingAllowed。他の編集許可とは独立しています。
 
 取得結果はmenu（保存対象ツリー）、clicks（singleClickCommand/doubleClickCommand）、fixedCommands、assignableCommands、revision、warning、各許可。menuはid/typeと、command・groupのtitle/childrenだけを投影し、全設定や認証情報は返しません。固定の設定/終了はmenuの外にあり、末尾へ自動付加します。assignableCommandsは公開済み引数なしコマンドのid/title/available/menuAllowedです。停止中も候補を返しますが、編集で起動・コマンド実行はしません。実表示では空グループや先頭/末尾/連続区切り線を既存ルールで省略します。
 

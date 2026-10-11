@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Toggle } from './Toggle';
 import type { AutomationAction, AutomationState } from '../shared/automation';
 
-export function CodexSettings() {
+export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
   const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -80,101 +80,12 @@ export function CodexSettings() {
           onChange={(v) => configure(v)}
         />
       </div>
-      <div className="setting-row">
-        <div>
-          <strong>設定変更を許可する</strong>
-          <p>AppDockと各Appletが公開した設定を変更できます。コマンド実行の許可も必要です。</p>
-        </div>
-        <Toggle
-          label="Codexからの設定変更を許可する"
-          checked={state.allowWrite}
-          disabled={busy || !state.enabled}
-          onChange={(v) => configure(state.enabled, v)}
-        />
+      <div className="permission-connection">
+        <p>AppletとMCPから操作できる範囲は「操作の許可」で設定します。</p>
+        <button className="secondary" onClick={onOpenPermissions}>
+          操作の許可を開く
+        </button>
       </div>
-      <div className="setting-row">
-        <div>
-          <strong>コマンド実行を許可する</strong>
-          <p>AppDockと稼働中のAppletが公開したコマンドを実行できます。</p>
-        </div>
-        <Toggle
-          label="Codexからのコマンド実行を許可する"
-          checked={state.allowExecute}
-          disabled={busy || !state.enabled}
-          onChange={(allowed) => void run({ kind: 'setExecution', allowed })}
-        />
-      </div>
-      <div className="setting-row">
-        <div>
-          <strong>Applet管理を許可する</strong>
-          <p>
-            有効・無効を保存し、有効なAppletを再起動できます。コマンド実行の許可も必要です。設定変更の許可とは独立しています。
-          </p>
-        </div>
-        <Toggle
-          label="CodexからのApplet管理を許可する"
-          checked={state.allowManageApplets}
-          disabled={busy || !state.enabled || !state.allowExecute}
-          onChange={(allowed) => void run({ kind: 'setAppletManagement', allowed })}
-        />
-      </div>
-      <div className="setting-row">
-        <div>
-          <strong>ショートカット編集を許可する</strong>
-          <p>キー・条件・実行順を編集できます。設定変更とコマンド実行の許可も必要です。</p>
-        </div>
-        <Toggle
-          label="Codexからのショートカット編集を許可する"
-          checked={state.allowEditShortcuts}
-          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
-          onChange={(allowed) => void run({ kind: 'setShortcutEditing', allowed })}
-        />
-      </div>
-      <div className="setting-row">
-        <div>
-          <strong>ジェスチャー編集を許可する</strong>
-          <p>
-            割当・条件・実行順・動作設定を編集できます。設定変更とコマンド実行の許可も必要です。
-          </p>
-        </div>
-        <Toggle
-          label="Codexからのジェスチャー編集を許可する"
-          checked={state.allowEditGestures}
-          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
-          onChange={(allowed) => void run({ kind: 'setGestureEditing', allowed })}
-        />
-      </div>
-      <div className="setting-row">
-        <div>
-          <strong>リボン編集を許可する</strong>
-          <p>
-            表示・上下配置・並び順・区切り線を編集できます。設定変更とコマンド実行の許可も必要です。
-          </p>
-        </div>
-        <Toggle
-          label="Codexからのリボン編集を許可する"
-          checked={state.allowEditRibbon}
-          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
-          onChange={(allowed) => void run({ kind: 'setRibbonEditing', allowed })}
-        />
-      </div>
-      <div className="setting-row">
-        <div>
-          <strong>タスクトレイ編集を許可する</strong>
-          <p>
-            メニューとクリック・ダブルクリックの割り当てを編集できます。設定変更とコマンド実行の許可も必要です。
-          </p>
-        </div>
-        <Toggle
-          label="Codexからのタスクトレイ編集を許可する"
-          checked={state.allowEditTray}
-          disabled={busy || !state.enabled || !state.allowExecute || !state.allowWrite}
-          onChange={(allowed) => void run({ kind: 'setTrayEditing', allowed })}
-        />
-      </div>
-      <p>
-        APIの呼出しと成功・失敗は、ログの「automation」に記録します。引数の値や認証情報は記録しません。
-      </p>
       <dl className="codex-status">
         <dt>サーバー</dt>
         <dd>{state.running ? '稼働中' : state.enabled ? '起動できません' : '停止中'}</dd>

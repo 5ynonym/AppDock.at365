@@ -6,7 +6,7 @@ module.exports = async function ({
   client,
   call,
   until,
-  section,
+  togglePermission,
   profile,
   fixtureId,
   fixtureRoot,
@@ -27,8 +27,7 @@ module.exports = async function ({
         },
       })
     ).structuredContent;
-  const grant = () =>
-    section.getByRole('switch', { name: 'Codexからのタスクトレイ編集を許可する' }).click();
+  const grant = () => togglePermission('Codexからのタスクトレイ編集を許可する');
   const configure = (changes) => ({ kind: 'configure', changes });
   assert.equal((await read()).trayEditingAllowed, false);
   assert.equal(
