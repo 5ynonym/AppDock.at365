@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -52,7 +54,11 @@ export function UpdateSettings({
       .catch((error) => setError(String(error).replace(/^Error: /, '')));
   };
   return (
-    <section className="update-settings" aria-label="アップデート設定">
+    <section
+      {...settingAnchor('about', 'updateActions')}
+      className="update-settings"
+      aria-label="アップデート設定"
+    >
       <div className="actions update-actions">
         <button
           className="update-primary"
@@ -90,11 +96,11 @@ export function UpdateSettings({
           {error}
         </p>
       )}
-      <details className="update-disclosure">
-        <summary>更新の設定</summary>
+      <details className="update-disclosure" {...settingAnchor('about', 'updates')}>
+        <summary>{hostSettingItem('about', 'updates').title}</summary>
         <div className="update-settings-content">
-          <label className="update-source">
-            <span>AppDockの更新元</span>
+          <label className="update-source" {...settingAnchor('about', 'hostSource')}>
+            <span>{hostSettingItem('about', 'hostSource').title}</span>
             <SettingsInput
               aria-label="AppDockの更新元"
               value={draft.updates.hostSource}
@@ -124,13 +130,13 @@ export function UpdateSettings({
           <div className="update-options">
             {(
               [
-                ['checkHostOnStartup', '起動時にAppDockの更新を確認'],
-                ['checkAppletsOnStartup', '起動時にAppletの更新を確認'],
-                ['notifyOnStartup', '起動時に更新が見つかったら通知'],
-                ['allowSameVersion', '同じバージョンの再適用を許可（開発用）'],
+                'checkHostOnStartup',
+                'checkAppletsOnStartup',
+                'notifyOnStartup',
+                'allowSameVersion',
               ] as const
-            ).map(([key, title]) => (
-              <label key={key}>
+            ).map((key) => (
+              <label key={key} {...settingAnchor('about', key)}>
                 <SettingsInput
                   type="checkbox"
                   checked={draft.updates[key]}
@@ -140,11 +146,11 @@ export function UpdateSettings({
                     })
                   }
                 />
-                {title}
+                {hostSettingItem('about', key).title}
               </label>
             ))}
-            <label>
-              起動から確認までの秒数
+            <label {...settingAnchor('about', 'startupDelaySeconds')}>
+              {hostSettingItem('about', 'startupDelaySeconds').title}
               <SettingsInput
                 aria-label="起動から確認までの秒数"
                 type="number"

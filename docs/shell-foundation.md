@@ -58,7 +58,7 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 ## 後続計画
 
-設定の左右領域とApplet詳細の設定本文は`page.settings`で共用する。選択ページの値だけを配信し、入力の受付・保存はmainの共有編集セッションへ接続する。境界は[設定基盤](settings-foundation.md)を参照する。Appletインデックスと横断検索は段階3で追加する。
+設定の左右領域とApplet詳細の設定本文は`page.settings`で共用する。選択ページの値だけを配信し、入力の受付・保存はmainの共有編集セッションへ接続する。境界は[設定基盤](settings-foundation.md)を参照する。Appletインデックス・横断検索・項目移動も同じ公開契約で提供する。
 
 複数Window・複数Shellの同時表示は未実装。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 

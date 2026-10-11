@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-12: Appletインデックス・設定横断検索、段階3の完了（0.27.1）
+
+- 設定左側に本体カテゴリ・Applet一覧と横断検索を追加。mainの静的カタログをNFKC・AND・安定順位で検索し、結果からページ全体のフォームを表示、安定IDで折りたたみ展開・スクロール・フォーカス・約2秒の強調を行う。検索値やスクロールはJSON範囲を変更せず、停止Appletの起動や操作実行を伴わない。検索語と最新移動要求は同一起動中のmainに保持する。
+- Applet本文内の旧ローカル検索を両入口から撤去し、同じ本文・編集状態を維持。検索は本文枠の外の左インデックスに置く。詳細の設定タブは継続し、詳細内に二重の検索・編集管理を加えていない。保存・破棄の全編集対象、即時保存、保存先、許可、互換変換は維持する。
+- 発行前レビューでは公開モデルのページ境界、現在値を検索へ含めないこと、宣言由来の別名・静的選択肢、連続移動と古い完了通知、対象削除、Shell復旧、本文共用を確認。停止/無効Appletアクションの利用不可表示、全本体項目の安定アンカー、複合コントロールの移動先と表示名共用を整備した。型名・操作・512文字上限・移動先は設計書とShell文書へ反映した。
+- 最終型検査と標準回帰 **309/309** 成功。ソース隔離GUI8本（settings-search 7群、settings-shell 10群、settings-notice 9群、navigation 17群、preferences 7群、settings-scroll、applet-sidebar 6群、shell-home 7群）が全成功。全本体項目のアンカー、検索0件/消去/キーボード、全本文維持、両入口の共有、WebApplet追加/削除、部分JSON、不正入力/数値途中入力/画像/競合、公開契約だけのShell fixture、故障/ready timeout/safe-shellを確認。両テーマ・狭幅・ホームzoom、検索の700/900幅・reduced motionも確認した。
+- 初回search GUIは試験用Webアカウント未作成のため既存の保存ガードで拒否された。fixtureでアカウントを作成するよう修正後に成功。最終回帰の初回navigationは、全本文30行（文字列24、型付き4、開始遅延、操作）を25行とする試験の期待値誤りで失敗した。修正後の最終ツリーで型検査・標準回帰・GUI全8本を再実行し成功。製品側のガードを緩和せず、失敗証跡を保持した。
+- 検証前後のstage treeは `1678a7ac7b3a35c7238d8f27a26c82726d29f1e2` で一致。完全ログ・実行時刻・終了コード・入力/ログhashは `.artifacts/commit-validation-settings-stage3/validation.json` と `results.jsonl`。関連文書のローカルリンク156件成功。検証後の追記はこのVERIFICATIONのみ。段階1・2は `a1fe63d` にまとめ、段階3を別コミットとする。
+- 保存項目・保存ファイル・既存操作の互換性を変えない検索UI追加としてパッチ版0.27.1へ更新。Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401、Windows 11 x64 10.0.26300。版更新後のfrozen installは制限環境のstack overflow後、同一コマンドの通常環境実行で359件再利用・download0で成功。依存版・lockfile・toolchain・検査機構は変更していない。
+- 通常publish終了コード0。`publish/AppDock.at365.exe` は **144102261 bytes / SHA256 `237fe479b4a952c98774f9f0b261ab9d6773fb32bc41472dc10eb49b221991fd`**。update.jsonのSHA256は `5cbe2ef9fdabc789f3cd2beb933d83a284020eadfcd01bbd7413dfc6c8a88370`。feedの版・size・hash、固定コピー `.artifacts/settings-stage3-0.27.1/` が一致。段階1・2の固定EXEも保持した。本体だけを発行し、未変更Applet再発行・全体ZIP作成なし。
+- 固定EXEのsettings-search 7群（settings-search-1791743659346）、settings-shell 9群（settings-shell-1791743687387）、settings-notice 8群（settings-notice-1791743721313）が成功。全項目移動・両入口・全体保存・不正JSON・revision競合・再起動保存・提供元切替・ready timeout復旧を確認。固定版の寸法は初期Window、renderer強制crash/700・900幅の切替はソース試験と区別する。各profileは.artifacts配下。
+- 終了・成功を確認した古い非保護profile12件（navigation 1、settings-notice 3、settings-shell 8）を、絶対パス境界・再解析ポイント・使用中プロセス検査後に整理した。各方式の直近3回・参照済み検証資料・失敗/不明・固定EXE・再利用fixtureは保持。削除名は `cleanup-deleted.json`、残存隔離プロセス0は `remaining-processes.json`。再現用最終実行スクリプトを証跡内に保存し、不要な今回の編集補助スクリプトを削除した。
+- 未確認: 物理日本語IME変換、実モニターのDPI切替、実利用アカウント/外部サービス、UAC登録・実更新適用。IMEは合成compositionイベント、DPIに関する今回の表示確認は現在の環境とzoomによる確認。ネイティブ入力フック/全兄弟Applet/全Release回帰の一律再実行は対象外。push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-12: 設定Shell・部分JSON、段階1・2の完了（0.27.0）
 
 - 設定全11カテゴリとApplet詳細の設定本文をDefault Shellへ移行。page.settingsの公開モデルには選択ページの値・定義・必要な補助情報・不透明な操作IDだけを渡す。mainの共有編集、既存保存先・即時保存・許可・互換変換を使用し、全体JSON画面と本体側の重複描画を撤去した。

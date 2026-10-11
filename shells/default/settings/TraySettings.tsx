@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -197,13 +199,9 @@ export function TraySettings({
     <section className="tray-settings" aria-label="タスクトレイ設定">
       <h3>タスクトレイ</h3>
       {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
-        <div className="tray-click-setting" key={key}>
+        <div className="tray-click-setting" key={key} {...settingAnchor('tray', key)}>
           <div>
-            <strong>
-              {key === 'trayClickCommand'
-                ? 'トレイクリックのコマンド'
-                : 'トレイダブルクリックのコマンド'}
-            </strong>
+            <strong>{hostSettingItem('tray', key).title}</strong>
             {key === 'trayDoubleClickCommand' && (
               <small>
                 未設定ならクリックをすぐ実行。設定するとWindowsのダブルクリック判定時間だけ待機します。
@@ -242,7 +240,7 @@ export function TraySettings({
           </div>
         </div>
       ))}
-      <h3>コンテキストメニュー</h3>
+      <h3 {...settingAnchor('tray', 'trayMenu')}>{hostSettingItem('tray', 'trayMenu').title}</h3>
       <div className="tray-toolbar">
         <button className="secondary" onClick={() => setPicker('add')}>
           ＋ コマンド

@@ -294,11 +294,11 @@ const checks = [];
 
     await chooseApplet('検証Applet 01');
     await body.getByLabel('検証項目 0', { exact: true }).fill('編集した値');
-    await body.getByLabel('Appletの設定項目を検索').fill('検証項目 23');
+    assert.equal(await body.getByLabel('Appletの設定項目を検索').count(), 0);
     assert.equal(
       await body.locator('.applet-settings .setting-row').count(),
-      2,
-      'the matched setting and the common startup delay remain visible',
+      30, // 24 strings, four typed settings, startup delay and the action row.
+      'all declared settings, the common startup delay and action remain visible',
     );
     await body.getByLabel('検証項目 23', { exact: true }).fill('末尾の値');
     await chooseApplet('検証Applet 02');

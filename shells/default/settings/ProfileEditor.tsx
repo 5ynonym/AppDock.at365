@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -47,10 +49,10 @@ export function ProfileEditor({
           <p>Your personal workspace</p>
         </div>
       </div>
-      <div className="setting-row">
+      <div className="setting-row" {...settingAnchor('profile', 'name')}>
         <div>
-          <strong>ユーザー名</strong>
-          <p>80文字以内で入力してください。</p>
+          <strong>{hostSettingItem('profile', 'name').title}</strong>
+          <p>{hostSettingItem('profile', 'name').description}</p>
         </div>
         <SettingsInput
           aria-label="ユーザー名"
@@ -60,10 +62,10 @@ export function ProfileEditor({
           onChange={(e) => onName(e.target.value)}
         />
       </div>
-      <div className="setting-row">
+      <div className="setting-row" {...settingAnchor('profile', 'avatar')}>
         <div>
-          <strong>アバター画像</strong>
-          <p>PNG / JPEG · 5MBまで。同名の別画像は登録できません。</p>
+          <strong>{hostSettingItem('profile', 'avatar').title}</strong>
+          <p>{hostSettingItem('profile', 'avatar').description}</p>
         </div>
         <div className="profile-actions">
           <button

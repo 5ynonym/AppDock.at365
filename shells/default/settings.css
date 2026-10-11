@@ -49,3 +49,58 @@
 .settings-surface.applet > main {
   padding: 0;
 }
+.settings-search {
+  width: 100%;
+  margin: 0 0 12px;
+}
+.settings-applet-heading {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 18px 12px 8px;
+  color: var(--muted);
+}
+.settings-categories [role='option'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+}
+.settings-categories [role='option'] small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.settings-result-count {
+  margin: 4px 10px 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+[data-setting-item] {
+  scroll-margin-block: 12px;
+}
+[data-setting-item].setting-highlight {
+  outline: 2px solid var(--accent, #32968b);
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent, #32968b) 12%, transparent);
+}
+.settings-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-body {
+    scroll-behavior: auto;
+  }
+  [data-setting-item] {
+    transition: none;
+    animation: none;
+  }
+}

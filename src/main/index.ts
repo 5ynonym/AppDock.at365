@@ -210,6 +210,7 @@ async function toggleTheme() {
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
+const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
 const settingsEditing = new SettingsEditingSession({
   current: () => settings.snapshot(),
   applets: () => (manager ? allApplets() : []),
@@ -1645,6 +1646,7 @@ async function initialize() {
     create: (request) =>
       request.kind === 'settings'
         ? new SettingsPageSession(request, {
+            navigation: settingsNavigation,
             editor: settingsEditing,
             host: snapshot,
             changed,

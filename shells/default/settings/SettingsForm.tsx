@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings, ExtensionSnapshot, HostSnapshot } from '../../../src/shared/contracts';
 import type { SettingsPageModel } from '../../../src/shared/settings-page';
@@ -112,7 +114,7 @@ export function SettingsForm({
         )}
         {category === 'about' && (
           <section className="about-page" aria-label="バージョン情報・更新">
-            <div className="about-host">
+            <div className="about-host" {...settingAnchor('about', 'versions')}>
               <span className="section-label">APPDOCK</span>
               <h2>
                 AppDock.at365 <span>v{version}</span>
@@ -149,7 +151,7 @@ export function SettingsForm({
                 </dl>
               </details>
             </div>
-            <h3>インストール済みのApplet</h3>
+            <h3 {...settingAnchor('about', 'updateSource')}>インストール済みのApplet</h3>
             <p className="muted">
               Appletごとに更新できます。更新元を変えるときは各欄の設定を開いてください。
             </p>
@@ -199,10 +201,7 @@ export function SettingsForm({
         {category === 'appearance' && (
           <>
             <h3>表示</h3>
-            <SettingRow
-              title="Shell"
-              description="Shell Appletが担当する領域だけを差し替え、ほかの領域はDefault Shellを使います。有効にしてから選択してください。"
-            >
+            <SettingRow pageId={category} itemKey="shellProvider">
               <select
                 aria-label="Shell"
                 value={draft.host.shellProvider || defaultShellId}
@@ -227,7 +226,7 @@ export function SettingsForm({
                   ))}
               </select>
             </SettingRow>
-            <SettingRow title="テーマ" description="ワークスペースの配色を選びます。">
+            <SettingRow pageId={category} itemKey="theme">
               <select
                 aria-label="テーマ"
                 value={draft.host.theme}
@@ -254,16 +253,10 @@ export function SettingsForm({
         {category === 'general' && (
           <>
             <h3>一般</h3>
-            <SettingRow
-              title="Applet・MCPからの操作"
-              description="操作ごとの許可は、専用の画面でまとめて設定できます。"
-            >
+            <SettingRow pageId={category} itemKey="permissions">
               <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
             </SettingRow>
-            <SettingRow
-              title="スタートアップに登録"
-              description="Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。"
-            >
+            <SettingRow pageId={category} itemKey="startAtLogon">
               <Toggle
                 label="スタートアップに登録"
                 checked={draft.host.startAtLogon}
@@ -271,10 +264,7 @@ export function SettingsForm({
                 onChange={(v) => edit({ ...draft, host: { ...draft.host, startAtLogon: v } })}
               />
             </SettingRow>
-            <SettingRow
-              title="常に管理者として起動"
-              description="次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。"
-            >
+            <SettingRow pageId={category} itemKey="runAsAdministrator">
               <Toggle
                 label="常に管理者として起動"
                 checked={draft.host.runAsAdministrator}
@@ -283,7 +273,8 @@ export function SettingsForm({
               />
             </SettingRow>
             <SettingRow
-              title="現在の起動状態"
+              pageId={category}
+              itemKey="launch"
               description={
                 launch.supported
                   ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
@@ -312,28 +303,11 @@ export function SettingsForm({
               </p>
             )}
             {(
-              [
-                [
-                  'closeToTray',
-                  '閉じるとトレイに常駐',
-                  'ウィンドウを閉じた後もAppletを動かします。',
-                ],
-                ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
-                [
-                  'hardwareAcceleration',
-                  'ハードウェアアクセラレーション',
-                  'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
-                ],
-                [
-                  'startMinimized',
-                  'トレイから起動',
-                  '次の起動時はウィンドウを表示せず、トレイに常駐します。',
-                ],
-              ] as const
-            ).map(([key, title, description]) => (
-              <SettingRow key={key} title={title} description={description}>
+              ['closeToTray', 'notifications', 'hardwareAcceleration', 'startMinimized'] as const
+            ).map((key) => (
+              <SettingRow key={key} pageId={category} itemKey={key}>
                 <Toggle
-                  label={title}
+                  label={hostSettingItem(category, key).title}
                   checked={draft.host[key]}
                   onChange={(v) => edit({ ...draft, host: { ...draft.host, [key]: v } })}
                 />
@@ -346,19 +320,22 @@ export function SettingsForm({
   );
 }
 function SettingRow({
-  title,
+  pageId,
+  itemKey,
   description,
   children,
 }: {
-  title: string;
-  description: string;
+  pageId: string;
+  itemKey: string;
+  description?: string;
   children: React.ReactNode;
 }) {
+  const item = hostSettingItem(pageId, itemKey);
   return (
-    <div className="setting-row">
+    <div className="setting-row" {...settingAnchor(pageId, itemKey)}>
       <div>
-        <strong>{title}</strong>
-        <p>{description}</p>
+        <strong>{item.title}</strong>
+        <p>{description ?? item.description}</p>
       </div>
       {children}
     </div>

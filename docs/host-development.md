@@ -65,7 +65,7 @@ window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
-Applet一覧は本体renderer、設定カテゴリはDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsEditingSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
+Applet管理一覧は本体renderer、設定カテゴリ・設定用Applet一覧・横断検索はDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsEditingSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
 
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
@@ -207,3 +207,9 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 設定ジェスチャーも全コマンド一覧へ統一し、CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用します。ShortcutCommandList/ShortcutOrderDialogはキー用、GesturesEditor/GestureOrderDialogはジェスチャー用の保存処理と表示を渡します。AppletShortcutDialogとGestureBindingDialogは入力と条件を構成し、キー記録はShortcutCaptureFieldを共用します。両方のメニューは編集・同入力の実行順・即時削除（confirmDelete=false）。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を維持します。条件の差異と全体設定は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照してください。
 
 詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。
+
+### 設定インデックスと項目移動
+
+設定本文内のAppletローカル検索は両入口から除去した。横断検索は本文外の左インデックスに置く。詳細側へ検索入口を追加する場合も、設定本文の枠外に置き、別の検索・下書き管理を作らない。
+
+hostSettingsPagesとhostSettingItemの静的ラベル・説明、Applet宣言をカタログと専用フォームで共有する。設定キーのaliasesは従来の保存互換キーのまま検索語にも使い、動的候補・現在値を索引に入れない。複合一覧はブロック単位、object-listの静的フィールドは親項目へ移動する。

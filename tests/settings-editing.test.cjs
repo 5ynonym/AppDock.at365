@@ -233,3 +233,37 @@ test('host projections preserve unknown sibling fields and exclude builtin updat
     undefined,
   );
 });
+
+test('search includes legacy key aliases and static object fields, never dynamic choices or data values', () => {
+  const v = createDefaultSettings();
+  const rows = [
+    {
+      id: 'test.search',
+      displayName: 'Search',
+      runtime: 'node',
+      settings: [
+        {
+          key: 'modern',
+          aliases: ['legacy'],
+          title: 'Canonical',
+          description: 'Description',
+          type: 'object-list',
+          fields: [
+            {
+              key: 'location',
+              title: 'Folder',
+              type: 'select',
+              options: [{ label: 'Static choice', value: 'static' }],
+            },
+          ],
+        },
+      ],
+      settingOptions: { modern: [{ label: 'Secret dynamic', value: 'secret' }] },
+    },
+  ];
+  const pages = settingsCatalog(rows, v);
+  assert.equal(searchSettings(pages, 'LEGACY folder')[0].key, 'setting:modern');
+  assert.equal(searchSettings(pages, 'static choice')[0].title, 'Canonical');
+  assert.equal(searchSettings(pages, 'secret dynamic').length, 0);
+  assert.equal(searchSettings(pages, 'Canonical')[0].title, 'Canonical');
+});

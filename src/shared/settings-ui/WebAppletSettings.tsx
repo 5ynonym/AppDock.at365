@@ -1,3 +1,5 @@
+import { webSettingLabels, appletSettingsPageId } from '../settings-catalog';
+import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { settingsControls } from './api';
 import { useEffect, useRef, useState } from 'react';
@@ -335,8 +337,8 @@ export function WebAppletSettings({
       )}
       {tab === 'settings' && item && (
         <div className="web-applet-form" key={item.id}>
-          <label>
-            名前
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'name')}>
+            {webSettingLabels.name}
             <SettingsInput
               aria-label="WebAppletの名前"
               value={item.name}
@@ -344,8 +346,8 @@ export function WebAppletSettings({
               onChange={(e) => change({ name: e.target.value })}
             />
           </label>
-          <label>
-            開始URL
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'url')}>
+            {webSettingLabels.url}
             <SettingsInput
               aria-label="WebAppletのURL"
               value={item.url}
@@ -357,9 +359,12 @@ export function WebAppletSettings({
               }}
             />
           </label>
-          <div className="actions">
+          <div
+            className="actions"
+            {...settingAnchor(appletSettingsPageId(item.id), 'action:defaults')}
+          >
             <button className="secondary" disabled={busy} onClick={() => void defaults()}>
-              Web側の推奨設定を取得
+              {webSettingLabels['action:defaults']}
             </button>
             {item.icon && (
               <>
@@ -370,8 +375,8 @@ export function WebAppletSettings({
               </>
             )}
           </div>
-          <label>
-            アイコン画像（PNG / JPEG / WebP、4MB以下）
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'icon')}>
+            {webSettingLabels.icon}
             <SettingsInput
               aria-label="WebAppletのアイコン画像"
               type="file"
@@ -413,8 +418,8 @@ export function WebAppletSettings({
               }}
             />
           </label>
-          <label>
-            表示方法
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'display')}>
+            {webSettingLabels.display}
             <select
               aria-label="WebAppletの表示方法"
               value={item.display}
@@ -424,8 +429,8 @@ export function WebAppletSettings({
               <option value="window">別ウィンドウ</option>
             </select>
           </label>
-          <label>
-            ページ遷移
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'navigation')}>
+            {webSettingLabels.navigation}
             <select
               aria-label="WebAppletのページ遷移"
               value={item.navigation}
@@ -436,8 +441,8 @@ export function WebAppletSettings({
               <option value="any">HTTP(S)のページを許可</option>
             </select>
           </label>
-          <label>
-            追加の許可先（認証用など、1行1origin）
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'allowedOrigins')}>
+            {webSettingLabels.allowedOrigins}
             <SettingsTextarea
               aria-label="WebAppletの追加許可先"
               value={item.allowedOrigins.join('\n')}
@@ -447,8 +452,8 @@ export function WebAppletSettings({
               placeholder="https://accounts.example.com"
             />
           </label>
-          <label>
-            使用するWebアカウント
+          <label {...settingAnchor(appletSettingsPageId(item.id), 'accountId')}>
+            {webSettingLabels.accountId}
             <select
               aria-label="WebAppletのアカウント"
               value={item.accountId}
@@ -466,15 +471,21 @@ export function WebAppletSettings({
               ))}
             </select>
           </label>
-          <div className="actions">
+          <div
+            className="actions"
+            {...settingAnchor(appletSettingsPageId(item.id), 'action:accounts')}
+          >
             <button className="text-button" onClick={onAccounts}>
-              Webアカウントを管理
+              {webSettingLabels['action:accounts']}
             </button>
           </div>
           <p className="muted">
             同じ枠を選んだWebAppletはログイン状態を共有します。Gmailの枠とは共有しません。
           </p>
-          <div className="actions">
+          <div
+            className="actions"
+            {...settingAnchor(appletSettingsPageId(item.id), 'action:delete')}
+          >
             <button
               className="text-button danger"
               onClick={() => {
@@ -489,7 +500,7 @@ export function WebAppletSettings({
                 setSelected('');
               }}
             >
-              このWebAppletを削除
+              {webSettingLabels['action:delete']}
             </button>
           </div>
           <p className="muted">

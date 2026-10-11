@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -74,9 +76,9 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       <p>
         同じPCのCodexからAppDockの状態を確認し、基本設定の変更や公開されたコマンドの実行ができます。連携の設定はこのPCへ即時反映されます。
       </p>
-      <div className="setting-row">
+      <div className="setting-row" {...settingAnchor('codex', 'automation')}>
         <div>
-          <strong>連携を有効にする</strong>
+          <strong>{hostSettingItem('codex', 'automation').title}</strong>
           <p>AppDockの起動中に接続できます。</p>
         </div>
         <Toggle
@@ -86,7 +88,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           onChange={(v) => configure(v)}
         />
       </div>
-      <div className="permission-connection">
+      <div className="permission-connection" {...settingAnchor('codex', 'permissions')}>
         <p>AppletとMCPから操作できる範囲は「操作の許可」で設定します。</p>
         <button className="secondary" onClick={onOpenPermissions}>
           操作の許可を開く
@@ -120,7 +122,9 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           {message}
         </p>
       )}
-      <h3>Codexへ登録</h3>
+      <h3 {...settingAnchor('codex', 'registration')}>
+        {hostSettingItem('codex', 'registration').title}
+      </h3>
       <p>
         このAppDockの接続情報だけをCodex設定に追加します。登録後はCodexを再読み込みまたは再起動してください。
       </p>
@@ -169,8 +173,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           : '新しいCodexチャットで「AppDockの状態を確認して」と依頼してください。'}{' '}
         接続テストはAppDock内の疎通確認です。
       </p>
-      <details>
-        <summary>接続の詳細</summary>
+      <details {...settingAnchor('codex', 'connection')}>
+        <summary>{hostSettingItem('codex', 'connection').title}</summary>
         <dl className="codex-status">
           <dt>接続先</dt>
           <dd>{state.endpoint || '連携を有効にすると決まります'}</dd>

@@ -6,6 +6,7 @@ import { configureSettingsControls } from '../../src/shared/settings-ui/api';
 import { shortcutFromEvent } from '../../src/shared/commands';
 import { SettingsViewClient } from './settings/runtime';
 import { SettingsForm } from './settings/SettingsForm';
+import { SettingsIndex } from './settings/SettingsIndex';
 import { SettingsTextarea } from '../../src/shared/settings-ui/SettingsInput';
 import '../../src/shared/settings-ui/controls.css';
 import './settings.css';
@@ -17,6 +18,7 @@ declare global {
 function App() {
   const [model, setModel] = useState<SettingsPageModel>();
   const [error, setError] = useState('');
+  const [movement, setMovement] = useState({ id: '', text: '' });
   const client = useRef<SettingsViewClient | null>(null);
   const drag = useRef<{ x: number; width: number } | null>(null);
   if (!client.current) {
@@ -79,6 +81,48 @@ function App() {
   useEffect(() => {
     if (model) document.documentElement.dataset.theme = model.dark ? 'dark' : 'light';
   }, [model?.dark]);
+  useEffect(() => {
+    const move = model?.content.move;
+    if (!move || move.completed || model.content.editing.mode !== 'form') return;
+    let done = false,
+      highlight: ReturnType<typeof setTimeout> | undefined;
+    let target: HTMLElement | null = null;
+    const reveal = () => {
+      if (done || c.model?.content.move?.id !== move.id) return;
+      target = document.querySelector<HTMLElement>(
+        `[data-setting-item="${CSS.escape(move.itemId)}"]`,
+      );
+      if (!target) return;
+      done = true;
+      observer.disconnect();
+      for (let parent: HTMLElement | null = target; parent; parent = parent.parentElement)
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
+      target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      target.focus({ preventScroll: true });
+      target.classList.add('setting-highlight');
+      highlight = setTimeout(() => target?.classList.remove('setting-highlight'), 2000);
+      setMovement({
+        id: move.id,
+        text: `${model.content.page.items.find((i) => i.id === move.itemId)?.title ?? '設定項目'}へ移動しました。`,
+      });
+      void c.act({ kind: 'moved', requestId: move.id, pageId: move.pageId }).catch(() => {});
+    };
+    const observer = new MutationObserver(reveal);
+    observer.observe(document.getElementById('root')!, { childList: true, subtree: true });
+    const frame = requestAnimationFrame(reveal);
+    const timeout = setTimeout(() => {
+      observer.disconnect();
+      if (!done) setError('設定項目の表示を待てませんでした。検索結果を選び直してください。');
+    }, 5000);
+    return () => {
+      done = true;
+      cancelAnimationFrame(frame);
+      clearTimeout(timeout);
+      clearTimeout(highlight);
+      observer.disconnect();
+      target?.classList.remove('setting-highlight');
+    };
+  }, [model?.content.move?.id, model?.content.page.id, model?.content.editing.mode]);
   const act = (operation: SettingsPageOperation) => void c.act(operation).catch(() => {});
   if (!model) return <p role="status">設定を読み込んでいます…{error}</p>;
   const { page, navigation, editing, context } = model.content;
@@ -97,23 +141,7 @@ function App() {
           aria-label="設定一覧"
         >
           <h2>設定</h2>
-          <div className="sidebar-extensions">
-            {navigation.map((p) => (
-              <button
-                key={p.id}
-                className={p.id === page.id ? 'selected' : undefined}
-                aria-current={p.id === page.id ? 'true' : undefined}
-                onClick={() => act({ kind: 'select', pageId: p.id })}
-              >
-                <span title={p.title}>{p.title}</span>
-                {p.dirty ? (
-                  <small className="unsaved-mark" aria-label="未保存">
-                    ●
-                  </small>
-                ) : null}
-              </button>
-            ))}
-          </div>
+          <SettingsIndex content={model.content} act={act} />
           <div
             className="sidebar-resizer"
             role="separator"
@@ -212,7 +240,9 @@ function App() {
           </button>
         )}
         <div className="settings-body" key={page.id + editing.mode}>
-          {editing.mode === 'json' ? (
+          {page.unavailableReason ? (
+            <p role="status">{page.unavailableReason}</p>
+          ) : editing.mode === 'json' ? (
             <SettingsTextarea
               aria-label="設定JSON"
               value={editing.text}
@@ -237,6 +267,9 @@ function App() {
             />
           )}
         </div>
+        <span key={movement.id} className="settings-live" role="status" aria-live="polite">
+          {movement.text}
+        </span>
       </main>
     </div>
   );

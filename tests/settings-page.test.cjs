@@ -29,10 +29,12 @@ function fixture() {
     changed() {},
   });
   let calls = 0;
+  const navigation = { query: '' };
   const page = new SettingsPageSession(
     { id: 'full', route: 'settings', kind: 'settings', context: 'full' },
     {
       editor,
+      navigation,
       host: () => ({ settings: saved, extensions: applets, dark: false }),
       auxiliary: () => ({}),
       actions: () => ({ sample: async () => ++calls }),
@@ -53,6 +55,20 @@ function fixture() {
   return {
     page,
     editor,
+    applets,
+    navigation,
+    replacement: () =>
+      new SettingsPageSession(
+        { id: 'replacement', route: 'settings', kind: 'settings', context: 'full' },
+        {
+          editor,
+          navigation,
+          host: () => ({ settings: saved, extensions: applets, dark: false }),
+          auxiliary: () => ({}),
+          actions: () => ({}),
+          changed() {},
+        },
+      ),
     act,
     get saved() {
       return saved;
@@ -117,4 +133,49 @@ test('partial JSON and incomplete numeric input survive controller replacement a
   assert.equal(f.saved.value.extensions['fixture.a.b'].settings['n.x'], 9);
   assert.equal(f.saved.value.extensions['private.other'].settings.secret, 'private-value');
   assert.equal(JSON.stringify(f.page.snapshot()).includes('private-value'), false);
+});
+
+test('search is metadata-only and persistent; explicit movement switches page and latest acknowledgement wins', async () => {
+  const f = fixture();
+  const before = f.editor.snapshot();
+  await f.act({ kind: 'search', text: 'ＦＩＸＴＵＲＥ number' });
+  const results = f.page.snapshot().content.results;
+  assert.equal(results.length, 1);
+  assert.equal(results[0].definition, undefined);
+  assert.deepEqual(f.editor.snapshot(), before);
+  assert.equal(f.replacement().snapshot().content.query, 'ＦＩＸＴＵＲＥ number');
+  await f.act({ kind: 'move', itemId: results[0].id });
+  const move = f.page.snapshot().content.move;
+  assert.equal(f.editor.snapshot().pageId, 'applet:fixture.a.b');
+  assert.equal(f.editor.snapshot().dirty, false);
+  await f.act({ kind: 'move', itemId: results[0].id });
+  const latest = f.page.snapshot().content.move;
+  await assert.rejects(f.act({ kind: 'moved', requestId: move.id, pageId: move.pageId }), /古く/);
+  await f.act({ kind: 'moved', requestId: latest.id, pageId: latest.pageId });
+  assert.equal(f.page.snapshot().content.move.completed, true);
+  await f.act({ kind: 'search', text: 'private-value' });
+  assert.equal(f.page.snapshot().content.results.length, 0);
+  assert.equal(f.editor.snapshot().pageId, latest.pageId);
+  await assert.rejects(f.act({ kind: 'search', text: 'x'.repeat(513) }), /512/);
+});
+test('invalid JSON prevents result movement without clearing query or raw input; removed targets are rejected', async () => {
+  const f = fixture();
+  await f.act({ kind: 'edit', action: { type: 'mode', value: 'json' } });
+  await f.act({
+    kind: 'edit',
+    action: { type: 'partial-text', pageId: 'appearance', value: '{broken' },
+  });
+  await f.act({ kind: 'search', text: 'Number' });
+  const result = f.page.snapshot().content.results[0];
+  await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /JSON/);
+  assert.equal(f.editor.snapshot().text, '{broken');
+  assert.equal(f.editor.snapshot().pageId, 'appearance');
+  await f.act({ kind: 'edit', action: { type: 'discard' } });
+  await f.act({ kind: 'move', itemId: result.id });
+  f.applets.splice(0);
+  assert.equal(f.page.snapshot().content.results.length, 0);
+  assert(f.page.snapshot().content.page.unavailableReason);
+  await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /見つかりません/);
+  await f.act({ kind: 'select', pageId: 'profile' });
+  assert.equal(f.page.snapshot().content.page.id, 'profile');
 });

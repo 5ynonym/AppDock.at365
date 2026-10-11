@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { useState } from 'react';
 import type { Settings, ExtensionSnapshot } from '../../../src/shared/contracts';
 import type { UiCommand } from '../../../src/shared/commands';
@@ -70,9 +72,13 @@ export function GesturesEditor({
     );
   });
   return (
-    <section className="gestures-editor command-shortcuts" aria-label="マウスジェスチャー設定">
+    <section
+      className="gestures-editor command-shortcuts"
+      {...settingAnchor('gestures', 'gestures')}
+      aria-label="マウスジェスチャー設定"
+    >
       <CommandBindingToolbar
-        title="マウスジェスチャー"
+        title={hostSettingItem('gestures', 'gestures').title}
         description="コマンドを見つけて、操作と使う場面を設定できます。"
         inputName="ジェスチャー"
         count={catalog.length}
@@ -84,13 +90,13 @@ export function GesturesEditor({
         onOrder={() => setOrderOpen(true)}
       >
         <div className="gesture-settings-card">
-          <div className="gesture-settings-state">
+          <div className="gesture-settings-state" {...settingAnchor('gestures', 'enabled')}>
             <div>
-              <strong>マウスジェスチャーを有効にする</strong>
+              <strong>{hostSettingItem('gestures', 'enabled').title}</strong>
               <p>右ボタンを押しながら、移動・クリック・ホイール・キーで操作。</p>
             </div>
             <Toggle
-              label="マウスジェスチャーを有効にする"
+              label={hostSettingItem('gestures', 'enabled').title}
               checked={gestures.enabled}
               onChange={(enabled) => change({ enabled })}
             />

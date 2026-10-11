@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -7,18 +9,19 @@ import { useEffect, useState } from 'react';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
 import type { GestureSettings } from '../../../src/shared/gestures';
 function Names({
-  label,
+  itemKey,
   values,
   change,
 }: {
-  label: string;
+  itemKey: string;
   values: string[];
   change: (values: string[]) => void;
 }) {
+  const label = hostSettingItem('gestures', itemKey).title;
   const [text, setText] = useState(values.join(', '));
   useEffect(() => setText(values.join(', ')), [JSON.stringify(values)]);
   return (
-    <label className="gesture-option">
+    <label className="gesture-option" {...settingAnchor('gestures', itemKey)}>
       <span>{label}</span>
       <SettingsInput
         aria-label={label}
@@ -46,37 +49,38 @@ export function GestureOptions({
   change(patch: Partial<GestureSettings>): void;
 }) {
   return (
-    <details className="gesture-options">
+    <details className="gesture-options" {...settingAnchor('gestures', 'options')}>
       <summary>
-        動作設定 <small>対象ブラウザ・除外・操作感・待機表示</small>
+        {hostSettingItem('gestures', 'options').title}{' '}
+        <small>{hostSettingItem('gestures', 'options').description}</small>
       </summary>
       <p className="settings-help">
         一時停止はトレイから切り替えられます。何も操作せず右ボタンを離すと、通常の右クリックになります。
       </p>
       <Names
-        label="Webブラウザのexe"
+        itemKey="browsers"
         values={gestures.browsers}
         change={(browsers) => change({ browsers })}
       />
       <Names
-        label="ジェスチャーを除外するexe"
+        itemKey="excludedProcesses"
         values={gestures.excludedProcesses}
         change={(excludedProcesses) => change({ excludedProcesses })}
       />
-      <div className="gesture-enabled">
+      <div className="gesture-enabled" {...settingAnchor('gestures', 'requireChromiumWindowClass')}>
         <Toggle
-          label="ブラウザ条件でChromiumウィンドウだけを対象にする"
+          label={hostSettingItem('gestures', 'requireChromiumWindowClass').title}
           checked={gestures.requireChromiumWindowClass}
           onChange={(requireChromiumWindowClass) => change({ requireChromiumWindowClass })}
         />
-        ブラウザ条件でChromiumウィンドウだけを対象にする
+        {hostSettingItem('gestures', 'requireChromiumWindowClass').title}
       </div>{' '}
       <p className="settings-help">
         Firefoxなどではオフにします。WebBrowserToolsの操作対象もこの一覧を使います。exe名のみを指定し、パスは含めません。
       </p>
       <div className="gesture-options-grid">
-        <label className="gesture-option">
-          <span>移動距離（px）</span>
+        <label className="gesture-option" {...settingAnchor('gestures', 'distance')}>
+          <span>{hostSettingItem('gestures', 'distance').title}</span>
           <SettingsInput
             type="number"
             min="5"
@@ -85,8 +89,8 @@ export function GestureOptions({
             onChange={(e) => change({ distance: numberInput(e.target.value) })}
           />
         </label>
-        <label className="gesture-option">
-          <span>ホイールの最小実行間隔（ms）</span>
+        <label className="gesture-option" {...settingAnchor('gestures', 'wheelDelayMs')}>
+          <span>{hostSettingItem('gestures', 'wheelDelayMs').title}</span>
           <SettingsInput
             type="number"
             min="0"
@@ -95,8 +99,8 @@ export function GestureOptions({
             onChange={(e) => change({ wheelDelayMs: numberInput(e.target.value) })}
           />
         </label>
-        <label className="gesture-option">
-          <span>待機表示の位置</span>
+        <label className="gesture-option" {...settingAnchor('gestures', 'indicatorPosition')}>
+          <span>{hostSettingItem('gestures', 'indicatorPosition').title}</span>
           <select
             value={gestures.indicatorPosition}
             onChange={(e) =>
@@ -107,8 +111,8 @@ export function GestureOptions({
             <option value="window-center">対象ウィンドウの中央</option>
           </select>
         </label>
-        <label className="gesture-option">
-          <span>待機表示の不透明度</span>
+        <label className="gesture-option" {...settingAnchor('gestures', 'indicatorOpacity')}>
+          <span>{hostSettingItem('gestures', 'indicatorOpacity').title}</span>
           <SettingsInput
             type="number"
             min="0.1"

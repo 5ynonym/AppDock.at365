@@ -220,3 +220,5 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 設定の受理済み編集はmainのSettingsEditingSessionが保持します。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 
 設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。
+
+設定横断検索はmainのSettingsNavigationStateがqueryと移動要求を保持し、settings-catalogの静的メタデータだけを照合します。Default ShellのSettingsIndexと安定アンカーが本文全体への移動を担当します。検索値・選択・移動はsettings.jsonへ保存しません。追加回帰は`scripts/settings-search-ui-test.cjs [固定EXE]`で、全本体項目のアンカー、非表示ページの遅延描画、検索/移動/復旧/削除対象を確認します。

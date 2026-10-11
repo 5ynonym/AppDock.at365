@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
   SettingsTextarea,
@@ -157,8 +159,12 @@ export function WebAccountSettings({
     return task;
   }
   return (
-    <section className="web-account-settings" aria-label="Webアカウント設定">
-      <h2>Webアカウント</h2>
+    <section
+      className="web-account-settings"
+      {...settingAnchor('web-accounts', 'accounts')}
+      aria-label="Webアカウント設定"
+    >
+      <h2>{hostSettingItem('web-accounts', 'accounts').title}</h2>
       <p className="muted">
         WebApplet専用のアカウント枠を管理します。同じ枠を選んだWebAppletはログイン状態を共有し、Gmailのアカウントとは別管理です。
       </p>

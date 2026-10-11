@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { CommandBindingToolbar } from '../../../src/shared/settings-ui/CommandBindingToolbar';
 import { useEffect, useRef, useState } from 'react';
@@ -76,9 +78,12 @@ export function ShortcutsEditor({
     );
   });
   return (
-    <div className="shortcuts-editor command-shortcuts">
+    <div
+      className="shortcuts-editor command-shortcuts"
+      {...settingAnchor('shortcuts', 'keybindings')}
+    >
       <CommandBindingToolbar
-        title="ショートカットキー"
+        title={hostSettingItem('shortcuts', 'keybindings').title}
         description="コマンドを見つけて、キーと使う場面を設定できます。"
         inputName="ショートカット"
         count={catalog.length}

@@ -1,3 +1,5 @@
+import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
@@ -15,56 +17,56 @@ const rows: {
   action?: string;
   label?: string;
 }[] = [
-  { key: 'read', description: '公開された状態・設定・コマンド一覧を取得します。' },
+  { key: 'read', description: hostSettingItem('permissions', 'read').description },
   {
     key: 'execute',
-    description: '公開されたコマンドを実行します。',
+    description: hostSettingItem('permissions', 'execute').description,
     mcp: 'allowExecute',
     action: 'setExecution',
     label: 'コマンド実行',
   },
   {
     key: 'write',
-    description: '本体とAppletが公開した設定を変更します。',
+    description: hostSettingItem('permissions', 'write').description,
     mcp: 'allowWrite',
     label: '設定変更',
   },
   {
     key: 'manageApplets',
-    description: 'Appletの有効・無効・再起動を操作します。',
+    description: hostSettingItem('permissions', 'manageApplets').description,
     mcp: 'allowManageApplets',
     action: 'setAppletManagement',
     label: 'Applet管理',
   },
   {
     key: 'editShortcuts',
-    description: 'キー・条件・実行順を編集します。',
+    description: hostSettingItem('permissions', 'editShortcuts').description,
     mcp: 'allowEditShortcuts',
     action: 'setShortcutEditing',
     label: 'ショートカット編集',
   },
   {
     key: 'editGestures',
-    description: '割り当て・条件・実行順・動作設定を編集します。',
+    description: hostSettingItem('permissions', 'editGestures').description,
     mcp: 'allowEditGestures',
     action: 'setGestureEditing',
     label: 'ジェスチャー編集',
   },
   {
     key: 'editRibbon',
-    description: '表示・配置・並び順・区切り線を編集します。',
+    description: hostSettingItem('permissions', 'editRibbon').description,
     mcp: 'allowEditRibbon',
     action: 'setRibbonEditing',
     label: 'リボン編集',
   },
   {
     key: 'editTray',
-    description: 'メニューとクリック・ダブルクリックの割り当てを編集します。',
+    description: hostSettingItem('permissions', 'editTray').description,
     mcp: 'allowEditTray',
     action: 'setTrayEditing',
     label: 'タスクトレイ編集',
   },
-  { key: 'sendInput', description: 'アクティブなウィンドウへキーや操作メッセージを送ります。' },
+  { key: 'sendInput', description: hostSettingItem('permissions', 'sendInput').description },
 ];
 
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
@@ -176,7 +178,7 @@ export function ApiPermissionsSettings({
             const appletOn = grants[row.key] === true;
             const mcpOn = row.mcp && state?.[row.mcp] === true;
             return (
-              <tr key={row.key}>
+              <tr key={row.key} {...settingAnchor('permissions', row.key)}>
                 <th scope="row">
                   <strong>{appletApiPermissionLabels[row.key]}</strong>
                   <p>{row.description}</p>

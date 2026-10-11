@@ -5,9 +5,10 @@ import type {
   SettingsPageAuxiliary,
   SettingsPageModel,
   SettingsPageRequest,
+  SettingsNavigationState,
 } from '../../shared/settings-page';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
-import { settingsPageChanged } from '../../shared/settings-catalog';
+import { settingsPageChanged, searchSettings } from '../../shared/settings-catalog';
 import type { SettingsEditingSession } from './settings-editing-session';
 import type { ShellPageController } from './shell-page-controller';
 
@@ -21,12 +22,14 @@ export class SettingsPageSession implements ShellPageController {
   private actionPage = '';
   private disposed = false;
   private error = '';
+  private navigation: SettingsNavigationState;
   private actions = new Map<string, { id: string; run: (args: unknown[]) => Promise<unknown> }>();
   private requests = new Map<string, Promise<unknown>>();
   constructor(
     private request: SettingsPageRequest,
     private options: {
       editor: SettingsEditingSession;
+      navigation?: SettingsNavigationState;
       host(): HostSnapshot;
       auxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary;
       actions(page: SettingsPageDefinition): Record<string, (args: unknown[]) => Promise<unknown>>;
@@ -46,6 +49,7 @@ export class SettingsPageSession implements ShellPageController {
       throw Error('Invalid settings page request');
     this.id = request.id;
     this.route = request.route;
+    this.navigation = options.navigation ?? { query: '' };
     if (request.pageId && request.pageId !== options.editor.snapshot().pageId) {
       const state = options.editor.snapshot();
       // The host's selected detail supplies the scope; a rejected transition keeps the original JSON.
@@ -65,14 +69,22 @@ export class SettingsPageSession implements ShellPageController {
   snapshot(): SettingsPageModel {
     const state = this.options.editor.snapshot();
     const host = this.options.host();
-    const page = this.options.editor.page();
+    const catalog = this.options.editor.catalog();
+    const page = catalog.find((p) => p.id === state.pageId) ?? {
+      id: state.pageId,
+      title: '設定対象が見つかりません',
+      kind: 'applet' as const,
+      json: false,
+      items: [],
+      unavailableReason: '設定対象が削除されたか、現在利用できません。別の設定を選んでください。',
+    };
     const previous =
       this.actionPage === page.id
         ? this.actions
         : new Map<string, { id: string; run: (args: unknown[]) => Promise<unknown> }>();
     this.actionPage = page.id;
     this.actions = new Map(
-      Object.entries(this.options.actions(page)).map(([key, run]) => [
+      Object.entries(page.unavailableReason ? {} : this.options.actions(page)).map(([key, run]) => [
         key,
         { id: previous.get(key)?.id ?? randomUUID(), run },
       ]),
@@ -85,20 +97,29 @@ export class SettingsPageSession implements ShellPageController {
       values: page.json ? this.options.editor.projection() : {},
       navigation:
         this.request.context === 'full'
-          ? this.options.editor
-              .catalog()
-              .filter((p) => p.kind === 'host')
-              .map((p) => ({
-                id: p.id,
-                title: p.title,
-                owner: p.owner,
-                dirty:
-                  !!state.buffers[p.id] ||
-                  settingsPageChanged(state.draft, host.settings.value, p, host.extensions),
-              }))
+          ? catalog.map((p) => ({
+              id: p.id,
+              title: p.title,
+              owner: p.owner,
+              dirty:
+                !!state.buffers[p.id] ||
+                settingsPageChanged(state.draft, host.settings.value, p, host.extensions),
+            }))
           : [],
-      query: '',
-      results: [],
+      query: this.request.context === 'full' ? this.navigation.query : '',
+      results:
+        this.request.context === 'full'
+          ? searchSettings(catalog, this.navigation.query).map(
+              ({ definition, keywords, ...item }) => ({
+                ...item,
+                pageTitle: catalog.find((p) => p.id === item.pageId)!.title,
+              }),
+            )
+          : [],
+      move:
+        this.request.context === 'full' && this.navigation.move?.pageId === page.id
+          ? this.navigation.move
+          : undefined,
       editing: {
         sessionId: state.sessionId,
         editRevision: state.editRevision,
@@ -112,7 +133,7 @@ export class SettingsPageSession implements ShellPageController {
         avatarLoading: state.avatarLoading,
       },
       actions: Object.fromEntries([...this.actions].map(([key, a]) => [key, a.id])),
-      auxiliary: this.options.auxiliary(page),
+      auxiliary: page.unavailableReason ? {} : this.options.auxiliary(page),
     };
     const signature = JSON.stringify({ content, dark: host.dark });
     if (signature !== this.signature) {
@@ -154,7 +175,45 @@ export class SettingsPageSession implements ShellPageController {
     try {
       let result: unknown;
       const op = action.operation;
-      if (op.kind === 'sidebar-width') {
+      if (op.kind === 'search') {
+        if (this.request.context !== 'full' || typeof op.text !== 'string' || op.text.length > 512)
+          throw Error('検索語は512文字以下にしてください。');
+        this.navigation.query = op.text;
+      } else if (op.kind === 'move') {
+        if (this.request.context !== 'full') throw Error('この入口では検索結果へ移動できません。');
+        const item = this.options.editor
+          .catalog()
+          .flatMap((p) => p.items)
+          .find((i) => i.id === op.itemId);
+        if (!item) throw Error('設定対象が見つかりません。検索結果を更新してください。');
+        if (state.mode === 'json' && state.parseError)
+          throw Error('JSONの内容を修正してから移動してください。');
+        await this.options.editor.act({
+          ...action,
+          action: { type: 'select-page', pageId: item.pageId },
+        });
+        const selected = this.options.editor.snapshot();
+        if (selected.mode !== 'form')
+          await this.options.editor.act({
+            sessionId: selected.sessionId,
+            editRevision: selected.editRevision,
+            operationId: randomUUID(),
+            action: { type: 'mode', value: 'form' },
+          });
+        if (item.pageId !== state.pageId) this.options.release?.();
+        this.navigation.move = { id: randomUUID(), itemId: item.id, pageId: item.pageId };
+      } else if (op.kind === 'moved') {
+        const move = this.navigation.move;
+        if (
+          this.request.context !== 'full' ||
+          !move ||
+          move.id !== op.requestId ||
+          move.pageId !== op.pageId ||
+          state.pageId !== op.pageId
+        )
+          throw Error('移動要求が古くなっています。');
+        move.completed = true;
+      } else if (op.kind === 'sidebar-width') {
         if (
           this.request.context !== 'full' ||
           !Number.isFinite(op.width) ||
@@ -172,6 +231,7 @@ export class SettingsPageSession implements ShellPageController {
           action: { type: 'select-page', pageId: op.pageId },
         });
         if (op.pageId !== state.pageId) this.options.release?.();
+        this.navigation.move = undefined;
       } else if (op.kind === 'edit') {
         if (
           ![

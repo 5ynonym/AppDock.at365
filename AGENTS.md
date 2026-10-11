@@ -34,7 +34,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。複数の同時Shell/Windowは未実装。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
 - 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いmainのSettingsEditingSessionで共有し、useSettingsEditorは本体用アダプターとする。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
-- 現在のApplet設定入口は詳細タブ。設定ページにも入口を追加する変更は上記の設計に従い、同じ本文と編集状態を共用する。
+- Applet設定は詳細タブと設定ページの左インデックスを入口とし、同じShell本文と編集状態を共用する。横断検索は左だけに結果を表示し、右本文はページ全体を保つ。Applet本文内のローカル検索を追加しない。
 - 更新・通常再起動は--restore-viewと画面選択を復元し、終了中のselected(null)でホームへ上書きしない。Appletの復元はstartupReadyと対象runningを待つ。
 
 ## 共通APIと設定保存

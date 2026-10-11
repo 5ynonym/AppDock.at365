@@ -15,6 +15,7 @@ export interface SettingsItem {
   description: string;
   definition?: SettingDefinition;
   keywords?: string[];
+  unavailableReason?: string;
 }
 export interface SettingsPageDefinition {
   id: string;
@@ -23,6 +24,7 @@ export interface SettingsPageDefinition {
   kind: 'host' | 'applet' | 'web';
   json: boolean;
   items: SettingsItem[];
+  unavailableReason?: string;
 }
 export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
@@ -42,56 +44,126 @@ export const hostSettingsPages = [
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
   appearance: [
-    ['shellProvider', 'Shell', 'Shell Appletが担当する領域を選びます。'],
-    ['theme', 'テーマ', '配色 Dark Light System'],
+    [
+      'shellProvider',
+      'Shell',
+      'Shell Appletが担当する領域だけを差し替え、ほかの領域はDefault Shellを使います。有効にしてから選択してください。',
+    ],
+    ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
   ],
   general: [
-    ['permissions', 'Applet・MCPからの操作'],
-    ['startAtLogon', 'スタートアップに登録'],
-    ['runAsAdministrator', '常に管理者として起動'],
-    ['launch', '現在の起動状態'],
-    ['closeToTray', '閉じるとトレイに常駐'],
-    ['notifications', 'デスクトップ通知'],
-    ['hardwareAcceleration', 'ハードウェアアクセラレーション'],
-    ['startMinimized', 'トレイから起動'],
+    [
+      'permissions',
+      'Applet・MCPからの操作',
+      '操作ごとの許可は、専用の画面でまとめて設定できます。',
+    ],
+    [
+      'startAtLogon',
+      'スタートアップに登録',
+      'Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。',
+    ],
+    [
+      'runAsAdministrator',
+      '常に管理者として起動',
+      '次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。',
+    ],
+    ['launch', '現在の起動状態', '状態を確認 管理者として再起動'],
+    ['closeToTray', '閉じるとトレイに常駐', 'ウィンドウを閉じた後もAppletを動かします。'],
+    ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
+    [
+      'hardwareAcceleration',
+      'ハードウェアアクセラレーション',
+      'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
+    ],
+    ['startMinimized', 'トレイから起動', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
   ],
-  ribbon: [['ribbon', 'リボンの配置']],
+  ribbon: [['ribbon', 'リボン', '表示 配置 並べ替え 上部 下部 セパレーター']],
   tray: [
-    ['trayMenu', 'タスクトレイの配置'],
-    ['trayClickCommand', 'クリック'],
-    ['trayDoubleClickCommand', 'ダブルクリック'],
+    ['trayClickCommand', 'トレイクリックのコマンド', 'シングルクリック'],
+    ['trayDoubleClickCommand', 'トレイダブルクリックのコマンド', 'ダブルクリック'],
+    ['trayMenu', 'コンテキストメニュー', '追加 削除 グループ 区切り線 表示イメージ'],
   ],
-  shortcuts: [['keybindings', 'ショートカット']],
+  shortcuts: [
+    ['keybindings', 'ショートカットキー', 'キー 割り当て コマンド 条件 実行順 登録エラー'],
+  ],
   gestures: [
-    ['gestures', 'マウスジェスチャー', '有効 割り当て 条件 実行順'],
-    ['options', '動作設定', 'Webブラウザのexe 除外するexe Chromium'],
+    ['gestures', 'マウスジェスチャー', '割り当て 条件 実行順'],
+    ['enabled', 'マウスジェスチャーを有効にする'],
+    ['options', '動作設定', '対象ブラウザ・除外・操作感・待機表示'],
+    ['browsers', 'Webブラウザのexe'],
+    ['excludedProcesses', 'ジェスチャーを除外するexe'],
+    ['requireChromiumWindowClass', 'ブラウザ条件でChromiumウィンドウだけを対象にする'],
+    ['distance', '移動距離（px）'],
+    ['wheelDelayMs', 'ホイールの最小実行間隔（ms）'],
+    ['indicatorPosition', '待機表示の位置', 'ジェスチャー開始地点 対象ウィンドウの中央'],
+    ['indicatorOpacity', '待機表示の不透明度'],
   ],
   'web-accounts': [['accounts', 'Webアカウント', 'アカウント名 追加 削除 ログイン情報をクリア']],
-  permissions: Object.entries(appletApiPermissionLabels).map(([key, title]) => [
-    key,
-    title,
-    'Applet MCP 操作の許可',
-  ]),
   codex: [
-    ['automation', 'Codex連携', '連携を有効にする'],
-    ['registration', 'Codexへ登録', '設定ファイル 登録 解除'],
-    ['connection', '接続の詳細', '登録名 接続ポート'],
+    ['automation', '連携を有効にする', 'AppDockの起動中に接続できます。'],
+    ['permissions', '操作の許可を開く'],
+    ['registration', 'Codexへ登録', '設定ファイル 設定先を変更 登録・修復 登録を解除 接続テスト'],
+    ['connection', '接続の詳細', '登録名 接続ポート ポートを適用 認証情報を再発行'],
   ],
   profile: [
-    ['name', 'ユーザー名'],
-    ['avatar', 'アバター画像'],
+    ['name', 'ユーザー名', '80文字以内で入力してください。'],
+    ['avatar', 'アバター画像', 'PNG / JPEG · 5MBまで。同名の別画像は登録できません。'],
   ],
   about: [
-    ['updates', '更新設定'],
-    ['versions', 'バージョン情報'],
-    ['updateSource', 'Appletの更新元'],
-    ['hostSource', 'AppDockの更新元'],
+    ['updateActions', '更新を適用', 'すべて更新 Appletを更新 更新を中止 更新を確認'],
+    ['versions', 'バージョン情報', 'AppDock Electron Chromium Node.js 実行環境 更新を確認'],
+    ['updates', '更新の設定', '起動時の更新確認と更新元を設定します。'],
+    ['updateSource', 'Appletの更新元', 'インストール済みのApplet 更新元の設定'],
+    [
+      'hostSource',
+      'AppDockの更新元',
+      'ローカルの絶対パス・UNC・更新情報JSONのHTTP(S) URL・GitHubリポジトリURLに対応します。空欄で更新確認を無効にします。',
+    ],
     ['checkHostOnStartup', '起動時にAppDockの更新を確認'],
     ['checkAppletsOnStartup', '起動時にAppletの更新を確認'],
     ['notifyOnStartup', '起動時に更新が見つかったら通知'],
     ['allowSameVersion', '同じバージョンの再適用を許可（開発用）'],
     ['startupDelaySeconds', '起動から確認までの秒数'],
   ],
+  permissions: Object.entries(appletApiPermissionLabels).map(([key, title]) => [
+    key,
+    title,
+    (
+      {
+        read: '公開された状態・設定・コマンド一覧を取得します。',
+        execute: '公開されたコマンドを実行します。',
+        write: '本体とAppletが公開した設定を変更します。',
+        manageApplets: 'Appletの有効・無効・再起動を操作します。',
+        editShortcuts: 'キー・条件・実行順を編集します。',
+        editGestures: '割り当て・条件・実行順・動作設定を編集します。',
+        editRibbon: '表示・配置・並び順・区切り線を編集します。',
+        editTray: 'メニューとクリック・ダブルクリックの割り当てを編集します。',
+        sendInput: 'アクティブなウィンドウへキーや操作メッセージを送ります。',
+      } as Record<string, string>
+    )[key],
+  ]),
+};
+export function hostSettingItem(pageId: string, key: string): SettingsItem {
+  const row = hostItems[pageId]?.find((row) => row[0] === key);
+  if (!row) throw Error('Unknown settings item: ' + pageId + '/' + key);
+  return item(pageId, row[0], row[1], row[2]);
+}
+export const webSettingLabels: Record<string, string> = {
+  name: '名前',
+  url: '開始URL',
+  icon: 'アイコン画像（PNG / JPEG / WebP、4MB以下）',
+  display: '表示方法',
+  navigation: 'ページ遷移',
+  allowedOrigins: '追加の許可先（認証用など、1行1origin）',
+  accountId: '使用するWebアカウント',
+  'action:defaults': 'Web側の推奨設定を取得',
+  'action:accounts': 'Webアカウントを管理',
+  'action:delete': 'このWebAppletを削除',
+};
+export const appletCommonDescriptions = {
+  display: '同じ画面をAppDock本体のページ、または別ウィンドウで表示します。',
+  startupDelaySeconds:
+    '有効化・再起動からAppletを起動するまで待ちます。0で即時開始。実行中の変更は次の起動から適用します。',
 };
 const generalKeys = [
   'startAtLogon',
@@ -124,6 +196,18 @@ const item = (
   description,
   definition,
 });
+function definitionTerms(definition: SettingDefinition): string[] {
+  return [
+    ...(definition.aliases ?? []),
+    ...(definition.options ?? []).map((o) => o.label),
+    ...(definition.fields ?? []).flatMap((f) => [
+      f.title,
+      f.description ?? '',
+      f.key,
+      ...definitionTerms(f),
+    ]),
+  ];
+}
 export function settingsCatalog(
   applets: ExtensionSnapshot[],
   draft: Settings,
@@ -134,7 +218,10 @@ export function settingsCatalog(
       title,
       kind: 'host' as const,
       json: !['web-accounts', 'permissions', 'codex'].includes(id),
-      items: hostItems[id].map(([key, title, description]) => item(id, key, title, description)),
+      items: hostItems[id].map(([key, title, description]) => ({
+        ...item(id, key, title, description),
+        keywords: id === 'appearance' && key === 'theme' ? ['Dark', 'Light', 'System'] : undefined,
+      })),
     })),
     ...orderApplets(applets, draft.appletOrder).map((a) => {
       const id = appletSettingsPageId(a.id);
@@ -146,30 +233,41 @@ export function settingsCatalog(
         json: true,
         items:
           a.runtime === 'web'
-            ? webKeys.map((key, i) =>
+            ? Object.entries(webSettingLabels).map(([key, title]) => ({
+                ...item(id, key, title),
+                keywords:
+                  key === 'display'
+                    ? ['本体のページ', '別ウィンドウ']
+                    : key === 'navigation'
+                      ? ['開始ページに固定', '同じorigin内だけ', 'HTTP(S)のページを許可']
+                      : undefined,
+              }))
+            : [
+                ...(a.pages ?? []).map((p) =>
+                  item(
+                    id,
+                    `page:${p.id}`,
+                    `${p.title}の表示方法`,
+                    appletCommonDescriptions.display,
+                  ),
+                ),
                 item(
                   id,
-                  key,
-                  [
-                    '名前',
-                    'URL',
-                    'アイコン',
-                    '表示方法',
-                    '遷移規則',
-                    '許可origin',
-                    'Webアカウント',
-                  ][i],
+                  'startupDelaySeconds',
+                  '開始までの秒数',
+                  appletCommonDescriptions.startupDelaySeconds,
                 ),
-              )
-            : [
-                ...(a.pages ?? []).map((p) => item(id, `page:${p.id}`, `${p.title}の表示方法`)),
-                item(id, 'startupDelaySeconds', '開始までの秒数'),
-                ...(a.settingActions ?? []).map((s) =>
-                  item(id, `action:${s.command}`, s.title, s.description),
-                ),
-                ...(a.settings ?? []).map((s) =>
-                  item(id, `setting:${s.key}`, s.title, s.description, s),
-                ),
+                ...(a.settingActions ?? []).map((s) => ({
+                  ...item(id, `action:${s.command}`, s.title, s.description),
+                  unavailableReason:
+                    !a.enabled || a.state !== 'running'
+                      ? 'Appletを開始してから操作できます。'
+                      : undefined,
+                })),
+                ...(a.settings ?? []).map((s) => ({
+                  ...item(id, `setting:${s.key}`, s.title, s.description, s),
+                  keywords: definitionTerms(s),
+                })),
               ],
       };
     }),

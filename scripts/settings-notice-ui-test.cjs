@@ -174,7 +174,11 @@ async function close() {
     await ribbon('settings').click();
     await (await settingsPage()).locator('.settings-categories').waitFor();
     assert.deepEqual(
-      await (await settingsPage()).locator('.settings-categories span[title]').allTextContents(),
+      await (
+        await settingsPage()
+      )
+        .locator('.settings-categories [aria-label="本体の設定"] span[title]')
+        .allTextContents(),
       [
         '表示',
         '一般',

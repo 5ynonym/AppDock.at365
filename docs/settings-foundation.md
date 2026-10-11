@@ -1,6 +1,6 @@
 # 設定基盤とDefault Shellへの移行設計
 
-実装状態: 段階1の設定基盤は0.26.44で実装・固定EXE確認済み。段階2は0.27.0としてShell移行・部分JSONを実装。Appletインデックスと検索UIは段階3。作業開始時の0.26.43（ホームShell化済み）を基準とする。実装順序は、設定基盤の整理、既存設定画面のDefault Shellへの移行、Appletインデックス・横断検索の追加とする。先に部分JSONを含む3機能の契約を定義する。部分JSONだけは、Shellへ全設定を渡す暫定APIを作らず既存のJSON編集機能を引き継ぐため、Shell移行の完了時に提供する。
+実装状態: 段階1の設定基盤は0.26.44で実装・固定EXE確認済み。段階2は0.27.0としてShell移行・部分JSONを実装。段階3のAppletインデックス・横断検索・項目移動を0.27.1で実装。作業開始時の0.26.43（ホームShell化済み）を基準とする。実装順序は、設定基盤の整理、既存設定画面のDefault Shellへの移行、Appletインデックス・横断検索の追加とする。先に部分JSONを含む3機能の契約を定義する。部分JSONだけは、Shellへ全設定を渡す暫定APIを作らず既存のJSON編集機能を引き継ぐため、Shell移行の完了時に提供する。
 
 設定ページを本体とAppletに共通する入口へ拡張する。左の検索結果から目的の設定へ移動でき、右ではその設定を含むページ全体を編集できる。Applet詳細の設定タブも残し、どちらの入口でも同じ画面・下書き・保存結果を使う。
 
@@ -20,7 +20,7 @@
 | Applet設定の検索は本文を絞り込む | 横断検索は左に結果を出し、右はページ全体を表示する |
 | Shellの本文契約は`page.logs`と`page.home` | 設定用のモデルと操作を追加し、全体ページと詳細内で共用する |
 
-本設計の段階1・2の実装は、[設定パネルの共用](host-development.md#applet設定パネルの共用)と[Shellのページ表示](shell-pages.md)を拡張する。段階3は後続。Shellの共通経路と依存境界は[Shell基盤](shell-foundation.md)、保存分類は[設定同期](settings-sync.md)、操作許可は[共通操作API](appdock-api.md)を正本とする。
+本設計の段階1・2の実装は、[設定パネルの共用](host-development.md#applet設定パネルの共用)と[Shellのページ表示](shell-pages.md)を拡張する。段階1～3の実装契約は末尾に示す。Shellの共通経路と依存境界は[Shell基盤](shell-foundation.md)、保存分類は[設定同期](settings-sync.md)、操作許可は[共通操作API](appdock-api.md)を正本とする。
 
 ## 画面と操作
 
@@ -168,7 +168,7 @@ Default ShellとShell Appletは同じ公開契約と実行経路を使う。移�
 
 Appletインデックス、横断検索と項目移動を順に提供し、本文のローカル検索を整理する。段階2の部分JSONをそのまま新しい入口でも使う。両入口の同一本文、全体保存、検索からの移動、不正入力の保持を一連のGUI操作で確認する。
 
-各実装段階は[共通手順](development-workflow.md)に従い、完成した本体を版更新・本体publish・固定EXE確認まで行う。今回の設計文書作成は製品変更・版更新・発行に当たらない。commit・push・Release・実利用先deployの範囲は各依頼に従う。
+各実装段階は[共通手順](development-workflow.md)に従い、完成した本体を版更新・本体publish・固定EXE確認まで行う。各段階の発行・検証結果はVERIFICATIONへ記録する。commit・push・Release・実利用先deployの範囲は各依頼に従う。
 
 ## 受入確認
 
@@ -201,3 +201,11 @@ Appletインデックス、横断検索と項目移動を順に提供し、本�
 編集の正本はSettingsEditingSession、公開投影はSettingsPageSession / SettingsPageModel / SettingsPageAction。settings-catalog.tsがページ・項目ID・JSON範囲・変更判定を定義する。IDはページIDとキーを個別にencodeURIComponentして結合し、階層は文字列分割せずキー配列で扱う。JSON上限はUTF-8 1MiB、画像5MiB、操作再送履歴512件。
 
 ホームShell化に合わせ、ホームのappletOrderもmainの共有編集から読み取る。ページ寿命を管理するShellPageHostへ設定固有の判断を入れず、requiresFlushのControllerだけView切替前に入力完了を待つ。フォーム部品はsrc/shared/settings-ui、設定専用本文はshells/default/settingsへ分離した。保存ファイル・操作許可・即時保存先は追加変更しない。
+
+### 段階3で確定した検索・移動契約
+
+検索語は512文字以内。SettingsNavigationStateをprimaryに保持し、search / move / movedを公開する。検索語・移動要求は保存ファイルへ追加しない。NFKC・小文字化・空白ANDで静的メタデータを照合し、legacy aliasesは保存互換の意味を変えず旧キー検索にも使う。動的候補や現在値は対象外。
+
+専用フォームの移動先は、一般・表示・プロフィール・許可は各行、リボン/ショートカット/ジェスチャー割当/Webアカウントは各ブロック、ジェスチャー動作設定と更新設定は各項目、Codexは連携/許可/登録/接続詳細の各ブロック。Appletはページ表示方法/遅延/宣言設定/操作、WebAppletは各入力と取得/管理/削除のブロック。設定カタログとsettingAnchorを対応させ、全本体項目とWeb項目の到達をGUIで確認する。
+
+表示完了は最大5秒待ち、最新要求だけを処理する。親detailsを開き、本文スクロール領域で即時移動、入力ではなくコンテナへフォーカスし、静的な強調を2秒で解除する。動きを減らす設定でもアニメーションを使わない。削除後の古い移動要求はエラー、右は利用不可表示とし、残る編集を保持する。検索を入口の外側へ集約し、Applet詳細内のローカル検索は再導入しない。

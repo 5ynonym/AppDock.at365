@@ -27,8 +27,8 @@ export interface SettingsPageModel {
     values: Record<string, unknown>;
     navigation: { id: string; title: string; dirty: boolean; owner?: string }[];
     query: string;
-    results: SettingsItem[];
-    move?: { id: string; itemId: string };
+    results: (SettingsItem & { pageTitle: string })[];
+    move?: { id: string; itemId: string; pageId: string; completed?: boolean };
     editing: {
       sessionId: string;
       editRevision: number;
@@ -64,13 +64,19 @@ export interface SettingsPageAuxiliary {
 export type SettingsPageOperation =
   | {
       kind: 'edit';
-      action: Exclude<SettingsEdit, { type: 'draft' | 'text' | 'buffer' | 'select-page' }>;
+      action: Exclude<SettingsEdit, { type: 'draft' | 'select-page' }>;
     }
   | { kind: 'invoke'; actionId: string; args?: unknown[] }
   | { kind: 'select'; pageId: string }
   | { kind: 'sidebar-width'; width: number }
   | { kind: 'search'; text: string }
-  | { kind: 'move'; itemId: string };
+  | { kind: 'move'; itemId: string }
+  | { kind: 'moved'; requestId: string; pageId: string };
+/** UI selection state lives for the primary context, independently of a Shell View. */
+export interface SettingsNavigationState {
+  query: string;
+  move?: SettingsPageModel['content']['move'];
+}
 export interface SettingsPageAction {
   id: string;
   type: 'settings';

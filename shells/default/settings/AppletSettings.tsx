@@ -1,4 +1,9 @@
 import {
+  appletSettingsPageId,
+  appletCommonDescriptions,
+} from '../../../src/shared/settings-catalog';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
+import {
   SettingsInput,
   SettingsTextarea,
   numberInput,
@@ -9,7 +14,7 @@ import type { ExtensionSnapshot, Settings } from '../../../src/shared/contracts'
 import { ShortcutListSetting } from '../../../src/shared/settings-ui/ShortcutListSetting';
 import { ObjectListSetting } from '../../../src/shared/settings-ui/ObjectListSetting';
 
-/** The host draft stays above this component, so filtering never discards edits. */
+/** Both entry points render this complete page against the main editing session. */
 export function AppletSettings({
   applet,
   draft,
@@ -19,15 +24,13 @@ export function AppletSettings({
   draft: Settings;
   onChange(value: Settings): void;
 }) {
-  const [filter, setFilter] = useState('');
+  const pageId = appletSettingsPageId(applet.id);
   const executing = useRef(false);
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [result, setResult] = useState<{ command: string; message: string; error: boolean } | null>(
     null,
   );
-  const actions = (applet.settingActions ?? []).filter((item) =>
-    `${item.title} ${item.description ?? ''}`.toLowerCase().includes(filter.toLowerCase()),
-  );
+  const actions = applet.settingActions ?? [];
   const executeAction = async (item: NonNullable<ExtensionSnapshot['settingActions']>[number]) => {
     if (executing.current) return;
     executing.current = true;
@@ -47,18 +50,18 @@ export function AppletSettings({
       setRunningAction(null);
     }
   };
-  const definitions = (applet.settings ?? []).filter((item) =>
-    `${item.title} ${item.description ?? ''} ${item.key}`
-      .toLowerCase()
-      .includes(filter.toLowerCase()),
-  );
+  const definitions = applet.settings ?? [];
   return (
     <div className="applet-settings">
       {(applet.pages ?? []).map((page) => (
-        <div className="setting-row" key={`page-${page.id}`}>
+        <div
+          className="setting-row"
+          key={`page-${page.id}`}
+          {...settingAnchor(pageId, `page:${page.id}`)}
+        >
           <div>
             <strong>{page.title}の表示方法</strong>
-            <p>同じ画面をAppDock本体のページ、または別ウィンドウで表示します。</p>
+            <p>{appletCommonDescriptions.display}</p>
           </div>
           <select
             aria-label={`${page.title}の表示方法`}
@@ -88,12 +91,10 @@ export function AppletSettings({
           </select>
         </div>
       ))}
-      <div className="setting-row">
+      <div className="setting-row" {...settingAnchor(pageId, 'startupDelaySeconds')}>
         <div>
           <strong>開始までの秒数</strong>
-          <p>
-            有効化・再起動からAppletを起動するまで待ちます。0で即時開始。実行中の変更は次の起動から適用します。
-          </p>
+          <p>{appletCommonDescriptions.startupDelaySeconds}</p>
         </div>
         <SettingsInput
           aria-label="開始までの秒数"
@@ -121,20 +122,19 @@ export function AppletSettings({
           }
         />
       </div>
-      <SettingsInput
-        className="shortcut-filter"
-        aria-label="Appletの設定項目を検索"
-        placeholder="設定項目を検索…"
-        value={filter}
-        onChange={(event) => setFilter(event.target.value)}
-      />
+
       {actions.map((item) => {
-        const available = applet.commands.some(
-          (command) => command.id === item.command && command.available,
-        );
+        const available =
+          applet.enabled &&
+          applet.state === 'running' &&
+          applet.commands.some((command) => command.id === item.command && command.available);
         const descriptionId = `setting-action-help-${item.command}`;
         return (
-          <div className="setting-row setting-action-row" key={item.command}>
+          <div
+            className="setting-row setting-action-row"
+            key={item.command}
+            {...settingAnchor(pageId, `action:${item.command}`)}
+          >
             <div>
               <strong>{item.title}</strong>
               <p id={descriptionId}>{item.description}</p>
@@ -156,11 +156,7 @@ export function AppletSettings({
         );
       })}
       {!definitions.length && !actions.length && (
-        <p className="empty">
-          {applet.settings?.length || applet.settingActions?.length
-            ? '該当する設定項目はありません。'
-            : 'このAppletには設定項目がありません。'}
-        </p>
+        <p className="empty">このAppletには設定項目がありません。</p>
       )}
       {definitions.map((item) => {
         const value = draft.extensions[applet.id]?.settings[item.key] ?? item.default;
@@ -178,7 +174,11 @@ export function AppletSettings({
         const options = applet.settingOptions[item.key] ?? item.options ?? [];
         const descriptionId = `setting-help-${applet.id}-${item.key}`;
         return (
-          <div className="setting-row" key={item.key}>
+          <div
+            className="setting-row"
+            key={item.key}
+            {...settingAnchor(pageId, `setting:${item.key}`)}
+          >
             <div>
               <strong>{item.title}</strong>
               <p id={descriptionId}>{item.description}</p>
