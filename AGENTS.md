@@ -1,149 +1,67 @@
 # AppDockの作業ルール
 
-- Shellの設計・後続計画は[Shell Hostの仕様と実装計画](docs/shell-foundation.md)を参照する。正式名称はDefault Shell（本体同梱の標準描画）、Shell Applet（差替え拡張）、Shell Host（本体側の起動・表示領域・切替・共通API）へ統一する。Default Shellは本体repo内で同時ビルド・単一EXEへ同梱し、Shell Appletと同じ公開API/実行経路を使う。移行したリボン描画は本体から撤去し、通常/復旧は同じDefault Shellを使う。本体とShell間の内部importやDefault Shell専用APIを作らない。独立repo規則は追加Appletに適用し、Default Shellは本体と一緒に発行・更新する。初期範囲はリボン/共通モデル・操作・購読/切替・復旧/MCP検証まで。複数Shellに備えて寿命を分離するが、複数ウィンドウ・全UI移植は後続。0.26.40のリボン移行・共通API・切替/復旧の実装契約は[Shell API](docs/shell-api.md)。同時複数Shell/Windowは未実装。0.26.41の部分差し替え・通常Applet機能との併用・共通オーバーレイとパレット移行は[部分Shellと共通オーバーレイ](docs/shell-overlays.md)を正本とする。新しい描画は領域単位で宣言し、未提供領域はDefault Shellを使う。内容Controllerと表示寿命を分け、移行済みパレットを本体rendererへ戻さない。
+A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示](../AGENTS.md)を読む。このファイルはAppDock全体に適用する。兄弟Appletの変更では、そのrepoの指示も確認する。
 
-- 0.26.39以降のWebApplet公開範囲は[WebApplet](docs/web-applets.md#共通apiへの公開02639以降)を正本とする。提供元が5コマンドとname/displayを宣言し、SettingsCommandsでwebApplets.itemsへ保存する。URL/アカウント/遷移制限やWebページへのIPCを公開しない。Applet操作の新規既定値は全項目ON、既存の保存済み拒否・旧個別許可・読込失敗時の拒否は維持する。MCPの初期OFFは変更しない。
+## 文書と作業範囲
 
-- 0.26.38の操作許可UIは設定の専用「操作の許可」へ集約する。Applet/MCPを独立した列で編集し、PC専用即時保存と共有draftの保持を維持する。接続/登録はCodex連携へ残す。前提不足時は保存済みON/OFFを保って理由を表示し、他の許可を自動変更しない。仕様と回帰は[共通操作API](docs/appdock-api.md)を参照する。
+- 現行仕様は現在のコードと[開発ガイド](DEVELOPMENT.md)から参照する機能別文書を正本とする。導入版ごとの説明を現行文書へ積み重ねない。実測・未確認事項・成果物のhashはVERIFICATIONへ記録し、過去の成功を現在の動作確認とみなさない。
+- 利用者向けREADME、開発手順、検証記録の分担は[文書方針](docs/documentation.md)に従う。共通仕様を各Appletへ複製せず、変更時は参照先・関連する型・試験を整合させる。
+- 未実装の設定拡張は[設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md)に分離する。基盤整理→Shell移行と部分JSON→Appletインデックス・検索の順とし、実装済みと扱わない。
 
-- 0.26.36以降のMCP/Applet共通操作は[AppDock共通操作API](docs/appdock-api.md)を正本とする。AppDockApiの単一インスタンスと操作カタログを共有し、Codexの許可と全Applet共通のPC専用許可を分離する。操作定義のcallers/permissions/schemaで公開先・許可・入力を管理し、入力APIはApplet専用とする。明示公開されたAppletコマンド経由の呼出しは許可する。AppletのHTTP接続や秘密token共有は不要。host.appdock.callの呼出元は接続から決定する。既存自己設定のcapability/非公開キー/activate時の契約を保ち、共通SettingsCommandsを通す。再入時の同期設定変更・非同期BUSY・自身の実行/管理SELF_CALL、Node/.NET SDK、旧DLL互換は専用回帰で確認する。
+## 実装と配布
 
-A:配下では最初に[A:\AGENTS.md](../../AGENTS.md)と[30.PROJECT共通指示](../AGENTS.md)を読む。このファイルはAppDockリポジトリ全体に適用する。
+- [実装・コミット・リリースの共通手順](docs/development-workflow.md)に従う。実装時は変更に必要な検証・対象モジュールの版更新・各publishへの発行まで。文書のみの変更は製品の版更新・発行を行わない。
+- コミット依頼時は対象と影響先の必要回帰をすべて確認してからコミットする。製品修正時はpublishも更新する。push・公開・実利用先deployは各依頼の範囲に従う。
+- 通常publishは本体単一EXEとupdate.json、変更Appletは自身のupdate.zip/update.jsonを生成する。未変更Appletの再発行・全体ZIP作成・旧ZIP整理を通常publishへ含めない。終了コード、版、成果物、固定EXEの隔離起動を確認する。
+- Release依頼では[リリース手順](docs/RELEASING.md)を読み、本体と同梱Appletの未公開版を確認する。公開済み同版は上書き・再作成しない。公開後検証に成功した対象repoごとに最新3件の公開Releaseを保持し、draft・Gitタグ・履歴・無関係repoを保持する。全体ZIPの準備と整理は[オールインワン](docs/all-in-one.md)に従う。
+- deploy先への旧EXEの別フォルダー退避は追加しない。配置hashと利用者データ保持は確認する。この扱いを自己更新helperの復旧用backupへ流用しない。
+- 開発生成物はrepo直下の.artifacts。完了時の整理は[テストフォルダー整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)に従い、終了・成功を確認した種類ごとの直近3回を残す。実行中・状態不明・失敗未解決・移行用・固定出力・再利用資料を削除しない。同期・バックアップ・スナップショットの設定は利用者が管理する。
 
-## 情報の保存先と更新
+## ツールとWindows検証
 
-- AppDock固有の作業ルール・運用上の注意・未実装の合意事項はこのファイルで管理する。仕様・運用・検証・発行方法に影響する変更では、このファイルと参照文書の更新要否を同じ作業で確認する。共通手順の本文は正本へ集約し、各Appletから参照する。
-- 詳細仕様の入口は[DEVELOPMENT.md](DEVELOPMENT.md)。版別の実装経緯・検証範囲は[実装履歴](docs/implementation-history.md)に保存している。関係箇所の調査時に参照し、当時の「未実装」「未確認」を現在の状態と混同しない。
-- 新しい実測結果・一時調査はVERIFICATION.mdへ記録する。古い版・ハッシュ・branch・権限を固定の現状として扱わず、現ソース・Git・配布物を確認する。兄弟Appletを編集するときは、そのrepoの指示と開発文書も読む。
+- Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。依存・ツールの公開後7日待機、完全版指定の例外、Node LTSの固定は[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従う。pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
+- node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
+- GUI試験は直列・隔離profileで行う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
+- 単一EXEのportable展開mutex・lease・子プロセス寿命・hProc形式のHANDLE変換・安定したTray識別を維持する。electron-builder更新時は独自templateの連携と実EXEの更新・再起動・同時起動・異常終了を確認する。設定・data・認証と展開物の寿命を混ぜない。
+- .NET SDK/Runtime・接続契約を変えたらnative AppletもRelease buildし、接続・停止・表示・保存を確認する。runtimeconfig欠落は発行元・EXE内・展開先を比較する。
+- PowerShell 5.1用PS1はUTF-8 BOM/CRLF、BATはCP932/CRLFを保つ。File.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATH・認証・実行権限はその環境で確認する。
+- 権限不足の切り分けと再実行は[制限付き実行環境](docs/development-workflow.md#制限付き実行環境)に従う。無関係アプリの停止や、検査・セキュリティ機構の無効化で成功扱いにしない。
 
-## 開発・発行・配置の注意
+## Shellと画面
 
-- 共通ログは[Applet API](docs/extensions.md#sdkで使えるサービス)を正本とする。停止処理中はhost.logだけを受け付け、AppletのIDと元のレベルを維持する。停止完了/異常終了後と、停止中の他APIの拒否を緩めない。回帰はtests/logging.test.cjs、実nativeの終了ログ/全体と個別画面はWallpaperSlideshowのscripts/test-host-logging-ui.cjsで確認する。
+- [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell Appletは描画を所有する。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
+- Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
+- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。複数の同時Shell/Windowは未実装。
+- Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
+- 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いuseSettingsEditorで共有する。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
+- 現在のApplet設定入口は詳細タブ。設定ページにも入口を追加する変更は上記の未実装設計に従い、同じ本文と編集状態を共用する。
+- 更新・通常再起動は--restore-viewと画面選択を復元し、終了中のselected(null)でホームへ上書きしない。Appletの復元はstartupReadyと対象runningを待つ。
 
-- 本体/全Appletの実行段階は[実装・コミット・リリースの共通手順](docs/development-workflow.md)を正本とする。実装時は必要なテストを選び、既存回帰を毎回一律に実行しない。変更モジュールの版更新・publish・発行物確認まで行い、コミットしない。コミット依頼時に対象/影響範囲の必要回帰をすべて通し、修正した発行物も更新してからコミットする。リリース時はコミット漏れ/未pushを確認・解消し、内容・依存・環境と証跡が一致した検証だけ再利用する。以下の機能別試験指定は検証範囲を選ぶ基準であり、実装のたびに全項目を実行する指定ではない。
+## 共通APIと設定保存
 
-- 実装・修正の作業完了時は、必要なテストと発行物の動作確認がすべて成功した後、[テストフォルダーの整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)を行う（2026-10-10ユーザー指定）。終了・成功を確認できる古いテスト専用フォルダーだけを対象とし、種類ごとに直近3回分を残す。実行中・状態不明・未解決の失敗記録・旧版移行用資料・固定ビルド出力・Release記録は削除しない。名前や経過日数だけで削除せず、安全確認できないものは保持して報告する。整理結果を検証記録へ残す。これは作業者の完了手順であり、通常publishや製品起動へ自動削除を追加する指示ではない。開発生成物の保存先は`.artifacts`（2026-10-10に`artifacts`から改名）。同期/バックアップ/スナップショットの設定はユキちゃんが担当する。
-- 完成した本体の実装・修正は、Release前でもバージョンをインクリメントして`publish.bat`を実行し、`publish`へ発行する。通常の修正はパッチ番号を上げ、指定版を優先する。同じ変更の発行再試行・検証用再発行・リリースでは重ねて増やさず、同梱だけの未変更Appletの版は上げない。版更新は[リリース手順](docs/RELEASING.md)のSetVersionでpackage.jsonを更新し、README等の現行版記載も揃える。ユキちゃんの動作確認場所なので、開発ビルドだけで完了にしない。通常publishは本体単一EXEとupdate.jsonだけを生成し、終了コード・成果物の整合・発行版の隔離起動を確認する。変更したAppletはそのrepoで版更新・publishを行う。オールインワンZIP作成・未変更Appletの再発行・旧版ZIP整理は通常publishに含めず、AppDockのリリース時だけ行う。調査/計画/文書だけ、または明示的な発行不要指定は除く。commit・公開・実利用deployは別の指示に従う。
-- Node/pnpmはtoolchain.jsonの版を.toolsへ配置してdev.bat経由で使う。pnpm 12の導入ではinstall.jsとWindows shimの再生成が必要。Electron取得は既存のpostinstall/setup手順に従う。依存更新時は初回導入と再実行も確認する。
-- 依存・ツールの通常更新は公開後7日待機し、Node.jsは固定したLTS版を使用する。[公開後待機](DEVELOPMENT.md#依存とツールの公開後待機)の設定と例外手順を守る。待機中の新版をoutdatedの解消だけのために入れない。緊急修正は出所・内容を確認した完全な版のみ例外へ記録し、広い除外や恒久的な待機無効化を行わない。
-- node_modulesをjunctionで共有したworktreeで依存のインストールを行わない。親repoのjunctionや.binがworktreeの絶対パスへ変わり得るため、依存を更新するcheckoutは独立node_modulesにする。worktree整理時は参照先の境界と元checkoutの動作を確認する。
-- build-main.cjsはout/mainを再生成する。GUI試験や再起動の最中にビルドを重ねない。発行完了後の固定した配布物を使い、検証コピーと最終EXEのSHA256を照合する。
-- 本体の単一EXEとportableの展開先/Tray IDの安定性を維持する。scripts/build-portable.cjs・portable.nsiの展開mutex/lease、子プロセスの寿命、hProc形式のHANDLE変換を保つ。electron-builder更新時はcustom templateとの連携と実EXEの更新/再起動/同時起動/異常終了を確認する。
-- 実行時の自動展開物は同期不要。現portable.nsiはTEMP/AppDock.at365-識別子へ展開し、EXE配置内には展開しない。LOCALAPPDATA/at365/AppDock/runtimeへの変更は可能だが、2026-10-10の追加相談では未実装。変更時は配置別の安定パスと展開mutex/lease/最終終了時の限定削除を保ち、共有素材・認証・設定の保存先と混ぜない。
-- オールインワンZIPの作成・旧版整理はAppDockのリリース時だけ行う（2026-10-09ユーザーの追加指定）。Release Prepareは通常publish後に全Appletを再発行・同梱し、全チェックと新版ZIP/本体の整合検証成功後、sealでpublish直下の`AppDock.at365-all-in-one-<version>.zip`のうち新版より古い正式版を削除する。削除名はplanのremovedOldBundlesへ記録する。生成・配置・検証に失敗した場合は旧版を残す。別のZIP、ディレクトリ/リンク、`.artifacts`、GitHub Releaseへこの削除ルールを適用しない。詳細は[オールインワン作成](docs/all-in-one.md#publishの旧版zip整理)。
-- 同じ版のオールインワンZIPの置換はstage内のprevious-all-in-one.zipをbackupとして指定する。null backupで既存ファイルの削除に失敗する実例があり、失敗時に旧ZIPを保持する既存の回帰試験と発行先での実置換を確認する。実利用先deploy時の退避不要という指定とは区別する。
-- .NET SDK/Runtime・プロセス契約を変えたらnative AppletのRelease buildと接続/停止/表示/保存も確認する。runtimeconfig欠落は発行元・EXE内・実展開先を比較して原因を切り分ける。
-- deployは依頼範囲で実施し、発行成功と実利用先への配置を区別する。ユーザー指定によりdeploy.batの配置先は同期/変更履歴で復元できるため、旧EXE等の別フォルダー退避を追加しない。配置ハッシュと設定保持は確認する。この指定を自己更新helperの復旧用backupへ流用しない。
-- Windows PowerShell用PS1はUTF-8 BOM/CRLF。Get-FileHashを解決できない環境では.NET FileStream/SHA256を使う。PowerShell 5.1のFile.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATHや認証境界は実行環境で確認する。
+- [共通操作API](docs/appdock-api.md)と[外部操作](docs/automation.md)を正本とする。単一AppDockApiと操作カタログを共有し、callers・permissions・schemaで公開先/許可/入力を管理する。MCPとAppletのPC専用許可を分ける。
+- 外部コマンド公開はApplet自身のmanifest宣言に従う。本体へApplet固有の許可一覧を置かず、IDの接頭辞・別名・runtime登録から公開権限を推測しない。停止中の自動有効化を避け、設定変更とコマンド実行を分離する。
+- 自己設定APIのcapability・非公開キー・activate中の契約を保持し、SettingsCommandsへ接続する。外部更新のexpectedRevision・dryRun・原子的保存・公開項目制限を維持する。再入のBUSY/SELF_CALLとNode/.NETの対応を確認する。
+- MCPはlocalhostのHost/Origin/token検査と登録TOMLの所有範囲を維持する。監査ログに引数・認証・生の例外を追加しない。受付・保存完了・OS登録・対象アプリでの効果確認を区別する。
+- 操作許可のUIは専用カテゴリへ集約し、Applet/MCPの独立した列、PC専用即時保存、共有draft保持を維持する。前提不足でも保存済みON/OFFを保ち、他の許可を自動変更しない。
+- Applet管理は共通AppletManagementへ集約する。enabledの保存と再起動を分け、無効Appletを再起動で有効化しない。設定アクションは自身の宣言済みコマンドに限定し、二重実行防止と未保存入力を保つ。
+- 保存場所と受信・復旧は[設定同期](docs/settings-sync.md)に従う。ログは共通Host APIを使い、停止処理中はhost.logだけを受け付ける。停止完了後・異常終了後の要求や停止中の他APIを許可しない。
 
-## ホスト・UI・Webアカウントの維持事項
+## 入力とトレイ
 
-- ショートカットの外部編集はshortcuts.getとappdock.shortcuts.updateへ集約する。既存keybindings/条件/同一キー順序/互換フィールドを共有し、settingsと同じrevision・dryRun・原子的保存を維持する。外部からの新規割当は公開済み引数なしコマンドだけ。既存の未公開/未導入割当を消さず、外部からは保持・無効化・削除を許可する。既定OFFのallowEditShortcutsとallowWrite/allowExecuteを要求し、保存完了とOS登録完了を区別する。詳細は[共通操作API](docs/automation.md#ショートカット編集02632以降)。
+- [条件付きショートカット](docs/keybindings.md)と[ジェスチャー](docs/gestures.md)を正本とする。本体・ローカルUI・Web・Windows入力は共通resolver/dispatcherへ接続し、押下時の条件、保存順、同一コマンド1回、再入防止・取消を維持する。
+- Applet条件は実Windowフォーカスと表示Surfaceで判定する。ownerはコマンド登録元IDを使い、ID接頭辞で推測しない。新規Applet割当はowner、本体/不明はapp。manifestの初期値は初回だけ適用し、解除した行を再生成しない。
+- 一覧は全コマンドの平坦な2列表示。表示順を実行順に流用せず、追加後の検索・スクロールを保持する。編集・順序パネルの一時入力は適用時に共有draftへ戻し、外部更新との競合を検査する。削除は確認なし、保存前の全体破棄で復元する。
+- 正常なWindows登録状態を行に表示せず、記録中の一時解除と実登録エラーを区別する。エラーの表示キャッシュをbackendやdraftへ戻さない。
+- ジェスチャーは本体InputHostが管理し、Appletへ二重フックを持たせない。開始HWND、方向転換取消、右クリック復元、捕捉キーの解放、ホイール積算/破棄、対象変更取消を実入力で確認する。連続操作への固定待機は加えず、再入防止は維持する。
+- トレイは[専用仕様](docs/tray-menu.md)。メニュー外の固定設定/終了、未知コマンドと配置、空配列、グループ解除時の子、単/ダブルクリック独立割当を維持する。外部編集は各専用コマンドと許可・共通revisionへ接続し、保存時に割当操作を実行しない。
 
-- Appletの有効・無効・再起動は本体のAppletManagementをGUI/通常コマンド/MCPで共有する。enabledの保存と再起動を分離し、無効なAppletを再起動で有効化しない。管理コマンドは登録されたAppletから本体が生成し、外部実行には既定OFFのallowManageAppletsとallowExecuteを要求する。Applet独自コマンドの公開宣言から管理権限を付与しない。詳細は[共通操作API](docs/automation.md#applet管理02631以降)。
+## WebとApplet
 
-- 外部コマンドの公開範囲は各Appletのmanifest commands[].automationで宣言する。本体にApplet固有の許可一覧を置かず、別名や接尾辞から推測しない。runtime登録/置換から公開権限を受け取らない。設定変更と実行の許可を分離し、停止中Appletの自動有効化を避ける。受付/処理応答/操作先の効果確認を区別する。MCPの全API呼出しは既存automationログへ成功/失敗を記録し、引数・認証・生の例外を載せない。詳しくは[共通操作API](docs/automation.md)。
-
-- 共通操作API/MCP/Codex登録は[専用仕様](docs/automation.md)を正本とする。外部APIの許可項目・revision・既存保存経路を維持し、任意コマンドや全設定JSONを公開しない。127.0.0.1限定とHost/Origin/token検査、PC専用認証、登録範囲外のTOML保持を保つ。共通API変更はtests/automation.test.cjs、GUI/発行版はscripts/automation-ui-test.cjsで確認する。App Serverは検証用クライアントにだけ使い、会話UIへの組込みとは区別する。
-
-- 起動設定は[専用仕様](docs/launch-settings.md)を正本とする。一般設定の共有draft/JSON/revision/saveを使用し、OS登録は明示保存時だけ変更する。タスクは元のportable EXE・配置先・ユーザーに固定し、他配置や手動登録へ干渉しない。UACキャンセル/権限不足では保存せず、保存競合/失敗時は以前のタスクXMLを復元する。実権限と登録状態は保存された希望値と区別する。検証用のタスクは確実に解除し、UAC承認を自動化しない。
-
-- Windows通知のクリックは配置専用protocol activationを使い、元のportable EXE/保存先へ戻す。Electronの共有製品名shortcut/COM登録に起動先を依存させない。URIから任意commandを実行せず、一度限りのトークンと稼働中子プロセスのガードを維持する。通知変更ではtests/notification-routing.test.cjsとscripts/notification-portable-test.cjsを確認し、Windows ShellによるURI起動と物理toastクリックの検証範囲を区別する。
-
-- メインWindowと共有sessionのスペルチェック無効化を維持する。起動遅延とminimumHostVersion照合はホスト共通で管理し、停止/無効化/終了で予約を取り消す。削除済みウィジェット基盤は互換性のために復活させない。
-- AppletページのUI WebContentsと表示先Window/領域を分離し、page/window切替でsession/Viewを作り直さない。非選択時の背景描画、表示中だけのキー処理、OS/入力フォーカスを奪わないことを検証する。詳細は[Appletページ](docs/applet-pages.md)。
-- WebアカウントはApplet IDごとに保存領域を分離する。認証originは宣言された完全なoriginに限定し、query/認証値/本人情報を診断に出さない。Gmail固有の観測/通知判定はGmail側へ残す。詳細は[WebアカウントAPI](docs/web-accounts.md)。
-- 背景Webの動作はvisibilityState、rAF、observer.readyだけで成功としない。Playwrightのfocus emulationが結果を変えるため、未表示の通常起動も別途検証する。ページ自身の描画/取得開始と、必要に応じて許可された実受信を確認する。実メール送信は明示許可の範囲に限定する。
-- keepActiveの認証遷移/別文書/破棄時の解除、native focus時の入力を保つ。破棄後にWebContents.debugger getterを呼ばず、生存中の参照と冪等disposeで解放する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
-- 設定はuseSettingsEditorの共有draft/JSON/revision/saveを維持し、詳細/設定画面で二重draftや二重入力を作らない。settingActionsは自身の宣言済みcommandに限定し、実行中ガード・結果表示・未保存入力を保つ。
-- Applet詳細の説明・設定・ショートカット・ログは固定の横並びタブで同ページ内に排他表示する。選択表示とキーボード操作、ヘッダー/タブ位置を保つ。ログは選択Appletへ固定し、リボンのログページのsource選択と独立させる。設定との往復で共有draftを保持し、別Appletへ切り替えても選択中のタブを維持する。仕様・検証は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照する。
-- 更新/通常再起動は--restore-viewとプロフィールの画面選択を復元し、終了中のselected(null)で保存先をホームへ上書きしない。Applet復元はstartupReady/対象runningを待つ。詳細は[更新ガイド](docs/updates.md)。
-- 更新の確認結果・進捗・適用完了は本文を動かさない共通ステータスバー通知を維持する。通知の表示時間はHostSnapshot.windowVisibleで実Windowの可視状態から数え、backgroundThrottling無効時のdocument.hiddenを非表示の判定に使わない。通常結果は6秒で消え、ホバー/フォーカス中は残り時間を止める。失敗結果は自動消去しない。詳細はdocs/updates.mdを参照する。
-- 自己更新の起動時checkはmetadata確認だけ。明示installの確認・実PID終了待ち・journal/commit・復元手順とsettings/dataの保持を維持する。故障注入は隔離したコピーだけへ行い、製品の確認dialogは省略しない。GUI・実GitHub取得・実インストール・実UNCの検証範囲を区別する。
-- 本体と全Appletの更新は`installUpdates('all')`の1job/1確認/1再起動へまとめる。同時適用する本体候補の版でAppletの最低host版を検証し、本体候補がない時は現行版を使う。ファイル型Appletだけを列挙し、WebAppletは本体に含める。確認日時は各確認ボタンの隣に置く。仕様と回帰は[更新ガイド](docs/updates.md)を参照する。
-
-## リリース
-
-- バージョン更新・リリースを依頼されたら、作業前に[docs/RELEASING.md](docs/RELEASING.md)を読む。手順書を正本とし、過去チャットや.artifactsだけに依存しない。
-- 「バージョンアップして一緒にリリースして」という依頼は、その変更の検証・配布物作成・対象mainのpush・タグ/Release作成・アセット添付・公開後確認までの指示として扱う。対象や版が不明なら必要な点だけ確認する。単なる文書整備・ビルドの依頼で公開しない。
-- AppDockのリリース依頼は本体と同梱Appletをまとめて扱う（2026-10-10ユーザー指定）。本体版が未公開なら単一EXE/update.json/全ローカルApplet入りZIPを本体Releaseへ公開する。同梱Appletの版が自身のrepoで未公開なら同梱版のupdate.zip/update.jsonをそのrepoへ公開・検証する。本体・Appletとも公開済み同版は再作成・上書きしない。同梱だけの版更新は不要。本体が公開済みでも検証済みbundleの一覧から未公開Appletを判定して続行できる。各repoの公開後検証と最新3件への整理まで完了し、skip/公開/失敗を個別記録する。単なる通常publishでは公開しない。詳細は[まとめてリリース](docs/RELEASING.md#本体と同梱appletをまとめてリリース)。
-- プロジェクト内のNode/pnpmを使う。既存のpublish.bat・更新JSON仕様・Applet個別更新を維持する。公開済みアセット/タグを自動上書きしない。
-- [Release手順](docs/RELEASING.md)の標準Prepare、または検証証跡を再利用した準備で、必要な検証を完了させる。再利用は型チェック/ソース回帰等に限り、新しい配布物の検証は毎回行う。preflight/sealとDraftの全アセット照合を経てPublishへ進む。失敗時は非公開のまま停止し、手順書の復旧手順に従う。公開リクエストの結果が不明なら再作成せず状態を確認する。
-- GUI試験は直列・隔離profileで行う。実利用設定・認証データは配布物へ入れない。
-- GitHub公開後のVerify成功後、公開済みReleaseをpublished_atの新しい順で3件だけ残し、古いReleaseと添付アセットを削除する（2026-10-09ユーザー指定）。本体はrelease.cjsのVerify末尾で共通release-retention.cjsを実行する。Appletも各repoの公開後検証が成功した場合だけ共通手順を使う。draft・Gitタグ/コミット履歴を保持し、候補/最新版の再確認と削除前後の記録を残す。公開・検証失敗時は削除しない。保持3件内の不具合Release等を追加で削除する場合は個別指定に従う。詳細は[Release整理](docs/RELEASING.md#公開済みreleaseを最新3件に整理)を参照する。
-
-## Applet追加
-
-- 新しいAppletはAppDockの親フォルダー直下の独立Gitリポジトリに置き、ルートに`extension.json`と`publish.bat`を用意する。開発/テスト生成物は`.artifacts`へ保存しGit除外する（既存Appletも2026-10-10に改名済み）。同期/バックアップ設定はユキちゃんが担当する。既存の6件を固定リストとして扱わない。
-- publish.batはビルドに失敗したら非0終了とし、共通`scripts/pack-applet-update.ps1`で、そのAppletの`publish/update.json`と`publish/update.zip`を生成する。manifestのIDは一意にし、版・minimumHostVersion・entryを正しく記載する。
-- AppDockのRelease Prepareのpack-all-in-oneはこれらのrepoを自動検出するため、名前一覧の追記は不要。追加したAppletは自身のpublishで確認し、AppDockリリース時に[オールインワン作成](docs/all-in-one.md)の検査と展開起動で収録を確認する。探索範囲外のrepoは勝手に無視せず、配置または明示のAppletRootを整える。
-- READMEは利用者向け、開発/発行手順はDEVELOPMENT/docs、実測結果と未確認事項はVERIFICATIONへ記録する。BATはCP932/CRLFを保つ。
-
-## WebAppletの維持事項
-
-- 追加/管理と新規サイト用ショートカット初期値はApplet一覧の組み込み「WebApplet」の設定/ショートカットへ集約する。管理項目はrendererだけの入口で、runtime snapshot・更新・リボン・並べ替え・コマンド提供元へ混ぜない。各サイトのID/個別設定/リボンは維持し、設定カテゴリへWebApplet入口を戻さない。
-- 設定/全Applet詳細はページ見出し下のSettingsToolbarで全編集内容を保存する。未保存のままそれ以外へ移ったら、本体Window上部のSettingsNoticeから保存/確認付き破棄を行う。共有draftを通知へ複製せず、専用preloadの通知操作をhost rendererへ戻す。別WebContentsViewへ重なるnative通知の最前面・フォーカス・サイズ・破棄・IPC送信元検査を保つ。専用GUIはscripts/settings-notice-ui-test.cjs。
-
-- URLから動的に追加する本体管理Applet。設定・アカウント・遷移・Web提供JSON・検証の正本は[WebApplet](docs/web-applets.md)。従来の未実装相談は実装履歴として扱う。
-- Gmailとはaccounts/session/Cookieの保存領域とライフサイクルを分離する。認証データのコピー・移行を追加しない。WebApplet専用の同じ枠はWebApplet間で共有する。
-- 枠の削除は保存データも消去し、枠除去とpendingDeletionを同じatomic writeで記録する。生成済みsessionの物理回収は次回起動のsession生成前に行い、ロック等の失敗は記録を残して再試行する。登録中/設定で参照中/同プロセスで生成済みのsessionを回収せず、削除済みsessionを終了時に再flushしない。専用sessions直下の検証済みIDと非転送rootを守り、Gmail/他枠/外部junction先を削除しない。旧版の記録なし残存領域を自動削除するものとは区別する。
-- Webアカウント管理は独立した設定カテゴリと専用accounts.jsonを使う。操作は設定draft/revision/saveから独立して即時反映し、削除/クリアはホストの警告dialogで確認する。旧settings内の枠はIDとsessionを保って移行し、専用ファイルの保存成功後だけ旧フィールドを除く。使用中枠の削除ガードと設定保存時の参照検証を維持する。
-- アカウント名はblur/Enter/ボタンで確定、確定前のEscapeで保存済みの名前へ戻す。IME変換中/空欄の確定、Enterとblurの重複送信、名前変更で直後の削除/クリアのクリックを失うことを避ける。非同期snapshot反映で次の編集中の名前を上書きしない。
-- リモートページにpreload/Node/ホストIPCを公開しない。外部JSONは検証した推奨初期値だけを取り込み、アカウント/コマンド/許可範囲拡張を受け入れず、手動変更を再取得で上書きしない。
-- WebAppletはページを開いた時に生成する。既存AppletSurfaceを使い、表示先の切替でWebContents/session/入力を作り直さない。無効化/削除/アカウント・URL変更時の破棄、Cookie保存、共有枠消去時の対象画面終了を確認する。
-- 無効化したApplet（WebApplet/Gmailを含む）は実リボンから除外し、再開時に元の表示/順序/上下配置へ戻す。リボン設定の一覧には保持し、コマンドによる明示起動や、有効なAppletの開始待ち/エラー表示/再試行を妨げない。
-- WebAppletのID接頭辞web.は本体管理用。ファイルmanifestからこの名前空間やweb runtimeを読み込まない。本体と一緒に更新されるため、個別Appletの配布更新対象へ混ぜない。
-- 今後の同機能変更ではtests/web-applets.test.cjs、tests/web-profiles.test.cjs、scripts/web-applets-ui-test.cjs、scripts/web-applets-portable-test.cjsに加え、既存ページ/Gmail表示の回帰を確認する。保存形式変更時は保持した旧配布物でscripts/web-profiles-migration-ui-test.cjsも実施する。実サイト認証・長期背景動作とオフラインfixtureの成功を区別する。
-
-## 条件付きショートカットの維持事項
-
-- 0.26.23の[画面設計](docs/shortcut-ui-redesign.md)を正本とする。設定ページは全コマンドの平坦な一覧で未割り当ても表示し、一覧内にグループ分け/実行順操作/コマンド変更を置かない。実行順は専用ShortcutOrderDialogで変更する。検索/状態フィルター/表示件数を上部にまとめ、ShortcutCommandListとAppletShortcutDialogをApplet詳細と共用する。追加時は絞り込み・表示位置を保持し、自動スクロールしない。
-
-- 設定ページ/通常Appletのショートカット削除は確認なしで共有draftへ反映する（BindingActionsのconfirmDelete=false）。保存前は全体の変更破棄で戻せる。ジェスチャーも0.26.24から確認なしで削除する。未割り当てとキーの左端を揃える。
-
-- 0.26.20からApplet詳細は一覧の＋とキー/条件ペアから小さな編集dialogを開く。割り当てメニューの「このキーの実行順…」から、他Appletを含む全割り当ての専用パネルを開く。入力中だけの一時フォームを追加/適用で共有draftへ反映し、全体保存を維持する。dialog表示中はグローバル登録と画面ショートカットを抑止し、取消/閉じる/破棄時に復帰する。Tabは移動、Escapeは取消、Enterは記録欄ではキー入力として扱い、特殊キーからCtrl/Alt/Shift付きTab/Escape等を選べる。実測はscripts/shortcuts-ui-test.cjsとapplet-shortcut-edit-checks.cjs。
-
-- 正本は[条件付きショートカット](docs/keybindings.md)。割り当てごとのkeybindingsを使い、旧shortcuts/globalShortcutCommandsへ条件を押し込まない。新形式が存在すれば旧フィールドは表示用の派生値。
-- 本体・localページ・Gmail UI/本文・WebApplet・Windowsホットキーは共通resolver/dispatcherへ渡す。押下時の条件で実行対象を固定し、保存順・同一コマンド1回・再入防止・終了時打切りを保つ。
-- Applet条件は実Windowフォーカスと表示中のSurfaceから判定する。非選択/背景/トレイのページ選択をアクティブと扱わず、リモートページへホストIPCを公開しない。
-- owner条件は現在のコマンド登録元extensionIdと表示中ページを照合し、ID接頭辞から推測しない。選択肢は「すべてのApplet → 提供元名だけ → 指定したApplet」の順。本体コマンドには提供元項目を出さない。
-- 未割り当てのAppletコマンドへキーを追加する時はowner、本体/提供元不明はappを既定にする。既存条件の編集/複製を上書きしない。コマンド一覧の補助表示は完全なIDを見せ、提供元表示名とIDの双方で検索できることを保つ。
-- Appletの初期割り当ては自身のmanifestの`commands`と`defaultKeybindings`で宣言し、本体の既定キー表へApplet固有IDを戻さない。初回発見時だけ保存へ追加し、既存Applet/利用者が解除した行を再生成しない。WebAppletは設定内の将来分テンプレートを新規追加時にコピーし、Applet詳細に一括初期化は置かない。正本の形式と検証境界はdocs/keybindings.mdを参照する。
-- UIはuseSettingsEditorのdraft/JSON/revision/saveを共用。条件のない旧設定への完全互換のために新設計を複雑化しない（2026-10-09ユーザー指定）。
-- グローバルキーの登録ステータスはWindowsの受付状態であり、設定の保存状態とは別。キー記録中は全登録を一時解除しstatusesが空になる。表示の調査時はこの一時停止/復帰を区別する。詳細はdocs/keybindings.md。
-- 正常時の登録済み/未登録と、正常な同キー割り当ての注意文は行に表示しない。登録エラーは記録中も直近の再検査結果を保持し、行高とエラー絞り込みを安定させる。表示用キャッシュをbackendの受付や共有draftへ使わない。全体順のメニューは操作範囲を明記する。
-
-## マウスジェスチャーの維持事項
-
-- 外部編集はgestures.get/appdock.gestures.updateと既定OFFのallowEditGesturesを使用する。共通revision/dryRun/原子的保存と、公開済み引数なしコマンドだけの新規割当を維持する。割当操作とconfigureを同じ検証単位で保存し、browser/exe条件・順序・入力処理は既存gesturesを共用する。保存成功を実入力成功と扱わない。正本は[共通操作API](docs/automation.md#ジェスチャー編集02633以降)。
-
-- 正本は[マウスジェスチャー](docs/gestures.md)。本体管理InputHost、共通コマンド予約、条件判定、共有設定draftを使い、Appletへフックを重複登録しない。WebBrowserToolsはブラウザ操作と送信キーを担当する。
-- 旧設定はgestures未指定時だけ取り込み、空配列/解除済み割り当てを復活させない。初期値はApplet manifestのdefaultGestureBindingsから初回だけ追加する。WebBrowserToolsの対象exeは本体側と一致させる。
-- 開始対象HWNDとページ文脈を固定し、対象/設定変更や取消後に次のアプリへ送らない。command.executeのinvocationとcommand.cancel/.NET CancellationTokenを保つ。キーとジェスチャーのコマンド予約は共用し、再入防止のためにジェスチャーの連続操作全体へ固定待機を追加しない。
-- 右クリック復元、捕捉した左/中/キーの解放、ホイールの積算/滞留破棄、停止時の解除を実入力で確認する。待機表示の初期化はフック登録前。InputHostは必要なWPFランタイムを自己完結で収録し、配布は本体単一EXEを維持する。
-- 変更時はtests/gestures.test.cjs、tests/InputTests、scripts/gestures-ui-test.cjs、既存ショートカット/ページ回帰を確認する。GUIは直列・隔離profile、発行後は固定配布物で確認する。
-- 0.26.24のジェスチャー一覧は全コマンドを平坦に表示し、未割り当ても残す。検索/状態フィルター/＋/入力と条件/即時削除をショートカットと共用する。編集は種類別の選択ボタンとキー記録を持つGestureBindingDialog、順序はGestureOrderDialogで同一入力内だけ変更する。正本はdocs/gestures.md。全体ON/OFFと動作設定、browser/exe条件はジェスチャー側で管理する。
-
-- 行の操作メニューはスクロール表の外へ浮かべ、行の高さを変えない。画面端の位置補正、外側クリック/Escapeで閉じる操作、キーボード移動を維持する。
-
-- Applet設定は詳細ページへ集約し、設定ページにApplet別設定一覧/本体専用キー入口を戻さない。全コマンド一覧はカタログ順でappletOrderには連動しない。AppletIndexの並べ替えは共有draftのappletOrderだけを変更し、起動順/keybindingsの実行順/ribbon.orderを変更しない。回帰はtests/applet-order.test.cjsとscripts/applet-order-ui-test.cjs。
-
-- ショートカットの行末メニューは編集/このキーの実行順/即時削除。追加/編集は小さなdialogで完成してから共有draftへ反映する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は保存位置を保持する。ジェスチャーも同じ操作と位置保持を使い、編集/並べ替え時の外部更新を上書きしない。
-
-- ショートカットとジェスチャーはCommandBindingListのコマンド/割り当て2列とし、狭幅・両テーマで検索/フィルター/編集パネルのoverflowを検証する。共通化では既存ショートカットのGUIも確認する。
-
-- コマンド一覧に実行順番号を表示しない。専用パネルだけに番号と順番操作を置き、適用は同キーのスロット内でのみ行う。変更したキーの内容や順序が外部更新された場合は適用を拒否し、他キーの更新は保持する。検索/状態フィルターに該当するコマンドの全割り当てを表示し、保存配列やdispatcherの実行順を表示のために並べ替えない。
-
-- ショートカットの解除はその他メニューの削除で選んだIDだけをdraftから除く。コマンド行は未割り当てとして残す。無効/停止中でも操作可能にし、空キーの保存検証を緩めない。Deleteは記録可能なキーとして維持する。
-
-- タスクトレイは[専用仕様](docs/tray-menu.md)を正本とし、共有draft/JSON/revision/saveを使う。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値。固定の設定/終了はツリー外から末尾付加。未知コマンドと配置を保持し、グループ解除で子を削除しない。一時停止/再開は共通executeCommandへ登録した本体コマンドで、どの入口から実行してもトレイのチェックを再構成する。実Tray callback/単・ダブル判定と、配布単一EXEの編集/再起動試験の範囲を区別する。
-
-## リボンの外部編集
-
-- `ribbon.get`/`appdock.ribbon.update`と既定OFFの`allowEditRibbon`を使用する。共有`parseRibbon`、revision、dryRun、原子的保存を維持し、非表示/無効Appletも配置一覧に含める。通常編集では未導入IDを保持し、明示resetだけ全配置を初期化する。編集でAppletを有効化したりページを開かない。正本は[共通操作API](docs/automation.md#リボン編集02634以降)、既存GUI仕様は[Appletページ](docs/applet-pages.md)。
-
-## タスクトレイの外部編集
-
-- `tray.get`/`appdock.tray.update`と既定OFFの`allowEditTray`を使う。メニューとクリック割当を共通revision/dryRunで原子的に保存し、新しい割当は公開済み引数なしコマンドへ限定する。既存の非公開/未知コマンドを保持し、移動/削除可能にする。固定の設定/終了、1段グループ、ungroupでの子保持、既存クリック判定を維持する。正本は[共通操作API](docs/automation.md#タスクトレイ編集02635以降)。
-
-- 0.26.42の本文領域とログ移行は[Shellのページ表示](docs/shell-pages.md)を正本とする。ShellPageHostは表示寿命と復旧、内容Controllerはモデルと操作を所有する。page.logsは全体/詳細/Web管理のログを同じ描画で提供し、本体へログUIを戻さない。未提供/故障時はDefault Shellへ復帰する。新しいページは公開モデルと操作を定義してから領域へ追加し、ホストへ内容固有処理を混ぜない。
+- [WebApplet](docs/web-applets.md)と[WebアカウントAPI](docs/web-accounts.md)の保存領域・認証・表示寿命を区別する。リモートページへpreload/Node/ホストIPCを渡さない。提供JSONは検証した初期値だけを取り込み、手動変更・権限を上書きしない。
+- WebAppletの追加/削除/初期ショートカットは一覧内の組み込み管理項目で行う。個別サイトのID・設定・リボンを保持し、組み込み管理項目をruntimeや更新対象へ混ぜない。公開設定・コマンドは提供元の宣言に従う。
+- Webアカウントは別ファイルへ即時保存する。名前のblur/Enter確定・Escape取消・IME/重複送信防止、削除/クリアの警告と参照中ガードを維持する。削除待ちsessionは検証済み専用root内で次回起動時に回収し、Gmail・別枠・外部リンク先を削除しない。
+- 表示先切替でWebContents/session/入力を再生成しない。非選択/非表示でも背景描画を維持する。rAF・visibilityState・observer.readyやPlaywrightのfocus emulationだけで実受信成功と扱わず、通常起動の描画/取得を確認する。
+- keepActiveの遷移/破棄時解除、native focusの優先、Debugger接続の冪等回収を維持する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
+- 無効Appletは実リボンから除外し、設定カタログと保存配置は保持する。再開時の元の配置と、有効Appletの開始待ち/エラー/再試行を維持する。
+- 新規Appletは30.PROJECT直下の独立repoにextension.jsonとpublish.batを置き、一意IDを使う。共通API・保存・配布は[Appletガイド](docs/applet-development.md)に従い、本体へ固定のApplet一覧を追加しない。共通pack-applet-update.ps1で個別更新物を作る。

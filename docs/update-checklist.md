@@ -4,7 +4,7 @@
 
 ## 1. 今回の発行物を用意する
 
-AppDockは0.23.0です。単一EXE形式を維持しています。Applet本体の版は今回変更していません。
+package.json、各Appletのmanifest、発行物のupdate.jsonから対象版を確認します。本体は単一EXE、Appletは自身のupdate.zipを使用します。
 
 | 対象 | 配布元へ置くファイル | ローカル更新元の指定例 |
 | --- | --- | --- |

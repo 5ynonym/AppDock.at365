@@ -1,6 +1,6 @@
-# Shell Host / Default Shell（0.26.41）
+# Shell Host / Default Shell
 
-リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。タイトルバー・本文・設定画面・共有設定draft・AppletページのWebContentsは本体に残る。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
+リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。ログ本文も[ページ用Shell](shell-pages.md)が描画する。タイトルバー・設定画面・共有設定draft・未移行の本文・AppletページのWebContentsは本体に残る。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
 
 ## 構成と拡張
 
@@ -68,4 +68,4 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 AppDockを終了してから`--safe-shell`で起動すると、選択とリボン表示設定を一時的に既定値として扱う。保存設定・Applet設定・認証は初期化しない。Default Shell自身の起動失敗は本体の最小ネイティブ通知から再試行・ログ画面・終了を選ぶ。第二のリボンを本体へ戻さない。破損した同梱コードそのものを再起動だけで修復できるとはしない。
 
-この版はprimary1件・本体1ウィンドウ。Default Shellのworkerは復旧用に稼働を維持し、Shell Appletの有効状態も選択とは独立。複数の同時Shell/Window、全画面の移植、Web本文の複製、内蔵チャットは未実装。検証の実測・未確認条件は[VERIFICATION](../VERIFICATION.md)へ記録する。
+現在はprimary1件・本体1ウィンドウ。Default Shellのworkerは復旧用に稼働を維持し、Shell Appletの有効状態も選択とは独立。複数の同時Shell/Window、全画面の移植、Web本文の複製、内蔵チャットは未実装。検証の実測・未確認条件は[VERIFICATION](../VERIFICATION.md)へ記録する。

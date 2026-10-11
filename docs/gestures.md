@@ -1,6 +1,6 @@
 # マウスジェスチャー
 
-AppDock 0.26.0で入力基盤をWebBrowserToolsから本体へ移した。ブラウザ操作コマンドと送信キーはWebBrowserToolsに残す。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorのdraft/JSON/revision/atomic writeを共用する。
+入力基盤は本体が所有する。ブラウザ操作コマンドと送信キーはWebBrowserToolsに残す。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorのdraft/JSON/revision/atomic writeを共用する。
 
 ## 保存と移行
 
@@ -9,7 +9,7 @@ AppDock 0.26.0で入力基盤をWebBrowserToolsから本体へ移した。ブラ
 - whenは`global/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。Applet条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。
 - `excludedProcesses`は全条件より優先。`enabled`は永続設定。トレイの一時停止は稼働中だけで、再起動で解除する。
 - `gestures`がない旧設定だけ、WebBrowserToolsの8割り当て、ON/OFF、対象exe、Chromium制限、距離、ホイール間隔、表示位置・透明度を取り込む。空の割り当て配列を既定値に戻さない。元のApplet設定を破棄しない。
-- manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。WebBrowserTools 0.3.0は8操作の初期値を宣言する。
+- manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。WebBrowserToolsは8操作の初期値を宣言する。
 - hostはWebBrowserToolsへの設定通知で旧`gestures.enabled`を常にfalseにし、`hostManagedGestures=true`と本体の対象ブラウザ設定を渡す。保存済み送信キーとコマンドIDは維持する。旧Appletと本体の二重フックを防ぐ。
 
 ## 入力・実行
@@ -30,13 +30,13 @@ AppDock 0.26.0で入力基盤をWebBrowserToolsから本体へ移した。ブラ
 
 ## 検証
 
-- Codex/MCPからの取得・編集（0.26.33）は[共通操作API](automation.md#ジェスチャー編集02633以降)。割当・順序・動作設定を同じ保存経路で更新し、GUIの未保存入力との競合を検査する。
+- Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、GUIの未保存入力との競合を検査する。
 - `tests/gestures.test.cjs`: 移行、明示的な空配列、検証、条件、初期値、共通予約と取消。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。
 
-## コマンド一覧と編集パネル（0.26.24）
+## コマンド一覧と編集パネル
 
 - 設定ページは全コマンドをカタログ順に表示し、未割り当ても残す。非表示の互換コマンドは割り当てがある場合だけ、未確認のコマンドは保存済みIDを使って表示する。検索はコマンド/完全ID/提供元/入力/条件、状態はすべて・割り当て済み・未割り当て。Windowsホットキーの登録エラーはジェスチャーには表示しない。
 - CommandBindingToolbar/CommandBindingListはショートカットと共用する。コマンドと割り当ての2列、＋で直接追加、入力と条件のペアをクリックして編集する。行のメニューは編集・このジェスチャーの実行順・削除。削除確認はなく、保存前は全体の変更破棄で戻せる。追加後に自動スクロールせず、検索/表示位置/focusを保持する。
@@ -47,6 +47,5 @@ AppDock 0.26.0で入力基盤をWebBrowserToolsから本体へ移した。ブラ
 - 全体のON/OFFと折りたたみ「動作設定」は一覧上部。対象ブラウザ・除外・距離・ホイール間隔・待機表示を既存共有draftへ反映する。OFF中も一覧と編集は利用できる。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
 
-0.26.1〜0.26.23の入力別グループ表・インライン編集・コマンドパレットによる追加・複製/確認付き削除は、0.26.24で上記UIへ置き換えた。保存済みbindingsと実行順は引き継ぐ。
 
 一時停止/再開は本体コマンド`appdock.gestures.togglePause`で切り替えます。トレイ内はチェック付き項目で、検索・キーからの実行も同期します。保存されない実行中の状態で、再起動後は解除します。配置の仕様は[タスクトレイ](tray-menu.md)を参照してください。

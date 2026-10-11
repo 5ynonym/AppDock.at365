@@ -20,7 +20,7 @@
 4. 未公開の各Appletについて、そのrepoの指示・既存検証を確認し、cleanな対象commit/main、ノート、manifest/feedのID/版/最低ホスト版、ZIP全収録ファイルのsize/hashを検証します。同梱の`updateZipSha256`と元update.zip、bundle中の各ファイルとの一致を必須とし、同梱版をそのまま使います。再発行でhashや内容が変われば本体Prepareへ戻します。同梱だけでApplet版を増やしません。
 5. 未公開本体と未公開Appletの下書き/全asset照合を完了してから順番に公開します。各Appletは下記の個別Release手順を使い、既存の一致するdraftは不足assetだけを追加して再利用します。既存の公開済みassetには`--clobber`を使わず、タグを移動しません。
 6. 本体はVerify、各Appletは匿名feed/ZIP取得とsize/hash、実`PortableUpdates.check()`の個別/一括結果（同梱版がavailable/installable）まで確認します。repoごとに公開/検証/整理/skipを記録します。新版が必要とする本体版を先に公開し、Appletが本体更新を待つ関係も確認します。実インストールやdeployは別です。
-7. 今回公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。ユキちゃんは2026-10-10にこの整理を今後も毎回行うことを継続承認しています。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
+7. 今回公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。この整理はリリース作業の継続承認済み手順です。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
 
 この工程は製品の起動・通常publishで自動実行する処理ではありません。複数repoの公開は一括トランザクションではないため、一部の公開/検証が失敗しても他repoの公開成功を取り消したり隠したりしません。
 
@@ -165,7 +165,7 @@ Publishは検証済み下書きと全アセットを再照合してから、最�
 
 ## 公開済みReleaseを最新3件に整理
 
-2026-10-09のユーザー指定により、AppDockと各Appletでは、新しいReleaseの公開後検証に成功した対象repoごとに整理します。公開済みRelease（prereleaseも含む）を`published_at`の降順、同時刻ならIDの降順で3件だけ保持し、残りのReleaseと添付アセットを削除します。バージョン文字列やコミットの作成日時では判定しません。未公開draftは数えず保持し、Gitタグ/コミット履歴も保持します。通常publishでは実行しません。
+AppDockと各Appletでは、新しいReleaseの公開後検証に成功した対象repoごとに整理します。公開済みRelease（prereleaseも含む）を`published_at`の降順、同時刻ならIDの降順で3件だけ保持し、残りのReleaseと添付アセットを削除します。バージョン文字列やコミットの作成日時では判定しません。未公開draftは数えず保持し、Gitタグ/コミット履歴も保持します。通常publishでは実行しません。
 
 本体はVerifyの公開後検証成功をplanへ保存してから、`scripts/release-retention.cjs`を呼び出します。全ページを取得し、検証済みReleaseのID/タグとlatestを照合、検証済みReleaseが保持3件に入ることを確認します。各削除の直前にも保持対象・latest・削除対象のID/タグ/公開日時/アセット情報を再取得して一致を確認し、[GitHub Release API](https://docs.github.com/en/rest/releases/releases#delete-a-release)のRelease ID指定DELETEだけを使います。Git ref削除の操作は行いません。
 
@@ -215,34 +215,3 @@ if ($LASTEXITCODE -ne 0) { throw 'Release整理が失敗しました。公開結
 ```
 
 `$taskRepo`は共通スクリプトのあるAppDock repoです。Nodeの版は現行toolchain.jsonに合わせます。本体/各Appletはそれぞれのrepo内で3件を保持し、今回リリースしていないrepoは整理しません。
-
-## 2026-10-09に成功した公開の記録
-
-次のローカル証跡とGitHubの実アセットを確認して、この手順へ移しました。.artifactsはGit管理対象外なので、将来これらのファイルがなくても上の手順を実行できます。
-
-- `.artifacts/github-releases-0.23.0/plan.json`: 7repoのtag/commit/ノート/アセットsize/hash。
-- 同`public-verification.json`: 全7repoの認証なし取得と実PortableUpdates.check成功。
-- `.artifacts/github-install-1791480155823/result.json`: 隔離EXEで全6Applet一括、本体同版、WindowMover個別のGitHub更新成功。
-- `.artifacts/all-in-one-release-result.json`: 全体ZIP取得検証と元のEXE/feedが不変である記録。
-
-実行したCLI操作は`gh release create <tag> <payload> <feed> --repo <repo> --target <commit> --title <title> --notes-file <file> --draft`、下書きassetのAPI照合、`gh release edit <tag> --repo <repo> --draft=false --latest`です。全体ZIPの追加時は`gh release upload v0.23.0 <zip> --repo 5ynonym/AppDock.at365`（clobberなし）、`gh release edit v0.23.0 --repo 5ynonym/AppDock.at365 --notes-file <既存本文に説明を追記したファイル>`を使いました。今回のスクリプトは初回から3assetを下書きへ揃える手順です。
-
-| repo | 公開タグ | commit（短縮） |
-| --- | --- | --- |
-| AppDock.at365 | v0.23.0 | 8a4d96e |
-| Applet.Gmail.at365 | v0.9.0 | 89bcd76 |
-| Applet.WallpaperSlideshow.at365 | v0.4.0 | 12524cb |
-| Applet.Watch.at365 | v0.1.1 | 8a84ca1 |
-| Applet.WebBrowserTools.at365 | v0.2.4 | b312404 |
-| Applet.WindowMover.at365 | v0.2.1 | 630c84d |
-| Applet.WindowsTools.at365 | v0.1.1 | 6e8ad2b |
-
-[AppDock v0.23.0](https://github.com/5ynonym/AppDock.at365/releases/tag/v0.23.0)（Release ID 407083349）の確認値:
-
-| アセット | bytes | SHA256 |
-| --- | ---: | --- |
-| AppDock.at365.exe | 100596899 | `71faa4c6670d2662f195936f45d9fbffde13f73d9136bb9869cdc14ce1b8bf02` |
-| update.json | 270 | `2e814fab94ae42eccbbb4f295d56e83ce74658f1d924d29bece5485dd8b42222` |
-| AppDock.at365-all-in-one-0.23.0.zip | 275724048 | `92a17694df699133353dc43160b68dc76eded545b4766b8b9621f13ac45f345c` |
-
-この版だけは、公開後にオールインワン機能を実装してZIPを追加した経緯があります。ZIPは同版を再ビルドしたEXEを含むため、先に公開した通常EXEとはバイト一致しません。既存EXE/feedは保持しました。これは履歴上の例外であり、今後は同じPrepareで作ったEXEを通常版と全体ZIPに使い、hash一致を必須にします。既存v0.23.0を新スクリプトで再公開しません。

@@ -1,6 +1,6 @@
 # スタートアップ・管理者起動
 
-0.26.13から、一般設定の`host.startAtLogon`と`host.runAsAdministrator`で起動方法を設定する。どちらも既定false。旧JSONの欠落だけをfalseへ移行し、null/非booleanは拒否する。通常の設定と同じ共有draft/JSON/revision/saveを使い、トグル操作だけではOSを変更しない。
+一般設定の`host.startAtLogon`と`host.runAsAdministrator`で起動方法を設定する。どちらも既定false。旧JSONの欠落だけをfalseへ移行し、null/非booleanは拒否する。通常の設定と同じ共有draft/JSON/revision/saveを使い、トグル操作だけではOSを変更しない。
 
 ## Windowsの登録
 

@@ -1,6 +1,8 @@
-# Shellのページ表示（0.26.42）
+# Shellのページ表示
 
-本文領域の表示基盤を追加し、全体のログページ・Applet詳細のログタブ・WebApplet管理のログタブをDefault Shellへ移した。本体rendererにログの描画は残さない。既存の起動後500件、Applet/source・レベル・文字検索、保存先を開く操作、ファイルの1MBローテーションは維持する。過去ファイルの閲覧、日付フィルター、保存期間変更は今回の範囲外。
+設定ページを追加する次期計画は[設定基盤とDefault Shellへの移行設計](settings-foundation.md)を参照する。設定用の領域・公開モデル・操作は未実装であり、以下は現行のログページ契約を記載する。
+
+全体のログページ・Applet詳細のログタブ・WebApplet管理のログタブはDefault Shellで描画する。本体rendererにログの描画は残さない。既存の起動後500件、Applet/source・レベル・文字検索、保存先を開く操作、ファイルの1MBローテーションは維持する。過去ファイルの閲覧、日付フィルター、保存期間変更は未実装。
 
 ## 部分差し替え
 
@@ -44,7 +46,7 @@
 
 `scope.type`が`all`ならsourceを選択できる。`applet`なら`scope.id`に固定し、`web`なら`web.*`と`web-applets`に固定する。詳細画面からsourceを広げる操作は拒否する。提供元Applet自身のIDと、ログの表示対象AppletのIDは別物として扱う。全体ページのsource選択は既存の再起動時表示状態へ反映する。文字検索とレベルはそのページの寿命に従い、提供元切替・復旧では保持し、ページを離れると終了する。
 
-WebContents・main frame・登録URL・現在route・readyを照合し、旧ページIDの操作を拒否する。新しい表示枠の後に届いた古い枠のcloseは無視する。ログの本体snapshot契約は既存互換のため維持するが、Shellへ全設定や認証状態を渡さない。MCP/worker向けのログ照会APIは今回追加していない。
+WebContents・main frame・登録URL・現在route・readyを照合し、旧ページIDの操作を拒否する。新しい表示枠の後に届いた古い枠のcloseは無視する。ログの本体snapshot契約は既存互換のため維持するが、Shellへ全設定や認証状態を渡さない。MCP/worker向けのログ照会APIは提供していない。
 
 ## 復旧
 

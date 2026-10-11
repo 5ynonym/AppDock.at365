@@ -1,6 +1,6 @@
 # WebApplet
 
-0.26.14の共有枠・PC専用sessionと旧保存先を移行しない方針は[設定同期](settings-sync.md)を参照してください。
+共有枠・PC専用sessionと旧保存先を移行しない方針は[設定同期](settings-sync.md)を参照してください。
 
 WebAppletはURLから追加する本体管理のAppletです。配布用のextension.jsonや別プロセスは不要で、Applet一覧・リボン・コマンド・ショートカットに表示します。1つのURLにつき1つの安定した`web.<UUID>`を発行し、最大64件を登録できます。ファイルとして導入するAppletにはこのID接頭辞を使いません。
 
@@ -32,9 +32,8 @@ GmailのPC専用root内`web-accounts/at365.gmail`、アカウント一覧、認�
 
 回収対象はWebApplet専用sessions直下の検証済みaccount IDだけです。登録中/設定から参照中/同プロセスで生成済みのsessionは回収せず、転送されたroot/対象junctionを拒否して、外部へのパスをたどりません。削除記録のない旧版の残存ディレクトリは自動で削除しません。
 
-0.24.0公開版のsettings.jsonにあるwebApplets.accountsは、最初の起動で検証して専用ファイルへ移します。移行先の保存成功後に旧フィールドを除去し、accountIdとsessionディレクトリを保ちます。既存の専用ファイルがある場合はそちらが正本で、古いsettings.jsonを戻しても枠を復活/上書きしません。不正な専用ファイルや外部変更は自動上書きせず、エラーとして保持します。設定保存時はitemsの参照先を生きた枠一覧で検証します。
+既存のsettings.jsonにあるwebApplets.accountsは、最初の起動で検証して専用ファイルへ移します。移行先の保存成功後に旧フィールドを除去し、accountIdとsessionディレクトリを保ちます。既存の専用ファイルがある場合はそちらが正本で、古いsettings.jsonを戻しても枠を復活/上書きしません。不正な専用ファイルや外部変更は自動上書きせず、エラーとして保持します。設定保存時はitemsの参照先を生きた枠一覧で検証します。
 
-この保存形式は0.24.0公開版から変更されています。旧版へ戻す場合は、終了後にaccounts.jsonのaccountsをsettings.jsonのwebApplets.accountsへ戻してください。Cookie/sessionの移動は不要です。
 
 ## 遷移と表示
 
@@ -75,13 +74,13 @@ Webページにはpreload/Node/ホストIPCを公開せず、sandbox/contextIsol
 
 ## 開発検証
 
-`tests/web-applets.test.cjs`は設定移行、ID/参照、危険なURL、origin比較、Web提供JSONの権限境界を確認します。`tests/web-profiles.test.cjs`は旧一覧の移行、設定byte/revision不変の即時保存、削除待ちの再起動/失敗再試行、参照/生成済みガード、junction/パスの削除境界と外部変更/不正ファイルの保持を確認します。`scripts/web-applets-ui-test.cjs [win-unpackedのEXE]`は独立ページ・即時操作・警告の取消/確認・下書き保持と従来のWeb表示を確認します。`scripts/web-profiles-migration-ui-test.cjs <保持した0.24.0のwin-unpacked EXE>`は旧版で作った実Cookieが移行後も残ることを隔離profileで確認します。旧配布物の再発行前に試験用コピーを保持し、現行EXEを旧版として試験しません。`scripts/web-applets-portable-test.cjs [単一EXE]`は実EXEの隔離コピーを通常起動して確認します。実サイトのログインや長時間動作とは区別します。
+`tests/web-applets.test.cjs`は設定移行、ID/参照、危険なURL、origin比較、Web提供JSONの権限境界を確認します。`tests/web-profiles.test.cjs`は旧一覧の移行、設定byte/revision不変の即時保存、削除待ちの再起動/失敗再試行、参照/生成済みガード、junction/パスの削除境界と外部変更/不正ファイルの保持を確認します。`scripts/web-applets-ui-test.cjs [win-unpackedのEXE]`は独立ページ・即時操作・警告の取消/確認・下書き保持と従来のWeb表示を確認します。`scripts/web-profiles-migration-ui-test.cjs <保持したwin-unpacked EXE>`は旧版で作った実Cookieが移行後も残ることを隔離profileで確認します。旧配布物の再発行前に試験用コピーを保持し、現行EXEを旧版として試験しません。`scripts/web-applets-portable-test.cjs [単一EXE]`は実EXEの隔離コピーを通常起動して確認します。実サイトのログインや長時間動作とは区別します。
 
 ## ページの言語
 
 WebAppletの専用sessionもWindowsの優先言語をChromiumから引き継ぎ、ホストで言語を固定しません。HTTPのAccept-Languageとnavigator.language/languagesの実測範囲は[検証記録](../VERIFICATION.md)、共通の扱いは[Webアカウントの言語](web-accounts.md#webviewの言語)を参照してください。サイト側で保存された言語設定は変更しません。
 
-## 共通APIへの公開（0.26.39以降）
+## 共通APIへの公開
 
 登録したサイトIDをappletIdとしてsettings.getSchema/settings.getに渡すと、name（名前）とdisplay（既定の表示先、page/window）だけを取得できます。URL・accountId・遷移規則・allowedOrigins・icon・imported・Cookieは返しません。追加・削除・ログイン情報消去や任意のURL/JavaScript実行も公開しません。
 

@@ -1,10 +1,10 @@
-# 部分Shellと共通オーバーレイ（0.26.41）
+# 部分Shellと共通オーバーレイ
 
 Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの実装を要求しない。本体が状態と操作を管理し、選択されたAppletが宣言した領域だけを描画する。未宣言・利用不可・描画失敗の領域にはDefault Shellを使用する。Default Shell専用のAPIや本体側の第二のパレットは作らない。
 
 ## 担当領域
 
-0.26.41の公開領域は`ribbon`と`overlay.command-palette`。0.26.42では[ページ表示](shell-pages.md)の`page.logs`も利用できる。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
+公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -28,7 +28,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読できる。例えば`compact`設定をコマンドから通常のsettings APIで変更すれば、リボンとオーバーレイはその設定に応じて描画を更新できる。両bridgeに同じ`ShellAppletApi`を適用する。
 
-`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、この版で未対応の領域は描画しない。`page.logs`は0.26.42以上で[ページ用bridge](shell-pages.md)を実装すると利用できる。
+`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、未対応の領域は描画しない。`page.logs`は0.26.42以上で[ページ用bridge](shell-pages.md)を実装すると利用できる。
 
 従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
 
@@ -70,6 +70,6 @@ ready期限は10秒。読込失敗・renderer終了/応答不能で同じ要求�
 
 Default Shellも利用できない場合は要求を取消して最小ネイティブ通知を出し、本体の操作停止を解除する。`--safe-shell`では各領域をDefault Shellへ固定する。
 
-次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログページは0.26.42で本文領域のHostと取得/購読・絞り込み契約を整え、`page.logs`として移行した。詳細は[Shellのページ表示](shell-pages.md)。過去ログ・日付検索・消去、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
+次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログは本文領域のHostと取得/購読・絞り込み契約を使い、`page.logs`で描画する。詳細は[Shellのページ表示](shell-pages.md)。過去ログ・日付検索・消去、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
 
 関連検証: `tests/command-palette.test.cjs`、manifest/boundary/presentation回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、既存Shell/トレイ/ページ/設定通知/ホストコマンド試験。実測は[VERIFICATION](../VERIFICATION.md)。

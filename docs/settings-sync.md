@@ -1,14 +1,14 @@
-# 設定同期と保存領域（0.26.14以降）
+# 設定同期と保存領域
 
 利用者向けの入口は[README](../README.md#設定とデータの保存先)。単一EXEの配布方式は維持し、同期できる登録データとPC専用の実行状態を分離する。
 
 ## 保存先
 
-0.26.16から共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。古いアバター参照は読み取り互換として許可するが、新規登録は`data/assets/profile`へ保存する。
+共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。古いアバター参照は読み取り互換として許可するが、新規登録は`data/assets/profile`へ保存する。
 
 今後追加するAppletにもこの保存境界を適用する。同期する設定はホストSettings、登録原素材はEXE隣のApplet別assetsを使う。端末固有のStorage/Secrets/認証/生成キャッシュはホストのPC専用root内でApplet IDごとに分離する。
 
-0.26.15からはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
+PC専用データはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
 
 EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。WebApplet名簿は`data/web-applets/accounts.json`の`schemaVersion/accounts`だけを共有する。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backupはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
 
@@ -25,7 +25,7 @@ EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材�
 
 ## 設定と名簿の受信
 
-`file-observer.ts`は親フォルダーのwatchと2秒のpollを併用する。イベント後100msから読み、同じbytesを180ms隔てて2回確認してから検証・反映する。途中JSON/一時的削除/ロック/通知欠落は直近正常値を維持して再照合する。同じ内容は再適用せず、受信ファイルを整形して書き戻さない。名簿とsettingsの到着順が違う場合は不足枠を同期待ちとして表示する。名簿未到着の起動時は空の共有accounts.jsonを生成しない。0.26.17以降は枠が0件ならユーザーの明示的な追加で名簿を作成できる。旧設定に残った参照は自動置換せず、WebApplet設定で新しい枠を選んで保存する。追加直前に届いた未反映名簿・破損名簿は上書きしない。既存枠を保持しているときの一時的欠落も同期待ちとする。
+`file-observer.ts`は親フォルダーのwatchと2秒のpollを併用する。イベント後100msから読み、同じbytesを180ms隔てて2回確認してから検証・反映する。途中JSON/一時的削除/ロック/通知欠落は直近正常値を維持して再照合する。同じ内容は再適用せず、受信ファイルを整形して書き戻さない。名簿とsettingsの到着順が違う場合は不足枠を同期待ちとして表示する。名簿未到着の起動時は空の共有accounts.jsonを生成しない。枠が0件ならユーザーの明示的な追加で名簿を作成できる。旧設定に残った参照は自動置換せず、WebApplet設定で新しい枠を選んで保存する。追加直前に届いた未反映名簿・破損名簿は上書きしない。既存枠を保持しているときの一時的欠落も同期待ちとする。
 
 SettingsStoreのchanged経由でホスト/キー/トレイ/WebApplet/実行中Appletへ適用する。useSettingsEditorのdirty draftは外部受信で消さず、revision違いの保存を拒否する。hardwareAcceleration等の起動専用項目、Windows起動タスクの明示保存契約は維持する。
 
@@ -43,6 +43,6 @@ PC専用`settings-backups/`へ検証済み設定を保存し、`last-good.json`�
 
 この実装はファイル同期サービスを設定・代行しない。2台の未同期同時編集を自動mergeする保証はなく、受信した正常ファイルを適用する。2台で同名別素材を同時に登録するケースも同期サービスの競合になるため、別名での登録や競合コピーの確認が必要。バックアップでJSONの内容を回復できるが、PC間認証の移行・実Google認証・実同期サービスの動作保証とは別。
 
-## Windowsの一時的な置換拒否（0.26.30）
+## Windowsの一時的な置換拒否
 
 atomicWriteは一時ファイルを書いた後、WindowsのEPERM/EACCES/EBUSYだけ同じrenameを最大3回、25/50/75ms待って再試行します。各再試行の直前に保存先のbytes/存在状態を最初の状態と比較し、外部更新・削除・新規作成を検出したら拒否します。設定操作やtoggleを再実行するものではなく、revision確認と変更内容は保持します。合計待機は最大150ms、他のエラーや読み取り失敗は即時に返し、一時ファイルは回収します。外部変更のABAや最終確認とrenameの間の別プロセス更新まで排他的に防ぐ仕組みではありません。

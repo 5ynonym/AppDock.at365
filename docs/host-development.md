@@ -2,23 +2,23 @@
 
 新しい公開操作は[AppDock共通操作API](appdock-api.md)へ実装し、MCPとAppletから同じ処理を使います。操作カタログを共有し、通信アダプターへ機能の処理を複製しません。
 
-0.26.26以降の共通操作API・MCP・Codex登録は[専用仕様](automation.md)を参照してください。Applet向けJSON-RPCとは別の入口です。
+共通操作API・MCP・Codex登録は[専用仕様](automation.md)を参照してください。Applet向けJSON-RPCとは別の入口です。
 
-0.26.29以降の外部コマンド公開は各Appletのmanifest宣言を使います。ホストへApplet固有IDの許可一覧を追加せず、runtimeの登録と宣言を照合して、実行権限・稼働状態・監査ログを共通管理します。[公開宣言](automation.md#appletによる公開宣言)を参照してください。
+外部コマンド公開は各Appletのmanifest宣言を使います。ホストへApplet固有IDの許可一覧を追加せず、runtimeの登録と宣言を照合して、実行権限・稼働状態・監査ログを共通管理します。[公開宣言](automation.md#appletによる公開宣言)を参照してください。
 
-0.26.17以降、ホスト画面のdock:* IPC操作失敗は共通handleでerrorログに記録する。同期throwと非同期rejectの両方を捕捉して元のエラーを返し、ログページとPC専用host.logへ操作名・エラーメッセージを残す。IPCの引数（設定・認証値・入力内容）は追加しない。送信元/Frame/URL検証はcallback呼び出し前に維持する。
+ホスト画面のdock:* IPC操作失敗は共通handleでerrorログに記録する。同期throwと非同期rejectの両方を捕捉して元のエラーを返し、ログページとPC専用host.logへ操作名・エラーメッセージを残す。IPCの引数（設定・認証値・入力内容）は追加しない。送信元/Frame/URL検証はcallback呼び出し前に維持する。
 
-0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 一般設定のスタートアップ登録と管理者起動は[起動設定](launch-settings.md)を参照してください。ホスト・UIの共有設定とWindowsタスクの保存処理、UACを伴う再起動をこの仕様で管理します。
 
-AppDock v0.3.1の実装を基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
+現在のコードを基準に、どの層へ変更を入れるかと検証方法をまとめます。Appletを作り始める手順は[Applet実装ガイド](applet-development.md)、通信契約は[Applet API](extensions.md)を参照してください。
 
-条件付きショートカットの現行設計は[保存形式・入力判定・逐次実行](keybindings.md)を参照してください。以下の版別説明は導入時の経緯です。
+条件付きショートカットの現行設計は[保存形式・入力判定・逐次実行](keybindings.md)を参照してください。
 
 ## まず変更範囲を決める
 
-0.17.1のWebアカウント設定連携はhost-apiのサービス経由で自身の宣言済みboolean/静的selectだけを公開し、WebAccountControllerがローカルUIの送信元を検証します。既存SettingsStoreの保存・変更通知を再利用し、停止時に購読を解除します。APIの詳細は[WebアカウントAPI](web-accounts.md)を参照してください。
+Webアカウント設定連携はhost-apiのサービス経由で自身の宣言済みboolean/静的selectだけを公開し、WebAccountControllerがローカルUIの送信元を検証します。既存SettingsStoreの保存・変更通知を再利用し、停止時に購読を解除します。APIの詳細は[WebアカウントAPI](web-accounts.md)を参照してください。
 
 Applet名の画面表示にはsnapshotの`displayName`を使用します。manifestの任意の`displayName`を優先し、省略時は`src/shared/applet-display-name.ts`で`name`の先頭の`Applet.`を除去します。元の`name`と`id`を識別・保存に使う契約は維持し、検索には表示名・元の名前・IDを含めます。manifestの検証、snapshot、renderer、トレイ、ログを一緒に整合させてください。
 
@@ -28,11 +28,10 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 機能固有の時計描画、画像処理、WindowsフックなどはAppletへ置きます。複数Appletで共有したい操作、ホストの保存・通知・アカウント管理、ユーザー向けの共通画面はHost APIやReact UIを拡張します。Appletのために任意のElectron APIやファイル操作をrendererへ公開しません。
 
-0.12.0の[WebアカウントAPI](web-accounts.md)では、ホストがWebContentsView・独立永続セッション・限定IPC・停止時の破棄を管理します。Gmailのセレクターと新着判定はApplet側です。Node APIは`webAccounts.start/open/read/report`で、.NET SDKのラッパーは提供していません。0.13.0では`report`の一時UIデータと、信頼済みローカルUIの`viewport`による表示領域変更・非表示を追加しています。
+[WebアカウントAPI](web-accounts.md)では、ホストがWebContentsView・独立永続セッション・限定IPC・停止時の破棄を管理します。Gmailのセレクターと新着判定はApplet側です。Node APIは`webAccounts.start/open/read/report`で、.NET SDKのラッパーは提供していません。`report`の一時UIデータと、信頼済みローカルUIの`viewport`による表示領域変更・非表示を追加しています。
 
-0.13.1では、非選択Viewを可視・実寸のまま非表示専用Windowへ保持し、rAF/レイアウトが止まらないようにします。選択中だけ操作Windowへ移し、停止/異常終了で背景Windowも破棄します。`test-background.cjs`は外部状態のfetch結果をページ自身のrAFで反映するため、テストがDOMを直接更新する場合では見逃した停止を検証できます。実Googleサーバーとの同期は別確認です。
 
-0.14.0はcycleと限定UIのitemOpener呼び出し、アカウント別soundの保存/選択/試聴を追加。自身のAppletのローカルshortcutsをUI/WebContents双方で処理し、Nodeの循環コマンドへ接続します。Gmailの初期Ctrl+Tab/Ctrl+Shift+Tabはglobalにしません。操作Windowの位置・サイズ/最大化は既存WindowStateStoreで保存し、Gmailの高さ640pxを復元下限にします。静的な境界/ライフサイクル回帰とGmailのtest-ui-features.cjsを併用し、音は無音WAVで実プレーヤーまで確認します。
+アカウントのcycle、限定UIのitemOpener、枠別soundの保存/選択/試聴は[WebアカウントAPI](web-accounts.md)に従います。UI/WebContentsのショートカットは本体の共通処理へ渡し、manifestの初期割当と利用者の編集を保持します。操作Windowの位置・サイズ/最大化はWindowStateStoreで保存します。境界/ライフサイクル回帰とGmailのtest-ui-features.cjsを併用し、音は無音WAVで実プレーヤーまで確認します。
 
 | 追加したいもの | 主な変更先 |
 | --- | --- |
@@ -50,7 +49,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 3. **保存と表示更新をつなぐ。** 設定はSettingsStore経由で更新し、全JSONの独自書き込みを避けます。状態をメモリへ追加した場合はsnapshotへ含め、`changed()`またはmanagerのchangedイベントでrendererへ通知します。既存の変更通知はまとめて送られます。React側では更新が届くまで待つ必要があります。
 4. **SDKへ公開する。** .NETは[Contracts.cs](../dotnet/AppDock.SDK/Contracts.cs)のインターフェースと型、[ExtensionContext](../dotnet/AppDock.Runtime/ExtensionContext.cs)の実装を対応させます。Nodeは[NodeExtensionContext](../src/main/node-worker.ts)とactivate時に渡すcontextの実装を対応させます。片方だけ対応する場合はAPI仕様に明記し、未対応なのに型だけ存在する状態を避けます。
 5. **購読やリソースの寿命を定める。** 解除用IDisposable／関数を返し、deactivateと通信断で解除します。.NETのコマンド／設定変更を直列化する `commandLock`を保持したまま、同じロックを再取得する処理を呼ばないようにします。ホストへ要求するだけなら別方向のRPCで返答を処理できますが、逆方向の処理完了を相互に待つ循環を作らないでください。
-6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletのREADMEには必要なAppDockバージョンを記載します。v0.5.0ではmanifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。旧ホストにはこの検証がないため、新機能を使うAppletの配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
+6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletのREADMEには必要なAppDockバージョンを記載します。manifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
 
 新APIがAppletプロセスからだけ使われる場合、preload/renderer IPCへの追加は不要です。Applet通信とReact用IPCは別の境界です。
 
@@ -58,11 +57,11 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 ## React UIとIPCを追加する手順
 
-0.16.0のWebアカウント管理は`web-accounts.ts`の原子的な配列保存と`web-account-preload.ts`の限定IPCを使います。moveはselected/UUIDを変更せず、setMonitoringは遅いworker reportも抑制します。monitoringResetsはreadで一度だけ渡します。`web-account-avatar.ts`はURLとストリーム上限を検証し、0.16.1のControllerが当該アカウントのsession/credentials:includeのnet.requestとnativeImageの64px変換を行います。取得/再試行/破棄の寿命をControllerに閉じ、画像バイトはUI snapshotだけへ渡します。Gmailのtest-accounts.cjsはオフラインの画像/2アカウントで並べ替え・個別監視・設定保持・表示を確認します。
+Webアカウント管理は`web-accounts.ts`の原子的な配列保存と`web-account-preload.ts`の限定IPCを使います。moveはselected/UUIDを変更せず、setMonitoringは遅いworker reportも抑制します。monitoringResetsはreadで一度だけ渡します。`web-account-avatar.ts`はURLとストリーム上限を検証し、Controllerが当該アカウントのsession/credentials:includeのnet.requestとnativeImageの64px変換を行います。取得/再試行/破棄の寿命をControllerに閉じ、画像バイトはUI snapshotだけへ渡します。Gmailのtest-accounts.cjsはオフラインの画像/2アカウントで並べ替え・個別監視・設定保持・表示を確認します。
 
-window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。0.15.2のweb-page-activity.tsはkeepActiveのobserveOriginでobserver.readyを待ち、背景のアクティブ状態を30秒ごとに更新します。native focus中はエミュレーションを解除します。同一文書の移動では状態を保ち、別文書のメインフレーム遷移/破棄・認証originで周期/250ms待機/接続を解除します。別Debugger/DevToolsへ干渉せず、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使い、DOM準備後に受信処理が遅れて始まる条件も検証します。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
+window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効にし、既存feature引数を保持します。web-page-activity.tsはkeepActiveのobserveOriginでobserver.readyを待ち、背景のアクティブ状態を30秒ごとに更新します。native focus中はエミュレーションを解除します。同一文書の移動では状態を保ち、別文書のメインフレーム遷移/破棄・認証originで周期/250ms待機/接続を解除します。別Debugger/DevToolsへ干渉せず、URLや認証値をログに出しません。Gmailのtest-native-background/probe-native-startupは通常のElectron起動を使い、DOM準備後に受信処理が遅れて始まる条件も検証します。Playwrightの自動focus emulationを背景更新の証拠として使わないでください。
 
-0.15.0の設定「バージョン情報・更新」はSettingsPageのaboutカテゴリです。保存フォームを持たず、既存draftは保持します。HostSnapshot.runtimeでElectron/Chromium/Node/OS・アーキテクチャを受け、既存VersionCheckとcheckUpdates/openReleasesを再利用します。表示しただけでは問い合わせず、手動操作時だけ通信します。最終確認時刻はページ内の結果で、永続設定ではありません。Gmailのtest-ui-featuresでライト/ダーク/システムの連動、更新あり/最新版/未公開/未設定/HTTPエラーをオフライン検証します。
+更新の設定と表示・通知は[更新ガイド](updates.md)を参照してください。保存フォームと表示専用の実行環境情報を区別します。
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
@@ -87,24 +86,9 @@ Appletと設定の一覧は共通の`.sidebar`／`.sidebar-extensions`スタイ�
 - SettingsStoreの原子的保存、revision確認、ファイル監視を利用します。秘密情報はSecrets、処理データはStorageへ分けます。
 - 既存の内部名 `extensions` / `extension.json` / `IAppDockExtension`は画面の呼称Appletと区別して維持します。表示名を揃えるためだけに保存形式を変更しません。
 
-## 時計を載せるために追加した機能
-
-| 追加 | 実装場所と意図 |
-| --- | --- |
-| `runtime: native` | [ExtensionManager](../src/main/core/extensions.ts)。専用EXEをcwd・標準入出力付きで起動し、Node／DLLと同じコマンド検証・停止管理を使う |
-| .NET接続処理の再利用 | [AppDock.Runtime](../dotnet/AppDock.Runtime/AppletSession.cs)。DLLランナーから接続・SDK実装を抽出し、WPF Applet自身のSTAメッセージループと両立する |
-| 設定変更の購読 | [SDK](../dotnet/AppDock.SDK/Contracts.cs)、[Runtime](../dotnet/AppDock.Runtime/ExtensionContext.cs)、[Node](../src/main/node-worker.ts)。表示を再起動なしで更新する |
-| 動的select・説明・刻み幅 | [共有型](../src/shared/contracts.ts)、[定義と値の検証](../src/shared/setting-definitions.ts)、[Host API](../src/main/core/host-api.ts)、React。接続中モニターを選択できるようにする |
-| ローカルキャッシュの更新 | .NET SetAsync／Node settings.set。コマンドで保存した直後に新しい状態を読めるようにする。購読発火の保証とは分ける |
-| 外部Appletの配布 | 時計はAppDock EXEへ固定同梱せず、EXE隣のextensionsへ配置。ホスト更新とApplet更新を別々に行える |
-
-この変更で時計固有のウィンドウ、DeviceName、DPI、位置計算をAppDock mainへ持ち込んでいません。動的な選択肢の意味や代替先はAppletが決めます。別の画面付きAppletもnative接続と共通の設定フォームを利用できます。
-
 ## 検証と成果物を更新する
 
-更新適用後の成功通知は`UpdateCompletionNotice.tsx`で左下のステータスバーに表示する。既存の稼働Applet数と一時的に入れ替え、約5秒でフェードアウト、×で即時に閉じる。本文の高さやAppletページの表示領域を変えず、ライト/ダークのaccent色を使う。`prefers-reduced-motion`ではアニメーションを省く。
-
-トレイ開始・最小化中の待機には`HostSnapshot.windowVisible`を使い、BrowserWindowのshow/hide/minimize/restoreでsnapshotを更新する。backgroundThrottling無効のrendererでは非表示Windowでもdocument.hiddenがfalseになるため、DOMの可視性だけを判定に使わない。実Windowが表示されている間だけ5200msの終了timerを開始し、非表示になったら解除する。成功の判定には`UpdateState.completion.ok`を使い、メッセージの文言では判定しない。
+更新確認・進捗・完了は共通ステータスバー通知で表示します。寿命と実Window可視状態の契約は[更新ガイド](updates.md#設定と取得)に従います。
 
 Node.jsとpnpmのグローバルインストールは不要です。プロジェクトの `setup-tools.bat` で `.tools` に準備し、下記のpnpmコマンドは `dev.bat` 経由で実行できます。直接のNodeコマンドは `dev.bat exec node ...` を使います。バージョンは `toolchain.json` で指定します。
 
@@ -141,7 +125,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 完成後は[ドキュメント方針](documentation.md)に従い、必要なホストバージョンと利用者が配置するファイルをREADMEへ、開発・検証の手順をDEVELOPMENTまたはこのガイドへ、実機条件と限界・結果・成果物のVersion／SHA256をVERIFICATIONへ記録します。Gitではsourceとdocsを管理し、publish・.artifacts・設定・秘密情報は除外します。
 
-## v0.6.0の追加契約と検証
+## 宣言コマンドと構造化フォームの検証
 
 ロード前コマンドは`parseDeclaredCommands` / `ExtensionManager.commandCatalog`で検証・公開します。通常のruntimeコマンドを優先し、起動可能な宣言だけ明示実行で有効化・即時起動します。互換性チェックと起動キューを共有し、遅延タイマーを取り消します。旧IDの別名は保存されたホットキーを維持し、新規候補に重複表示しません。
 
@@ -149,31 +133,31 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 履歴専用操作は一般コマンドとは独立した`panel.action`です。現在のパネル（actions / tabs / images）にあるIDだけ許可します。ローカル画像は`panel-images.ts`で実パスの包含を確認し、CSPを緩めず`appdock://host/panel-images`で配信します。ホスト管理外のファイルや外部画像URLは受け付けません。
 
-[panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDK既存コンストラクターは維持し、新機能のminimumHostVersionは0.6.0です。
+[panel-imagesのテスト](../tests/panel-images.test.cjs)は大きなローカル画像・キャッシュ外拒否・古いボタン拒否を確認します。[ライフサイクル](../tests/lifecycle.test.cjs)はロード前宣言・旧ID・同時開始・互換性・遅延解除を確認します。SDKの既存コンストラクターを維持し、利用するAPIの最低ホスト版をmanifestへ指定します。
 
 ## トレイコマンドとメニュー
 
-0.26.10以降の正本は[タスクトレイの設定とメニュー](tray-menu.md)。自由なグループと配置をtrayMenuへ保存し、旧trayCommandsは初回だけ移行します。設定/終了はホストが末尾固定し、一時停止/再開は通常の本体コマンドです。クリック判定は下記のv0.9.0の契約を維持します。
+トレイの正本は[タスクトレイの設定とメニュー](tray-menu.md)。自由なグループと配置をtrayMenuへ保存し、trayMenuが未指定のときだけtrayCommandsから移行します。設定/終了はホストが末尾固定し、一時停止/再開は通常の本体コマンドです。クリック判定は下記に従います。
 
-## v0.8.0の描画設定
+## 描画設定
 
 `host.hardwareAcceleration`はboolean、既定true。単一インスタンスのロック取得後、`app.whenReady()`より前に同じ`SettingsStore`で設定を読み込み、falseの場合だけ`app.disableHardwareAcceleration()`を呼びます。不正な設定は既存のエラー表示で起動を中止し、ファイルを保持します。設定保存・外部編集による変更は次の完全起動で適用し、実行中のGPUプロセスへ変更を加えません。
 
 一般設定の説明には完全終了・再起動が必要なことを表示します。[設定回帰](../tests/preferences.test.cjs)は旧設定補完・OFF保持・不正型を確認し、[UIテスト](../scripts/hardware-acceleration-ui-test.cjs)は3回の起動でON→OFF→ONを実測します。GPU情報取得後の`app.isHardwareAccelerationEnabled()`とOFF時の`getGPUFeatureStatus().gpu_compositing`を確認します。Applet APIとSDKは変更しません。
 
-## v0.9.0のクリック判定
+## クリック判定
 
-`host.trayDoubleClickCommand`はコマンドIDまたはnull、既定null。v0.7.0のclickのみの処理を`TrayClickDispatcher`へ置き換え、Windowsのclick→double-click通知で後者が来たときに前者の待機を取り消します。未設定時は即時実行。設定変更・メニュー表示・終了では待機を取り消し、非同期の判定時間取得が後から完了しても復活させません。
+`host.trayDoubleClickCommand`はコマンドIDまたはnull、既定null。`TrayClickDispatcher`がWindowsのclick→double-click通知で後者が来たときに前者の待機を取り消します。未設定時は即時実行。設定変更・メニュー表示・終了では待機を取り消し、非同期の判定時間取得が後から完了しても復活させません。
 
 ダブル割り当て時だけ.NETホストの`--double-click-time`で`GetDoubleClickTime`を取得します。設定変更を毎クリックで読み、Windows自体の設定は変更しません。取得中の時間を差し引き、通知の順序競合を避ける25msの余裕を加えます。取得失敗はwarnログに記録し、Windowsの既定判定時間500msを使います。`DEFAULT_DOUBLE_CLICK_TIME_MS`をログ側と`TrayClickDispatcher`側で共有し、待機には同じ25msの余裕を加えます。SDK/Runtime/Applet APIは変更しません。
 
 [クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。
 
-0.16.3はWebアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。詳細と旧保存形式の互換性は[WebアカウントAPI](web-accounts.md)を参照してください。
+Webアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。詳細と旧保存形式の互換性は[WebアカウントAPI](web-accounts.md)を参照してください。
 
-0.16.4のportableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
+portableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
 
-## GmailChecker対応（0.11.0）
+## Node Appletのファイル選択と音声
 
 - `node-worker.ts`: `ui.pickFile`、`audio.play`、`tray.attention`、通知オプションを追加。ファイル選択だけRPC期限を5分に拡張。
 - `core/host-api.ts`: capabilityと引数を検証。通知クリックは所有Appletと起動世代を照合。
@@ -183,25 +167,25 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 既存API v1/.NET Appletとの互換を維持します。ホスト回帰は`tests/notification-services.test.cjs`、現在の実Electron/Nodeの統合検証は[Gmailの検証スクリプト](../../Applet.Gmail.at365/scripts/test-gui.cjs)を参照してください。
 
-## Appletページとリボン（0.18.0）
+## Appletページとリボン
 
 契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、renderer/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
-0.19.0はリボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。当時はAppDock本体のキー設定を「Applet別の設定」の先頭へ移しました。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
+リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
-0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。
+WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](web-accounts.md)を参照してください。
 
 
 ## Applet設定パネルの共用
 
-- 0.26.11ではページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/プロフィール/バージョン情報・更新です。
+- ページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/操作の許可/Codex連携/プロフィール/バージョン情報・更新です。
 - 他ページで未保存の場合、`core/settings-notice.ts`が小さな透明背景のWebContentsViewを本体Window上部へ重ねます。Viewの追加後とリサイズ時に通知を最前面へ戻し、背景Webの領域/入力/寿命は変えません。通知は時間で消えず、設定/Appletへ戻る・保存成功・破棄確定で非表示になります。表示でfocusしません。通知と専用preloadは通知状態/操作/高さだけを公開し、IPCはそのViewのmainFrameとURLを照合します。通常host IPCを通知やリモートページへ許可しません。
 - draft/JSON/画像/revisionはhost rendererの`useSettingsEditor`だけが所有します。通知の保存/破棄はhostへ戻し、pendingとrefで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
 - `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
 
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集セッションです。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
 - `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じて`AppletSettings`/`AppletShortcutOverview`（専用のAppletShortcutDialogで追加・編集）を描画します。設定ページはShortcutsEditorで全コマンドを平坦に表示します。両方がShortcutCommandListとAppletShortcutDialogを共用します。`SettingsActions.tsx`の保存・再読込操作とエラー表示も両ページで共用し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
-- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログは`LogsPage`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
+- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログはShellの`page.logs`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
 - JSON編集中に詳細設定へ戻る際は、表示前にフォームへ変換します。不正なJSONは保持し、説明画面に戻して設定ページで修正するよう案内します。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
 - 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
 
@@ -214,12 +198,12 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 ## コマンドパレットの共用
 
-実行用・割り当て選択用・ピン留めの表示とキーボード操作は`src/renderer/CommandPalette.tsx`で共用する。呼出し側が候補とonChooseを渡し、mode=selectのEnter/クリックは選択結果だけを返す。ピン留めは同じ保存形式を使い、設定内は共有draft、通常実行用は既存の即時保存に接続する。検索候補は完全コマンドID・提供元名でも絞り込める。IME中の決定抑制、フォーカス復帰、Tabの閉じ込め、選択用での入力停止/復帰を保つ。アイコンとスイッチはIcon/Toggleを共用する。利用例・編集検証は[ジェスチャー](gestures.md)を参照。
+コマンド検索とトレイの選択パレットは本体のCommandPaletteSessionとDefault Shellの描画を共用します。表示・取消・フォーカス・復旧は[共通オーバーレイ](shell-overlays.md)に従い、本体rendererへパレットを追加しません。
 
 ## 割り当て操作UIの共用
 
-0.26.22から設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
+設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
 
-0.26.24から設定ジェスチャーも全コマンド一覧へ統一し、CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用します。ShortcutCommandList/ShortcutOrderDialogはキー用、GesturesEditor/GestureOrderDialogはジェスチャー用の保存処理と表示を渡します。AppletShortcutDialogとGestureBindingDialogは入力と条件を構成し、キー記録はShortcutCaptureFieldを共用します。両方のメニューは編集・同入力の実行順・即時削除（confirmDelete=false）。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を維持します。条件の差異と全体設定は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル02624)を参照してください。
+設定ジェスチャーも全コマンド一覧へ統一し、CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用します。ShortcutCommandList/ShortcutOrderDialogはキー用、GesturesEditor/GestureOrderDialogはジェスチャー用の保存処理と表示を渡します。AppletShortcutDialogとGestureBindingDialogは入力と条件を構成し、キー記録はShortcutCaptureFieldを共用します。両方のメニューは編集・同入力の実行順・即時削除（confirmDelete=false）。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を維持します。条件の差異と全体設定は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照してください。
 
 詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。

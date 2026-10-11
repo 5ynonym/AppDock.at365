@@ -1,4 +1,4 @@
-# AppDock共通操作API（0.26.39）
+# AppDock共通操作API
 
 MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保存処理を使います。機能別の契約は[共通操作APIの各操作](automation.md)を正本とし、この文書はAppletの接続・許可・互換性を説明します。
 
@@ -13,7 +13,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-0.26.38以降は本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。0.26.37の共通許可は変更せず引き継ぎます。0.26.37では操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。0.26.39以降、applet-api.jsonが存在しない新規環境の初期値は全9項目ONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境の初期値は全9項目ONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、通常設定の未保存draftとは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -28,7 +28,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 CodexとAppletの権限は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、内側には全Applet共通の許可を適用します。MCP起点を理由にApplet専用APIを拒否しません。これにより、MCPには生のキー送信APIを出さず、Appletが定義・公開する具体的な操作を実行できます。これは信頼できる、自分で作成するローカルAppletを前提にした仕様です。Appletプロセス自体はOSサンドボックスではありません。
 
-## Windows入力（0.26.37以降）
+## Windows入力
 
 最低本体版0.26.37、appdock-api capability、sendInput許可が必要です。
 
@@ -61,7 +61,7 @@ await context.appdock.call('commands.execute', {
 });
 ```
 
-.NETは`IExtensionContext.AppDock`の`IAppDockService.CallAsync`を使用します。結果は`JsonElement`、失敗は`AppDockApiException.Code`です。0.26.36のSDK/Runtimeは従来のAssemblyVersionを維持し、既存IExtensionContext実装向けに既定のプロパティ実装を備えます。新APIを使うnative Appletは新Runtimeも組み込んで再発行してください。
+.NETは`IExtensionContext.AppDock`の`IAppDockService.CallAsync`を使用します。結果は`JsonElement`、失敗は`AppDockApiException.Code`です。SDK/Runtimeは従来のAssemblyVersionを維持し、既存IExtensionContext実装向けに既定のプロパティ実装を備えます。新APIを使うnative Appletは新Runtimeも組み込んで再発行してください。
 
 ```csharp
 var current = await context.AppDock.CallAsync("settings.get", cancellationToken: token);
@@ -90,16 +90,16 @@ await context.AppDock.CallAsync("commands.execute", new {
 
 入力は`tests/node-invocation.test.cjs`、InputTests、専用WinForms fixture `tests/fixtures/dotnet/AppDock.InputTarget`をReleaseビルド後の`scripts/native-input-ui-test.cjs`で検証します。後者は2Appletのpublish出力を隔離profileへコピーし、全11操作・.NET呼出し・許可取消・MCP経由の明示コマンド・対象変更・取消・連続ジェスチャーを確認します。GUIは直列で実行し、引数のEXEはwin-unpacked版を使用します。
 
-## 操作許可の画面（0.26.38）
+## 操作許可の画面
 
 ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操作ごとの2列表示に切り替えます。MCP情報取得は連携中許可の固定表示、入力は直接公開なしの固定表示です。許可のON/OFFは保存値を表示し、不足する前提や連携停止を補足します。連携OFF/前提未充足でも許可の準備・取消を可能にし、他の許可を自動変更しません。接続・登録はCodexSettingsに残し相互リンクします。
 
 従来のPC専用APIで即時保存し、共有settings.jsonのdraft/revisionとは独立します。この画面にはJSON切替を出さず、別項目の未保存変更がある場合だけ既存の保存ツールバーを表示します。回帰はscripts/applet-api-ui-test.cjsとscripts/automation-ui-test.cjsです。
 
-## WebAppletの操作（0.26.39）
+## WebAppletの操作
 
-登録したWebAppletを対象に、同じsettings.getSchema/settings.get/commands.list/commands.executeを使います。Node/.NET SDKとMCPの双方で利用できます。設定とコマンドの公開宣言はWebApplet提供元に置き、通信層に専用入口は追加しません。公開する範囲・引数例・表示先の優先順位は[WebApplet公開操作](web-applets.md#共通apiへの公開02639以降)を参照してください。Webページ自身へのホストAPI注入は行いません。
+登録したWebAppletを対象に、同じsettings.getSchema/settings.get/commands.list/commands.executeを使います。Node/.NET SDKとMCPの双方で利用できます。設定とコマンドの公開宣言はWebApplet提供元に置き、通信層に専用入口は追加しません。公開する範囲・引数例・表示先の優先順位は[WebApplet公開操作](web-applets.md#共通apiへの公開)を参照してください。Webページ自身へのホストAPI注入は行いません。
 
-## 描画モデルAPI（0.26.40）
+## 描画モデルAPI
 
 `ui.ribbon.get`、`ui.assets.get`、`ui.actions.invoke`を共通操作カタログへ追加。既存の編集用`ribbon.get`とは独立する。モデル・操作ID・MCP公開範囲・Shell roleは[Shell API](shell-api.md)を参照。

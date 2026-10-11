@@ -1,12 +1,12 @@
 # Applet API v1
 
-0.26.41からのShell Appletは、通常のコマンド・設定・ページとShell描画を同じAppletで提供できます。`shell` capabilityと`shell.views`による領域単位の宣言、自己設定の購読、描画からの自己コマンド実行は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください。全領域の実装は不要です。
+Shell Appletは、通常のコマンド・設定・ページとShell描画を同じAppletで提供できます。`shell` capabilityと`shell.views`による領域単位の宣言、自己設定の購読、描画からの自己コマンド実行は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください。全領域の実装は不要です。
 
-0.26.36から、Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作APIを利用できます。宣言・PC専用許可・再入制約・既存自己設定APIの互換性は[AppDock共通操作API](appdock-api.md)を参照してください。
+Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作APIを利用できます。宣言・PC専用許可・再入制約・既存自己設定APIの互換性は[AppDock共通操作API](appdock-api.md)を参照してください。
 
-0.26.14から、認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
-## v0.4.0: 動的コマンドとキー送信の一覧設定
+## 動的コマンドとキー送信の一覧設定
 
 `dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大100件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
 
@@ -14,7 +14,7 @@
 
 設定定義の `type: "shortcut-list"` は `{ id, title, keys }` の配列を扱い、追加・削除UIを提供します。IDは小文字英数字とハイフン（先頭英数字、40文字以内）、名前は100文字以内、最大32件。既定値は `[]` です。キーは `Ctrl+Shift+T` や `Win+E` などの1組の組み合わせで、フォーム保存／Host API保存時に検証します。設定型はキーを送信せず、実行はApplet側の責任です。
 
-実装例: [WindowsToolsの開発ガイド](../../Applet.WindowsTools.at365/DEVELOPMENT.md)。この型と動的APIを使用するAppletにはv0.4.0以降が必要です。既存API v1のAppletは引き続き使用できます。
+実装例: [WindowsToolsの開発ガイド](../../Applet.WindowsTools.at365/DEVELOPMENT.md)。この型と動的APIを使用するAppletにはAppDock 0.4.0以上が必要です。
 
 画面上では拡張機能をAppletと呼びます。`extension.json`、`extensions`、`IAppDockExtension` などの既存API名は互換性を維持します。
 
@@ -22,7 +22,7 @@
 
 ## マニフェスト
 
-### v0.21.0: 設定ページの操作ボタン
+### 設定ページの操作ボタン
 
 `settingActions` は最大16件の `{ title, command, description?, successMessage? }` を宣言します。
 `command` は同じマニフェストの `commands` に宣言した正規IDに限定し、重複・別Applet・ホストのコマンドを拒否します。
@@ -107,7 +107,7 @@ public sealed class Extension : IAppDockExtension
 
 1拡張ごとにホストランナーを1プロセス起動します。各DLLは独立したAssemblyLoadContextで読み込み、AppDock.SDKの型はランナーと共有します。コマンド処理は同一拡張内で直列化します。定期処理は前回の完了まで次回を重ねません。定期処理とコマンドの同時実行が問題になるロジックでは、拡張側にも排他を置いてください。定期処理はSDKから停止されますが、拡張が独自に作成したリソースはDeactivateAsyncで解放してください。CancellationTokenを処理へ渡してください。
 
-DLL用の.NETホストはframework-dependentで発行し、PCにインストール済みのMicrosoft.NETCore.App 10.0（Windows x64）を使用します。AppDockは.NETランタイムを同梱せず、DLL用ホストはWindowsDesktopランタイムを要求しません。WPF/WinFormsの画面やSTAメッセージループが必要なAppletは、上記の `runtime: native` と専用EXEで実装します。時計Appletは自身のWindowsDesktopランタイムを同梱します。別のnative Appletをframework-dependentで配布する場合は、利用先に必要なWindowsDesktopランタイムを用意してください。任意の既存EXEを置くだけで接続されるものではなく、SDKの接続とライフサイクルへの対応が必要です。P/InvokeのようなWindows API処理をDLL Appletに置くことも可能です。
+DLL用の.NETホストはframework-dependentで発行し、PCにインストール済みのMicrosoft.NETCore.App 10.0（Windows x64）を使用します。DLL用ホストには.NETランタイムを同梱せず、WindowsDesktopランタイムも要求しません。本体のInputHostは別途自己完結で同梱します。WPF/WinFormsの画面やSTAメッセージループが必要なAppletは、上記の `runtime: native` と専用EXEで実装します。時計Appletは自身のWindowsDesktopランタイムを同梱します。別のnative Appletをframework-dependentで配布する場合は、利用先に必要なWindowsDesktopランタイムを用意してください。任意の既存EXEを置くだけで接続されるものではなく、SDKの接続とライフサイクルへの対応が必要です。P/InvokeのようなWindows API処理をDLL Appletに置くことも可能です。
 
 ## TypeScript / Node.js
 
@@ -125,13 +125,13 @@ export async function activate(context: NodeExtensionContext) {
 export async function deactivate() { /* 独自のリソースを解放 */ }
 ```
 
-v0.7.0以降、`tray.add` / `Tray.Add`はメニューの表示名を提案します。トレイへの追加はホスト設定のコマンドごとの「トレイに表示」で選択し、既定はOFFです。提案のない登録コマンドも選択できます。クリック時に実行するコマンドは`host.trayClickCommand`で選び、既定は`appdock.open`です。
+`tray.add` / `Tray.Add`はメニューの表示名を提案します。利用者が本体の「設定 → タスクトレイ」でコマンドを配置し、Appletは表示を強制しません。提案のない登録コマンドも選択できます。クリック時のコマンドは`host.trayClickCommand`で選び、既定は`appdock.open`です。メニューとダブルクリックの契約は[トレイ仕様](tray-menu.md)を参照してください。
 
 Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト本体のNode空間にはロードしません。stdoutはプロトコル専用です。通常のconsole.logはstderrへ転送します。
 
 ## SDKで使えるサービス
 
-Webサービスのアカウント別ページには0.12.0の[WebアカウントAPI](web-accounts.md)（Nodeのみ）を使用できます。0.13.0では一時UIデータと、ローカルUIによる表示領域・非表示の切替にも対応します。
+Webサービスのアカウント別ページには[WebアカウントAPI](web-accounts.md)（Nodeのみ）を使用できます。一時UIデータと、ローカルUIによる表示領域・非表示の切替にも対応します。
 
 | API | 用途 | capabilities |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ Webサービスのアカウント別ページには0.12.0の[WebアカウントA
 | Storage | 拡張ID・キー別のJSON永続データ（1件1MBまで） | `storage` |
 | Secrets | 拡張ID・キー別の暗号化文字列 | `secrets` |
 
-ログは.NETの`context.Log.InfoAsync/ErrorAsync`、Nodeの`context.log.info/error`を使い、独自ファイルへの出力を避けてください。ホストがApplet IDを付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。0.26.18以降はdeactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
+ログは.NETの`context.Log.InfoAsync/ErrorAsync`、Nodeの`context.log.info/error`を使い、独自ファイルへの出力を避けてください。ホストがApplet IDを付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。deactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
 
 設定変更はキャッシュへ通知します。設定に依存する表示やタイマー間隔等は、OnChangedの購読または都度読み取りで反映してください。UIへHTML/JavaScriptは渡せません。Reactがテキストとして描画します。API v1は1拡張1パネルです。
 
@@ -156,17 +156,17 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 
 拡張→ホストは `host.settings.get/set/options` / `host.notifications.show` / `host.ui.panel` / `host.browser.open` / `host.log` / `host.storage.get/set` / `host.secrets.get/set/delete` です。SDKがこの通信を隠蔽します。無効化・終了時はdeactivateを最大2秒待ち、残った子プロセスを終了します。異常終了した拡張はエラー状態にし、他の拡張は動作を継続します。自動再起動のループは行わず、画面の「再起動」で復旧します。
 
-## v0.25.2: ショートカット初期値
+## ショートカット初期値
 
-AppDock 0.25.2以降、`extension.json`に`defaultKeybindings`を指定できます。各行は`command`/`key`/`enabled`/`when`を持ち、`command`は同じmanifestの`commands`に宣言したIDに限ります。`when`は[条件付きショートカット](keybindings.md)の形式です。初回導入時にだけ利用者の設定へコピーされます。
+`extension.json`に`defaultKeybindings`を指定できます。各行は`command`/`key`/`enabled`/`when`を持ち、`command`は同じmanifestの`commands`に宣言したIDに限ります。`when`は[条件付きショートカット](keybindings.md)の形式です。初回導入時にだけ利用者の設定へコピーされます。
 
-## v0.9.1: Appletの表示名
+## Appletの表示名
 
 `extension.json`の任意項目`displayName`（空白だけではない1～100文字の文字列）で表示名を指定できます。前後の空白を除いた名前をホストの一覧・詳細・設定・コマンド候補・トレイのサブメニュー・起動ログに使用します。明示した表示名はそのまま尊重します。
 
 省略時は`name`の先頭の`Applet.`だけを取り除きます（例: `Applet.Watch.at365` → `Watch.at365`）。除去して空になる場合は元の名前を使います。`name`・`id`・実行ファイル名・設定やコマンドIDは変更しません。検索は表示名・元の名前・IDのすべてに対応します。snapshotは元の`name`と、解決済みの`displayName`を別々に返します。旧ホストはこの項目を無視して従来の`name`を表示するため、既存Appletの最低ホスト版を変更する必要はありません。反映にはAppDockの再起動が必要です。
 
-## v0.5.0: manifestとホスト共通設定
+## manifestとホスト共通設定
 
 - `minimumHostVersion`: 必要なホストの安定版SemVer (`0.5.0`など)。省略時は従来どおりAPI v1として起動。
 - `startupDelaySeconds`: 既定の遅延秒数、0～86400の整数。省略は0。
@@ -178,18 +178,18 @@ AppDock 0.25.2以降、`extension.json`に`defaultKeybindings`を指定できま
 パネルの`images`は4件まで。各項目は`title`、任意の`description`、`image`（JPEG/PNG/WebPのbase64 data URL、200000文字以内）、名前空間内の`actions`（4件まで）。ホストは外部URL・SVG・HTMLを受け付けない。.NETの既存`Panel`コンストラクターは維持し、任意の`Images`プロパティと`PanelImage`を追加。Nodeの`ui.showPanel`でも同じJSON型を使用できる。
 
 これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
-## v0.6.0: 宣言コマンド・構造化一覧・パネル操作
+## 宣言コマンド・構造化一覧・パネル操作
 
-新しい機能を使うAppletは`minimumHostVersion: "0.6.0"`を指定してください。
+この節の機能を使うAppletは`minimumHostVersion: "0.6.0"`を指定してください。
 
 manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロード前からパレット・ショートカットに表示するコマンドを宣言します。実行中はruntimeの登録内容を優先し、snapshotの`available`で使用可否を知らせます。`activateOnExecute: true`の明示実行は無効化・開始待ち状態から有効化して即時起動します。最低ホストバージョンはこの経路でも検証します。起動時に同じIDをruntimeへ登録してください。`aliases`は同じ名前空間の旧ID（8件まで）を受け付け、未割り当ての別名はコマンド候補に重複表示しません。既存の割り当ては保持します。
 
 `type: object-list`の設定は`fields`と`itemTitle`を持つ64件までのオブジェクト配列です。フォームで追加・並べ替え・削除します。旧JSON文字列も読み取れます。フィールドはboolean / number / string / select / string-listで、一覧の入れ子は不可。`string-list`はフィールド内だけで使用し、64件までの文字列を追加・削除します。`format: directory`でフォルダー選択、`aliases: ["Folder"]`で旧単一文字列を統合します。`select`の`numericOptions: true`は旧数値enumをoptionsの順序で読み取ります。正規化時も未知のフィールドを保持します。
 
-`Panel.Images`は1000件まで、`Tabs`は100件までに拡張しました。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
+`Panel.Images`は最大1000件、`Tabs`は最大100件です。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
 
 `local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。従来のbase64 `Image`は200000文字上限のまま使用可能です。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
-## v0.11.0: Node Appletの通知・ファイル選択
+## Node Appletの通知・ファイル選択
 
 既存API v1と従来の通知呼出しを維持した追加です。利用するAppletは`minimumHostVersion: "0.11.0"`を指定します。
 
@@ -206,17 +206,17 @@ WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の�
 
 長い認証やファイル選択を行うAppletはコマンドを即時受付し、バックグラウンドで処理してパネルへ状態を反映してください。通常のコマンドRPCは従来どおり15秒です。GmailCheckerが利用例です。
 
-## v0.26.0: ジェスチャーの初期値と実行文脈
+## ジェスチャーの初期値と実行文脈
 
 manifestのdefaultGestureBindingsに、自身のcommandsに宣言したコマンドの割り当て（id/command/gesture/enabled/when、最大100行）を宣言できる。初回だけ設定へコピーする。詳細は[マウスジェスチャー](gestures.md)。
 
 command.executeは任意のinvocation（session/window/process/source）を受け取る。.NETハンドラーはCommandExecution.Currentから読み取れる。source=gestureの場合のwindowは開始対象HWNDの10進文字列。command.cancelのsessionが一致すればハンドラーのCancellationTokenを取り消す。引数なしの既存ハンドラーは変更不要。対象固定や取消を実操作まで反映するかはAppletの実装による。
-## v0.26.29: 外部コマンド公開
+## 外部コマンド公開
 
 manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣言できます。省略/falseは非公開、runtime登録や別名だけでは公開しません。形式・動的コマンドとの照合・権限は[共通操作API](automation.md#appletによる公開宣言)を参照してください。利用するAppletは`minimumHostVersion: "0.26.29"`以上を指定します。
 
-設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。AppDock 0.26.30以降、settings capabilityと明示の公開・生成宣言が必要です。
+設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。settings capabilityと明示の公開・生成宣言が必要です。
 
-0.26.37では公開先をAPIごとのcallers宣言から判定し、Applet専用入力API2件を追加しました。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
+公開先をAPIごとのcallers宣言から判定し、Applet専用入力APIを提供します。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
 
-0.26.42のpage.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参照してください。Shell Appletの自己設定/自己コマンドAPIも共用します。
+page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参照してください。Shell Appletの自己設定/自己コマンドAPIも共用します。

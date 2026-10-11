@@ -1,57 +1,24 @@
 # AppDock.at365 開発ガイド
 
-MCPとAppletが共有する操作サービス・Node/.NET SDK・独立した許可設定は[AppDock共通操作API](docs/appdock-api.md)を参照してください。既存の自己設定APIも共通の設定変更処理へ接続します。
-
-0.26.35のタスクトレイ外部編集は`TrayEditingCommands`が`parseTrayMenu`と既存設定保存・クリック判定を使用します。[共通操作API](docs/automation.md#タスクトレイ編集02635以降)と[トレイ仕様](docs/tray-menu.md)を参照してください。回帰は`tests/tray-editing-commands.test.cjs`、MCP/GUIは`automation-ui-test.cjs`内の`automation-tray-checks.cjs`、実Trayイベントはsource版`tray-menu-ui-test.cjs`です。
-
-0.26.34のリボン外部編集は`RibbonCommands`と共有`parseRibbon`を使います。`ribbon.get`と`appdock.ribbon.update`、独立した編集許可、無効/未導入Appletの保持は[共通操作API](docs/automation.md#リボン編集02634以降)が正本です。単体回帰は`tests/ribbon-commands.test.cjs`、GUI/MCP/Codex/再起動は`automation-ui-test.cjs`から`automation-ribbon-checks.cjs`を実行し、既存の編集画面は`ribbon-layout-ui-test.cjs`で確認します。
-
-0.26.32のショートカット外部編集と0.26.33のジェスチャー外部編集は[共通操作API](docs/automation.md)を参照してください。`ShortcutCommands`/`GestureCommands`は既存の割当検証・保存形式とSettingsCommandsのrevisionを共有します。回帰は`tests/shortcut-commands.test.cjs`/`tests/gesture-commands.test.cjs`、GUI/実キー/MCPは`scripts/automation-ui-test.cjs`（ジェスチャー編集は`automation-gesture-checks.cjs`）です。ジェスチャー物理入力の試験とは区別します。
-
-0.26.31のApplet管理コマンドは[共通操作API](docs/automation.md#applet管理02631以降)を参照してください。共通処理は`src/main/core/applet-management.ts`、登録は`src/shared/applet-management.ts`、回帰は`tests/applet-management.test.cjs`と`tests/automation.test.cjs`、実プロセス/UI/MCPは`scripts/automation-ui-test.cjs`で確認します。
-
-利用方法は[README.md](README.md)、実測結果と未確認事項は[VERIFICATION.md](VERIFICATION.md)を参照してください。
+現在のコードを基準に、開発環境と機能別の仕様・検証への入口をまとめます。利用方法は[README](README.md)、作業規則は[AGENTS](AGENTS.md)、実測結果は[VERIFICATION](VERIFICATION.md)を参照してください。
 
 ## 文書の入口
 
-- [Shell Hostの仕様と実装計画](docs/shell-foundation.md): 0.26.40で初期基盤を実装済み。Default Shellは本体同梱の標準描画、Shell Appletは差替え拡張、Shell Hostは本体側の実行基盤を指す。リボンはDefault Shellへ移行し、本体の重複描画を撤去した。共通の公開API・実行経路、同時ビルド/単一EXE同梱、Default Shellへの復旧、MCP利用と、将来の複数Shellに残す境界を記載する。
+| 対象 | 正本 |
+| --- | --- |
+| 実装・コミット・Release | [共通手順](docs/development-workflow.md)、[Release](docs/RELEASING.md)、[全体パッケージ](docs/all-in-one.md) |
+| ホストとAppletの開発 | [ホスト開発](docs/host-development.md)、[Applet開発](docs/applet-development.md)、[Applet API](docs/extensions.md) |
+| 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
+| 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
+| ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
+| 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
+| Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
+| 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
+| 文書 | [文書方針](docs/documentation.md) |
+| 未実装の設定拡張 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
+| 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 
-- [実装・コミット・リリースの共通手順](docs/development-workflow.md): 実装時のテスト選択、コミット前の必要回帰、リリース前のコミット漏れ/プッシュ確認、検証証跡の再利用条件。本体と全Appletに適用します。以下の試験一覧は、この手順に従って必要な段階で実行します。
-
-- [設定同期・登録素材・PC専用保存](docs/settings-sync.md): 0.26.14の保存境界と0.26.15のat365/profile保存先、ファイル名ID、受信監視、バックアップ、隔離GUI検証。
-
-- [作業ルール](AGENTS.md): このrepo固有の運用上の注意と未実装の相談事項。[過去の実装記録](docs/implementation-history.md)は当時の検証範囲を調べる際に参照。
-
-- [GitHub Release手順](docs/RELEASING.md): 本体の通常版/オールインワンと未公開の同梱Appletをまとめて公開・取得確認し、今回公開した各repoを最新3件へ整理。
-
-0.18.0のAppletページ宣言・Node/.NET API・限定UIブリッジ・表示先・リボン設定と検証は[Appletページとリボン](docs/applet-pages.md)を参照してください。
-
-実リボンは有効なAppletのページだけを表示します。停止中もリボン設定の一覧と保存済み配置は保持します。停止/再開の回帰はWebApplet・既存ページ/Gmail・リボン配置のGUI試験で確認します。
-
-0.17.1ではWebアカウントのローカルUIへ、自身のAppletの宣言済みboolean/静的select設定の読み書きと変更通知を追加しました。保存は既存SettingsStore、詳細は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
-
-0.16.3のWebアカウント変更は、操作中のWebContents間だけの入力フォーカス引継ぎと、観測のaccountNameによる仮名の一度だけの置換です。詳細と保存互換性は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
-
-- [AppDock実装ガイド](docs/host-development.md): ホスト・設定・React UIの変更箇所と検証。
-- [共通操作APIとCodex連携](docs/automation.md): MCP、PC専用接続設定、Codex登録、基本設定の外部操作と検証。
-- [Applet実装ガイド](docs/applet-development.md): 新しいAppletの実装・設定・コマンド・終了処理。
-- [Applet API](docs/extensions.md): APIと通信の契約。
-- [WebアカウントAPI](docs/web-accounts.md): WebContentsView・永続セッション・DOM観測（0.12.0）、一時UIデータと表示領域（0.13.0）、背景描画（0.13.1）、項目を開く操作・切替キー・通知音・画面位置保存（0.14.0）、テーマ同期・音声コピー（0.15.0）、通常起動の描画（0.15.1）、準備完了後の背景同期再開・操作中の自然なフォーカス（0.15.2）。
-- [移行メモ](docs/migration.md): 既存アプリからの分割案と当時の設計記録。
-- [ドキュメント方針](docs/documentation.md): READMEと開発文書の分担、新規リポジトリの構成。
-- [Gmailの開発ガイド](../Applet.Gmail.at365/DEVELOPMENT.md): Node通知・Webアカウント・ページ表示と、隔離GUI・portable検証。
-
-## Applet設定パネル
-
-0.26.11のページ共通保存・未保存の浮動通知・Applet切替時のタブ保持は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)、組み込み管理入口への移動は[WebApplet](docs/web-applets.md)を参照してください。専用GUIは`dev.bat exec node scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`です。
-
-0.21.0ではApplet詳細に設定パネルを埋め込み、設定ページのApplet別設定とも共用します。画面・編集状態・保存処理の分担と検証は[AppDock実装ガイド](docs/host-development.md#applet設定パネルの共用)を参照してください。
-
-## 構成
-
-ホスト本体はTypeScript、画面はReactです。C#/.NETとTypeScript/Node.js、ネイティブ表示を持つ専用EXEのAppletをそれぞれ別プロセスで実行します。設定JSONやAPIの `extensions` は互換性のため名前を維持します。
-
-0.17.0ではウィジェット機能・配置設定・Node/.NET APIを削除しました。WPF等の独自ウィンドウは`native`、WebサービスはWebアカウントAPI、宣言的な表示はPanelを使用します。0.18.0からHTML/Reactの独自操作画面にはAppletページAPIも利用できます。Watchは独自WPF画面のnative EXEです。
+本体はTypeScript、描画はReactです。C#/.NETとNode.jsのAppletは別プロセスで実行し、独自WPF/WinForms画面はnative Appletが所有します。設定/APIの内部名extensionsは維持します。ページ共通の保存・未保存通知・詳細タブの契約は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照してください。
 
 ## 開発環境・ビルド・テスト
 
@@ -89,7 +56,7 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 
 Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号を変更してから `.\setup-tools.bat` を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは `.tools/node/<version>` と `.tools/pnpm/<version>` に残すので、設定を戻してsetupを実行すると切り戻せます。winget等の更新対象にはなりません。更新後は `.\dev.bat run typecheck`、`.\dev.bat test`、`.\publish.bat` で確認してください。
 
-現在の固定ツールはNode.js 24.21.0（最新24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
+現在の固定ツールはNode.js 24.21.0（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
 
 Electron 44.6.0はバイナリを初回実行時に取得するため、[公式手順](https://www.electronjs.org/docs/latest/tutorial/installation)の`install-electron`をプロジェクトの`postinstall`で明示実行します。pnpmが変更なしのインストールを省略する場合、バイナリが必要なら次を実行してください。
 
@@ -121,7 +88,7 @@ pnpm本体はnpmで導入するため、workspace設定だけでは保護され�
 
 `build`は`scripts/build-main.cjs`で生成済みの`out/main`を整理してからTypeScriptをコンパイルします。削除したモジュールが次の配布物に残ることを防ぎます。React/Viteも`out/renderer`を再生成します。設定の読み込み・保存は定義済みのトップレベル項目のみを返し、Applet固有の`extensions.<id>.settings`は保持します。
 
-0.16.4のportable発行は`scripts/build-portable.cjs`を経由します。electron-builder 26.15.3がportableのscript/includeを無視するため、ビルドプロセス内だけでNsisTarget.computeFinalScriptへ`scripts/portable.nsi`を渡し、終了時に復元します。node_modulesは編集しません。ビルダーの固定版と元テンプレートのライフサイクルを検証し、依存更新時は明示的に見直します。直接electron-builder CLIを使うとこのランチャーを含まないため、発行にはpublish.batまたはdev.bat run distを使ってください。APIからビルドする試験もdev.batのローカルNode/pnpm環境を使います。
+portable発行は`scripts/build-portable.cjs`を経由します。electron-builderのportableテンプレートを適用するため、ビルドプロセス内だけでNsisTarget.computeFinalScriptへ`scripts/portable.nsi`を渡し、終了時に復元します。node_modulesは編集しません。ビルダーの固定版と元テンプレートのライフサイクルを検証し、依存更新時は明示的に見直します。直接electron-builder CLIを使うとこのランチャーを含まないため、発行にはpublish.batまたはdev.bat run distを使ってください。APIからビルドする試験もdev.batのローカルNode/pnpm環境を使います。
 
 ランチャーはWindows TEMP・外側EXEの正規化パス・test-profileを小文字化してSHA256を取り、`TEMP/AppDock.at365-<hash>`へ展開します。版番号は含めません。起動/展開/最終削除をGlobalの名前付きmutexで直列化し、別の名前付きカーネルオブジェクトの生存を実行領域のleaseとして使用します。leaseは子のElectron本体へDuplicateHandleで渡すため、ランチャーだけの強制終了後も本体を保護します。二重起動は使用中の資産をそのまま使用し、全leaseがなくなった時だけ生成領域を削除します。設定や認証領域は削除対象外です。
 
@@ -162,11 +129,11 @@ scripts/                   ビルドと実機UI/portable検証
 
 `dotnet-host`、`updater`、`test-extensions`、`node-extensions`などの固定ビルド出力、`release-*`、`all-in-one-*`、単独の調査ファイルは、この手順の削除対象に含めません。`.artifacts`全体への再帰削除や、更新日時だけを使った一括削除は行いません。publishの旧版ZIP整理・GitHub Release保持数とは別の手順です。
 
-この手順は通常publishや製品起動に自動削除を追加するものではありません。開発生成物の保存先は2026-10-10に本体と各Appletで`artifacts`から`.artifacts`へ改名しました。既存の検証記録内の旧`artifacts/`パスは当該repoの`.artifacts/`へ読み替えてください。保存済みJSON/ログにある実行当時の絶対パスやハッシュは履歴として保持し、旧planを無条件に再実行せず、再開前にパス・phase・実状態を照合します。同期・バックアップ・スナップショットの設定はユキちゃんが担当します。
+この手順は通常publishや製品起動に自動削除を追加するものではありません。開発生成物は`.artifacts`へ保存します。既存の検証記録内の旧`artifacts/`パスは当該repoの`.artifacts/`へ読み替えてください。保存済みJSON/ログにある実行当時の絶対パスやハッシュは履歴として保持し、旧planを無条件に再実行せず、再開前にパス・phase・実状態を照合します。同期・バックアップ・スナップショットの設定は利用者が担当します。
 
 ## 配置
 
-共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。0.26.18では停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行した単一EXEとnative fixtureで全体/個別ログ画面・終了時ログを確認します。
+共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行した単一EXEとnative fixtureで全体/個別ログ画面・終了時ログを確認します。
 
 `deploy.bat` はPowerShell 7（`pwsh.exe`）を使用します。
 
@@ -192,7 +159,7 @@ scripts/                   ビルドと実機UI/portable検証
 
 electron-builderのportable形式を使用します。起動時にElectronと.NETホストを一時フォルダーへ展開し、`PORTABLE_EXECUTABLE_DIR`で元のEXEの隣に設定を保存します。.NETの単一ファイルと同じ方式ではありません。
 
-Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します。React画面にはNodeを公開せず、Appletのパネルはホストの宣言的な契約で描画します。Webアカウント対応Appletの操作画面は、限定preloadを持つ別BrowserWindowとリモートのWebContentsViewを組み合わせます。manifestのcapabilitiesはHost APIの使用宣言・検査であり、直接のファイル操作やネットワーク通信の権限制限ではありません。
+Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します。React画面にはNodeを公開せず、Appletのパネルはホストの宣言的な契約で描画します。Webアカウント対応Appletの操作画面は、限定preloadを持つローカルUIとリモートのWebContentsViewを組み合わせ、[Appletページ](docs/applet-pages.md)の宣言に従って本体ページまたは別Windowへ表示します。manifestのcapabilitiesはHost APIの使用宣言・検査であり、直接のファイル操作やネットワーク通信の権限制限ではありません。
 
 `minimumHostVersion`を宣言したAppletは起動前にホストバージョンを検査します。既存のAPI v1、設定・コマンドIDは維持します。manifestで宣言したコマンドはロード前から公開し、旧IDは別名として維持できます。履歴画像のボタンやモニター切替は一般コマンドではなく専用のパネル操作です。
 
@@ -204,29 +171,26 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 リボンの上寄せ/下寄せ・セパレーターと既存設定の移行は[Appletページとリボン](docs/applet-pages.md)を参照してください。隔離GUIは`scripts/ribbon-layout-ui-test.cjs`、本体ショートカットは「設定 → ショートカット」のコマンド一覧で編集します。Applet個別設定/キー編集は詳細上部の独立したタブへ集約します。表示順・共有編集は[ホスト開発ガイド](docs/host-development.md#appletの表示順)、隔離GUIは`scripts/applet-order-ui-test.cjs`を参照してください。
 
-0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](docs/web-accounts.md)を参照してください。
+WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
-0.21.0はmanifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・未保存draft維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
+manifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・未保存draft維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
 
-## 本体・Appletの自己更新
 
-0.24.0の本体管理WebApplet・Gmailから独立したログイン枠・Web提供JSONの初期設定・保存形式・隔離試験は[WebApplet](docs/web-applets.md)を参照してください。
+## 共通操作と更新の検証
 
-0.24.1はWebアカウント管理を独立ページ/専用ファイル/即時操作へ移し、名前のblur確定/Escape取消と削除待ちsessionの次回起動回収を追加します。同じ文書の移行・操作・削除境界を参照してください。
+AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、Applet管理、ショートカット、ジェスチャー、リボン、トレイの編集にはそれぞれの既存サービスを使い、通信層へ処理を複製しません。tests/appdock-api.test.cjs、tests/automation.test.cjsと対象サービスの単体試験、scripts/automation-ui-test.cjs、scripts/applet-api-ui-test.cjsを変更範囲から選びます。入力APIはNode実行文脈とInputTests、scripts/native-input-ui-test.cjsも確認します。詳細な手順と許可は[共通操作API](docs/appdock-api.md)と[外部操作](docs/automation.md)を参照してください。
 
-0.22.0の取得元・更新情報JSON・共通ミニプログラム・発行・復元・隔離試験は[更新の開発ガイド](docs/updates.md)を参照してください。`publish.bat`は本体EXEと`publish/update.json`を生成します。
-
-0.23.0は全6Appletの更新ZIP/JSON生成、共通進捗とキャンセル、journalのcommit記録・中断復旧を追加します。`scripts/update-progress-ui-test.cjs`と`scripts/update-recovery-test.cjs`の実行方法・隔離範囲は上記ガイド、実GitHub/HTTP(S)/UNCでの確認は[配布先のチェックリスト](docs/update-checklist.md)を参照してください。
+自己更新のmetadata・helper・journal・中断復旧は[更新ガイド](docs/updates.md)、実GitHub/HTTP(S)/UNCは[チェックリスト](docs/update-checklist.md)で確認します。通常publishと、公開後の実取得・インストール確認は別工程です。
 
 ## 条件付きショートカット
 
-0.25.0の[保存形式・判定・検証](docs/keybindings.md)を参照してください。全画面の入力とWindowsホットキーをホスト共通の条件判定/逐次実行へ集約します。新規割り当ては提供元条件を既定にし、本体コマンドはapp条件にします。
+[保存形式・判定・検証](docs/keybindings.md)を参照してください。全画面の入力とWindowsホットキーをホスト共通の条件判定/逐次実行へ集約します。新規割り当ては提供元条件を既定にし、本体コマンドはapp条件にします。
 
-0.26.23の[ショートカット画面の設計](docs/shortcut-ui-redesign.md)を参照してください。設定ページの全コマンド一覧とApplet詳細で一覧・小さな編集パネルを共用し、検索/状態フィルターと追加時の表示位置を保持します。
+[編集画面と表示順](docs/keybindings.md#編集画面と表示順)を参照してください。設定ページの全コマンド一覧とApplet詳細で一覧・小さな編集パネルを共用し、検索/状態フィルターと追加時の表示位置を保持します。
 
 ## マウスジェスチャー
 
-本体の入力プロセス、設定移行、コマンド文脈・取消、試験は[マウスジェスチャー](docs/gestures.md)を参照してください。0.26.24からショートカットと一覧/編集の枠/実行順パネルを共用し、ジェスチャー選択とbrowser/exe条件だけを専用に構成します。
+本体の入力プロセス、設定移行、コマンド文脈・取消、試験は[マウスジェスチャー](docs/gestures.md)を参照してください。ショートカットと一覧/編集の枠/実行順パネルを共用し、ジェスチャー選択とbrowser/exe条件だけを専用に構成します。
 
 ショートカット/マウスジェスチャーの共通操作UIは[割り当て操作UI](docs/host-development.md#割り当て操作uiの共用)を参照してください。scripts/shortcuts-ui-test.cjsは全コマンド/フィルター/メニュー/保存/登録エラー/両画面のdark/light全3幅を検証し、単一EXEのパスを引数で渡すと隔離コピーをCDPで検証します。
 
@@ -240,30 +204,15 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 タスクトレイの保存形式・移行・編集UI・一時停止コマンドと検証は[タスクトレイ仕様](docs/tray-menu.md)を参照してください。
 
-0.26.25の更新確認/進捗は共通のステータスバー通知へ統一しています。表示時間・確認結果・実Windowの可視状態の扱いは[更新ガイド](docs/updates.md#設定と取得)を参照してください。リボンのアバター用CSSは配置用の中間要素があっても一致するセレクターとし、画像の余白なし・正円を維持します。
+更新確認/進捗は共通のステータスバー通知へ統一しています。表示時間・確認結果・実Windowの可視状態の扱いは[更新ガイド](docs/updates.md#設定と取得)を参照してください。リボンのアバター用CSSは配置用の中間要素があっても一致するセレクターとし、画像の余白なし・正円を維持します。
 
-## 設定コマンド（0.26.30）
-
-変更操作はcommands.executeのid/argsに統一し、旧settings.patchを削除。読取りはsettings.get/getSchemaに任意appletIdを追加しました。設定定義のautomation/generateCommandsから本体・Appletの更新schemaと引数なしコマンドを生成します。仕様と利用例は[共通操作API](docs/automation.md#設定宣言と自動生成コマンド)、保存競合は[設定同期](docs/settings-sync.md)を正本とします。主な回帰はtests/settings-commands.test.cjs、tests/automation.test.cjs、scripts/automation-ui-test.cjsです。
-
-## 共通入力API（0.26.37）
-
-Windowsのキー・操作メッセージ送信を本体InputHostへ集約し、WebBrowserToolsとWindowsToolsから呼びます。公開先・全Applet共通許可・SDK・取消・試験手順は[共通操作API](docs/appdock-api.md)を参照してください。Node実行文脈の回帰はtests/node-invocation.test.cjs、実入力はscripts/native-input-ui-test.cjsです。依存パッケージを追加せず既存MCP SDKのSchema検証器を使います。
-
-## 操作許可の統合UI（0.26.38）
-
-Applet/MCPの許可をApiPermissionsSettingsへ集約し、一般/Codex接続ページから重複スイッチを除きました。PC専用保存・設定draft・MCPの固定公開範囲は[共通操作API](docs/appdock-api.md)を参照してください。GUI回帰は新旧SDK試験とMCP試験で移動後のスイッチを実操作します。
-
-## WebApplet公開設定と許可既定値（0.26.39）
-
-WebApplet提供元の公開宣言を共通SettingsCommandsとコマンドカタログで扱います。[仕様・回帰範囲](docs/web-applets.md#共通apiへの公開02639以降)と[Applet既定許可](docs/appdock-api.md#宣言と許可)を参照してください。MCP/Applet通信・SDKの変更やApplet再発行は不要です。
 
 ## Shell実装の入口
 
-0.26.41の[部分Shellと共通オーバーレイ](docs/shell-overlays.md)は、`shell.views`による領域単位の選択、リボン/パレットそれぞれのDefault Shell復旧、通常Applet機能との併用を定義する。`OverlayHost`と内容別`OverlayController`を分離し、新しいモーダルは表示寿命・最前面・入力停止・フォーカス復帰を再利用する。トレイのコマンド選択も同じ描画を使用する。パレット関連回帰は`tests/command-palette.test.cjs`、`scripts/shell-overlay-ui-test.cjs [固定EXE]`。新しいページ領域は取得/購読/操作契約を定義してから移す。
+[部分Shellと共通オーバーレイ](docs/shell-overlays.md)は、`shell.views`による領域単位の選択、リボン/パレットそれぞれのDefault Shell復旧、通常Applet機能との併用を定義する。`OverlayHost`と内容別`OverlayController`を分離し、新しいモーダルは表示寿命・最前面・入力停止・フォーカス復帰を再利用する。トレイのコマンド選択も同じ描画を使用する。パレット関連回帰は`tests/command-palette.test.cjs`、`scripts/shell-overlay-ui-test.cjs [固定EXE]`。新しいページ領域は取得/購読/操作契約を定義してから移す。
 
-0.26.40からの公開契約・ビルド境界は[Shell API](docs/shell-api.md)。Default Shellのソースは`shells/default`、本体側は`src/main/core/shell-host.ts`と`ui-presentation.ts`。新たなUIは機能状態・操作・表示モデルを本体側へ置き、Shellは公開モデルを描画する。移行した描画を本体rendererへ重複実装しない。
+公開契約・ビルド境界は[Shell API](docs/shell-api.md)。Default Shellのソースは`shells/default`、本体側は`src/main/core/shell-host.ts`と`ui-presentation.ts`。新たなUIは機能状態・操作・表示モデルを本体側へ置き、Shellは公開モデルを描画する。移行した描画を本体rendererへ重複実装しない。
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-0.26.42の[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.logsの公開モデル/操作/購読、Default Shellへのログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/log-page.test.cjsとscripts/shell-page-ui-test.cjs [固定EXE]。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.logsの公開モデル/操作/購読、Default Shellへのログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/log-page.test.cjsとscripts/shell-page-ui-test.cjs [固定EXE]。過去ログや日付検索は後続。

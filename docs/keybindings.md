@@ -27,7 +27,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - main/core/shortcut-dispatcherは開始前に全対象を予約する。コマンドによるキー送信の再入・同じキーの実行中再押下を抑止し、逐次awaitする。コマンド失敗は記録して続行し、終了・再起動では打ち切る。
 - mainの本体IPCとpageHostShortcutが共通resolver/dispatcherを呼ぶ。PageHostはSurfaceの可視状態と実Windowフォーカスを参照し、別Windowと埋め込み表示で同じApplet IDを使う。Surface破棄時に登録を除去する。native Appletの独自Windowは含めない。
 - WindowsHotKeyBackendはキーを重複除去して一度だけ登録。OSイベント時にはglobalを含む条件一致行を全評価する。同じキーがOS登録済みならローカル経路では実行しない。登録エラーは既存statusとして表示する。
-- ショートカット編集dialogを開くと誤実行防止のため全グローバル登録を一時解除し、statusesを空にする。dialogを閉じると保存済み設定で再登録する。0.26.8から正常時の「登録済み／未登録」を表示せず、有効なglobal行で利用可能なコマンドの登録エラーだけを示す。空のstatusesは記録/再同期の一時状態でもあるため、直近の非空statusを表示専用に保持し、同じコマンド/キーのエラーを再検査結果が届くまで表示する。エラーの絞り込みも同じ表示statusを使う。無効行/別scope/利用不能コマンドへ古いエラーを表示しない。backendの登録状態/入力判定や設定draftへこの表示用キャッシュを戻さない。
+- ショートカット編集dialogを開くと誤実行防止のため全グローバル登録を一時解除し、statusesを空にする。dialogを閉じると保存済み設定で再登録する。正常時の「登録済み／未登録」を表示せず、有効なglobal行で利用可能なコマンドの登録エラーだけを示す。空のstatusesは記録/再同期の一時状態でもあるため、直近の非空statusを表示専用に保持し、同じコマンド/キーのエラーを再検査結果が届くまで表示する。エラーの絞り込みも同じ表示statusを使う。無効行/別scope/利用不能コマンドへ古いエラーを表示しない。backendの登録状態/入力判定や設定draftへこの表示用キャッシュを戻さない。
 - 同じキーの複数割り当ては正常な使い方なので、行ごとの「同じキーの割り当てあり」を表示しない。共通の説明で全一致/順次実行を案内する。一覧には実行順操作・番号を置かず、専用パネルで変更した保存順序で実行する。
 - ローカル入力はkeyDownのみ、repeat/IME中/記録中を除く。本体はDOMの入力先判定を保つ。Applet Web画面はCtrl/Alt付きまたはF1〜F24/Pauseに限定して文字入力を守る。リモートへのpreload/IPC追加は行わない。グローバルはOS登録でありIME状態は参照できない。
 - アクティブページの条件は押下時に確定する。コマンドがページやフォーカスを変えても捕捉済みの対象を再評価しない。各コマンド自体の実行先（前面アプリ等）はそのコマンドの実装に従う。
@@ -42,7 +42,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 ## 編集画面と表示順
 
-0.26.22から設定ページは、本体・Applet・各WebAppletの全通常コマンドをまとめた平坦な一覧とする。未割り当ても表示し、キー/提供元のグループ分け、実行順番号、並べ替え、コマンド変更操作を置かない。カタログの順序を保ち、保存済みの配列や実行順を表示の都合で並べ替えない。
+設定ページは、本体・Applet・各WebAppletの全通常コマンドをまとめた平坦な一覧とする。未割り当ても表示し、キー/提供元のグループ分け、実行順番号、並べ替え、コマンド変更操作を置かない。カタログの順序を保ち、保存済みの配列や実行順を表示の都合で並べ替えない。
 
 検索はコマンド名・完全ID・提供元・キー・条件の表示名を対象とする。空白で区切った語をすべて含むコマンドへ絞り込む。「すべて／割り当て済み／未割り当て／登録エラー」の選択、表示件数、絞り込み解除を上部にまとめる。該当コマンドに複数の割り当てがあればすべて表示する。未確認の保存済みコマンドと割り当て済みのhidden互換別名も一覧に残す。
 
@@ -65,6 +65,6 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - 条件一致/無効/利用可能性/同じコマンドの最初の一致を1回実行する仕様は既存resolver/dispatcherのまま。実行順の編集は行数やコマンドを変えない。
 ## マウスジェスチャーと共通の編集UI
 
-ToggleとBindingActionsを共用する。ショートカットの削除はconfirmDelete=false、ジェスチャーの複製・確認付き削除・グループ内の並べ替え・CommandPalette選択は維持する。ジェスチャー表のcolgroupと固定幅は変更しない。保存形式・revision・JSON・useSettingsEditorの共有は変更しない。
+CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧のメニューは編集・同じ入力の実行順・確認なし削除。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。
 
-画面設計は[ショートカットUI](shortcut-ui-redesign.md)。主要な回帰はtests/keybindings.test.cjs、scripts/shortcuts-ui-test.cjs（全コマンド一覧とApplet編集）、scripts/keybindings-ui-test.cjs（実OS入力/ページ条件）、navigation/applet-order GUI。発行した単一EXEは隔離コピーで同じ一覧・保存・再起動を確認する。
+主要な回帰はtests/keybindings.test.cjs、scripts/shortcuts-ui-test.cjs（全コマンド一覧とApplet編集）、scripts/keybindings-ui-test.cjs（実OS入力/ページ条件）、navigation/applet-order GUI。発行した単一EXEは隔離コピーで同じ一覧・保存・再起動を確認する。

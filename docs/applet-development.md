@@ -6,15 +6,15 @@ AppDock本体の公開機能をAppletから操作する場合は[AppDock共通�
 
 新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、端末固有データは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。認証・Storage・Secrets・生成キャッシュはPC専用、登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
-AppDock v0.3.0 / API v1を基準にした実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
+現在のAppDock / API v1を対象とする実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
 新しいAppletにも[ドキュメント方針](documentation.md)を適用し、利用者向けの`README.md`と開発者向けの`DEVELOPMENT.md`を分けて作成します。最低ホスト版・導入・操作・設定・利用上の制約はREADME、ビルド・テスト・発行・内部構造はDEVELOPMENT、実測結果はVERIFICATIONへ記載してください。
 
 ## 1. 機能と実行方式を決める
 
-Webアカウントの独自ローカルUIに自身のboolean/静的select設定を置く場合は、AppDock 0.17.1のsnapshot.settings/setSettingを使えます。manifestへ設定とsettings capabilityを宣言し、[WebアカウントAPI](web-accounts.md)の保存・同期契約に従ってください。
+Webアカウントの独自ローカルUIに自身のboolean/静的select設定を置く場合は、snapshot.settings/setSettingを使えます。manifestへ設定とsettings capabilityを宣言し、[WebアカウントAPI](web-accounts.md)の保存・同期契約に従ってください。
 
-Appletは1つの道具として有効化・停止・再起動できる単位です。時計、マウスジェスチャー、AutoLockなど、独立して切り替えたい機能は別Appletにします。次の機能のために、Applet内へ汎用的な拡張機構を先に作る必要はありません。
+Appletは1つの道具として有効化・停止・再起動できる単位です。時計やWindows操作など、独立して切り替えたい機能は別Appletにします。マウスジェスチャーの入力基盤は本体が担当するため、Appletへ入力フックを重複実装しません。次の機能のために、Applet内へ汎用的な拡張機構を先に作る必要はありません。
 
 | runtime | 選ぶ場面 | 実装と参照例 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ Appletは1つの道具として有効化・停止・再起動できる単位で�
 | `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要 | 自身のランタイムを持つEXE。[Watch](../../Applet.Watch.at365/DEVELOPMENT.md) |
 | `node` | TypeScriptで実装する処理。Electron同梱Nodeを利用 | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts)、[WebBrowserTools](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md) |
 
-独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。アカウント一覧等の専用画面が必要になった場合は、ホスト側の型とUIを追加します。
+独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。専用画面は[Appletページ](applet-pages.md)を使い、Webアカウントが必要な場合は[WebアカウントAPI](web-accounts.md)を使います。
 
 各Appletは別プロセスで動きます。これは障害の分離で、OS権限の制限ではありません。ローカルの信頼できる実装を対象にします。
 
@@ -109,7 +109,7 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 
 - `id`は小文字英数字・`.`・`-`による安定した識別子です。コマンドIDは必ず `<id>.` で始め、機能名や表示名を変えても既存IDを維持します。ショートカットとピンはIDで保存されます。
 - 新しく導入したAppletのショートカット初期値は、`extension.json`の`commands`と`defaultKeybindings`で宣言します。例: `"defaultKeybindings": [{"command":"at365.sample.refresh","key":"Ctrl+R","enabled":true,"when":{"scope":"owner","appletIds":[]}}]`。コマンドは同じmanifestの`commands`内に必須です。初回導入時だけ保存設定へコピーし、あとからユーザーが変更・解除した内容を更新で上書きしません。実行時にも同じコマンドIDを登録します。
-- コマンドはActivate時に登録します。有効なAppletが登録したコマンドは、パレットとショートカット設定に自動表示されます。通常のショートカットはAppDockの画面操作中に有効です。v0.3.1以降では、ユーザーが「グローバル」を有効にするとWindowsのホットキーとして登録します。登録・解除はホストが担当し、Appletの停止時に解除します。`at365.watch.toggle` は既定でグローバルPauseです。
+- コマンドはActivate時に登録します。有効なAppletが登録したコマンドは、パレットとショートカット設定に自動表示されます。通常のショートカットはAppDockの画面操作中に有効です。ユーザーが「グローバル」を有効にするとWindowsのホットキーとして登録します。登録・解除はホストが担当し、Appletの停止時に解除します。`at365.watch.toggle` は既定でグローバルPauseです。
 - 設定値は `context.Settings` 経由で扱います。保存先はAppDockの `settings.json` の `extensions.<id>.settings` です。Appletから設定ファイル全体を直接書き換えません。
 - manifestの既定値はフォーム表示用です。SDKの読み取りにも同じfallbackを指定します。空の設定で起動できるようにしてください。manifestの既定値が自動的に全項目保存されるわけではありません。
 - boolean / number / string / selectを宣言し、説明・数値の上下限・刻み幅を付けます。フォームとHost API保存時は検証されますが、手動JSON編集の値をApplet側でも検証・補正します。
@@ -148,7 +148,7 @@ Watchは独自のWPFウィンドウで時計を描画し、配置とフォント
 | テストの待機 | main側のrunningだけではReactへ登録コマンドが届いた保証にならない。ショートカット検証前はパレットの行が現れるまで待つ |
 | 描画テスト | 一時的なPNG書き込みロックは待機して読み取る。必要なら描画出力を原子的に置換する。大量の描画記録はテスト時だけ有効にする |
 
-動的select・Runtime抽出・native接続をホストへ足した場所は[ホスト実装ガイドの時計の変更一覧](host-development.md#時計を載せるために追加した機能)にまとめています。
+動的select・設定検証・native接続の変更先は[ホスト実装ガイド](host-development.md#まず変更範囲を決める)を参照してください。
 
 ## 6. ビルド・配置・検証する
 
@@ -168,55 +168,55 @@ UIテストは一意の `.artifacts` フォルダーを作り、ホストへ `--
 
 時計のテストはマウスジェスチャー・OSホットキー・AutoLock等を検証しません。モニターの抜き差し、異なるDPIの実機、RDP、スリープ復帰、長期常駐も、次の機能で必要なら別途確認します。
 
-## v0.6.0のApplet設計
+## 宣言コマンドと構造化フォーム
 
 モニターごとのフォームには`object-list`とフィールド内の`string-list`を使います。旧Folderや数値enumの移行を宣言でき、JSON文字列からも設定を引き継げます。ロード前に設定したいコマンドはmanifestの`commands`へ宣言し、即時ロードを許す開始操作だけ`activateOnExecute`を指定します。旧IDは`aliases`で維持できます。
 
 履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
 
-契約と範囲は[拡張API](extensions.md#v060-宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshowの開発ガイド](../../Applet.WallpaperSlideshow.at365/DEVELOPMENT.md)を参照してください。必要ホストをv0.6.0へ上げ、SDK・Runtimeを含めて再publishします。
+契約と範囲は[拡張API](extensions.md#宣言コマンド構造化一覧パネル操作)、実装例と検証は[WallpaperSlideshowの開発ガイド](../../Applet.WallpaperSlideshow.at365/DEVELOPMENT.md)を参照してください。利用APIの最低ホスト版をmanifestへ指定し、SDK・Runtimeを含めて発行します。
 
-## v0.7.0のトレイ表示
+## トレイ表示
 
-登録・宣言した一般コマンドは、ユーザーがホスト設定の「トレイに表示」を有効にするとトレイメニューへ追加されます。既定はOFFです。Applet側の`context.Tray.Add` / `context.tray.add`はメニューラベルの提案で、表示を強制しません。これらを呼ばないAppletでも登録コマンドを選択できます。クリック時のコマンドもホスト設定から選べるため、Appletごとに独自トレイを追加する必要はありません。安定したコマンドIDを維持し、実行中の動的置換には従来の`ReplaceAsync`を使います。
+登録・宣言した一般コマンドは、利用者が本体のタスクトレイ設定でメニューへ配置できます。Applet側のcontext.Tray.Add / context.tray.addはラベルの提案で、表示を強制しません。クリック時の割当も本体が管理するため、Appletごとに独自トレイを追加する必要はありません。安定したコマンドIDを維持し、動的置換にはReplaceAsyncを使います。配置・空配列・単/ダブルクリックの契約は[トレイ仕様](tray-menu.md)を参照してください。
 
-v0.9.0ではシングルクリックとダブルクリックを別々の一般コマンドへ割り当てられます。ダブルは既定未設定。割り当てた場合はホストが単クリックを判定時間だけ待機し、ダブル時に単クリックを取り消します。Applet側の実装・API変更は不要です。
+シングルクリックとダブルクリックを別々の一般コマンドへ割り当てられます。ダブルは既定未設定。割り当てた場合はホストが単クリックを判定時間だけ待機し、ダブル時に単クリックを取り消します。Applet側の実装・API変更は不要です。
 
-表示名はmanifestの任意の`displayName`で指定します（1～100文字、空白のみは不可）。AppDock v0.9.1以降は一覧・設定・コマンド候補・トレイ等でこの名前を使います。省略時は`name`の先頭の`Applet.`を除去します。元の名前・ID・実行ファイル名は維持し、manifest更新後はホストを再起動します。詳細は[Applet API](extensions.md)を参照してください。
-## Node Appletのファイル選択・通知音（0.11.0）
+表示名はmanifestの任意の`displayName`で指定します（1～100文字、空白のみは不可）。一覧・設定・コマンド候補・トレイ等でこの名前を使います。省略時は`name`の先頭の`Applet.`を除去します。元の名前・ID・実行ファイル名は維持し、manifest更新後はホストを再起動します。詳細は[Applet API](extensions.md)を参照してください。
+## Node Appletのファイル選択・通知音
 
 TypeScript/Nodeの現行実利用例は[Gmail](../../Applet.Gmail.at365/DEVELOPMENT.md)です。ローカルReact UIとWebアカウントのDOM観測を分け、ログイン領域はホストへ任せます。別途APIクライアントを実装する場合は、一般設定をホストフォーム、秘密をSecrets、履歴をStorageへ分けます。認証やポーリングはコマンド受付から切り離し、停止時にAbortControllerで中止してください。
 
 
-ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#v0110-node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。
+ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。
 
-Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、0.12.0の[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。0.13.0の`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
+Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
 
 初回未表示からページの描画を背景で継続する必要がある場合、最低ホスト版は0.15.1としてください。ホストは透明・画面外・非フォーカスの専用WindowへViewを保持し、可視の操作Windowを選択した場合だけ移します。サービス固有の通知・観測処理は引き続きApplet側です。snapshot.darkでホストテーマを受け取り、通知音は管理領域へコピーします。
 
 通常起動でGmailの初回更新を維持する場合は0.15.2を指定し、webAccounts.keepActive:trueを宣言します。observerのready:trueを受けたobserveOriginだけを対象にし、背景では30秒ごとに同期再開を促します。native focusがあるWebContentsは通常のfocus/blurを使い、認証originではタイマーも解除します。Windowsのフォーカス/選択を自動変更する方式ではありません。通常起動での検証はテストツールによるfocus overrideを避けてください。
 
-0.14.0では`webAccounts.cycle(1|-1)`とローカルUIの`openItem/setSound/pickSound/testSound`を追加し、ウィンドウ位置・サイズを保存します。項目を開く処理は任意で宣言するitemOpenerの関数式へkeyを渡し、明示的なUI操作でだけ実行します。音はアカウントごとのsoundをreadから参照して既存audio APIで再生してください。APIと境界は[WebアカウントAPI](web-accounts.md)を参照します。
+`webAccounts.cycle(1|-1)`とローカルUIの`openItem/setSound/pickSound/testSound`を提供し、ウィンドウ位置・サイズを保存します。項目を開く処理は任意で宣言するitemOpenerの関数式へkeyを渡し、明示的なUI操作でだけ実行します。音はアカウントごとのsoundをreadから参照して既存audio APIで再生してください。APIと境界は[WebアカウントAPI](web-accounts.md)を参照します。
 
-0.16.0はローカルUIの`move/setMonitoring`と、readの`monitoring/monitoringResets`を追加します。Appletは個別OFFで基準・履歴・件数をresetし、read間のOFF→ONにも対応します。ヘッダー画像を観測結果のavatar URLへ置く場合は、manifestのavatarOriginsに画像のHTTPS originを明示してください。画像取得・変換・ローカルUIへのdata画像はホストが担当し、Nodeへ画像バイトを送りません。
+ローカルUIは`move/setMonitoring`、readは`monitoring/monitoringResets`を提供します。Appletは個別OFFで基準・履歴・件数をresetし、read間のOFF→ONにも対応します。ヘッダー画像を観測結果のavatar URLへ置く場合は、manifestのavatarOriginsに画像のHTTPS originを明示してください。画像取得・変換・ローカルUIへのdata画像はホストが担当し、Nodeへ画像バイトを送りません。
 
-0.16.1のwebAccounts.cycleはウィンドウを開かず、既存の表示/最小化/非表示とフォーカスを維持します。表示が必要な明示操作だけでopenを呼んでください。アバターは当該アカウントのログイン済みsessionから取得します。
+webAccounts.cycleはウィンドウを開かず、既存の表示/最小化/非表示とフォーカスを維持します。表示が必要な明示操作だけでopenを呼んでください。アバターは当該アカウントのログイン済みsessionから取得します。
 
-0.16.3では、操作中のWebContentsでcycleを繰り返すときだけ入力を切替先へ引き継ぎます。ログイン後の自動命名にはobserverのaccountName（1〜60文字・制御文字なし）を返し、最低ホスト版を0.16.3にしてください。新規名は「新しいアカウント」で、明示rename後や一度取得した名前は自動変更しません。Gmailの日本語/英語ヘッダー抽出と連続キー入力の実装例は[Gmail開発ガイド](../../Applet.Gmail.at365/DEVELOPMENT.md)を参照します。
-## Appletページの追加（0.18.0）
+操作中のWebContentsでcycleを繰り返すときだけ入力を切替先へ引き継ぎます。ログイン後の自動命名にはobserverのaccountName（1〜60文字・制御文字なし）を返し、最低ホスト版を0.16.3にしてください。新規名は「新しいアカウント」で、明示rename後や一度取得した名前は自動変更しません。Gmailの日本語/英語ヘッダー抽出と連続キー入力の実装例は[Gmail開発ガイド](../../Applet.Gmail.at365/DEVELOPMENT.md)を参照します。
+## Appletページの追加
 
 HTML/Reactで独自画面を作り、リボンから本体ページまたは独立Windowとして開く場合は[Appletページとリボン](applet-pages.md)を参照してください。manifestのpages、安定したページIDとopenCommand、pages capabilityを宣言します。Nodeはcontext.pages.open、.NET/nativeはcontext.Pages.OpenAsyncを利用します。WebアカウントUIはsource:web-accountsと既存openを再利用します。
 
-AppDock 0.19.0ではページボタンを上寄せ/下寄せへ利用者が配置し、間にセパレーターを置けます。Appletのページ宣言やopen APIは0.18.0から変わらず、配置はホストが管理します。
+ページボタンを上寄せ/下寄せへ利用者が配置し、間にセパレーターを置けます。Appletのページ宣言やopen APIは変わらず、配置はホストが管理します。
 
-0.20.0はWebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingを追加します。契約と移行は[WebアカウントAPI](web-accounts.md)を参照してください。
+WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](web-accounts.md)を参照してください。
 
 ## 外部操作へ公開するコマンド
 
 既存のコマンドを外部API/MCPから呼び出せるようにする場合は、Applet自身のmanifestで公開を宣言します。本体へ個別IDを追加しません。形式と条件は[共通操作API](automation.md#appletによる公開宣言)を参照してください。
 
-設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。AppDock 0.26.30以降、settings capabilityと明示の公開・生成宣言が必要です。
+設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。settings capabilityと明示の公開・生成宣言が必要です。
 
-0.26.37の入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
+入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
 
 ログだけを差し替えるShell AppletはminimumHostVersion 0.26.42以上でpage.logsを宣言できます。モデル・操作・フォーカス・復旧の契約は[Shellのページ表示](shell-pages.md)を参照してください。

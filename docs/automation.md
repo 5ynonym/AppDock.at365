@@ -1,12 +1,12 @@
 # 共通操作APIとCodex連携
 
-0.26.36以降はAppletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。
+Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。
 
-0.26.26から、本体に共通操作APIとローカルMCPを持ちます。利用者の手順は[README](../README.md#codex連携)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
+本体に共通操作APIとローカルMCPを持ちます。利用者の手順は[README](../README.md#codex連携)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
 
 ## 構成
 
-- `src/main/core/automation-api.ts`: 通信に依存しない操作、公開カタログ、実行権限、引数、受付状態。
+- `src/main/core/appdock-api.ts`と`src/shared/appdock-api.ts`: 通信に依存しない操作、公開カタログ、実行権限、引数、受付状態。`automation-api.ts`は既存呼出元向けの再export。
 - `settings-commands.ts`: 設定宣言から読取りschema/更新コマンドを構築し、型検証・revision・保存を共通化。
 - `applet-management.ts`: Applet管理の自動生成コマンド、永続化、状態確認、ローカル/MCP共通の同時操作ガード。
 - `shortcut-commands.ts`: ショートカットの限定読取り、操作列の検証・原子的保存。共有keybindingsとSettingsCommandsのrevisionを使用。
@@ -22,7 +22,7 @@
 
 `dock:automation` IPCは本体Window/mainFrame/URL検査を通し、WebAppletやAppletページへ公開しません。本体のprepareSettings/commitSettingsを共有して保存します。APIからWindows起動登録・UACを呼びません。
 
-## API v2（0.26.30以降）
+## API v2
 
 | 内部メソッド | MCPツール | 引数と結果 |
 | --- | --- | --- |
@@ -33,12 +33,17 @@
 | applets.get | appdock_get_applet | id。applet（基本情報/description/runtime/errorSummary）と公開commands/executable/writable |
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
-| shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。0.26.32以降 |
-| tray.get | appdock_get_tray | 引数なし。menu/clicks/fixedCommands/assignableCommands/revision/warning/各許可。0.26.35以降 |
-| ribbon.get | appdock_get_ribbon | 引数なし。layout/items/retainedIds/revision/warning/各許可。0.26.34以降 |
-| gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。0.26.33以降 |
+| shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。 |
+| tray.get | appdock_get_tray | 引数なし。menu/clicks/fixedCommands/assignableCommands/revision/warning/各許可。 |
+| ribbon.get | appdock_get_ribbon | 引数なし。layout/items/retainedIds/revision/warning/各許可。 |
+| gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。 |
+| ui.ribbon.get | appdock_get_ribbon_view | 任意contextId。リボンの表示モデル・epoch・revision・操作ID |
+| ui.assets.get | appdock_get_ui_asset | モデル内のassetIdをidへ指定。PNG/WebPのdata URL |
+| ui.actions.invoke | appdock_invoke_ui_action | epoch・requestId・actionId・任意contextId。モデルで公開された操作を実行 |
 
-旧settings.patch/appdock_patch_settingsは削除しました。設定変更はすべてcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
+公開範囲の正本は`appDockOperations`のcallersです。入力APIはApplet専用で、MCPには直接公開しません。描画モデルの詳細は[Shell API](shell-api.md)を参照してください。
+
+設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
 | キー | 値 | 適用タイミング |
 | --- | --- | --- |
@@ -55,9 +60,9 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 未公開コマンドの実行/一般設定、アカウント/認証、更新適用、任意画面操作は公開しません。将来の入口も共通APIの検証と保存を使います。
 
-## ジェスチャー編集（0.26.33以降）
+## ジェスチャー編集
 
-取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。0.26.35ではリボン・トレイ取得も含めMCPは計11ツールです。更新後はCodexを再読み込みしてください。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
+取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
@@ -98,9 +103,9 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 結果はdryRun/changed/settings/bindings/revision/warning/applies=gesturesChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。入力処理への反映は非同期であり、保存完了は物理ジェスチャーの成功や現在の一時停止解除を示しません。全API呼出しを既存automationログへ記録し、操作引数やexe名はログに残しません。
 
-## ショートカット編集（0.26.32以降）
+## ショートカット編集
 
-取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。0.26.32で読取りツールが1件増えて8件、0.26.35ではジェスチャー・リボン・トレイ取得を含め11件です。更新後はCodexを再読み込みしてください。
+取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。
 
 読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
@@ -143,7 +148,7 @@ revisionは本体/各Applet設定と共通です。他の設定編集・再起�
 
 追加エラーはSHORTCUT_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
 
-## Applet管理（0.26.31以降）
+## Applet管理
 
 本体が登録済みのファイル型AppletとWebAppletに `appdock.applets.<appletId>.enable` / `disable` / `restart` を生成します。引数はありません。Applet固有コマンドの公開宣言とは独立した本体コマンドで、設定JSONにIDを追加するだけでは生成しません。管理コマンドは対象appletIdを持ちますが、ショートカット・ジェスチャー・トレイではAppDock所属です。無効なAppletのenableも候補に残ります。削除済みの対象を実行すると拒否します。
 
@@ -152,7 +157,7 @@ revisionは本体/各Applet設定と共通です。他の設定編集・再起�
 - 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未保存draftを混同しません。
 - 成功応答はcompletion=lifecycleApplied、changed（enabledの保存有無）、applet（id/enabled/state）、effectVerified=falseです。waitingは予約状態で、起動完了を意味しません。起動失敗はLIFECYCLE_FAILEDになり、保存済みenabledは巻き戻しません。失敗/通信切断後は状態とログを確認します。
 
-PC専用automation.jsonに `allowManageApplets` を追加しました。初期値と既存設定に項目がない場合はfalseです。「操作の許可」のMCP列の「Appletの有効・無効・再起動」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
+PC専用automation.jsonの`allowManageApplets`は既定falseです。「操作の許可」のMCP列の「Appletの有効・無効・再起動」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
 
 カタログのpermission=applets.manageと、system.getInfo/commands.listのappletManagementAllowedで管理権限を確認できます。拒否はAPPLET_MANAGEMENT_DISABLEDです。取消は次の要求から有効で、開始済みの処理を中断しません。ローカル操作に外部操作の許可は不要です。MCPツールは既存の7件を維持し、管理操作もcommands.execute経由で監査ログへ記録します。
 
@@ -162,7 +167,7 @@ PC専用automation.jsonに `allowManageApplets` を追加しました。初期�
 
 - 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
-- 本体管理のWebApplet: 提供元のweb-applets.tsがopen/back/forward/reload/homeを宣言。0.26.39以降はname/displayの設定宣言も共通設定コマンドに登録。詳細は[WebApplet公開操作](web-applets.md#共通apiへの公開02639以降)。
+- 本体管理のWebApplet: 提供元のweb-applets.tsがopen/back/forward/reload/homeを宣言。name/displayの設定宣言も共通設定コマンドに登録。詳細は[WebApplet公開操作](web-applets.md#共通apiへの公開)。
 
 Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、通常コマンドは既存executeCommandへ、設定コマンドは共通SettingsCommandsへ渡します。通常のApplet RPCコマンドは引き続き引数なしで、argsに値を渡すと拒否します。APIコマンドの同時実行は1件、重複時はBUSY。設定変更許可だけでは実行できず、実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
 
@@ -172,7 +177,7 @@ Applet詳細には全設定・認証・パス・panelを含めません。WebApp
 
 ## Appletによる公開宣言
 
-0.26.29以降、外部公開はAppletのextension.jsonのcommandsにbooleanのautomationで指定します。省略/falseは非公開です。本体はApplet名やIDごとの一覧を持ちません。
+外部公開はAppletのextension.jsonのcommandsにbooleanのautomationで指定します。省略/falseは非公開です。本体はApplet名やIDごとの一覧を持ちません。
 
 ```json
 {
@@ -188,7 +193,6 @@ runtime登録やhost.commands.replaceのautomation値は採用せず、manifest�
 
 本体は宣言の検証・実行許可・稼働状態・同時実行制御・監査ログを管理します。公開宣言は実行許可を有効にするものではありません。現在はPC単位のコマンド実行許可を全Appletで共有し、Applet/コマンド個別の許可スイッチはありません。
 
-0.26.28以前の固定一覧による互換公開は行いません。Gmail 0.9.4はopenと公開設定、WallpaperSlideshow 0.4.5はnextと公開設定を宣言します。Codexの登録方法は同じですがMCPは7ツールになりました。更新後はCodexを再読み込みしてください。
 
 ## 設定宣言と自動生成コマンド
 
@@ -233,9 +237,9 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 対象は同じWindowsホストのCodex。CODEX_HOME/config.toml、未指定ならホームの.codex/config.tomlを候補とし、絶対パスを画面で変更できます。WSL/リモートの自動設定はしません。
 
-0.26.27から登録名の既定値はAppDockで、mcp_servers.AppDockのurl/enabled/required/http_headersだけを追加します。接続の詳細で登録名を変更できます（英字で始まる64文字以内の英数字・ハイフン・アンダースコア）。複数配置にはAppDock_Testなど別の名前を指定します。同名の他登録は上書きしません。serverIdはCodexへの登録名、APIのinstanceIdと管理コメントは配置IDです。
+登録名の既定値はAppDockで、mcp_servers.AppDockのurl/enabled/required/http_headersだけを追加します。接続の詳細で登録名を変更できます（英字で始まる64文字以内の英数字・ハイフン・アンダースコア）。複数配置にはAppDock_Testなど別の名前を指定します。同名の他登録は上書きしません。serverIdはCodexへの登録名、APIのinstanceIdと管理コメントは配置IDです。
 
-0.26.26の登録名を自動移行しません。旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は保存済みの所有hashを照合して旧名の管理範囲だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
+登録名を自動移行しません。旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は保存済みの所有hashを照合して旧名の管理範囲だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
 
 required=falseなのでAppDock停止をCodex全体の必須起動失敗にしません。Bearer tokenはCodexのローカルconfig.tomlにも平文で保存されます。画面・IPC状態・ログには出しません。
 
@@ -254,9 +258,9 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 参考: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)、[Codex設定](https://learn.chatgpt.com/docs/config-file/config-reference)、[MCP transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)。
 
-## リボン編集（0.26.34以降）
+## リボン編集
 
-取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。0.26.35ではトレイ取得を含めMCP全11ツール。更新後はCodexを再読み込みしてください。
+取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。
 
 編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
@@ -292,7 +296,7 @@ revisionは全設定で共通です。古いrevision、プロセス再起動前�
 
 エラーはRIBBON_EDITING_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。
 
-## タスクトレイ編集（0.26.35以降）
+## タスクトレイ編集
 
 取得は`tray.get`（MCP `appdock_get_tray`）、変更は`commands.execute`の`appdock.tray.update`です。MCPは11ツール。更新後はCodexを再読み込みしてください。
 
@@ -337,4 +341,4 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 
 ## Applet専用操作
 
-0.26.37のinput.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しません。Appletが明示公開するコマンドからの呼出しは全Applet共通の許可で実行できます。[公開先と許可](appdock-api.md)を参照してください。
+input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しません。Appletが明示公開するコマンドからの呼出しは全Applet共通の許可で実行できます。[公開先と許可](appdock-api.md)を参照してください。

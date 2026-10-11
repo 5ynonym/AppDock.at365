@@ -1,10 +1,10 @@
 # 本体とAppletの共通更新
 
-利用者向けの操作は[README](../README.md#アップデート)を参照。0.22.0以降はframework-dependent .NET 10単一ファイル`AppDock.Updater.exe`をportable本体のresourcesへ同梱する。.NET 10 Runtimeの従来要件以外の導入は不要。
+利用者向けの操作は[README](../README.md#アップデート)を参照。framework-dependent .NET 10単一ファイル`AppDock.Updater.exe`をportable本体のresourcesへ同梱する。.NET 10 Runtimeの従来要件以外の導入は不要。
 
 ## 設定と取得
 
-0.26.25から確認結果・取得中・取消・適用完了を共通の`UpdateProgress`でステータスバーへ表示する。固定のフッター領域内に重ねるため本文やWebContentsViewの領域を動かさない。通常結果は実Windowが表示されている時間で6秒後に消え、ホバー/フォーカス中は残り時間を停止する。失敗は明示的に閉じるまで残す。取得中の件数/bytes/進捗とキャンセルは同じ欄を使う。
+確認結果・取得中・取消・適用完了を共通の`UpdateProgress`でステータスバーへ表示する。固定のフッター領域内に重ねるため本文やWebContentsViewの領域を動かさない。通常結果は実Windowが表示されている時間で6秒後に消え、ホバー/フォーカス中は残り時間を停止する。失敗は明示的に閉じるまで残す。取得中の件数/bytes/進捗とキャンセルは同じ欄を使う。
 
 明示操作の結果は一意ID・種別・メッセージを持つ`UpdateState.notice`に渡し、同じ内容を続けて確認しても再表示する。確認時の失敗/未設定を「更新なし」と混同しない。起動時の自動チェックは従来のWindows通知設定を維持し、通常結果のバーを追加しない。再起動後の適用結果は既存の`completion`から同じUIへ渡す。新しい操作開始時にnotice/completionをクリアし、保存済みの結果ファイル・ログの形式は変えない。
 
@@ -18,7 +18,7 @@
 
 本体のpublish.bat/dev.bat run distはhelperをビルドし、portable EXEの発行後にpublish/update.jsonを生成する。外部公開はしない。
 
-0.23.0の共通`scripts/pack-applet-update.ps1`は.NET 10 SDKでパッカーを増分ビルドして実行する。全6Appletのpublish.batは発行後にこれを呼び、各リポジトリのpublish/update.jsonとpublish/update.zipを生成する。通常のpublish/各Applet名フォルダーは配置用のまま保持する。Applet側でOutputDirectoryを指定した場合も、その内容をパッケージ化してJSON/ZIPはリポジトリ内publishへ出力する。.NET AppletではNode.js不要。
+共通`scripts/pack-applet-update.ps1`は.NET 10 SDKでパッカーを増分ビルドして実行する。全6Appletのpublish.batは発行後にこれを呼び、各リポジトリのpublish/update.jsonとpublish/update.zipを生成する。通常のpublish/各Applet名フォルダーは配置用のまま保持する。Applet側でOutputDirectoryを指定した場合も、その内容をパッケージ化してJSON/ZIPはリポジトリ内publishへ出力する。.NET AppletではNode.js不要。
 
 ZIPは一時ファイルへ完成させてから置換し、feedを最後に保存する。出力先が入力フォルダー自身でも、生成前に収録一覧を固定し、既存update.json/update.zipを除外する。manifestのAPI/entryと配布量上限を検査する。配布先確認は[チェックリスト](update-checklist.md)を参照。個別に生成するときは次も利用できる。
 
@@ -49,7 +49,7 @@ tests/portable-updates.test.cjsは隔離ディレクトリーで設定移行、�
 
 scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへコピーし、実helper/ランチャーで本体/一括/個別交換と再起動を確認する。DevTools/Node inspectorは隔離試験に明示指定し、最終のnative確認ダイアログだけ試験内で差し替える。通常起動にdebug/inspector引数を追加しない。結果/画像は専用profileへ保存。
 
-## 0.22.1 の操作画面と再起動
+## 操作画面と再起動
 
 更新・一括更新を先頭に置き、UpdateSettingsの共通設定と各AppletカードのAppletUpdateSourceをdetailsで折りたたむ。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存useSettingsEditorの下書き・revision付き保存へ統一する。
 
@@ -59,7 +59,7 @@ useRestartViewはページ・選択Applet・設定カテゴリ/タブ・ログ�
 
 portable-updates-ui-testはトレイ開始ONの通常起動非表示、更新後の設定/更新ページへの復帰、通常再起動で別カテゴリとAppletページへの復帰、dark/light・900px・折りたたみ/既定復帰/下書きガードも検証する。
 
-## 0.23.0 の進捗とキャンセル
+## 進捗とキャンセル
 
 UpdateStateはbusy/cancellable/phaseと、対象ID・名前・件数・取得bytes・任意の全体bytesを持つ。UpdateProgressを共通画面へ置き、ページ移動後も経過/結果を表示する。通知は取得中100msごとを目安に抑え、最終bytesは通知する。
 
