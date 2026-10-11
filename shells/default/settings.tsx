@@ -10,6 +10,9 @@ import { SettingsIndex } from './settings/SettingsIndex';
 import { SettingsTextarea } from '../../src/shared/settings-ui/SettingsInput';
 import '../../src/shared/settings-ui/controls.css';
 import './settings.css';
+document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
+  ? 'dark'
+  : 'light';
 declare global {
   interface Window {
     appdockPage: ShellPageApi;
@@ -22,7 +25,10 @@ function App() {
   const client = useRef<SettingsViewClient | null>(null);
   const drag = useRef<{ x: number; width: number } | null>(null);
   if (!client.current) {
-    client.current = new SettingsViewClient(setModel, setError);
+    client.current = new SettingsViewClient((next) => {
+      document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
+      setModel(next);
+    }, setError);
     configureSettingsControls(client.current.controls());
   }
   const c = client.current;
@@ -78,9 +84,6 @@ function App() {
       document.removeEventListener('keydown', keys);
     };
   }, []);
-  useEffect(() => {
-    if (model) document.documentElement.dataset.theme = model.dark ? 'dark' : 'light';
-  }, [model?.dark]);
   useEffect(() => {
     const move = model?.content.move;
     if (!move || move.completed || model.content.editing.mode !== 'form') return;

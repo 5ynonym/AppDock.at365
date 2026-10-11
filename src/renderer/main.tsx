@@ -549,8 +549,8 @@ function App() {
       )}
       <main
         className={
-          page === 'settings'
-            ? 'settings-main'
+          page === 'settings' || page === 'home' || page === 'logs'
+            ? 'shell-page-main'
             : page === 'extensions'
               ? 'applet-detail-main settings-main applet-detail-settings-main'
               : page.startsWith('page:')

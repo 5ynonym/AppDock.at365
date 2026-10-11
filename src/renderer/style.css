@@ -1,1 +1,36 @@
 @import '../shared/settings-ui/controls.css';
+
+/* The host allocates space; each Shell owns its content padding and scrolling. */
+.shell-page-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.shell-page-main > .page-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.shell-page-main > .error-banner {
+  flex-shrink: 0;
+}
+.shell-page-slot {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.detail-logs:has(> .shell-page-slot),
+.detail-settings > .applet-settings-panel.shell-settings-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}

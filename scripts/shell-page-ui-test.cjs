@@ -201,6 +201,17 @@ async function check(name, action) {
       assert.equal(await p.getByLabel('ログを検索').inputValue(), 'Fixture');
     });
     await check(
+      'logs fill the host area across notification, resize and zoom changes',
+      async () => {
+        await require('./shell-page-layout-helper.cjs').exerciseLayout(
+          dock,
+          await logs(),
+          app,
+          'logs',
+        );
+      },
+    );
+    await check(
       'partial provider switch keeps query; normal commands/settings and stale actions',
       async () => {
         const old = await logs();
@@ -315,6 +326,7 @@ async function check(name, action) {
         ),
       );
       await p.screenshot({ path: path.join(profile, 'detail-dark.png') });
+      await require('./shell-page-layout-helper.cjs').assertLayout(dock, p, app, true);
     });
     await check('theme and resized layout, source isolation from root', async () => {
       await dock.evaluate(async () => {

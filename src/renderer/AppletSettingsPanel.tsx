@@ -32,7 +32,10 @@ export function AppletSettingsPanel({
     if (panel.current) panel.current.scrollTop = 0;
   }, [applet.id, tab]);
   return (
-    <div className="applet-settings-panel" ref={panel}>
+    <div
+      className={`applet-settings-panel${tab === 'settings' ? ' shell-settings-panel' : ''}`}
+      ref={panel}
+    >
       {tab === 'settings' ? (
         <ShellPageSlot
           key={applet.id}

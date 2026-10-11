@@ -9,6 +9,9 @@ import type {
 } from '../../src/shared/shell-pages';
 import { shortcutFromEvent } from '../../src/shared/commands';
 import './logs.css';
+document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
+  ? 'dark'
+  : 'light';
 declare global {
   interface Window {
     appdockPage: ShellPageApi;
@@ -28,6 +31,7 @@ function App() {
       if (live && next.kind === 'logs') {
         if (latest.current?.id === next.id && latest.current.revision > next.revision) return;
         latest.current = next;
+        document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
         setModel(next);
         if (!pending.current) setFilters(next.content.filters);
       }
@@ -83,9 +87,6 @@ function App() {
   useEffect(() => {
     if (session && model) void api.ready(session).catch((e) => setError(String(e)));
   }, [session, !!model]);
-  useEffect(() => {
-    document.documentElement.dataset.theme = model?.dark ? 'dark' : 'light';
-  }, [model?.dark]);
   const act = (action: ShellPageAction) => {
     setError('');
     void api.act(action).catch((e) => setError(String(e)));
@@ -104,7 +105,7 @@ function App() {
   if (!model) return error ? <p role="alert">{error}</p> : null;
   const content = model.content;
   return (
-    <main className="logs-page">
+    <main className="logs-page" data-embedded={content.scope.type !== 'all'}>
       <div className="page-heading compact">
         {content.scope.type === 'all' ? <h1>ログ</h1> : <h3>ログ</h3>}
         <button className="secondary" onClick={() => act({ id: model.id, type: 'open-directory' })}>

@@ -394,7 +394,13 @@ async function until(fn, label) {
       .waitFor();
     await assert.rejects(op(shell, { kind: 'move', itemId: oldItem }), /見つかりません/);
     await op(shell, { kind: 'select', pageId: 'appearance' });
+    await shell.getByLabel('テーマ', { exact: true }).waitFor();
     await search().fill('テーマ');
+    // The fixture switches providers through the host API, outside the Shell input queue.
+    await until(
+      async () => (await modelOf(shell)).content.query === 'テーマ',
+      'search accepted before provider replacement',
+    );
     checks.push(
       'live added WebApplet indexed, individual body anchors, deleted target removed and stale movement rejected',
     );

@@ -1,5 +1,28 @@
 # 検証記録
 
+## 2026-10-12: LightテーマのShellページ切替時の背景（0.28.2）
+
+- スロット自体は透明で、背後のHTMLルートはLightの`rgb(250,251,252)`だった。一方、BrowserWindowの背景は`#101116`固定、ページViewの背景は未指定、Default ShellはDarkのCSSから始まり、特に設定はready通知後のeffectでテーマを適用していた。調査時の18切替（`shell-page-theme-1791755781927`）では、利用者が見た瞬間的な黒フレーム自体は再現できていない。背景不一致と適用順序を原因候補として是正した。
+- Windowの生成・設定変更・OSテーマ通知と、ページViewの生成/ready待ちを含む更新で背景色をテーマに合わせる。Default Shellはmedia queryで初期テーマを設定し、受付モデルのdarkを同期的に適用してからreadyを通知する。前回の全域レイアウト、共有編集、公開契約、透明オーバーレイを維持。保存形式・設定項目・保存ファイルに変更なしとして本体0.28.1→0.28.2のパッチ更新。
+- 発行前レビューでWindowの背景更新を一般のchanged通知からテーマ関連の経路へ限定した。修正後の型検査・ビルド成功。ページController/Shell境界の単体14/14、設定ShellのソースGUI11群が成功（`settings-shell-1791756058234`）。テーマGUIはGPU有効/無効で各18切替、合計36切替を確認し、ネイティブWindow/Viewの色が一致、取得できた可視フレームに逆テーマ色なし（`shell-page-theme-1791756084359`、`shell-page-theme-1791756165995`）。フレーム購読が取得しない合成前の瞬間や実利用環境のちらつき解消を断定する検証ではない。
+- 計測試験の初回はView基底prototypeを観測してWebContentsViewの背景を取得できず失敗。試験を修正して成功し、失敗結果`shell-page-theme-1791755991155`を保持。配布EXEの初回home-light画像はmainの最新モデルだけを待ち、Shellへの通知/描画反映前に撮影していた。試験にdata-themeとcomputed背景色の確認を加え、同じEXEで再実行し、Light画像を確認した。製品の追加修正なし。レビュー・試験ログ・入力hashは`.artifacts/shell-theme-0.28.2/`。
+- 通常publish終了コード0。package/feed/隔離起動版0.28.2、EXE **144092668 bytes / SHA256 `acaf204d7f6676b6610eedcd044a41814a5935c63ff218e78b6292bc79a8ee64`**。feed SHA256 `97e76dce2544b32b896523f389161ad05c1a93455ae4c3f0a56129b2d6d7eddb`。size/hashと固定コピー・実行コピーが一致。固定EXEのホーム8群（`shell-home-1791756449227`）、ログ10群（`shell-page-1791756356779`）、設定10群（`settings-shell-1791756403891`）が成功。テーマ表示、編集/保存、部分差し替え、故障/ready timeout/safe-shellを確認した。
+- 制限環境のfrozen installはstack overflow、publishは.NET段階終了1。同一コマンドの通常ユーザー環境で再実行し成功。固定依存359件再利用/download0、lockfile/toolchain・待機方針を変更していない。本体のみ発行し、未変更Applet・全体ZIPを再発行していない。
+- 終了・成功・絶対パス境界・再解析ポイント・使用中プロセスを確認後、今回の古い成功profile1件を整理した（`cleanup-result.json`）。テーマ試験の直近3回・調査baseline・失敗・固定EXE/参照資料を保持。既存の古いprofileで参照関係や実行方式が未確定なものは保持した。関連テスト残存プロセス0。未実施: 実モニターのDPI/物理IME・実利用設定・無関係な全回帰/兄弟Applet/Release検証。commit・push・公開・実利用先deployは行っていない。
+
+## 2026-10-12: Shellページを本文領域全体へ配置（0.28.1）
+
+- ホーム・全体ログ・設定のホスト枠から最大幅1170px・中央寄せ・外側余白を解除。ShellPageSlotの固定36px控除/最低140pxを除き、flexで割り当てられた矩形を祖先境界でクリップして報告する。祖先/SlotのResizeObserverとscroll/resizeを集約し、同じ寸法の通知を抑える。Applet詳細は見出し・タブを残し、設定/ログ本文の残り領域だけを使用する。
+- Default Shellのホームは24px（幅600px以下16px）の内部余白と可変列カード、ログは残り高さを使う表・固定列見出し・一覧内スクロール、設定は左右領域の全高表示に変更。高さ340px以下ではログ/設定をページ内スクロールへ切り替える。設定モデル・操作・共有draft・保存形式・ファイル構成を変えない表示修正として0.28.0→0.28.1のパッチ更新。README・開発入口・Shell仕様/レイアウト設計も更新した。
+- 発行前に製品差分・関連CSSの適用先・Viewの寿命/座標/zoom・共有編集・公開Shellとの共通経路をレビュー。実装中に低高さ用CSSの宣言順を整え、追加の製品修正を要する指摘なし。試験修正も再確認した。レビュー本文は `.artifacts/shell-layout-0.28.1/review.md`。
+- 成功: 型チェック、ビルド、ページController/Shell境界の関連単体 **14/14**。ソースGUI **7本**（ホーム8群・ログ10群・設定11群・検索7群・設定スクロール・navigation17群・未保存通知9群）。通常/狭幅/低い高さ・1500/900/700幅・125% zoom・ライト/ダーク・通知出現/消失・長いログの最終行と列見出し・Slotと利用可能領域/実View boundsの一致・詳細内の設定/ログ・Web管理・検索項目移動・JSON・draft・Shell部分差し替え/故障復旧を確認した。
+- 検索GUIの初回/2回目は、外部APIのページ選択後にShellの描画更新を待たず入力し、古いqueryが残って失敗。テーマ部品の出現と新queryの受付を待つよう試験だけ修正して成功した。未保存通知GUIの初回はホスト保存後の更新をShellが受け取る前に次の入力へ進み、通知生成待ちで失敗。公開onChangedで保存済み状態の受信/描画を確認するよう試験だけ修正し、ソース9群・固定EXE8群に成功。製品の競合検査や編集キューは変更していない。失敗ログは保持した。
+- 通常publish終了コード0。単一EXE **144095607 bytes / SHA256 `b1ba9ca17cea3bf9c66cb53698513ad89ecca069f63859dc9fdb68f265c1e823`**。package/feed/起動版0.28.1、feedのsize/hashと固定コピーが一致。update.json SHA256は `cc9f21f2517577f6cf50c5463ca5569facfc64eee8f0f81284e8a2c6f391ae0f`。固定配布物・入力hash・発行/試験ログは `.artifacts/shell-layout-0.28.1/`。本体のみ発行し、未変更Applet・全体ZIPは再発行していない。
+- 固定EXEのGUI **5本すべて成功**: ホーム8群（`shell-home-1791755066051`）、ログ10群（`shell-page-1791755106171`）、設定10群（`settings-shell-1791755140568`）、検索7群（`settings-search-1791755174887`）、未保存通知8群（`settings-notice-1791755206004`）。隔離実行コピーも上記hashに一致。固定EXEでは初期寸法とログの最大化、通知による再配置を確認し、細かいサイズ/zoom/強制renderer crashの組合せはソースGUIで確認した。
+- 制限環境ではElectron起動失敗、版更新後のfrozen installのstack overflow、publishの.NET段階終了1を記録。同じコマンドを通常ユーザー環境で実行して成功した。Node24.21.0/pnpm12.10.1/Electron44.6.0を維持し、依存359件再利用/download0、lockfile/toolchain/待機方針を変更していない。
+- 整理: 成功・終了済み、同種/同方式の直近3回より古い未参照profile3件を削除（`cleanup-result.json`）。絶対パス境界と再解析ポイント、結果JSON、既存検証資料からの参照を確認。CIMによる使用中プロセスの事前照会は権限拒否となったが、PowerShellの後続処理が継続して削除されたため、事前のプロセス確認は成立していない。直後に通常ユーザー権限で削除対象と今回の固定EXE試験の残存プロセス0を確認した（`remaining-processes.json`）。失敗/不明・参照済み資料・固定出力・直近成功分は保持した。
+- 未実施: 物理IME・実モニターのDPI切替・実利用設定/外部サービス・無関係な全標準回帰/全兄弟Applet/全Release検証。commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-12: Applet専用ジェスチャー互換処理の撤去（0.28.0）
 
 - main `17cf128296e8ae11cc8868be202e7107a724f39a`、作業ツリーcleanから開始。旧WebBrowserTools設定を読む`migrateGestures`、固定のApplet ID/8コマンド、通知時に設定を上書きする`appletInputSettings`を削除。設定読込・初期割り当て・共通操作APIは、未保存の本体ジェスチャー設定に共通初期値を使う。起動・設定通知・Shell取得は各Appletの保存済み設定をそのまま渡す。宣言による初回割り当て、保存済み本体設定、明示的な空配列は維持する。

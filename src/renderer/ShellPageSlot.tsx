@@ -49,24 +49,40 @@ export function ShellPageSlot({
     const element = slot.current!;
     const main = element.closest('main')!;
     let live = true;
+    let frame = 0;
+    let lastReport = '';
     const update = () => {
+      frame = 0;
       if (request.current.kind === 'settings') request.current.hostWidth = window.innerWidth;
-      const m = main.getBoundingClientRect();
-      const top = element.getBoundingClientRect().top;
-      element.style.height = `${Math.max(140, m.bottom - top - 36)}px`;
       const r = element.getBoundingClientRect();
-      const y = Math.max(r.y, m.y),
-        bottom = Math.min(r.bottom, m.bottom);
-      void window.dock
-        .shellPage(
-          request.current,
-          bottom > y ? { x: r.x, y, width: Math.max(1, r.width), height: bottom - y } : null,
-        )
-        .catch((e) => {
-          if (live) setError(String(e));
-        });
+      let x = Math.max(0, r.left),
+        y = Math.max(0, r.top),
+        right = Math.min(window.innerWidth, r.right),
+        bottom = Math.min(window.innerHeight, r.bottom);
+      // Native child views must also respect the bounds of their embedded panel.
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        const p = parent.getBoundingClientRect();
+        x = Math.max(x, p.left);
+        y = Math.max(y, p.top);
+        right = Math.min(right, p.right);
+        bottom = Math.min(bottom, p.bottom);
+        if (parent === main) break;
+      }
+      const bounds =
+        element.getClientRects().length && right > x && bottom > y
+          ? { x, y, width: right - x, height: bottom - y }
+          : null;
+      const report = JSON.stringify([request.current, bounds]);
+      if (report === lastReport) return;
+      lastReport = report;
+      void window.dock.shellPage(request.current, bounds).catch((e) => {
+        if (live) setError(String(e));
+      });
     };
-    refresh.current = update;
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    refresh.current = schedule;
     const unsubscribe = window.dock.onShellPageFocusHost((id, edge) => {
       if (id !== request.current.id) return;
       const elements = [
@@ -83,18 +99,22 @@ export function ShellPageSlot({
       (edge === 'before' ? before.at(-1) : after[0])?.focus({ preventScroll: true });
     });
     update();
-    const observer = new ResizeObserver(update);
-    observer.observe(main);
-    if (element.parentElement) observer.observe(element.parentElement);
-    window.addEventListener('resize', update);
-    main.addEventListener('scroll', update);
+    const observer = new ResizeObserver(schedule);
+    for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement) {
+      observer.observe(parent);
+      if (parent === main) break;
+    }
+    window.addEventListener('resize', schedule);
+    // Capture scrolls in embedded panels as well as the main host area.
+    main.addEventListener('scroll', schedule, true);
     return () => {
       live = false;
       refresh.current = () => {};
+      cancelAnimationFrame(frame);
       observer.disconnect();
       unsubscribe();
-      window.removeEventListener('resize', update);
-      main.removeEventListener('scroll', update);
+      window.removeEventListener('resize', schedule);
+      main.removeEventListener('scroll', schedule, true);
       void window.dock.closeShellPage(request.current.id);
     };
   }, []);

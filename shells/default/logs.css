@@ -59,7 +59,10 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--panel);
-  overflow: hidden;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-gutter: stable;
 }
 .log-head,
 .log-row {
@@ -69,6 +72,9 @@
   padding: 14px 18px;
 }
 .log-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   font-size: 9px;
   letter-spacing: 1px;
   background: var(--side);
@@ -121,7 +127,21 @@ body,
   height: 100%;
 }
 .logs-page {
-  padding: 0 2px 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding: 24px;
+  overflow: hidden;
+}
+.logs-page > :not(.log-table) {
+  flex-shrink: 0;
+}
+.logs-page[data-embedded='true'] {
+  padding: 0;
+}
+body {
+  overflow: hidden;
 }
 button,
 input,
@@ -171,6 +191,7 @@ h3 {
 }
 .log-toolbar input {
   min-width: 150px;
+  max-width: 100%;
 }
 .log-toolbar select {
   max-width: 100%;
@@ -199,4 +220,27 @@ h3 {
 [role='alert'] {
   color: #e37c8f;
   overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .logs-page:not([data-embedded='true']) {
+    padding: 16px;
+  }
+  .page-heading {
+    flex-wrap: wrap;
+  }
+  .log-head,
+  .log-row {
+    grid-template-columns: 65px 54px minmax(0, 1fr);
+    padding: 12px;
+    gap: 8px;
+  }
+}
+@media (max-height: 340px) {
+  .logs-page {
+    overflow: auto;
+  }
+  .log-table {
+    flex: none;
+    overflow: visible;
+  }
 }

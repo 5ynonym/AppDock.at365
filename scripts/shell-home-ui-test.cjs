@@ -194,6 +194,17 @@ const invoke = (p, actionId) =>
       await p.screenshot({ path: path.join(profile, 'home-dark.png') });
     });
     await check(
+      'home fills the host area across notification, resize and zoom changes',
+      async () => {
+        await require('./shell-page-layout-helper.cjs').exerciseLayout(
+          dock,
+          await home(),
+          app,
+          'home',
+        );
+      },
+    );
+    await check(
       'shared draft order, notice, card navigation and pin execution preserve input',
       async () => {
         await navigate('settings');
@@ -402,6 +413,11 @@ const invoke = (p, actionId) =>
       });
       const p = await home('fixture.home');
       await until(async () => (await model(p)).dark === false, 'light');
+      await p.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+      assert.equal(
+        await p.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+        'rgb(250, 251, 252)',
+      );
       await p.screenshot({ path: path.join(profile, 'home-light.png') });
       if (app) {
         await app.evaluate(({ BrowserWindow }) => {

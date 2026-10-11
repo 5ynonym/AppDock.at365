@@ -148,10 +148,30 @@ const noticeVisible = async (expected) => {
   return p;
 };
 const save = async () => {
-  await button('変更をすべて保存').click();
-  await ((await snapshot()).navigation.route === 'settings' ? await settingsPage() : page)
-    .getByText('すべて保存されています', { exact: true })
-    .waitFor();
+  const shell = await settingsPage();
+  // Saving from the host toolbar must reach the embedded Shell before its next input.
+  await shell.evaluate(() => {
+    window.__noticeSaveReceived = false;
+    window.__noticeSaveStop = window.appdockPage.onChanged((m) => {
+      if (m.kind === 'settings' && !m.content.editing.dirty && !m.content.editing.pending)
+        requestAnimationFrame(() => {
+          window.__noticeSaveReceived = true;
+        });
+    });
+  });
+  try {
+    await button('変更をすべて保存').click();
+    await ((await snapshot()).navigation.route === 'settings' ? await settingsPage() : page)
+      .getByText('すべて保存されています', { exact: true })
+      .waitFor();
+    await shell.waitForFunction(() => window.__noticeSaveReceived);
+  } finally {
+    await shell.evaluate(() => {
+      window.__noticeSaveStop?.();
+      delete window.__noticeSaveStop;
+      delete window.__noticeSaveReceived;
+    });
+  }
 };
 async function close() {
   if (!portable) await app.close();

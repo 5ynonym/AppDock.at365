@@ -210,6 +210,7 @@ export class ShellPageHost {
         shellView(p.shell, `page.${this.current.kind}`)!,
         this.options.preload,
       );
+      view.setBackgroundColor(this.current.snapshot().dark ? '#101116' : '#fafbfc');
       const s: Surface = {
         view,
         url,
@@ -292,8 +293,10 @@ export class ShellPageHost {
       this.closeSurface();
     if (!this.surface) this.present();
     const s = this.surface;
-    if (!s?.ready) return;
+    if (!s) return;
     const model = this.current.snapshot();
+    s.view.setBackgroundColor(model.dark ? '#101116' : '#fafbfc');
+    if (!s.ready) return;
     if (model.revision !== s.revision) {
       s.revision = model.revision;
       s.view.webContents.send('shell-page:changed', model);

@@ -136,6 +136,8 @@ async function until(fn, label) {
     await host.evaluate(() => window.dock.navigate('settings'));
     let shell = await settingsPage();
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
+    await require('./shell-page-layout-helper.cjs').exerciseLayout(host, shell, app, 'settings');
+    checks.push('settings fill the host area across notification, resize and zoom changes');
     const model = await shell.evaluate(() => window.appdockPage.connect().then((c) => c.snapshot));
     assert.deepEqual(Object.keys(model.content.values), ['host']);
     assert.deepEqual(Object.keys(model.content.values.host), ['theme']);
@@ -245,6 +247,7 @@ async function until(fn, label) {
       .click();
     await host.getByRole('tab', { name: '設定', exact: true }).click();
     shell = await settingsPage();
+    await require('./shell-page-layout-helper.cjs').assertLayout(host, shell, app, true);
     await shell.getByLabel('Fixture text', { exact: true }).fill('shared from detail');
     await shell.getByLabel('Fixture amount', { exact: true }).fill('-');
     await host.getByRole('button', { name: '変更をすべて保存', exact: true }).click();

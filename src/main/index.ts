@@ -643,10 +643,15 @@ function snapshot(): HostSnapshot {
     avatarUrl: avatarFile() ? `appdock://host/avatar.png?v=${avatarSignature()}` : null,
   };
 }
+function refreshWindowTheme() {
+  if (window && !window.isDestroyed())
+    window.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#101116' : '#fafbfc');
+}
 function applySettings() {
   webApplets?.reconcile();
   trayClicks?.cancel();
   nativeTheme.themeSource = settings.value.host.theme;
+  refreshWindowTheme();
   refreshPageDisplays();
   trayMenu();
   changed();
@@ -1434,7 +1439,10 @@ async function initialize() {
       /* A sync write can temporarily lock an image. Retry on the next poll. */
     }
   }, 2000);
-  nativeTheme.on('updated', changed);
+  nativeTheme.on('updated', () => {
+    refreshWindowTheme();
+    changed();
+  });
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
@@ -1511,7 +1519,7 @@ async function initialize() {
     minWidth: Math.min(windowMinimum.width, savedWindow?.bounds.width ?? windowMinimum.width),
     minHeight: Math.min(windowMinimum.height, savedWindow?.bounds.height ?? windowMinimum.height),
     title: 'AppDock.at365',
-    backgroundColor: '#101116',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#101116' : '#fafbfc',
     show: false,
     frame: false,
     icon: windowIcon,

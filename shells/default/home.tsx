@@ -4,6 +4,9 @@ import type { HomePageModel, ShellPageModel, ShellPageApi } from '../../src/shar
 import { Icon } from '../../src/shared/ui-icons';
 import { shortcutFromEvent } from '../../src/shared/commands';
 import './home.css';
+document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
+  ? 'dark'
+  : 'light';
 declare global {
   interface Window {
     appdockPage: ShellPageApi;
@@ -29,6 +32,7 @@ function App() {
       if (live && next.kind === 'home') {
         if (latest.current?.id === next.id && latest.current.revision > next.revision) return;
         latest.current = next;
+        document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
         setModel(next);
       }
     };
@@ -85,9 +89,6 @@ function App() {
   useEffect(() => {
     if (session && model) void api.ready(session).catch((e) => setError(String(e)));
   }, [session, !!model]);
-  useEffect(() => {
-    document.documentElement.dataset.theme = model?.dark ? 'dark' : 'light';
-  }, [model?.dark]);
 
   const act = (actionId: string) => {
     if (!model) return;

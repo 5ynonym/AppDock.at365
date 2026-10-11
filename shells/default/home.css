@@ -40,7 +40,7 @@
 }
 .stats {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.25fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
   gap: 12px;
   margin: 18px 0 28px;
 }
@@ -119,10 +119,12 @@
 }
 .extension-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 14px;
 }
 .extension-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: block;
   text-align: left;
   padding: 19px;
@@ -234,7 +236,13 @@ body,
   height: 100%;
 }
 .home-page {
-  padding: 0 2px 12px;
+  height: 100%;
+  overflow: auto;
+  padding: 24px;
+  scrollbar-gutter: stable;
+}
+body {
+  overflow: hidden;
 }
 button {
   font: inherit;
@@ -323,9 +331,8 @@ h1 {
     gap: 8px;
   }
 }
-@media (max-width: 670px) {
-  .stats,
-  .extension-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 600px) {
+  .home-page {
+    padding: 16px;
   }
 }
