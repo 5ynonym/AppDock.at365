@@ -14,6 +14,8 @@ MCPとAppletが共有する操作サービス・Node/.NET SDK・独立した許�
 
 ## 文書の入口
 
+- [Shell Hostの仕様と実装計画](docs/shell-foundation.md): 未実装の設計案。Default Shellは本体同梱の標準描画、Shell Appletは差替え拡張、Shell Hostは本体側の実行基盤を指す。リボンをDefault Shellへ移して本体の重複描画を撤去する。共通の公開API・実行経路、同時ビルド/単一EXE同梱、Default Shellへの復旧、MCP利用、将来の複数Shellに残す境界。
+
 - [実装・コミット・リリースの共通手順](docs/development-workflow.md): 実装時のテスト選択、コミット前の必要回帰、リリース前のコミット漏れ/プッシュ確認、検証証跡の再利用条件。本体と全Appletに適用します。以下の試験一覧は、この手順に従って必要な段階で実行します。
 
 - [設定同期・登録素材・PC専用保存](docs/settings-sync.md): 0.26.14の保存境界と0.26.15のat365/profile保存先、ファイル名ID、受信監視、バックアップ、隔離GUI検証。
