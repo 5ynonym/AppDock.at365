@@ -125,7 +125,7 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().includes('settingsNotice'),
+            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );

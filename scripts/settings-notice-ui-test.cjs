@@ -29,6 +29,28 @@ for (const id of ['a', 'b']) {
   );
   fs.writeFileSync(path.join(folder, 'index.js'), 'module.exports = {};');
 }
+const noticeProvider = path.join(profile, 'extensions', 'fixture.notice');
+fs.cpSync(path.join(root, 'out/shells/default'), noticeProvider, { recursive: true });
+fs.writeFileSync(
+  path.join(noticeProvider, 'extension.json'),
+  JSON.stringify({
+    apiVersion: 1,
+    id: 'fixture.notice',
+    name: 'Notification Shell Fixture',
+    version: '1.0.0',
+    minimumHostVersion: '0.29.0',
+    runtime: 'node',
+    entry: 'worker.cjs',
+    capabilities: ['shell'],
+    shell: { apiVersion: 1, views: { 'notification.banner': 'notifications.html' } },
+    commands: [{ id: 'fixture.notice.crash', title: 'Crash notification fixture' }],
+  }),
+);
+fs.writeFileSync(
+  path.join(noticeProvider, 'worker.cjs'),
+  "exports.activate=async c=>c.commands.register('fixture.notice.crash','Crash',()=>process.exit(1));",
+);
+settings.extensions['fixture.notice'] = { enabled: true, settings: {} };
 const settingsFile = path.join(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const checks = [];
@@ -96,7 +118,8 @@ async function launch(restore = false) {
           .contexts()
           .flatMap((c) => c.pages())
           .find(
-            (p) => p.url().startsWith('appdock://host/') && !p.url().includes('settingsNotice'),
+            (p) =>
+              p.url().startsWith('appdock://host/') && !p.url().endsWith('/notifications.html'),
           ),
       'host renderer',
     );
@@ -136,13 +159,14 @@ const select = (name) =>
     .click();
 const snapshot = () => page.evaluate(() => window.dock.snapshot());
 const notice = () =>
-  until(() => pages().find((p) => p.url().includes('settingsNotice=1')), 'notice renderer');
+  until(() => pages().find((p) => p.url().endsWith('/notifications.html')), 'notice renderer');
 const noticeVisible = async (expected) => {
   const p = await notice();
   await until(
     async () =>
-      (await p.getByRole('region', { name: '未保存の変更', exact: true }).count()) ===
-      (expected ? 1 : 0),
+      (await p
+        .getByRole('region', { name: /未保存の変更があります|変更を保存できません/ })
+        .count()) === (expected ? 1 : 0),
     `notice visible ${expected}`,
   );
   return p;
@@ -295,7 +319,7 @@ async function close() {
           focused: w.webContents.isFocused(),
         };
       });
-      assert.ok(info.top.endsWith('?settingsNotice=1'));
+      assert.ok(info.top.endsWith('/notifications.html'));
       assert.equal(info.bounds.y, 48);
       // Capture the whole window and each native surface; parent-only screenshots omit child views.
       const capture = await app.evaluate(async ({ BrowserWindow }) => {
@@ -447,13 +471,67 @@ async function close() {
     await noticeVisible(false);
     assert.equal(errors.length, 0, errors.join('\n'));
     checks.push('light theme / resize / save and hide / no renderer errors');
+    await page.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      s.settings.value.host.shellProvider = 'fixture.notice';
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await ribbon('extensions').click();
+    await (await settingsPage()).getByLabel('検証値', { exact: true }).fill('partial provider');
+    await ribbon('home').click();
+    const externalNotice = await until(
+      () => pages().find((p) => p.url().includes('/fixture.notice/notifications.html')),
+      'external notification provider',
+    );
+    await externalNotice.getByRole('button', { name: 'すべて保存', exact: true }).waitFor();
+    assert.equal(
+      (await externalNotice.evaluate(() => window.appdockNotifications.connect())).providerAppletId,
+      'fixture.notice',
+    );
+    const episode = (await externalNotice.evaluate(() => window.appdockNotifications.connect()))
+      .snapshot.items[0].id;
+    await page
+      .evaluate(() => window.dock.executeCommand('fixture.notice.crash'))
+      .catch((error) => assert.match(error.message, /接続が終了/));
+    await until(
+      async () =>
+        (await snapshot()).extensions.find((e) => e.id === 'fixture.notice').state === 'error',
+      'notification worker stopped',
+    );
+    const fallbackNotice = await until(
+      () => pages().find((p) => p.url().endsWith('/shells/default/notifications.html')),
+      'default notification fallback',
+    );
+    await fallbackNotice.getByRole('button', { name: 'すべて保存', exact: true }).waitFor();
+    assert.equal(
+      (await fallbackNotice.evaluate(() => window.appdockNotifications.connect())).snapshot.items[0]
+        .id,
+      episode,
+    );
+    await fallbackNotice.getByRole('button', { name: 'すべて保存', exact: true }).click();
+    await until(
+      async () => (await fallbackNotice.getByRole('region').count()) === 0,
+      'fallback save',
+    );
+    assert.equal(
+      (await snapshot()).settings.value.extensions['test.a'].settings.value,
+      'partial provider',
+    );
+    await page.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      s.settings.value.host.shellProvider = 'appdock.default-shell';
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    checks.push(
+      'real notification-only Shell Applet / worker crash fallback / same episode and shared save',
+    );
     await close();
     await launch(true);
     await ribbon('extensions').click();
     assert.equal(await tab('設定').getAttribute('aria-selected'), 'true');
     assert.equal(
       await (await settingsPage()).getByLabel('検証値', { exact: true }).inputValue(),
-      'light',
+      'partial provider',
     );
     checks.push('published settings and retained tab survive restart');
     const result = {

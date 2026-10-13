@@ -80,11 +80,15 @@ const localUi = async (suffix) =>
         .find((page) => page.url().endsWith(suffix)),
     `Missing UI ${suffix}`,
   );
+const settingsUi = () => require('./settings-shell-helper.cjs').settingsPage(dock);
 const button = (title) =>
-  (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title)
-    ? rail
-    : dock
-  ).getByRole('button', { name: title, exact: true });
+  require('./settings-shell-helper.cjs')
+    .deferred(async () => {
+      if (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title)) return rail;
+      const snapshot = await dock.evaluate(() => window.dock.snapshot());
+      return snapshot.navigation.route === 'settings' ? settingsUi() : dock;
+    })
+    .getByRole('button', { name: title, exact: true });
 const setDisplay = (extensionId, pageId, display) =>
   dock.evaluate(
     async ({ extensionId, pageId, display }) => {
@@ -241,8 +245,9 @@ async function launch() {
             '.applet-page-viewport',
             '.settings-sidebar-slot',
           ].map((selector) => {
-            const element = document.querySelector(selector),
-              style = getComputedStyle(element);
+            const element = document.querySelector(selector);
+            if (!element) return { selector, missing: true };
+            const style = getComputedStyle(element);
             return {
               selector,
               rect: element.getBoundingClientRect().toJSON(),
@@ -277,20 +282,42 @@ async function launch() {
       account,
     );
     await button('設定').click();
+    await (
+      await settingsUi()
+    )
+      .locator('.settings-categories')
+      .getByRole('button', { name: 'プロフィール', exact: true })
+      .click();
+    await (
+      await settingsUi()
+    )
+      .getByRole('heading', { name: 'プロフィール', level: 1, exact: true })
+      .waitFor();
     await button('JSON').click();
-    const noticeDraft = JSON.parse(await dock.getByLabel('設定JSON', { exact: true }).inputValue());
+    const noticeDraft = await until(async () => {
+      const value = JSON.parse(
+        await (await settingsUi()).getByLabel('設定JSON', { exact: true }).inputValue(),
+      );
+      return value.profile ? value : null;
+    }, 'Profile partial JSON rendered');
     noticeDraft.profile.name = 'Gmail overlay fixture';
-    await dock.getByLabel('設定JSON', { exact: true }).fill(JSON.stringify(noticeDraft));
+    await (
+      await settingsUi()
+    )
+      .getByLabel('設定JSON', { exact: true })
+      .fill(JSON.stringify(noticeDraft));
     await button('Gmail').click();
     const noticeUi = await until(
       () =>
         app
           .context()
           .pages()
-          .find((page) => page.url().includes('settingsNotice=1')),
+          .find((page) => page.url().endsWith('/notifications.html')),
       'Gmail unsaved notice renderer',
     );
-    await noticeUi.getByRole('region', { name: '未保存の変更', exact: true }).waitFor();
+    await noticeUi
+      .getByRole('region', { name: /未保存の変更があります|変更を保存できません/ })
+      .waitFor();
     assert.equal(
       await gmailUi.getByPlaceholder('送信元・件名・アカウント名で検索').inputValue(),
       '保持',
@@ -303,13 +330,16 @@ async function launch() {
         );
         return window.contentView.children.at(-1).webContents.getURL();
       }),
-      'appdock://host/index.html?settingsNotice=1',
+      require('node:url').pathToFileURL(path.join(root, 'out/shells/default/notifications.html'))
+        .href,
     );
     await noticeUi.screenshot({ path: path.join(profile, 'gmail-settings-notice.png') });
     await noticeUi.getByRole('button', { name: 'すべて保存', exact: true }).click();
     await until(
       async () =>
-        (await noticeUi.getByRole('region', { name: '未保存の変更', exact: true }).count()) === 0,
+        (await noticeUi
+          .getByRole('region', { name: /未保存の変更があります|変更を保存できません/ })
+          .count()) === 0,
       'Gmail notice save',
     );
     assert.equal(
@@ -424,13 +454,15 @@ async function launch() {
       'Applet page stop hides Gmail ribbon without activating it; resume restores a usable ribbon, account/Cookie and saved preferences',
     );
     await button('設定').click();
-    await dock
+    await (
+      await settingsUi()
+    )
       .locator('.settings-categories')
       .getByRole('button', { name: 'リボン', exact: true })
       .click();
-    await dock.getByLabel('Gmailをリボンに表示').uncheck();
+    await (await settingsUi()).getByLabel('Gmailをリボンに表示').uncheck();
     await button('Gmailを上へ').click();
-    await dock.getByLabel('設定をリボンに表示').uncheck();
+    await (await settingsUi()).getByLabel('設定をリボンに表示').uncheck();
     await button('変更をすべて保存').click();
     await until(
       async () => (await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
@@ -439,8 +471,12 @@ async function launch() {
     assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
     await button('ホーム').click();
     await rail.getByLabel('リボン', { exact: true }).click({ button: 'right' });
-    await dock.getByRole('heading', { name: 'リボン', exact: true }).waitFor();
-    await dock.screenshot({ path: path.join(profile, 'ribbon-settings.png') });
+    await (
+      await settingsUi()
+    )
+      .getByRole('heading', { name: 'リボン', level: 1, exact: true })
+      .waitFor();
+    await (await settingsUi()).screenshot({ path: path.join(profile, 'ribbon-settings.png') });
     checks.push(
       'Ribbon visibility/order editing / hidden settings recovery by right click / minimized monitoring',
     );

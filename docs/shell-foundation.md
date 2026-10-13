@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ本文はShellが描画する。未移行の設定等は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
+本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ、設定本文、通知バナーはShellが描画する。未移行の本文は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界
 
@@ -23,6 +23,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | page.settings | SettingsPageSessionとSettingsEditingSession | [設定基盤](settings-foundation.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
+| notification.banner | NotificationServiceとNotificationBannerController | [通知基盤](notifications.md) |
 
 選択はhost.shellProviderの1件、表示コンテキストはprimary、本体Windowは1つ。各領域で選択Appletの宣言を解決し、未提供領域はDefault Shellを使う。複数の提供元を領域ごとに同時選択する設定はない。通常Appletのcommands/settings/pagesとの併用は可能で、Shell未選択でも有効Appletの通常機能は動作する。
 

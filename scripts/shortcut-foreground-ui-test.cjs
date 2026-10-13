@@ -114,7 +114,7 @@ const checks = [];
           .find(
             (p) =>
               p.url().startsWith('appdock://host/index.html') &&
-              !p.url().includes('settingsNotice'),
+              !p.url().endsWith('/notifications.html'),
           ),
       'host page',
     );

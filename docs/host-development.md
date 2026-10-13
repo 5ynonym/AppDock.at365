@@ -179,8 +179,8 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 ## Applet設定パネルの共用
 
 - ページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/操作の許可/Codex連携/プロフィール/バージョン情報・更新です。
-- 他ページで未保存の場合、`core/settings-notice.ts`が小さな透明背景のWebContentsViewを本体Window上部へ重ねます。Viewの追加後とリサイズ時に通知を最前面へ戻し、背景Webの領域/入力/寿命は変えません。通知は時間で消えず、設定/Appletへ戻る・保存成功・破棄確定で非表示になります。表示でfocusしません。通知と専用preloadは通知状態/操作/高さだけを公開し、IPCはそのViewのmainFrameとURLを照合します。通常host IPCを通知やリモートページへ許可しません。
-- draft/JSON/画像/revisionはmainの`SettingsEditingSession`が所有し、host rendererの`useSettingsEditor`は購読と直列入力のアダプターです。通知の保存/破棄はhostへ戻し、pendingとrefで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
+- 他ページで未保存の場合、SettingsNotificationSourceが[通知基盤](notifications.md)へ条件通知を発行し、Default Shell/Shell Appletがバナーを描画します。NotificationBannerHostの小さなWebContentsViewをWebより上・モーダルより下へ配置し、背景の領域/入力/寿命を維持します。設定/Appletへ戻るとバナーだけを隠し、保存成功・破棄確定で通知を解消します。表示でfocusを奪わず、通常host IPCは渡しません。
+- draft/JSON/画像/revisionはmainの`SettingsEditingSession`が所有し、host rendererの`useSettingsEditor`は購読と直列入力のアダプターです。通知の保存/破棄は本体の編集サービスへ委譲し、入力反映待ち・最新revision・通知の実行ロックとpendingで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
 - `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
 
 - `useSettingsEditor.ts`は`App`で一度だけ生成する編集アダプターです。受理済み編集はmainに保持し、画面の寿命と分離します。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。

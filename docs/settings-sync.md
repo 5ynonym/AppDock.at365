@@ -10,7 +10,7 @@
 
 PC専用データはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
 
-EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。WebApplet名簿は`data/web-applets/accounts.json`の`schemaVersion/accounts`だけを共有する。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backupはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
+EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。WebApplet名簿は`data/web-applets/accounts.json`の`schemaVersion/accounts`だけを共有する。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backup、通知履歴notifications/history.jsonはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
 
 旧.appdockからのPC専用データの移行・削除は実装しないというユーザー指定。旧chromium/web-accounts/storage/secrets/web-applets/sessionsが残る場合は警告する。同期を始める前に完全終了して旧保存データを整理する。既存settings.jsonの読み取り互換性と、従来からある名簿の旧フィールド読み取りとは区別する。
 

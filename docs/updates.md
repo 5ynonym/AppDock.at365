@@ -76,3 +76,5 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 ```
 
 いずれも本体とhelperを先に発行してから実行する。実配布先GitHub/HTTP(S)/UNCの検証とは区別する。
+
+発行時のパッカーは、入力/出力の祖先にあるWindowsの登録済みボリュームマウントポイントを認識します。入力/出力自身のリンク、通常の祖先ジャンクション、Applet配布物内のリンクは引き続き拒否します。ボリュームの識別は[GetVolumeNameForVolumeMountPointW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumenameforvolumemountpointw)を使います。適用/復旧/展開時の従来のリンク検査は変更しません。回帰は tests/update-pack-mount.test.cjs と tests/portable-updates.test.cjs で確認します。

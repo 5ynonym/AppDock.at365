@@ -21,7 +21,6 @@ import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { AppletIndex } from './AppletIndex';
 import { orderApplets } from '../shared/applet-order';
 import { SettingsToolbar, SettingsMessages } from './SettingsActions';
-import { SettingsNotice } from './SettingsNotice';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from '../shared/settings-ui/VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
@@ -198,32 +197,21 @@ function App() {
   useEffect(() => {
     if (webAccountsRequest) editor.selectPage('web-accounts');
   }, [webAccountsRequest]);
-  const noticeError = editor.parseError || editor.saveError;
-  const lastEditorPage = useRef<Page>('settings');
-  if (page === 'settings' || page === 'extensions') lastEditorPage.current = page;
   useEffect(() => {
     void window.dock
-      .settingsNotice({
-        visible: editor.dirty && page !== 'extensions' && page !== 'settings',
-        busy: busy || editor.pending || editor.avatarLoading,
-        dark: snapshot?.dark ?? true,
-        message: noticeError.slice(0, 2000),
-      })
+      .settingsUiContext(busy || editor.pending || editor.avatarLoading)
       .catch((e) => setError(String(e)));
-  }, [editor.dirty, page, busy, editor.pending, editor.avatarLoading, snapshot?.dark, noticeError]);
-  const noticeAction = useRef<(action: 'save' | 'discard' | 'edit') => void>(() => {});
-  noticeAction.current = (kind) => {
-    if (busy || editor.pending || editor.avatarLoading) return;
-    if (kind === 'edit') setPage(lastEditorPage.current);
-    else if (kind === 'save') {
-      setError('');
-      void editor.save();
-    } else {
-      setError('');
-      void editor.discard();
-    }
-  };
-  useEffect(() => window.dock.onSettingsNoticeAction((kind) => noticeAction.current(kind)), []);
+  }, [busy, editor.pending, editor.avatarLoading]);
+  useEffect(
+    () =>
+      window.dock.onFlushSettingsInputs((id) => {
+        void editor
+          .flush()
+          .then(() => window.dock.settingsInputsFlushed(id))
+          .catch((e) => setError(String(e)));
+      }),
+    [editor.flush],
+  );
   const orderedApplets = orderApplets(
     snapshot?.extensions.filter((e) => e.sourceKind !== 'builtin') ?? [],
     editor.draft.appletOrder,
@@ -504,6 +492,13 @@ function App() {
           }}
         >
           <Icon name="search" size={15} /> コマンドを検索 {paletteKey && <kbd>{paletteKey}</kbd>}
+        </button>
+        <button
+          className="titlebar-notifications"
+          aria-label="通知へ移動"
+          onClick={() => void window.dock.focusNotifications()}
+        >
+          通知
         </button>
         <div className="window-controls">
           {(['minimize', 'maximize', 'close'] as const).map((a, i) => (
@@ -1118,6 +1113,4 @@ function ExtensionDetail({
   );
 }
 configureSettingsControls(window.dock);
-createRoot(document.getElementById('root')!).render(
-  new URLSearchParams(location.search).has('settingsNotice') ? <SettingsNotice /> : <App />,
-);
+createRoot(document.getElementById('root')!).render(<App />);

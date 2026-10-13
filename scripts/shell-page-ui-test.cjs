@@ -101,7 +101,8 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().includes('settingsNotice'),
+            p.url().startsWith('appdock://host/index.html') &&
+            !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );
@@ -258,8 +259,21 @@ async function check(name, action) {
     );
     await check('modal palette remains above page and restores focus', async () => {
       const p = await logs('fixture.logs');
-      await dock.evaluate(() =>
-        window.dock.settingsNotice({ visible: true, busy: false, dark: true, message: '' }),
+      await dock.evaluate(async () => {
+        const s = await window.dock.settingsEditing();
+        await window.dock.editSettings({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: crypto.randomUUID(),
+          action: {
+            type: 'draft',
+            value: { ...s.draft, profile: { ...s.draft.profile, name: 'Notification fixture' } },
+          },
+        });
+      });
+      await until(
+        () => browser.pages().some((p) => p.url().endsWith('/notifications.html')),
+        'notification renderer',
       );
       await p.getByLabel('ログを検索').focus();
       await p.keyboard.press('Control+p');
@@ -271,16 +285,22 @@ async function check(name, action) {
           ),
         );
         const pageIndex = urls.findIndex((u) => u.endsWith('/logs.html'));
-        const noticeIndex = urls.findIndex((u) => u.includes('settingsNotice'));
+        const noticeIndex = urls.findIndex((u) => u.endsWith('/notifications.html'));
         const overlayIndex = urls.findIndex((u) => u.endsWith('/overlay.html'));
         assert(pageIndex >= 0 && noticeIndex > pageIndex && overlayIndex > noticeIndex);
       }
       await require('./shell-overlay-helper.cjs').closingAction(palette.keyboard.press('Escape'));
       await until(async () => await p.evaluate(() => document.hasFocus()), 'page focus restored');
       assert.equal(await p.getByLabel('ログを検索').inputValue(), 'Fixture');
-      await dock.evaluate(() =>
-        window.dock.settingsNotice({ visible: false, busy: false, dark: true, message: '' }),
-      );
+      await dock.evaluate(async () => {
+        const s = await window.dock.settingsEditing();
+        await window.dock.editSettings({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: crypto.randomUUID(),
+          action: { type: 'reload' },
+        });
+      });
     });
     await check(
       'renderer failure falls back with filters; retry and intentional disable',

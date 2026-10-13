@@ -1,6 +1,6 @@
 # Shell Host / Default Shell
 
-リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。ホームとログ本文も[ページ用Shell](shell-pages.md)が描画する。タイトルバー・設定画面・共有設定draft・未移行の本文・AppletページのWebContentsは本体に残る。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
+リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。ホームとログ本文も[ページ用Shell](shell-pages.md)が描画する。設定本文と[通知バナー](notifications.md)もShellが描画する。タイトルバー・共有設定draft・未移行の本文・AppletページのWebContentsは本体に残る。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
 
 ## 構成と拡張
 

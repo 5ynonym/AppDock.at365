@@ -113,7 +113,7 @@ let output = '';
             .find(
               (p) =>
                 p.url().startsWith('appdock://host/index.html') &&
-                !p.url().includes('settingsNotice'),
+                !p.url().endsWith('/notifications.html'),
             )),
       );
       await page.waitForFunction(
@@ -216,7 +216,7 @@ let output = '';
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().includes('settingsNotice'),
+            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
         );
       await page
         ?.evaluate(() => {

@@ -15,6 +15,7 @@ export default defineConfig({
         logs: path.resolve('shells/default/logs.html'),
         home: path.resolve('shells/default/home.html'),
         settings: path.resolve('shells/default/settings.html'),
+        notifications: path.resolve('shells/default/notifications.html'),
       },
     },
   },

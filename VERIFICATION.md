@@ -1,5 +1,31 @@
 # 検証記録
 
+## 2026-10-13: 通知基盤のコミット前回帰と設計更新（0.29.0）
+
+- [通知基盤の設計](docs/notification-foundation.md)を実装済みのService内部操作管理、現行bridge、targets受付制限、予約枠、既読未実装に合わせて更新。次回の通知センターについてShell本文領域/Controller、activeと履歴のID統合、検索/ページ取得、明示既読、終了履歴削除、バナーと操作ロックの共有、保存不能/再起動、実装順と受入条件を具体化した。独自デスクトップ、Windows/旧API・Applet公開、即時保存は後続として区別する。
+- コミット対象をstageし、最終検証前後のtree・入力SHA256・stageと作業ファイルの一致を確認。本体標準 `dev.bat run test` **322/322**、skip/fail 0、型検査成功。標準回帰には更新pack/復旧と通知基盤を含む。証跡・完全ログ・実行コマンド/終了コード・ツール/OS・treeは `.artifacts/commit-validation-notification-0.29.0-20261013/`。
+- 追加ソースGUI: ホーム **8群**（`shell-home-1791875597842`）、Appletページ/Gmail **7群**（`applet-pages-1791876055817`）成功。Gmailは公開済みAppletの隔離コピーとオフラインHTTPS fixtureを使用し、通知からの保存、メールView/検索/入力保持、背景動作、停止/再開/再起動を確認。兄弟repoのcommit/tree/statusと実際のコピー入力hashを保存し、実メールアカウントは使っていない。
+- Gmail試験は移行前の本体設定DOM/全体JSONを前提として失敗。現行Settings Shell helper、カテゴリ部分JSONと描画反映待ちへ修正した。修正途中のJSONキー/描画順、プロフィール/リボンの見出し厳密一致の失敗をログとprofileに保持し、最終7群成功。製品コードの追加変更なし。試験修正後に標準回帰と型検査も再実行した。
+- 発行時のソース/試験入力hashとログを照合し、製品内容・該当試験に変更のない通知fixture8群、設定通知10群、Shellページ10群、navigation17群、固定単一EXE9群の結果を再利用した。今回の設計書とGmail試験の変更を区別し、変更したGUIは新規実行。再利用元/範囲/照合根拠はreused-gui.json。固定EXEでの実ユーザー破棄dialog、物理DPI/IME・スクリーンリーダー等の未確認事項は前項のまま維持する。
+- 最終publishのEXE/feed/helperのSHA256は前項と一致。製品の追加修正がないため版と発行物を維持。設計リンクと差分を検査し、発行を妨げるレビュー指摘なし。検証後は本記録だけを追加し、文書のみの差分と最終treeを証跡へ保存する。
+- 試験プロセス残存0。今回追加した方式別成功profileは直近3件以内のため削除対象0。失敗profile、固定EXE、再利用証跡/fixtureを保持。不要な今回専用編集補助ファイルを削除した。push・公開・実利用先deployは実施しない。
+
+## 2026-10-13: 通知基盤とDefault Shellバナー（0.29.0）
+
+- info/warning/error、timed/manual/condition、操作IDと要求ID、通知単位の二重実行ガード、所有者内dedupeKey、表示先状態、履歴をNotificationServiceへ集約。PC専用 `notifications/history.json` を追加したため本体0.28.2→0.29.0のマイナー更新。通常更新で期限を延長せず、明示的なrestartTimerで再設定できる。persistent履歴は安全な要約のみ、callback/操作ID/draftを保存せず、再起動時のactiveはinterruptedにする。
+- `notification.banner`、共通preload、NotificationBannerController/Host、Default Shellの通知entryを追加。通知だけ提供する追加Shellも同じ経路を使用する。複数カード、3件からの展開/スクロール、両テーマ、zoom、タイトルバーからの明示focus、Tab境界/Escape、旧Viewを保持したShell切替と故障復旧に対応。本文レイアウトを変えず、Webより上・モーダルより下に配置する。旧本体専用のSettingsNotice描画・View・preload・IPCを除去した。
+- 未保存警告は削除可能なSettingsNotificationSourceで既存SettingsEditingSessionに接続。入力の反映待ちと最新編集revisionで全体保存/確認付き破棄を行い、失敗/キャンセルで維持する。設定/Appletページではバナーだけ隠す。将来の即時保存化ではこの発行元だけを外せる。今回の対象は段階1。通知センターUI、独自デスクトップ通知、Windows通知の基盤統合、Applet/MCP新通知API、即時保存化は後続。既存Windows通知の経路・設定は維持。
+- 発行前レビューは `.artifacts/notification-0.29.0-20261013/review.md`。解消後の空モデル送信、終了時の操作関数回収、activeと終了履歴の保持上限、終了中の再発行停止、直前編集ページの記録、通知/検索ボタンのCSS識別を修正した。修正差分を再確認し、発行を妨げる指摘なし。
+- 成功: 型検査・本体/Default Shell/.NETのビルド。関連単体 **30/30**、追加された更新パッカー/既存更新・復旧 **27/27**、合計 **57/57**。ソースGUIは汎用通知fixture8群（`notification-banner-1791873177602`）、最終設定通知10群（`settings-notice-1791873609858`）、Shellページ/モーダル10群（`shell-page-1791873195325`）、navigation17群（`navigation-1791873430467`）。汎用通知fixtureは実Electronで表示先を差し替える試験であり、実Applet workerの停止検証は最終設定通知試験と固定EXE試験で行った。
+- 実装中の失敗: 解消後のモデルが残る不具合を修正。汎用GUIの期限検査はElectron evaluateの引数指定を修正し、fixtureのuserData/初期zoomも隔離した。navigationはfixture未生成で開始前に失敗したため生成後再実行。通知ボタンに検索専用クラスを使っていた識別衝突を修正してnavigation17群成功。実workerの意図的な異常終了ではRPC切断を期待結果として検査した。失敗profileとログは保持し、失敗を成功に読み替えていない。
+- 開発ドライブ移行後の依存: Windows用 `@typescript/typescript-win32-x64` が欠落して型検査不可。通常frozen installは変更なし判定。 `dev.bat install --frozen-lockfile --force` で359件を既存キャッシュから再配置（download0）し復旧。マウント変更との直接因果は未確認。lockfile/toolchain/待機例外は変更なし。版更新後のverifyDepsBeforeRun要求は通常frozen installで同期した。MXC起動失敗は設計調査時からあり、必要なコマンドを通常ユーザー環境で実行した。
+- 開発ドライブ移行に直接関係する発行失敗: EXE作成後、更新パッカーが祖先の `A:\30.PROJECT` のボリュームマウントを拒否。pack処理だけWindows登録済み祖先マウントを認識するよう修正。入力/出力自身のリンク、通常の祖先ジャンクション、配布物内のリンクは拒否し、apply/recover/extractの従来検査は維持した。現在のマウント配下で本体/Appletのpack成功とリンク拒否を実helperで検証。新試験初回はCP932 stderrのUTF-8解釈による文言不一致で失敗し、Shift-JISのデコードへ修正して27/27成功。更新helper変更を再レビューし、同じ0.29.0を再発行した。
+- 最終通常publish終了コード0。EXE **144105998 bytes / SHA256 `7a491a20bd17f3d98506ca3162198699ce70cd0372f30b5e93a83f85667392a6`**。feed SHA256 `40ef769761da3a3c5e1e6f5dfa0ce8f3d76a0383da7096d4bd5c74c484d0f39e`。package/feed/隔離起動版0.29.0、feedのsize/hash、固定コピーと試験コピーが一致。同梱helperのSHA256は `c34ff165ad2b05c2332ef6bb4b673b08db6a4e99a72507fd0d21091aeb73d3b7` で発行元と一致。発行ログ、固定EXE、hashは `.artifacts/notification-0.29.0-20261013/`。
+- 固定単一EXEの設定通知 **9群**成功（`settings-notice-1791874357621`）。保存、入力/外部revisionエラー保持、Web上の操作、テーマ/サイズ、実際の通知専用Shell Applet worker異常終了→同一通知IDでDefault Shell復帰→保存、再起動後の保存状態を確認した。破棄dialogのキャンセル/確定はソースのdialog応答fixtureで確認し、固定EXEでの実ユーザー応答は今回未実施。
+- 画像を確認し、通知文と保存/破棄ボタン、縦スタックと領域内スクロールを確認。試験プロセスの残存なし。今回専用の不要な編集補助ファイル8件を削除。成功profileは方式別に直近3件以内なので削除対象なし。失敗、固定EXE、検証証跡とfixtureは保持した。
+- 未実施: 物理DPI/IME・スクリーンリーダー実機、実利用設定、通知センター等の後続UI、無関係な全回帰/兄弟Applet、GitHub公開/自己更新先での検証。本体のみpublishし、未変更Applet・全体ZIPは発行していない。commit・push・公開・実利用先deployは行っていない。
+
+
 ## 2026-10-12: LightテーマのShellページ切替時の背景（0.28.2）
 
 - スロット自体は透明で、背後のHTMLルートはLightの`rgb(250,251,252)`だった。一方、BrowserWindowの背景は`#101116`固定、ページViewの背景は未指定、Default ShellはDarkのCSSから始まり、特に設定はready通知後のeffectでテーマを適用していた。調査時の18切替（`shell-page-theme-1791755781927`）では、利用者が見た瞬間的な黒フレーム自体は再現できていない。背景不一致と適用順序を原因候補として是正した。

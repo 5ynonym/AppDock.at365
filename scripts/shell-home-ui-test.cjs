@@ -106,7 +106,7 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().includes('settingsNotice'),
+            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );
@@ -230,7 +230,7 @@ const invoke = (p, actionId) =>
           settings.appletOrder,
         );
         const notice = await until(
-          () => browser.pages().find((p) => p.url().includes('settingsNotice')),
+          () => browser.pages().find((p) => p.url().endsWith('/notifications.html')),
           'notice',
         );
         await notice.getByRole('button', { name: 'すべて保存', exact: true }).waitFor();
@@ -465,7 +465,7 @@ const invoke = (p, actionId) =>
       const again = await home();
       assert.equal((await model(again)).content.applets[0].id, 'fixture.home');
       const n = await until(
-        () => browser.pages().find((p) => p.url().includes('settingsNotice')),
+        () => browser.pages().find((p) => p.url().endsWith('/notifications.html')),
         'notice',
       );
       await n.getByRole('button', { name: 'すべて保存', exact: true }).click();

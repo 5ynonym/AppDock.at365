@@ -16,6 +16,7 @@
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
+| 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[移行設計](docs/notification-foundation.md) |
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 

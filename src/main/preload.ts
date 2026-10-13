@@ -55,14 +55,15 @@ const api: DockApi = {
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
   refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
   restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),
-  settingsNotice: (state) => ipcRenderer.invoke('dock:settingsNotice', state),
-  confirmDiscardSettings: () => ipcRenderer.invoke('dock:confirmDiscardSettings'),
-  onSettingsNoticeAction: (callback) => {
-    const handler = (_: Electron.IpcRendererEvent, action: 'save' | 'discard' | 'edit') =>
-      callback(action);
-    ipcRenderer.on('dock:settingsNoticeAction', handler);
-    return () => ipcRenderer.removeListener('dock:settingsNoticeAction', handler);
+  settingsUiContext: (busy) => ipcRenderer.invoke('dock:settingsUiContext', busy),
+  focusNotifications: () => ipcRenderer.invoke('dock:focusNotifications'),
+  settingsInputsFlushed: (id) => ipcRenderer.invoke('dock:settingsInputsFlushed', id),
+  onFlushSettingsInputs: (callback) => {
+    const listener = (_: Electron.IpcRendererEvent, id: string) => callback(id);
+    ipcRenderer.on('dock:flushSettingsInputs', listener);
+    return () => ipcRenderer.removeListener('dock:flushSettingsInputs', listener);
   },
+  confirmDiscardSettings: () => ipcRenderer.invoke('dock:confirmDiscardSettings'),
   webDefaults: (url) => ipcRenderer.invoke('dock:webDefaults', url),
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
   clearWebAccount: (id) => ipcRenderer.invoke('dock:clearWebAccount', id),

@@ -5,7 +5,9 @@
   "version": "0.0.0",
   "runtime": "node",
   "entry": "worker.cjs",
-  "capabilities": ["shell"],
+  "capabilities": [
+    "shell"
+  ],
   "shell": {
     "apiVersion": 1,
     "ui": "index.html",
@@ -13,7 +15,8 @@
       "overlay.command-palette": "overlay.html",
       "page.logs": "logs.html",
       "page.home": "home.html",
-      "page.settings": "settings.html"
+      "page.settings": "settings.html",
+      "notification.banner": "notifications.html"
     }
   }
 }

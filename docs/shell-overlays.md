@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`と`page.home`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
+公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`・`page.home`・`page.settings`、非モーダルの[通知領域](notifications.md)`notification.banner`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
 
 ```json
 {

@@ -34,3 +34,11 @@
   overflow: hidden;
   scrollbar-gutter: auto;
 }
+
+.titlebar-notifications {
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+  margin-right: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}

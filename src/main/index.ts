@@ -93,7 +93,11 @@ import {
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
 import { mergeWebDefaults } from '../shared/web-applets';
-import { SettingsNotice } from './core/settings-notice';
+import { NotificationService } from './core/notification-service';
+import { NotificationHistoryStore } from './core/notification-history';
+import { NotificationBannerHost } from './core/notification-banner-host';
+import { NotificationBannerController } from './core/notification-banner-controller';
+import { SettingsNotificationSource } from './core/settings-notification-source';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
 import { AppDockApi, AutomationError } from './core/appdock-api';
@@ -170,7 +174,29 @@ if (locked) {
   }
 }
 let window: BrowserWindow | null = null;
-let settingsNotice: SettingsNotice | undefined;
+let notificationBanner: NotificationBannerHost | undefined;
+let notificationService: NotificationService | undefined;
+let settingsNotificationSource: SettingsNotificationSource | undefined;
+let settingsUiBusy = false;
+let lastEditingRoute: 'settings' | 'extensions' = 'settings';
+const settingsInputFlushes = new Map<string, () => void>();
+async function flushSettingsInputs() {
+  if (!window || window.isDestroyed() || window.webContents.isLoading())
+    throw Error('設定画面の準備中です。');
+  const id = randomUUID();
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      settingsInputFlushes.delete(id);
+      reject(Error('設定入力の反映を確認できませんでした。もう一度お試しください。'));
+    }, 3000);
+    settingsInputFlushes.set(id, () => {
+      clearTimeout(timer);
+      settingsInputFlushes.delete(id);
+      resolve();
+    });
+    window!.webContents.send('dock:flushSettingsInputs', id);
+  });
+}
 let shellHost: ShellHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let shellPageHost: ShellPageHost | undefined;
@@ -179,6 +205,9 @@ const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(
   () => changed(),
   async () => {
+    if (['settings', 'extensions'].includes(navigation.state.route))
+      lastEditingRoute = navigation.state.route as 'settings' | 'extensions';
+    await flushSettingsInputs();
     await shellPageHost?.flush();
   },
   (error) => log.write('error', 'navigation', String(error)),
@@ -362,6 +391,10 @@ const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
+    if (['settings', 'extensions'].includes(navigation.state.route))
+      lastEditingRoute = navigation.state.route as 'settings' | 'extensions';
+    if (!quitting) settingsNotificationSource?.refresh();
+    notificationBanner?.refresh();
     shellHost?.refresh();
     shellPageHost?.refresh();
     overlayHost?.refresh();
@@ -1049,6 +1082,7 @@ function registerIpc() {
     shellHost?.retry();
     overlayHost?.retry();
     shellPageHost?.retry();
+    notificationBanner?.retry();
   });
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
@@ -1061,9 +1095,17 @@ function registerIpc() {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
     return automation.action(action);
   });
-  handle('dock:settingsNotice', (state) => {
-    settingsNotice?.update(state);
-    overlayHost?.layout();
+  handle('dock:settingsUiContext', (busy) => {
+    if (typeof busy !== 'boolean') throw Error('Invalid settings UI state');
+    settingsUiBusy = busy;
+    if (!quitting) settingsNotificationSource?.refresh();
+  });
+  handle('dock:settingsInputsFlushed', (id) => {
+    if (typeof id !== 'string') throw Error('Invalid input flush');
+    settingsInputFlushes.get(id)?.();
+  });
+  handle('dock:focusNotifications', () => {
+    if (!overlayHost?.active) notificationBanner?.focus();
   });
   handle('dock:openCommandPalette', (request: CommandPaletteRequest) =>
     openCommandPalette(request),
@@ -1545,13 +1587,44 @@ async function initialize() {
     });
   }
   windowState.track(window);
-  settingsNotice = new SettingsNotice(
-    window,
-    'appdock://host/index.html?settingsNotice=1',
-    path.join(__dirname, 'settings-notice-preload.js'),
-    (message) => log.write('error', 'settings', message),
-    () => overlayHost?.layout(),
+  notificationService = new NotificationService(
+    new NotificationHistoryStore(
+      path.join(dataDirectory, 'notifications', 'history.json'),
+      (message) => log.write('error', 'notifications', message),
+    ),
   );
+  settingsNotificationSource = new SettingsNotificationSource(notificationService, {
+    editor: settingsEditing,
+    route: () => navigation.state.route,
+    busy: () => settingsUiBusy || quitting,
+    flush: async () => {
+      await flushSettingsInputs();
+      await shellPageHost?.flush();
+    },
+    edit: async () => {
+      await navigation.navigate(lastEditingRoute);
+    },
+  });
+  notificationBanner = new NotificationBannerHost({
+    window,
+    preload: path.join(__dirname, 'notification-banner-preload.js'),
+    controller: new NotificationBannerController(
+      notificationService,
+      () => nativeTheme.shouldUseDarkColors,
+    ),
+    providers: () => manager.snapshot(),
+    selected: () =>
+      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    ready: () => startupReady && !quitting,
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
+    execute: executeShellCommand,
+    layer: () => overlayHost?.layout(),
+    failed: (message, unavailable) => {
+      log.write('error', 'notifications', message);
+      if (unavailable)
+        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
+    },
+  });
   shellHost = new ShellHost({
     window,
     preload: path.join(__dirname, 'shell-preload.js'),
@@ -1694,7 +1767,7 @@ async function initialize() {
       return dispatchShortcut(normalized);
     },
     layer: () => {
-      settingsNotice?.layout();
+      notificationBanner?.layout();
       overlayHost?.layout();
     },
     failed: (message, unavailable) => {
@@ -1705,7 +1778,7 @@ async function initialize() {
   });
   configurePageHost({
     overlay: () => {
-      settingsNotice?.layout();
+      notificationBanner?.layout();
       overlayHost?.layout();
     },
     window: () => window,
@@ -2081,6 +2154,8 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (shutdownStarted) return;
   shutdownStarted = true;
+  notificationBanner?.dispose();
+  notificationService?.dispose();
   shellHost?.dispose();
   overlayHost?.dispose();
   shellPageHost?.dispose();
