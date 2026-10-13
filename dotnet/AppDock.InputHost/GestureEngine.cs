@@ -67,7 +67,7 @@ internal sealed class GestureEngine : IDisposable
     private bool OnTarget(GesturePoint p) => GetAncestor(WindowFromPoint(p),2) == target;
     private void Begin(GesturePoint p)
     {
-        if (config is not {Enabled:true} || busy) return;
+        if (config is not {Enabled:true} || busy || HasStartBlocker()) return;
         target = GetForegroundWindow();
         if (target == 0 || !OnTarget(p)) return;
         GetWindowThreadProcessId(target, out var pid);
@@ -144,6 +144,15 @@ internal sealed class GestureEngine : IDisposable
         return "key:"+(Pressed(0x11)||keys.Overlaps([0x11u,0xA2u,0xA3u])?"Ctrl+":"")+(Pressed(0x12)||keys.Overlaps([0x12u,0xA4u,0xA5u])?"Alt+":"")+(Pressed(0x10)||keys.Overlaps([0x10u,0xA0u,0xA1u])?"Shift+":"")+name;
     }
     private static bool Pressed(int key) => (GetAsyncKeyState(key)&0x8000)!=0;
+    private bool HasStartBlocker()
+    {
+        // Captured downs do not reach the OS key state until their paired release.
+        if (keys.Overlaps([0x10u,0x11u,0x12u,0xA0u,0xA1u,0xA2u,0xA3u,0xA4u,0xA5u]) || clicks.Count > 0) return true;
+        // GetAsyncKeyState uses physical mouse buttons; the hook uses logical buttons.
+        var leftButton = GetSystemMetrics(23) != 0 ? 0x02 : 0x01; // SM_SWAPBUTTON
+        return Pressed(0x10) || Pressed(0x11) || Pressed(0x12) || Pressed(0x5B) || Pressed(0x5C) ||
+            Pressed(leftButton) || Pressed(0x04) || Pressed(0x05) || Pressed(0x06);
+    }
     private void Move(GesturePoint p)
     {
         if (cancelled) return;
@@ -252,5 +261,6 @@ internal sealed class GestureEngine : IDisposable
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out GesturePoint point);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(nint window,out WindowRect rect);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll",SetLastError=true)] private static extern uint SendInput(uint count,Input[] inputs,int size);
 }

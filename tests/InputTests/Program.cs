@@ -12,6 +12,7 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         if(args is ["--send",var handle,var action]) {
             var sendCursor=Cursor.Position;
+            Action? releaseBlocker=null;
             try {
                 nint window;
                 if (handle.StartsWith("pid:")) {
@@ -19,16 +20,31 @@ internal static class Program
                     GetWindowThreadProcessId(window,out var foregroundPid);
                     if (foregroundPid!=pid) window=Process.GetProcessById(pid).MainWindowHandle;
                 } else window=new nint(long.Parse(handle));
-                SetForegroundWindow(window);Thread.Sleep(150);
+                var focusDeadline=Environment.TickCount64+2000;
+                do {FocusWindow(window);Thread.Sleep(50);} while(GetForegroundWindow()!=window && Environment.TickCount64<focusDeadline);
                 if(GetForegroundWindow()!=window) throw new Exception($"Input target {handle}/{window} did not become foreground (actual {GetForegroundWindow()}).");
-                GetWindowRect(window,out var rect);Cursor.Position=new(rect.Left+350,rect.Top+330);Thread.Sleep(40);Mouse(8);Thread.Sleep(50);
+                GetWindowRect(window,out var rect);Cursor.Position=new(rect.Left+350,rect.Top+330);Thread.Sleep(40);
+                var hovered=GetAncestor(WindowFromPoint(Cursor.Position),2);
+                var held=string.Join(",",new[]{0x10,0x11,0x12,0x5B,0x5C,0x01,0x02,0x04,0x05,0x06}.Where(k=>(GetAsyncKeyState(k)&0x8000)!=0).Select(k=>k.ToString("X")));
+                Console.WriteLine($"Input preflight: target={window}, foreground={GetForegroundWindow()}, hovered={hovered}, held={held}, cursor={Cursor.Position}, action={action}");
+                if(hovered!=window)throw new Exception("Input pointer did not reach the target window.");
+                ushort modifier=action switch {"blocked:left-ctrl"=>0xA2,"blocked:right-ctrl"=>0xA3,"blocked:left-alt"=>0xA4,"blocked:right-alt"=>0xA5,"blocked:left-shift"=>0xA0,"blocked:right-shift"=>0xA1,"blocked:left-win"=>0x5B,"blocked:right-win"=>0x5C,_=>0};
+                if(modifier!=0){releaseBlocker=()=>ReleaseModifier(modifier);Key(modifier);}
+                else if(action=="blocked:left"){releaseBlocker=()=>Mouse(4);Mouse(2);}
+                else if(action=="blocked:middle"){releaseBlocker=()=>Mouse(0x40);Mouse(0x20);}
+                else if(action is "blocked:x1" or "blocked:x2"){var button=action=="blocked:x1"?1:2;releaseBlocker=()=>Mouse(0x100,button);Mouse(0x80,button);}
+                Thread.Sleep(60);Mouse(8);Thread.Sleep(50);
+                if(releaseBlocker!=null){
+                    releaseBlocker();Thread.Sleep(40);
+                    Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);Thread.Sleep(60);Mouse(0x800,120);
+                }
                 if(action=="move-left")Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);
                 else if(action=="key:A"){Key(0x41);Thread.Sleep(80);Key(0x41,true);}
                 else if(action=="key:Ctrl+A"){Key(0x11);Thread.Sleep(20);Key(0x41);Thread.Sleep(80);Key(0x41,true);Key(0x11,true);}
                 else if(action=="click-left"){Mouse(2);Thread.Sleep(80);Mouse(4);}
                 else if(action=="wheel-up")Mouse(0x800,120);
                 Thread.Sleep(100);Mouse(16);Thread.Sleep(150);return 0;
-            }finally{Mouse(16);Cursor.Position=sendCursor;}
+            }finally{Mouse(16);releaseBlocker?.Invoke();Cursor.Position=sendCursor;}
         }
         using var form=new Probe(); form.Text="AppDock isolated gesture test";form.StartPosition=FormStartPosition.CenterScreen;form.Size=new(720,500);
         var original=Cursor.Position;
@@ -50,7 +66,7 @@ internal static class Program
         });
         int Count(){lock(invocations)return invocations.Count;}
         async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window=""){
-            var triggers=new[]{"move-up","move-down","move-left","move-right","click-left","click-middle","wheel-up","wheel-down","key:A"};
+            var triggers=new[]{"move-up","move-down","move-left","move-right","click-left","click-middle","wheel-up","wheel-down","key:A","key:Ctrl+A"};
             var process=Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
             await peer.RequestAsync("gestures.sync",new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,indicatorOpacity=.45,indicatorPosition="gesture-start",context="test",revision=1,
                 rows=triggers.Select((g,i)=>new{id="r"+i,command="test.run",gesture=g,title="Test "+g,window,when=new{scope,appletIds=Array.Empty<string>(),processes=new[]{process}}}).ToArray()},CancellationToken.None);
@@ -70,6 +86,42 @@ internal static class Program
             Console.WriteLine($"First stroke: received={Count()-n}, foreground={GetForegroundWindow()==form.Handle}, foregroundProcess={Process.GetProcessById((int)firstForegroundPid).ProcessName}");
             Check(Count()==n+1 && invocations[^1]=="move-left","single stroke on release");
             var right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"ordinary right click replay");
+            async Task BlockedStart(string name,Action press,Action release,int stateKey,bool releaseEarly)
+            {
+                FocusTarget(form);await Task.Delay(80);Cursor.Position=form.PointToScreen(new(330,220));
+                var before=Count();var downs=form.RightDowns;var ups=form.RightUps;
+                try {
+                    press();await Task.Delay(60);
+                    Check((GetAsyncKeyState(stateKey)&0x8000)!=0,name+" blocker is held");
+                    Mouse(8);await Task.Delay(40);
+                    Console.WriteLine($"{name}: right-down delta={form.RightDowns-downs}, foreground={GetForegroundWindow()==form.Handle}");Check(form.RightDowns==downs+1,name+" right-down passes immediately");
+                    if(releaseEarly){release();await Task.Delay(40);}
+                    Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(60);
+                    Mouse(0x800,120);await Task.Delay(60);await End();
+                    Console.WriteLine($"{name}: right-up delta={form.RightUps-ups}, invocation delta={Count()-before}");Check(Count()==before && form.RightUps==ups+1,name+" bypasses stroke/wheel and passes right-up"+(releaseEarly?" after early release":" while held"));
+                } finally {Mouse(16);release();await Task.Delay(60);}
+            }
+            // Both sides are real OS inputs, including the extended right Ctrl/Alt keys.
+            foreach(var modifier in new (ushort Key,string Name)[]{(0xA2,"left Ctrl"),(0xA3,"right Ctrl"),(0xA4,"left Alt"),(0xA5,"right Alt"),(0xA0,"left Shift"),(0xA1,"right Shift"),(0x5B,"left Win"),(0x5C,"right Win")})
+                foreach(var early in new[]{false,true})
+                    await BlockedStart(modifier.Name,()=>Key(modifier.Key),()=>ReleaseModifier(modifier.Key),modifier.Key,early);
+            foreach(var button in new (uint Down,uint Up,int Data,int Key,string Name)[]{(2,4,0,GetSystemMetrics(23)!=0?2:1,"left button"),(0x20,0x40,0,4,"middle button"),(0x80,0x100,1,5,"X1 button"),(0x80,0x100,2,6,"X2 button")})
+                foreach(var early in new[]{false,true})
+                    await BlockedStart(button.Name,()=>Mouse(button.Down,button.Data),()=>Mouse(button.Up,button.Data),button.Key,early);
+            n=Count();await Begin();Key(0xA2);await Task.Delay(20);Key(0x41);await Task.Delay(80);Key(0x41,true);await End();
+            Check(Count()==n+1 && invocations[^1]=="key:Ctrl+A","modifier pressed after right-down remains a key gesture");
+            n=Count();var down=form.RightDowns;await Begin();
+            Check(form.RightDowns==down+1,"captured Ctrl still held prevents a new waiting session");
+            Key(0xA2,true);Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(60);await End();
+            Check(Count()==n,"captured Ctrl release does not start a gesture mid-press");
+            n=Count();await Begin();Mouse(2);await Task.Delay(80);await End();
+            Check(Count()==n+1,"left click gesture starts normally before captured-button test");
+            n=Count();down=form.RightDowns;await Begin();
+            Check(form.RightDowns==down+1,"captured left button still held prevents a new waiting session");
+            Mouse(4);Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(60);await End();
+            Check(Count()==n,"captured button release does not start a gesture mid-press");
+            n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
+            Check(Count()==n+1 && invocations[^1]=="move-left","plain right gesture resumes after blockers are released");
             n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(30);Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-80);await Task.Delay(40);await End();Check(Count()==n,"direction change cancels");
             n=Count();var left=form.LeftUps;await Begin();Mouse(2);await Task.Delay(100);await End();Mouse(4);await Task.Delay(60);Check(Count()==n+1 && form.LeftUps==left,"left click and release after right are consumed");
             n=Count();await Begin();Mouse(0x20);await Task.Delay(80);Mouse(0x40);await End();Check(Count()==n+1 && invocations[^1]=="click-middle","middle click");
@@ -87,24 +139,46 @@ internal static class Program
             Check(cancellations>0,"session cancellation notifications");
         }finally{child.StandardInput.Close();await reading;await child.WaitForExitAsync();Console.Write(await errors);}
     }
-    private sealed class Probe:Form {public int RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
+    private sealed class Probe:Form {public int RightDowns,RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg is 0x204 or 0x206)RightDowns++;if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
     private static void FocusTarget(Form form) {
-        form.Show(); form.Activate();
+        form.Show(); form.Activate(); FocusWindow(form.Handle);
+    }
+    private static void FocusWindow(nint window) {
+        // The --send thread has no Form/message loop yet; AttachThreadInput needs a queue.
+        PeekMessage(out _,0,0,0,0);
         var thread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
         var own = GetCurrentThreadId();
+        var targetThread = GetWindowThreadProcessId(window, out _);
         var attached = thread != 0 && thread != own && AttachThreadInput(own, thread, true);
-        try { SetForegroundWindow(form.Handle); }
-        finally { if(attached) AttachThreadInput(own, thread, false); }
+        var targetAttached = targetThread != 0 && targetThread != own && targetThread != thread && AttachThreadInput(own, targetThread, true);
+        try { BringWindowToTop(window); SetForegroundWindow(window); }
+        finally {
+            if(targetAttached) AttachThreadInput(own, targetThread, false);
+            if(attached) AttachThreadInput(own, thread, false);
+        }
     }
+    [StructLayout(LayoutKind.Sequential)]private struct NativeMessage{public nint Window;public uint Message;public nuint WParam;public nint LParam;public uint Time;public int X,Y;public uint Private;}
+    [DllImport("user32.dll")]private static extern bool PeekMessage(out NativeMessage message,nint window,uint min,uint max,uint flags);
     [DllImport("kernel32.dll")]private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")]private static extern bool AttachThreadInput(uint a,uint b,bool attach);
     private static void Mouse(uint flags,int data=0){if(SendInput(1,[new(){Union=new(){Mouse=new(){Flags=flags,Data=unchecked((uint)data)}}}],Marshal.SizeOf<Input>())!=1)throw new Exception("SendInput mouse failed: "+Marshal.GetLastWin32Error());}
-    private static void Key(ushort key,bool up=false)=>SendInput(1,[new(){Type=1,Union=new(){Key=new(){Key=key,Flags=up?2u:0}}}],Marshal.SizeOf<Input>());
+    private static void Key(ushort key,bool up=false)=>SendInput(1,[new(){Type=1,Union=new(){Key=new(){Key=key,Flags=(up?2u:0)|(key is 0xA3 or 0xA5 or 0x5B or 0x5C?1u:0)}}}],Marshal.SizeOf<Input>());
     [StructLayout(LayoutKind.Sequential)]private struct Input{public uint Type;public Union Union;}
     [StructLayout(LayoutKind.Explicit)]private struct Union{[FieldOffset(0)]public MouseEvent Mouse;[FieldOffset(0)]public KeyEvent Key;}
     [StructLayout(LayoutKind.Sequential)]private struct MouseEvent{public int X,Y;public uint Data,Flags,Time;public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)]private struct KeyEvent{public ushort Key,Scan;public uint Flags,Time;public nuint Extra;}
     [DllImport("user32.dll",SetLastError=true)]private static extern uint SendInput(uint count,Input[] inputs,int size);
+    // Ctrl around Win-up prevents the test from opening the Start menu.
+    private static void ReleaseModifier(ushort key) {
+        if(key is 0x5B or 0x5C)Key(0xA2);
+        Key(key,true);
+        if(key is 0x5B or 0x5C)Key(0xA2,true);
+    }
+    [DllImport("user32.dll")]private static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")]private static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")]private static extern nint WindowFromPoint(System.Drawing.Point point);
+    [DllImport("user32.dll")]private static extern nint GetAncestor(nint window,uint flags);
+    [DllImport("user32.dll")]private static extern bool BringWindowToTop(nint handle);
     [DllImport("user32.dll")]private static extern bool SetForegroundWindow(nint handle);
     [DllImport("user32.dll")]private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")]private static extern uint GetWindowThreadProcessId(nint handle,out uint pid);

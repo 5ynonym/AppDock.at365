@@ -1,5 +1,31 @@
 # 検証記録
 
+## 2026-10-14: 最新mainへジェスチャー開始判定を統合・コミット検証（0.34.1）
+
+- main be7e5bf（0.34.0、Shell領域割り当て実装/TTS設計を含む）へ今回のworktree差分を3-wayで統合、競合なし。既存mainの変更を保持した。0.33.1試験版を最新minorへ合わせて0.34.1とし、package.json/更新情報/同梱Default Shellを一致させた。設定項目・保存ファイル・公開APIの変更はなく、パッチ更新区分を維持。旧0.33.1の実装・検証は以下の履歴に保持する。
+- コミット前レビューで、右down時だけの判定、通常入力の通過、途中解放と捕捉済み入力の対の解放、左右Win/マウスボタン、開始後のキー/クリック、対象条件・取消、最新Shellとの文書/試験/版の整合を確認。製品側の修正を要する指摘なし。
+- 最終試験tree **95001aaeebe36751a6bf2d238bb722cb259459d6**で型検査と標準回帰 **370/370（fail/skip 0）**、実OS入力 **96/96**、実Node WebBrowserTools/.NET WindowsToolsの共有入力・許可・取消・連続操作 **4群**（native-input-ui-1791913043409）成功。.NET ExtensionHost/InputHost publishとInputTests Release buildも成功。SDK/API・Applet製品コードは変更せず、無関係な兄弟Appletの全回帰/再発行は対象外。
+- 固定単一EXEの隔離コピーでジェスチャー **15群**（gestures-ui-1791912850803）、ショートカット **8群**（shortcuts-ui-1791913126368）、同じ発行内容のwin-unpackedで画面遷移 **17群**（navigation-1791913207768）が成功。左右修飾キー8種類/他ボタン4種類の先行押下・途中解放・解除後の再開、開始後のCtrl+A、実Window/ページ/Web条件、登録競合、記録中の解除、即時保存/競合/再起動、両テーマ3幅を検証。
+- 初回portable試験のフォーカス取得失敗と初回stroke未受信を失敗profile/ログへ保持。試験ツールに、送信モードのメッセージキュー生成、前面/対象Windowの入力スレッド接続、BringWindowToTop、入力前に限った2秒の取得確認、カーソル下root Windowの照合とキー状態の診断を追加。前面/対象が一致するまで入力せず、入力後のジェスチャー再送・期待値緩和はしない。[Windows仕様](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-attachthreadinput)も確認。修正後に上記370件/96件/4群と固定EXE試験を再確認して成功した。
+- 試験ツールの調整中に製品コードは変更していない。発行時tree 477e24ad0be47c1c39f2372d6d1850941b73edf4と最終試験treeの差は配布物へ同梱しないtests/InputTests/Program.csだけ。版を重ねて増やさず同じ固定EXEを最終試験に使用。検証後の追記はVERIFICATIONだけとして差分を検査・記録する。
+- publish.bat終了0。単一EXE **0.34.1 / 144,134,515 bytes / SHA256 91546e9757f5f36b3f923ad203c0ddeb5f816b410217230e63725cb11b84a593**。update.jsonの版/size/hash、同梱Default Shell0.34.1、同梱InputHost DLLと試験出力のhashが一致。portableコピーの前後hashも一致。通常publishだけを行い、未変更Appletの発行・全体ZIP・旧ZIP整理は行わない。
+- 固定Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401/Windows26300 x64を使用。frozen/offline install成功、lockfile/toolchain/待機/検証方針は変更なし。全コマンド/引数/cwd/時刻/終了コード/完全ログ/hash、tree、試験EXE/fixture/参照Appletのcommit/tree/発行物hashは **.artifacts/commit-validation-gesture-start-0.34.1-20261014/** に保存。コミット後SHA/treeもmetadata.jsonへ保存する。
+- 明示許可に従い、実入力試験中だけ通常AppDockのgestures.enabledをOFFにし、終了後は元の値へ復元。MCP再取得で全ジェスチャー設定が変更前と一致した。今回の方式別成功分は直近3回以内で、過去の封印済み証跡・実行方式不明・失敗/診断profile・固定出力を保護し、profile削除は0件。不要な今回の診断補助2ファイルだけを削除し、ログ/hashを保持。最終4試験のアプリ終了を確認。詳細はcleanup.json/gui-results.json。
+- 通常キーの先行押下は対象外。OSの左右ボタン入れ替え設定を実際に変更する試験、特殊ドライバーの独自ボタン、管理者アプリ/UAC・別デスクトップは未確認。push/Release/実利用先deployは今回の範囲外。
+
+## 2026-10-14: 修飾キー・他マウスボタンの先行押下でジェスチャー開始を見送る（0.33.1）
+
+- mainの確定済み51e0372（0.33.0）から専用worktree `A:/30.PROJECT/AppDock.at365.worktrees/gesture-modifier-bypass`、branch `codex/gesture-modifier-bypass`を作成した。開始時の元mainの別作業の未コミット変更（0.34.0）は含めず保持。終了時には別作業がmain 2e9737e（0.34.0）へコミット済みで、さらに別の文書編集があることを再確認した。この試験EXEは開始時の0.33.0を基にした0.33.1で、0.34.0のShell領域割り当て実装を含まない。統合時は最新mainとの版・影響を再照合する。今回の変更は未コミット・未統合で、push/Release/実利用先deployを行わない。
+- 右ボタン押下時、左右Ctrl/Alt/Shift/Winまたは左/中/X1/X2が押されていればBeginへ入らず、通常入力を通す。先行入力の途中解放で待機を開始しない。前回捕捉した修飾キー・左/中ボタンがまだ解放されていない場合も見送る。開始後の修飾キー付きキー操作・クリック操作は維持。通常キーの押下は開始条件に含めない。左右マウスボタンの入れ替えはSM_SWAPBUTTONで論理左の物理キーを選ぶ。
+- 発行前レビュー：Beginの判定順、通常右ボタンの押下/解放の通過、捕捉済み入力の対の解放、busy/取消/対象条件、Winと左右ボタンの扱い、既存キー/クリックジェスチャーの維持、試験・文書・版の整合を確認。発行を妨げる製品側の指摘なし。設定項目・保存ファイル・公開APIの追加/削除/互換性変更はなく、開始判定の修正としてパッチ0.33.1へ更新。README/DEVELOPMENT/ジェスチャー仕様を更新した。
+- .NET SDK10.0.401、Node24.21.0、pnpm12.10.1、Electron44.6.0、Windows26300 x64。InputHost自己完結Release publishとInputTests Release buildは成功（0警告/0エラー）。型検査・本体build・ジェスチャー関連ソース回帰20/20（fail/skip 0）成功。標準の全回帰・無関係なApplet回帰は今回の部分実装では実行しない。
+- 実OS入力回帰96/96成功：左右の各修飾キー8種類と左/中/X1/X2を先に押し、押下継続/途中解放の両方で右down/upが直接届くこと、移動・ホイールがジェスチャーを実行しないことを確認。捕捉Ctrl/左ボタンの継続、待機開始後のCtrl+A、解放後の再開、従来のクリック・キーrepeat・ホイール積算/破棄・通常右クリック復元・取消・対象条件も確認。
+- 初回実入力試験は稼働中の通常AppDock入力フックとの干渉で通常右クリックの受信が失敗し、診断ログを保持した。明示許可を受け、通常AppDockのgestures.enabledだけを試験中OFFへ変更。干渉解消後の残り1件はOSのWM_RBUTTONDBLCLKを試験の押下数へ含めていなかったため、右downとdouble-clickの両通知を数えるよう試験を修正し再検証した。最終試験後、enabledを元のtrueへ復元し、MCPの再取得で全ジェスチャー設定が変更前と一致した。元のAppDockを停止・配置・更新していない。
+- 共有node_modulesのjunctionでpnpmのworkspace構造検証が失敗したため、確認済みjunctionだけを外し専用node_modulesを作成。`dev.bat install --frozen-lockfile --offline`で359件を既存キャッシュから取得、download 0で成功。.toolsは元repoの既存固定ツールをjunction参照して再利用する。lockfile/toolchain/pnpm-workspaceはGit正規化blobが元repoと一致し、依存版・公開後待機・検証方針を変更していない。
+- 通常publish.bat終了0。本体単一EXE **0.33.1 / 144,123,207 bytes / SHA256 aa81db8949bde4634e18120ee65885f4d6dc7f165cce5398ecf188114eb32503**。update.jsonの版/size/hashと同梱Default Shell0.33.1が一致し、同梱InputHost DLLと試験済み出力のhashが一致。未変更Appletの発行・全体ZIP生成・旧ZIP整理は行わない。
+- 固定EXEの隔離コピーで `dev.bat exec node scripts/gestures-ui-test.cjs --portable` が15群成功。`.artifacts/gestures-ui-1791910901799/result.json`にok:true、前後EXE hash一致を記録。左右修飾キー8種類と他ボタン4種類を先に押して途中で離す実入力で開始を見送ること、解除後の通常ジェスチャー、実Window/ページ/Web条件、Ctrl+A、両テーマ3幅、即時保存/競合/renderer reload/プロセス再起動を検証した。
+- 証跡と完全ログは `.artifacts/gesture-start-validation/`。今回の成功GUI profileは1件で直近3件以内。固定ビルド出力・試験資料・診断/失敗ログを保持し、削除対象はない。試験用InputTests・専用InputHost・隔離portableの終了を確認した。左右入れ替えのOS設定を実際に切り替える試験、特殊ドライバーの独自ボタン、管理者アプリ/UAC・別デスクトップは未確認。
+
 ## 2026-10-14: 領域ごとのShell割り当て実装（0.34.0）
 
 - main `51e0372`を起点に[設計](docs/shell-region-assignment.md)の段階1〜5を実装。既存8領域の`host.shellProviders`、Default常時有効、利用不能領域だけのフォールバック、設定・解決・実Viewの区別を共通Registryへ集約した。旧`shellProvider`は入力時に移行し、起動だけでは共有設定を保存しない。新旧併記は新マップを優先し、未知領域・未導入・無効Appletの指定を保持する。設計の大きな変更なし。

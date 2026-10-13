@@ -224,6 +224,33 @@ const checks = [];
       await expect(['a', 'b']);
       checks.push('global/app order and duplicate suppression');
       await save([
+        row('start-stroke', 'a', 'global'),
+        row('start-wheel', 'b', 'global', 'wheel-up'),
+      ]);
+      for (const blocker of [
+        'left-ctrl',
+        'right-ctrl',
+        'left-alt',
+        'right-alt',
+        'left-shift',
+        'right-shift',
+        'left-win',
+        'right-win',
+        'left',
+        'middle',
+        'x1',
+        'x2',
+      ]) {
+        const before = calls().length;
+        await send('blocked:' + blocker);
+        await wait(200);
+        assert.equal(calls().length, before, blocker + ' must bypass gesture start');
+      }
+      await expect(['a']);
+      checks.push(
+        'pre-held modifiers and other mouse buttons bypass start, including early release; plain gesture resumes',
+      );
+      await save([
         row('pages', 'a', 'pages'),
         row('owner', 'b', 'owner'),
         row('selected', 'c', 'applets', 'move-left', ['test.gestures']),

@@ -18,6 +18,8 @@
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
 
+右ボタン押下時にCtrl/Alt/Shift/Win（左右両方）、左/中/X1/X2ボタンが既に押されている場合は待機を開始せず、右ボタンの押下・解放と通常入力を通す。途中のキー/ボタン解放では開始しない。開始判定はGetAsyncKeyStateの上位ビットを使い、左右ボタンの入れ替えではSM_SWAPBUTTONで論理左ボタンに対応する物理ボタンを選ぶ。前のジェスチャーで捕捉し、まだ解放されていない修飾キー・左/中ボタンも開始を見送る。待機開始後の修飾キー・クリックの捕捉は維持する。通常キーの押下状態は開始判定に含めない。
+
 右ボタン解放で一方向の移動を実行。距離は5〜500px、方向転換で解除まで取消。何も認識せずに解放した場合だけ通常右クリックを再送し、取消・未割当ストロークでは再送しない。右ドラッグを使うアプリは除外または一時停止する。
 
 左/中クリックは押下時、ホイールはdelta 120を1刻みとして細かい入力を積算、キーは押下時に実行。捕捉した押下に対応する解放も消費し、右を先に解放しても対象アプリへ漏らさない。キーのOS repeatを捨て、未割当キーは通常入力へ渡す。対応する修飾キーを待機中に押した場合も対で捕捉する。Escapeは割り当てがあればコマンド、なければ取消。
@@ -32,7 +34,7 @@
 
 - Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、編集中の対象行との競合を検査する。
 - `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、共通予約と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
-- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外の試験。カーソルを終了時に戻す。
+- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。
 
