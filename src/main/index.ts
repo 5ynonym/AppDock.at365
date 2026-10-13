@@ -5,6 +5,8 @@ import { ShellHost } from './core/shell-host';
 import { OverlayHost } from './core/overlay-host';
 import { ShellPageHost } from './core/shell-page-host';
 import { HomePageSession, HomeCommandExecution } from './core/home-page';
+import { NotificationCenterController } from './core/notification-center';
+import { publishUpdateResult } from './core/update-result-notification';
 import { LogPageSession } from './core/log-page';
 import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
@@ -1755,7 +1757,15 @@ async function initialize() {
     route: () => navigation.state.route,
     ready: () => startupReady && !quitting,
     create: (request) =>
-      request.kind === 'settings'
+      request.kind === 'notifications'
+        ? new NotificationCenterController(request, {
+            service: notificationService!, applets: allApplets, dark: () => nativeTheme.shouldUseDarkColors, changed,
+            confirmDeletion: async (count) => (await dialog.showMessageBox(window!, {
+              type:'warning',message:'通知履歴を'+count+'件削除しますか？',detail:'終了した通知の履歴だけを削除します。',
+              buttons:['キャンセル','削除'],defaultId:0,cancelId:0,
+            })).response===1,
+          })
+        : request.kind === 'settings'
         ? new SettingsPageSession(request, {
             navigation: settingsNavigation,
             editor: settingsEditing,
@@ -1966,9 +1976,15 @@ async function initialize() {
   const updateResultFile = path.join(dataDirectory, 'update-result.json');
   if (fs.existsSync(updateResultFile)) {
     try {
-      const result = JSON.parse(fs.readFileSync(updateResultFile, 'utf8'));
+      const resultBytes = fs.readFileSync(updateResultFile, 'utf8');
+      const result = JSON.parse(resultBytes);
       updater.state.phase = result.message;
-      updater.state.completion = { ok: result.ok === true, message: String(result.message) };
+      if (result.ok === true) {
+        publishUpdateResult(resultBytes, { typed:typedNotifications!,
+          receiptFile:path.join(dataDirectory,'notifications','update-receipt.json'),
+          openDetails:() => executeCommand('appdock.updates.open'),warn:message=>log.write('warn','updates',message),
+        });
+      } else updater.state.completion = { ok: false, message: String(result.message) };
       log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
       const temporary =
         typeof result.temporaryDirectory === 'string'

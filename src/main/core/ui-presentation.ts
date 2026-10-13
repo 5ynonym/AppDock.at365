@@ -13,7 +13,7 @@ export class NavigationCoordinator {
   ) {}
   navigate(route: string, section?: NavigationState['section'], appletId?: string) {
     if (
-      !['home', 'extensions', 'settings', 'logs'].includes(route) &&
+      !['home', 'extensions', 'settings', 'logs', 'notifications'].includes(route) &&
       !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
     )
       throw Error('Unknown route');

@@ -33,7 +33,7 @@ declare global {
     dock: DockApi;
   }
 }
-type Page = 'home' | 'extensions' | 'settings' | 'logs' | `page:${string}`;
+type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
 type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
 const webManagerId = 'appdock.web-manager';
 function Brand({ small = false }: { small?: boolean }) {
@@ -75,7 +75,7 @@ function App() {
     'page',
     'home',
     (value) =>
-      ['home', 'extensions', 'settings', 'logs'].includes(value) ||
+      ['home', 'extensions', 'settings', 'logs', 'notifications'].includes(value) ||
       /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
   );
   const setPage = (next: Page) => {
@@ -430,6 +430,7 @@ function App() {
   ];
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
+    if (id === 'appdock.notifications.open') { setPage('notifications'); return; }
     if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
       if (id === 'appdock.logs.open') setLogSource('');
       setPage(id === 'appdock.applets.open' ? 'extensions' : 'logs');
@@ -544,7 +545,7 @@ function App() {
       )}
       <main
         className={
-          page === 'settings' || page === 'home' || page === 'logs'
+          page === 'settings' || page === 'home' || page === 'logs' || page === 'notifications'
             ? 'shell-page-main'
             : page === 'extensions'
               ? 'applet-detail-main settings-main applet-detail-settings-main'
@@ -775,6 +776,7 @@ function App() {
                 />
               )}
             </div>
+            {page === 'notifications' && <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />}
             {page === 'logs' && (
               <ShellPageSlot
                 scope={{ type: 'all' }}

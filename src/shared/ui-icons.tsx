@@ -3,6 +3,7 @@ export type IconName =
   | 'home'
   | 'extensions'
   | 'settings'
+  | 'bell'
   | 'logs'
   | 'search'
   | 'arrow'
@@ -39,6 +40,12 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M4 7h16M4 17h16" />
       <circle cx="9" cy="7" r="3" />
       <circle cx="16" cy="17" r="3" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+      <path d="M10 21h4" />
     </>
   ),
   logs: (

@@ -23,7 +23,7 @@ export interface HomePageRequest {
   appletOrder: string[];
 }
 export type ShellPageRequest =
-  LogPageRequest | HomePageRequest | import('./settings-page').SettingsPageRequest;
+  LogPageRequest | HomePageRequest | import('./settings-page').SettingsPageRequest | import('./notification-center').NotificationCenterRequest;
 export interface ShellPageViewport {
   x: number;
   y: number;
@@ -71,12 +71,13 @@ export interface HomePageModel {
   };
 }
 export type ShellPageModel =
-  LogPageModel | HomePageModel | import('./settings-page').SettingsPageModel;
+  LogPageModel | HomePageModel | import('./settings-page').SettingsPageModel | import('./notification-center').NotificationCenterModel;
 export interface HomeCommandResult {
   message: string;
   error: string;
 }
 export type ShellPageAction =
+  | import('./notification-center').NotificationCenterAction
   | import('./settings-page').SettingsPageAction
   | { id: string; type: 'filters'; filters: LogFilters }
   | { id: string; type: 'open-directory' }

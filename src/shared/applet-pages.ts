@@ -25,6 +25,7 @@ export const builtinRibbon: RibbonItem[] = [
   { id: 'extensions', title: 'Applet', icon: 'extensions' },
   { id: 'settings', title: '設定', icon: 'settings' },
   { id: 'logs', title: 'ログ', icon: 'logs' },
+  { id: 'notifications', title: '通知センター', icon: 'bell' },
   { id: 'theme', title: 'テーマを切り替え', icon: 'sun' },
   { id: 'profile', title: 'プロフィール設定を開く', icon: 'settings' },
 ];

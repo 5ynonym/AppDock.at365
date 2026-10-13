@@ -13,7 +13,7 @@ export function ShellPageSlot({
   sidebarWidth,
 }: {
   scope?: LogScope;
-  kind?: 'logs' | 'home' | 'settings';
+  kind?: 'logs' | 'home' | 'settings' | 'notifications';
   settingsContext?: 'full' | 'applet';
   settingsPageId?: string;
   sidebarWidth?: number;
@@ -23,7 +23,9 @@ export function ShellPageSlot({
 }) {
   const slot = useRef<HTMLDivElement>(null);
   const request = useRef<ShellPageRequest>(
-    kind === 'settings'
+    kind === 'notifications'
+      ? { id: crypto.randomUUID(), route: 'notifications', kind: 'notifications' }
+      : kind === 'settings'
       ? {
           id: crypto.randomUUID(),
           route: settingsContext === 'applet' ? 'extensions' : 'settings',

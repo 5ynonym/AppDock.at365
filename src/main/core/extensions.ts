@@ -127,6 +127,9 @@ function readManifest(
       compareVersions(m.minimumHostVersion, '0.30.0') < 0)
   )
     throw Error('通知種類にはnotifications capabilityとminimumHostVersion:0.30.0以上が必要です。');
+  if (sourceKind !== 'builtin' && ((m.shell?.views?.['page.notifications']) || m.notificationTypes.some((t: any) => !t.defaultTargets.length)) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion,'0.31.0') < 0))
+    throw Error('通知センターにはminimumHostVersion:0.31.0以上が必要です。');
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);

@@ -98,3 +98,7 @@ Shellの`onFlush`/`flushed`はViewを切り替える前に受理待ち入力を�
 設定の`search`は最大512文字の検索語だけを更新し、編集revision・選択ページ・JSON範囲を変えない。`move`は最新カタログの項目IDを検証し、不正JSONなら移動を拒否する。成功時はフォーム全体を選択し、一意の移動要求を返す。Viewは宣言されたdata-setting-itemアンカーを待ち、親detailsを開き、固定ヘッダー外のスクロール領域へ移動してコンテナへフォーカスする。`moved`は現在の要求ID・ページIDのみを完了にする。古い要求を採用しない。
 
 SettingsNavigationStateはprimaryに保持し、Controller再作成・Shell復旧でもqueryを戻す。検索結果は項目名・説明・所属名・移動IDだけで、別ページの値や完全な定義を含めない。対象消失時は左結果を更新し、右は利用不可を表示する。選択と編集の値は勝手に別ページへ移さない。
+
+## 通知センター
+
+minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本文HTMLを指定できます。kind:notificationsのモデルと通知専用actionを同じwindow.appdockPageから取得します。モデル・署名は[notification-center.ts](../src/shared/notification-center.ts)、状態/保存/操作の契約は[通知設計](notification-foundation.md#段階3-通知センター)を参照してください。getSettings/executeCommandは従来どおり自Applet限定です。ShellPageHostのmainFrame/URL/現sessionとControllerのslot IDを検査します。

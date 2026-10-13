@@ -229,6 +229,52 @@ export class NotificationService {
         .map(({ actions: _a, busy: _b, dismissible: _d, ...entry }) => entry),
     ];
   }
+  historyStatus() {
+    return this.history.status;
+  }
+  centerEntries() {
+    this.expire();
+    const active = [...this.records.values()]
+      .filter((r) => r.item.status === 'active')
+      .map((r) => ({ ...structuredClone(r.item), historyPolicy: r.input.history }));
+    const ended = this.historyEntries()
+      .filter((i) => i.status !== 'active')
+      .map((i) => ({
+        ...i,
+        actions: [],
+        busy: false,
+        dismissible: false,
+        historyPolicy: this.records.get(i.id)?.input.history ?? ('persistent' as const),
+      }));
+    return [...new Map([...ended, ...active].map((i) => [i.id, i])).values()];
+  }
+  markRead(ids: string[]) {
+    const rows = this.centerEntries();
+    if (ids.some((id) => !rows.some((i) => i.id === id))) throw Error('通知が更新されました。');
+    const persistent = ids.filter(
+      (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
+    );
+    if (persistent.length) this.history.markRead(persistent);
+    for (const id of ids) {
+      const r = this.records.get(id);
+      if (r && !r.item.read) {
+        r.item.read = true;
+        r.item.revision++;
+      }
+    }
+    this.changed();
+  }
+  deleteHistory(ids: string[]) {
+    const rows = this.centerEntries();
+    if (ids.some((id) => !rows.some((i) => i.id === id && i.status !== 'active')))
+      throw Error('終了履歴だけを削除できます。');
+    const persistent = ids.filter(
+      (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
+    );
+    if (persistent.length) this.history.deleteEnded(persistent);
+    for (const id of ids) this.records.delete(id);
+    this.changed();
+  }
   end(source: string, id: string, status: 'resolved' | 'withdrawn' = 'resolved', reason?: string) {
     const r = this.records.get(id);
     if (!r || r.item.source !== source) throw Error('Notification owner mismatch');

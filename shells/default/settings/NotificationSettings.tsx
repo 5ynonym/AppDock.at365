@@ -102,6 +102,18 @@ export function NotificationSettings({
                   )}
                   <fieldset>
                     <legend>通知先</legend>
+                    <label>
+                      <SettingsInput
+                        type="checkbox"
+                        aria-label={type.title + 'の通知センターのみ'}
+                        checked={!policy.selectedTargets.length}
+                        disabled={!!type.requiredTargets.length}
+                        onChange={(e) => {
+                          if (e.target.checked) change(type, { targets: [] });
+                        }}
+                      />
+                      通知センターのみ
+                    </label>
                     {type.allowedTargets.map((target) => (
                       <label key={target}>
                         <SettingsInput

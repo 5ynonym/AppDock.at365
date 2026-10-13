@@ -118,9 +118,7 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       typeof v.disabledControlReason !== 'string' ||
       v.disabledControlReason.length > 1000 ||
       !targets(v.allowedTargets) ||
-      !v.allowedTargets.length ||
       !targets(v.defaultTargets) ||
-      !v.defaultTargets.length ||
       !targets(v.requiredTargets) ||
       [...v.defaultTargets, ...v.requiredTargets].some((t) => !v.allowedTargets.includes(t)) ||
       v.requiredTargets.some((t) => !v.defaultTargets.includes(t)) ||
@@ -193,6 +191,20 @@ export const settingsNotificationType: NotificationTypeEntry = {
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
   return [
     structuredClone(settingsNotificationType),
+    {
+      ...structuredClone(settingsNotificationType),
+      ownerId: 'updates',
+      typeId: 'applied',
+      title: '更新適用完了',
+      description: '更新後の再起動で、更新を適用したことを通知します。',
+      levels: ['info'],
+      defaultLevel: 'info',
+      canDisable: true,
+      disabledControlReason: '',
+      requiredTargets: [],
+      lifetimePolicy: 'userDuration',
+      defaultDurationSeconds: 6,
+    },
     ...applets.flatMap((a) =>
       (a.notificationTypes ?? []).map((t) => ({
         ...t,
@@ -232,7 +244,7 @@ export function resolveNotificationPolicy(
       ? 'applet-disabled'
       : invalidTargets && type.canDisable
         ? 'type-definition-changed'
-        : !available.length
+        : selectedTargets.length > 0 && !available.length
           ? 'no-available-targets'
           : undefined;
   return {
@@ -266,8 +278,7 @@ export function validateNotificationPreferenceChanges(
       (!type.canDisable && row.enabled === false) ||
       (row.durationSeconds !== undefined && type.lifetimePolicy !== 'userDuration') ||
       row.targets?.some((t) => !type.allowedTargets.includes(t)) ||
-      type.requiredTargets.some((t) => row.targets !== undefined && !row.targets.includes(t)) ||
-      ((row.enabled ?? type.defaultEnabled) && row.targets !== undefined && !row.targets.length)
+      type.requiredTargets.some((t) => row.targets !== undefined && !row.targets.includes(t))
     )
       throw Error(type.title + ': 通知種類の制約に合わない設定です。');
   }

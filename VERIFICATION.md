@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-13: 通知センターと更新完了バナー（0.31.0）
+
+- page.notificationsを公開Shell本文へ追加し、Default Shellにアクティブ通知・終了履歴、文字/レベル/発行元/状態/未読の絞込み、明示既読、50件の履歴ページ、終了履歴削除を実装。通知センターのみの表示先を空配列として指定できる。バナーとセンターは同じ通知ID・期限・操作ロックを使い、終了履歴に操作callbackを復元しない。
+- 個別操作は現在の対象IDを検査し、別通知の更新で不要な拒否を起こさない。ページ/一括操作はquery hashを照合し、一括削除は確認前にIDを固定して新着を除外する。永続履歴の既読/削除は原子的保存の失敗でメモリー内変更も戻す。未知schemaは上書きせず、session履歴の個別操作を継続する。
+- 成功したupdate-result.jsonをhost/updates/appliedのinfoバナーへ移行。既定6秒、手動時間指定、種類別オン/オフ、更新画面への操作を使える。本体通知なのでApplet共通スイッチで抑制しない。PC専用notifications/update-receipt.jsonの結果bytes hashで通常再起動の重複を防ぎ、オフ時の結果も受付済みにする。更新失敗・進捗は既存処理を保持。新しい保存ファイルと通知設定種類のため0.31.0へ更新した。
+- 発行前レビューでShell接続元/mainFrame/session、所有者・実行世代、履歴の安全な射影、query/操作競合、更新結果の受付済み保存を確認。個別既読の過剰なrevision検査、操作後のモデル取得前に次の操作を許すUI、旧リボン件数固定の試験を修正。最終の製品・試験tree **c76605b09cf14237a2bb711f3634821e9cf96775**を固定し、型検査と標準回帰 **346/346、fail/skip 0** 成功。
+- ソースGUI: 通知センター **9群**（notification-center-1791885493079、実Node/.NET、再起動、追加Shell故障復旧）、通知設定 **8群**（notification-settings-1791885496431）、設定通知 **10群**（settings-notice-1791885502979）、設定Shell **11群**（settings-shell-1791885509674）、navigation **17群**成功。個別既読・削除・検索保持、確認中の新着保持、テーマとセンターのみの操作を検証した。dialogの取消/許可はソース試験の応答fixtureを使用。
+- 開発ドライブのマウント変更で、実更新helperのapply/recoverが祖先30.PROJECTをリンクと判定し、ready前に失敗した。再取得では直らないため、登録済み祖先ボリューム認識をhelper全経路へ統一。payload走査にはroot境界を渡し、対象自身・通常junction・payload内のリンク/マウントを引き続き拒否する。実helperのマウント下適用/復旧/展開とjunction拒否を追加し、更新関連 **28/28**、標準回帰も再実行して成功。packだけの暫定対応を残さず共通検査へ整理した。
+- 通常publishと再発行成功。本体単一EXE **0.31.0 / 144,128,218 bytes / SHA256 263165b0337c8dfcbea2c79b4025d2e354d96fe7ffa005c2bdd46ad48971dac1**。update.jsonの版/size/hashとDefault Shell0.31.0が一致。最終固定EXEでセンター **7群**（notification-center-1791885542063）、既存設定通知 **9群**（settings-notice-1791885565024）成功。
+- 実単一EXEの隔離コピーを同版更新し、実helperの適用・終了・再起動、新基盤バナー/受付済み記録、ステータスバー重複なし、実カードボタンから通常更新画面へ移動する **3群**成功（update-result-banner-1791885418971）。更新jobをseedしたGUIとは別の検証。初回の描画待ちと再起動後CDPの引継ぎを前提にした試験を修正し、再起動後は保持されるmain inspectorから実Shellの公開API/DOMを検査した。製品のデバッグ権限を増やしていない。
+- 全コマンド/引数/cwd/終了コード/完全ログとhash、入力/native fixture/toolchain、Git treeと固定EXEの証跡は .artifacts/commit-validation-notification-center-0.31.0-20261013/。Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401/Windows26300 x64。固定lockfile再installはキャッシュで成功し、依存/lockfile/待機方針は変更なし。通常execの0x80070057は既存環境制約として通常ユーザー実行へ切り替え、Windows管理者へ昇格していない。
+- 成功した同方式の直近3件を保持し、古い通知設定sourceと設定Shell sourceの成功profile各1件をパス・再解析ポイント・使用中プロセス確認後に整理。失敗/状態不明、固定EXE、fixture、再利用証跡を保護。今回の編集補助を削除し、検証後の文書差分と最終treeを封印する。物理DPI/スクリーンリーダー、固定EXEの実ユーザーdialog応答は未確認。
+- 設計書を段階3実装済み/段階4デスクトップ通知へ更新。引き続き段階4・5・即時保存を、それぞれ実装→設計書更新→コミットする依頼を受けている。即時保存完了まで未保存警告の接続を維持し、移行完了時に旧管理を除去する。push/Release/実利用先deployは今回の範囲に含めない。
+
 ## 2026-10-13: 通知種類・通知設定とApplet API（0.30.0）
 
 - 「設定 → 通知」をpage.settings/Default Shellへ追加。本体とmanifestの静的notificationTypesを一覧化し、停止中のAppletも起動せず表示する。種類別enabled/targets/durationSeconds、既定継承/空欄manual、種類別復元、未導入種類の上書き保持、横断検索を既存の編集・部分JSON・全体保存へ接続した。設定項目追加のため本体を0.29.0→0.30.0へマイナー更新。

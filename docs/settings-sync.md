@@ -52,3 +52,5 @@ atomicWriteは一時ファイルを書いた後、WindowsのEPERM/EACCES/EBUSY�
 notificationPreferences.overridesはsettings.jsonの任意フィールドです。ownerKind/ownerId/typeIdの組で種類ごとにenabled/targets/durationSecondsを上書きします。未導入Applet/削除された種類/未実装の既知表示先を同期で受信しても保持し、PCで実行できない場合は理由付き抑制となります。種類定義、起動世代、利用可否、active状態と履歴はこの共有設定へ保存しません。
 
 省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。共有編集draftや外部revisionの競合保護を共用し、通知設定だけの別保存・即時保存は導入しません。詳細は[通知契約](notifications.md)を参照してください。
+
+通知センターの既読/履歴削除とnotifications/update-receipt.jsonの受付済み記録はPC専用です。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。

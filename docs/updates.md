@@ -77,4 +77,10 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 
 いずれも本体とhelperを先に発行してから実行する。実配布先GitHub/HTTP(S)/UNCの検証とは区別する。
 
-発行時のパッカーは、入力/出力の祖先にあるWindowsの登録済みボリュームマウントポイントを認識します。入力/出力自身のリンク、通常の祖先ジャンクション、Applet配布物内のリンクは引き続き拒否します。ボリュームの識別は[GetVolumeNameForVolumeMountPointW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumenameforvolumemountpointw)を使います。適用/復旧/展開時の従来のリンク検査は変更しません。回帰は tests/update-pack-mount.test.cjs と tests/portable-updates.test.cjs で確認します。
+更新helperは発行・適用・復旧・展開で、対象の祖先にあるWindowsの登録済みボリュームマウントポイントを認識します。対象自身のリンク、通常の祖先ジャンクション、Applet配布物内のリンクやマウントは引き続き拒否します。ボリュームの識別は[GetVolumeNameForVolumeMountPointW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumenameforvolumemountpointw)を使います。payloadの走査では配布物rootを境界にし、root内の再解析ポイントを許可しません。回帰は tests/update-pack-mount.test.cjs と tests/portable-updates.test.cjs で確認します。
+
+## 更新適用の完了通知
+
+更新後の起動で読み込むupdate-result.jsonの成功結果は、host/updates/appliedという通知種類のバナーで案内します。初期表示はinfo/6秒で、通知設定からオン/オフ、通知センターのみ、表示時間を変更できます。履歴はPC専用通知履歴に安全な固定文言だけを記録します。既読や履歴削除で更新処理をやり直しません。
+
+PC専用notifications/update-receipt.jsonはschemaVersion:1と最後に受付けた成功結果のSHA256を持ち、同じ結果を再起動ごとに再送しません。通知オフで抑制した結果も受付済みにします。保存できない場合は次回再表示の可能性をログへ記録し、未知schemaは上書きしません。進捗、確認結果、失敗結果、helperの交換/復元契約は従来の更新処理を使います。

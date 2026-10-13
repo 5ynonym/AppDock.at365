@@ -1,12 +1,12 @@
 # 通知基盤とShellバナー
 
-通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、次の通知センターと即時保存への方針は[移行設計](notification-foundation.md)を参照する。
+通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、次の独自デスクトップ通知と即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 
 ## 本体のサービス
 
 NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、表示されない時間も進む。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
 
-初版のtargetsはbannerまたは空配列。空配列は将来の通知センター用のストア管理であり、初版に閲覧ページはない。desktop/windowsは未実装として拒否する。旧Windows通知APIは別経路を維持する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
+targetsはbannerまたは空配列。空配列は通知センターだけに表示する指定。desktop/windowsは未実装として拒否する。旧Windows通知APIは別経路を維持する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
 
 同じ所有者・dedupeKeyのactive通知を更新し、終了後の再発は新IDになる。所有者は本体側が決定する。操作のホスト発行IDは現在の通知revisionと照合し、要求IDを最大512件記憶する。同じ要求の再送は同じ結果、異なる内容でのID再利用はエラーになる。通知単位のロックで別表示先からの二重押下を拒否し、失敗後は明示的に再試行できる。終了・撤回時に操作関数を回収する。
 
@@ -18,7 +18,7 @@ notificationCatalogは本体定義とmanifest.notificationTypesを集約する�
 
 「設定 → 通知」はpage.settingsの同じ編集セッションを使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体必須警告を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
 
-未保存の編集では配送を変えない。オフの保存は既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbannerだけで、desktop/windowsはフォームで操作不能。通知センターのみは次の段階。
+未保存の編集では配送を変えない。オフの保存は既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbannerだけで、desktop/windowsはフォームで操作不能。「通知センターのみ」はtargets:[]として選択できる。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
 
@@ -30,7 +30,7 @@ PC専用dataDirectory内のnotifications/history.jsonにschemaVersion:1の履歴
 
 ownerKind/ownerId/typeId/endReasonを任意保存する。旧記録は種類不明のまま読める。schemaVersion:1を維持する。
 
-再起動で過去のactive履歴をinterruptedへ変換し、操作を復活させない。現在の発行元が条件を評価して新規通知を作る。通知センター、既読操作、検索、履歴削除UIは後続段階。
+再起動で過去のactive履歴をinterruptedへ変換し、操作を復活させない。現在の発行元が条件を評価して新規通知を作る。通知センターで既読・検索・終了履歴削除を提供する。
 
 ## Shellの領域とbridge
 

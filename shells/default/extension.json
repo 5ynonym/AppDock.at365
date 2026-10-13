@@ -16,6 +16,7 @@
       "page.logs": "logs.html",
       "page.home": "home.html",
       "page.settings": "settings.html",
+      "page.notifications": "notification-center.html",
       "notification.banner": "notifications.html"
     }
   }

@@ -95,6 +95,30 @@ export class NotificationHistoryStore {
       this.failed(message);
     }
   }
+  get status() {
+    return { writable: this.writable, saveError: this.reported };
+  }
+  private edit(ids: string[], deleting: boolean) {
+    if (!this.writable) throw Error('通知履歴の保存形式が未対応のため、変更できません。');
+    const prior = new Map([...this.records].map(([id, e]) => [id, structuredClone(e)]));
+    for (const id of ids) {
+      const entry = this.records.get(id);
+      if (!entry) continue;
+      if (deleting) {
+        if (entry.status !== 'active') this.records.delete(id);
+      } else entry.read = true;
+    }
+    if (!this.flush()) {
+      this.records = prior;
+      throw Error('通知履歴を保存できません。変更は適用されていません。');
+    }
+  }
+  markRead(ids: string[]) {
+    this.edit(ids, false);
+  }
+  deleteEnded(ids: string[]) {
+    this.edit(ids, true);
+  }
   list() {
     this.prune();
     return structuredClone([...this.records.values()]);
@@ -134,7 +158,8 @@ export class NotificationHistoryStore {
   flush() {
     clearTimeout(this.timer);
     this.timer = undefined;
-    if (!this.writable) return;
+    if (!this.writable) return false;
+    let success = false;
     let temp = '';
     try {
       this.prune();
@@ -143,6 +168,7 @@ export class NotificationHistoryStore {
       fs.writeFileSync(temp, JSON.stringify({ schemaVersion: 1, entries: this.list() }), 'utf8');
       fs.renameSync(temp, this.file);
       this.reported = false;
+      success = true;
     } catch {
       this.report('通知履歴を保存できませんでした。通知の表示と操作は継続します。');
     } finally {
@@ -151,5 +177,6 @@ export class NotificationHistoryStore {
           fs.unlinkSync(temp);
         } catch {}
     }
+    return success;
   }
 }

@@ -23,15 +23,16 @@ internal static class Program
         var volume = new StringBuilder(64);
         return GetVolumeNameForVolumeMountPointW(directory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, volume, 64);
     }
-    private static void NoLinks(string value, bool allowVolumeAncestors = false)
+    private static void NoLinks(string value, string? treeRoot = null)
     {
         var target = Full(value);
+        var boundary = Full(treeRoot ?? value);
         for (var current = target; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
             if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
             {
-                // Packaging may live below a registered volume mount, but never traverse
-                // a linked input/output or a linked entry inside an Applet payload.
-                if (allowVolumeAncestors && !Same(current, target) && VolumeMount(current)) continue;
+                // Registered volume ancestors are normal storage, including during apply/recovery.
+                // A linked target or any mount/link inside a payload tree is still rejected.
+                if (!Same(current, boundary) && Within(current, boundary) && VolumeMount(current)) continue;
                 throw new IOException("更新対象にリンク・ジャンクションを使用できません。");
             }
     }
@@ -55,15 +56,15 @@ internal static class Program
         foreach (var file in files) text.Append(Path.GetRelativePath(directory, file).Replace('\\', '/')).Append('\0').Append(Hash(file)).Append('\n');
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant();
     }
-    private static List<string> Files(string directory, bool allowVolumeAncestors = false)
+    private static List<string> Files(string directory)
     {
         var files = new List<string>(); long size = 0;
         void Walk(string current)
         {
-            NoLinks(current, allowVolumeAncestors);
+            NoLinks(current, directory);
             foreach (var file in Directory.EnumerateFileSystemEntries(current))
             {
-                NoLinks(file, allowVolumeAncestors); SafeName(Path.GetRelativePath(directory, file).Replace('\\', '/'));
+                NoLinks(file, directory); SafeName(Path.GetRelativePath(directory, file).Replace('\\', '/'));
                 if (Directory.Exists(file)) Walk(file);
                 else
                 {
@@ -320,7 +321,7 @@ internal static class Program
     }
     private static void Pack(string kind, string source, string version, string output)
     {
-        source = Full(source); output = Full(output); NoLinks(source, true); NoLinks(output, true);
+        source = Full(source); output = Full(output); NoLinks(source); NoLinks(output);
         string id; string? minimumHostVersion = null; string payload;
         List<string>? files = null;
         if (kind == "host") { id = "host"; payload = "AppDock.at365.exe"; }
@@ -334,15 +335,15 @@ internal static class Program
                 throw new IOException("発行するAppletのAPI・エントリーが正しくありません。");
             if (m.TryGetProperty("minimumHostVersion", out var minimum)) minimumHostVersion = minimum.GetString();
             // Collect before creating the archive, including when output is the source itself.
-            files = Files(source, true).Where(file => Path.GetRelativePath(source, file).Replace('\\', '/') is not ("update.json" or "update.zip")).ToList();
+            files = Files(source).Where(file => Path.GetRelativePath(source, file).Replace('\\', '/') is not ("update.json" or "update.zip")).ToList();
             payload = "update.zip";
         }
         else throw new IOException("発行形式はhost/appletです。");
         Directory.CreateDirectory(output);
         var filePath = Path.Combine(output, payload);
-        NoLinks(filePath, true);
-        NoLinks(Path.Combine(output, "update.json"), true);
-        NoLinks(Path.Combine(output, "update.json.tmp"), true);
+        NoLinks(filePath);
+        NoLinks(Path.Combine(output, "update.json"));
+        NoLinks(Path.Combine(output, "update.json.tmp"));
         var temporary = Path.Combine(output, ".update-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {

@@ -6,6 +6,7 @@ export type ShellRegion =
   | 'overlay.command-palette'
   | 'page.logs'
   | 'page.home'
+  | 'page.notifications'
   | 'page.settings'
   | 'notification.banner';
 export function shellView(

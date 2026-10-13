@@ -98,8 +98,12 @@ test('Ribbon inserts new Applets without dropping, duplicating or mutating saved
   const ordered = orderRibbon(source, ['page:test.pages:main', 'missing', 'settings']);
   assert.equal(ordered[0].id, 'page:test.pages:main');
   assert.equal(ordered[1].id, 'settings');
-  assert.equal(ordered.length, 7);
-  assert.equal(new Set(ordered.map((item) => item.id)).size, 7);
+  assert.equal(ordered.length, source.length);
+  assert.deepEqual(
+    [...new Set(ordered.map((item) => item.id))].sort(),
+    source.map((item) => item.id).sort(),
+  );
+  assert.ok(ordered.some((item) => item.id === 'notifications'));
   assert.equal(source[0].id, 'home');
 });
 test('Disabled Applets disappear from the ribbon while the settings catalogue and placement remain', () => {

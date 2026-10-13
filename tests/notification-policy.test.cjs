@@ -87,7 +87,9 @@ function setup(t, definitions = [definition()]) {
       clock += ms;
       service.expire();
     },
-    advanceWithoutTimer: (ms) => { clock += ms; },
+    advanceWithoutTimer: (ms) => {
+      clock += ms;
+    },
   };
 }
 const content = (extra) => ({
@@ -133,14 +135,16 @@ test('declarations reject identity duplication, Applet mandatory claims, invalid
 });
 test('preferences distinguish inheritance and explicit null; reject invalid and duplicate values', () => {
   const settings = createDefaultSettings(),
-    type = p.notificationCatalog([
-      {
-        id: owner.ownerId,
-        displayName: 'Fixture',
-        state: 'stopped',
-        notificationTypes: [definition()],
-      },
-    ])[1];
+    type = p
+      .notificationCatalog([
+        {
+          id: owner.ownerId,
+          displayName: 'Fixture',
+          state: 'stopped',
+          notificationTypes: [definition()],
+        },
+      ])
+      .find((t) => t.ownerKind === 'applet' && t.ownerId === owner.ownerId);
   assert.equal(p.resolveNotificationPolicy(type, settings).lifetime.milliseconds, 5000);
   settings.notificationPreferences = p.parseNotificationPreferences({
     overrides: [row({ durationSeconds: null })],
