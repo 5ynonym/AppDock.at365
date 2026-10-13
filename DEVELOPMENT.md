@@ -13,6 +13,7 @@
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
 | 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
+| Shellの領域別割り当て設計 | [領域ごとの指定・復旧・専用コマンドと実装計画（未実装）](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |

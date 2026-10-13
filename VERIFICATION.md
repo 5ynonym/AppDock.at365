@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-14: Shellの領域別割り当て設計をmainへ統合
+
+- 設計branch codex/shell-region-design（a398213）をmain a0d5363へ統合。VERIFICATION先頭の競合は双方の検証記録を保持して解消した。製品ソース・設定・依存・配布物は変更しない。
+- main 0.33.0との意味上の差分を文書だけで調整。対象を現行8領域に揃え、通知センターと独立desktop、共通NotificationSurfaceHost、設定ShellのschemaVersion:2互換検査を反映した。共有ドラフトを前提とした計画をSettingsStore/SettingsInputSessionの即時保存・フィールド単位競合・UI内の不正入力へ改めた。保存応答とflushの待ち合わせ、desktopの独立した可視状態も確認した。
+- 文書リンク・参照ファイル・見出し/コードフェンス・JSON例・差分を検査し、マージ前mainからの変更が文書3件だけであることを確認した。証跡は .artifacts/merge-shell-region-design-20261014/。設計時の .artifacts/commit-validation-shell-region-design-20261013/ もmain側へhash一致で退避した。
+- 文書のみのため製品回帰・GUI・版更新・publishは対象外。Shellの領域別割り当て自体は未実装。マージ検証後に設計worktreeを削除し、pushは行わない。
+
+## 2026-10-13: Shellの領域別割り当て設計（未実装）
+
+- main a14dd90（0.30.0）からcodex/shell-region-designを独立worktreeへ作成し、[領域ごとのShell割り当てと実装計画](docs/shell-region-assignment.md)を追加。開発ガイドに未実装計画として入口を追加した。既存作業のindex・ソース・配布物は変更していない。
+- 6領域の明示指定、無効化時のDefault Shell復旧、旧単一設定の移行、保存指定と実Viewの区別、故障記録・再試行、編集中の切替、専用コマンドの任意条件と自己状態API、本体描画移行の境界を整理。5段階の実装順序と影響先・受入条件を記載した。
+- 設計レビューで、旧設定を固定実装した外部Shellの更新範囲、Registryとコマンドsnapshotの相互再帰回避、表示中パレットの復旧先、モーダル中の操作拒否、最終実行経路の検査と受付済み処理の限界を補足した。現行コード・公開契約との照合を行い、コミットを妨げる未解決の指摘なし。
+- 文書のローカルリンク、参照するソース/試験の存在、見出し・コードフェンス、JSON例2件、会話上の呼称混入、git diff --checkを確認した。既存VERIFICATIONの過去証跡は独立worktreeに複製されないため、そのリンクの実在確認は今回の追記範囲に限定した。初回検査の範囲過大を修正して再確認した。
+- 検証スクリプト・実行ログ・対象tree/commit・文書hashは .artifacts/commit-validation-shell-region-design-20261013/ に保存。文書のみのため製品回帰・GUI・ビルド・版更新・publishは実施しない。製品機能の実装済み・動作検証済みとは扱わない。マージ・pushは行わない。
+
 ## 2026-10-13: 独立デスクトップ通知と表示Host共用（0.31.1）
 
 - 予約済みdesktop表示先を有効にし、通知種類でbanner/desktopの複数選択を可能にした。NotificationServiceのtargetItems/setDelivery、NotificationSurfaceController/Host/preloadを共用し、バナー専用の旧ファイル/API実装を撤去。Default Shellの同じカード・操作・期限・IDを使い、desktop用の独立Windowだけを追加した。新しい保存ファイル・設定キー・SDK APIを増やしていないためパッチ0.31.1。
