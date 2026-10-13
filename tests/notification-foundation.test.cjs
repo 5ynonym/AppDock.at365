@@ -64,12 +64,12 @@ test('levels, lifecycle, source identity and independent banner visibility', (t)
     input({ level: 'warning', dedupeKey: 'same', bannerVisible: false }),
   );
   const b = s.upsert('host.beta', input({ level: 'error', dedupeKey: 'same' }));
-  assert.equal(s.bannerItems().length, 1);
+  assert.equal(s.targetItems('banner').length, 1);
   assert.equal(s.list().length, 2);
   assert.notEqual(a, b);
   assert.equal(s.upsert('host.alpha', input({ dedupeKey: 'same', bannerVisible: true })), a);
   assert.deepEqual(
-    s.bannerItems().map((i) => i.id),
+    s.targetItems('banner').map((i) => i.id),
     [a, b],
   );
   assert.throws(() => s.end('host.beta', a), /owner/);
@@ -197,7 +197,7 @@ test('session/none policies, unsupported interfaces and history omission are exp
   const { service: s, store } = fixture(t);
   s.upsert('host.alpha', input({ targets: [], history: 'session' }));
   const id = s.upsert('host.alpha', input({ history: 'none' }));
-  assert.equal(s.bannerItems().length, 1);
+  assert.equal(s.targetItems('banner').length, 1);
   s.end('host.alpha', id);
   assert.equal(s.list().length, 1);
   assert.equal(store.list().length, 0);
@@ -226,11 +226,11 @@ test('history handles malformed, newer schemas and write errors without losing r
   const runtime = new NotificationService(unavailable);
   runtime.upsert('host.alpha', input());
   unavailable.flush();
-  assert.equal(runtime.bannerItems().length, 1);
+  assert.equal(runtime.targetItems('banner').length, 1);
   runtime.dispose();
   assert.ok(messages.length >= 3);
   s.upsert('host.alpha', input());
-  assert.equal(s.bannerItems().length, 1);
+  assert.equal(s.targetItems('banner').length, 1);
 });
 test('history retains active records while pruning old and excessive terminal records', (t) => {
   const { store } = fixture(t);
@@ -322,5 +322,5 @@ test('settings adapter has one episode, shared actions and is removable without 
   assert.equal(operations, 2);
   s.upsert('host.other', input());
   s.withdrawSource('host.settings');
-  assert.equal(s.bannerItems().length, 1);
+  assert.equal(s.targetItems('banner').length, 1);
 });

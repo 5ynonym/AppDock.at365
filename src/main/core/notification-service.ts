@@ -80,7 +80,7 @@ export class NotificationService {
       !['info', 'warning', 'error'].includes(input.level) ||
       !['persistent', 'session', 'none'].includes(input.history) ||
       !Array.isArray(input.targets) ||
-      input.targets.some((t) => t !== 'banner') ||
+      input.targets.some((t) => !['banner', 'desktop'].includes(t)) ||
       new Set(input.targets).size !== input.targets.length ||
       !['timed', 'manual', 'condition'].includes(input.lifetime?.type) ||
       (input.lifetime.type === 'timed' &&
@@ -208,15 +208,15 @@ export class NotificationService {
     this.expire();
     return structuredClone([...this.records.values()].map((r) => r.item));
   }
-  bannerItems() {
+  targetItems(target: NotificationItem['targets'][number]) {
     this.expire();
     return structuredClone(
       [...this.records.values()]
         .filter(
           (r) =>
             r.item.status === 'active' &&
-            r.item.targets.includes('banner') &&
-            r.input.bannerVisible !== false,
+            r.item.targets.includes(target) &&
+            (target !== 'banner' || r.input.bannerVisible !== false),
         )
         .map((r) => r.item),
     );
@@ -303,13 +303,17 @@ export class NotificationService {
     while (ended.length > 1000) this.records.delete(ended.shift()!.item.id);
     this.changed();
   }
-  setBannerDelivery(ids: string[], state: 'showing' | 'hidden' | 'failed') {
+  setDelivery(
+    target: NotificationItem['targets'][number],
+    ids: string[],
+    state: 'showing' | 'hidden' | 'failed',
+  ) {
     let changed = false;
     for (const r of this.records.values()) {
-      if (r.item.status !== 'active' || !r.item.targets.includes('banner')) continue;
+      if (r.item.status !== 'active' || !r.item.targets.includes(target)) continue;
       const next = ids.includes(r.item.id) ? state : 'hidden';
-      if (r.item.delivery.banner !== next) {
-        r.item.delivery.banner = next;
+      if (r.item.delivery[target] !== next) {
+        r.item.delivery[target] = next;
         this.persist(r);
         changed = true;
       }

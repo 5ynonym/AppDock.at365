@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-13: 独立デスクトップ通知と表示Host共用（0.31.1）
+
+- 予約済みdesktop表示先を有効にし、通知種類でbanner/desktopの複数選択を可能にした。NotificationServiceのtargetItems/setDelivery、NotificationSurfaceController/Host/preloadを共用し、バナー専用の旧ファイル/API実装を撤去。Default Shellの同じカード・操作・期限・IDを使い、desktop用の独立Windowだけを追加した。新しい保存ファイル・設定キー・SDK APIを増やしていないためパッチ0.31.1。
+- desktop対象がある間だけWindowとhookを作らない表示可否query workerを生成し、最後の対象を外す/終了すると両方を破棄。新着はshowInactiveでfocusを保ち、本体を隠しても表示する。トレイの画面/作業領域/側を優先し、取得不能時は本体の画面へ配置。幅440・高さ600またはworkArea60%を上限とし、DIPと画面変更イベントを使う。
+- WindowsのSHQueryUserNotificationStateとlock/suspend、本体の全画面状態で表示を抑制。抑制中もactiveの期限は進み、期限切れを解除後に再表示しない。query失敗ではログ/センター閲覧と明示再試行を使い、worker再起動ループを避ける。InputHostの通常入力/ジェスチャーモードを変更せず専用queryモードを追加した。
+- notification.desktopはminimumHostVersion:0.31.1以上の追加Shellで差し替えられる。同じ公開appdockNotificationsにsurfaceとopenCenterを追加し、接続元/mainFrame/URL/session/表示先チャネルを束縛する。個別領域だけDefault Shellへ戻り、idleでWindowを作り直しても同provider/版の故障記憶を保持する。既存Appletの予約済みdesktop種類宣言は読込を維持し、新領域の最低版制約と分離した。
+- 発行前レビューはIPC/操作ロック、表示先ごとの配送状態、focusと作業領域、抑制/期限、worker/Window解放、Shell故障記憶と宣言互換を対象に実施。idle時の故障記憶消失、旧版の予約済みdesktop宣言を不必要に拒否する条件を修正し回帰を追加。専用adapter registryを増やさず共通射影/Hostへまとめた構成を設計書へ反映した。
+- 最終製品/試験tree **d6e725aee9e50863e6a8d6061e601f4196bf0536**を固定し、型検査と標準回帰 **350/350、fail/skip 0** 成功。通知配送・座標・宣言互換の追加回帰を含む。.NET SDK/Runtime/ExtensionHost/InputHostと通知fixtureのRelease build成功。Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401/Windows26300 x64、全コマンド/引数/cwd/終了コード/完全ログ/入力・fixture・兄弟repo・EXE hashは .artifacts/commit-validation-notification-desktop-0.31.1-20261013/。
+- ソースGUI: desktop **7群**（notification-desktop-1791887881033）、汎用banner **8群**（notification-banner-1791887884800）、通知センター **9群**（notification-center-1791887903230）、通知設定 **8群**（notification-settings-1791887906672）、設定通知 **10群**、設定Shell **11群**（settings-shell-1791887920475）、navigation **17群**成功。実Node/.NET、両テーマ、現在の150%画面の作業領域、共有dismiss/停止、抑制中の期限切れ、追加Shell故障復旧/idle再生成、query worker終了まで確認した。
+- InputHost通常モードの実Node WebBrowserTools/.NET WindowsTools回帰 **4群**（native-input-ui-1791887896902）成功。許可・取消・対象変更・連続ジェスチャー入力を確認。途中の.NETケースは送信受付直後に実入力イベントを検査して失敗したため、隣のNodeケースと同じ実ターゲットイベント待ちへ修正。入力再送や判定緩和は行わず、修正後の最終回帰で成功。初回desktop GUIの通知件数期待も実6件に合わせて修正し、失敗profile/ログを保持した。
+- 通常publishとレビュー修正後の再発行成功。単一EXE **0.31.1 / 144,125,522 bytes / SHA256 72e39ad299b84cf087dfd3a67b9564371e270dbbeee04d70eb188134bfa1b741**。update.jsonの版/size/hashと同梱Default Shell0.31.1が一致。最終固定EXEでdesktop **5群**（notification-desktop-1791888056872）、センター **7群**（notification-center-1791888070998）、設定通知 **9群**（settings-notice-1791888093560）成功。物理的なOSロック/復帰、別アプリの排他D3D全画面、複数実モニター/タスクバー方向の全組合せ、スクリーンリーダーは未確認。lock/unlockはイベントfixture、全画面は実本体Windowで検証した。
+- 版変更後の固定lockfile installはキャッシュ成功。lockfile/toolchain/待機方針と兄弟Applet配布物を変更していない。開発ドライブの既存祖先マウント対応で発行成功し、新たな影響なし。通常ユーザーの実行許可を使用し、Windows管理者への昇格なし。
+- 検証済み成功profileを方式別の直近3件へ整理し、VERIFICATION/最終再利用証跡・固定出力・fixture・失敗/状態不明を保持。今回の整理一覧はcleanup.json/cleanup-final.json、編集補助は削除。プロセス終了とstage/作業ファイル/tree一致を確認し、検証後の文書のみの補記を封印する。
+- 設計書を段階4実装済み/次の段階5 Windows adapter・旧show統合へ更新。本体の通常本文はprimaryの1 Windowのまま、通知専用Windowをその例外として文書とrepo指示へ反映した。続けて即時保存まで各段階を実装・設計反映・コミットする。push/Release/実利用先deployは今回の範囲外。
+
 ## 2026-10-13: 通知センターと更新完了バナー（0.31.0）
 
 - page.notificationsを公開Shell本文へ追加し、Default Shellにアクティブ通知・終了履歴、文字/レベル/発行元/状態/未読の絞込み、明示既読、50件の履歴ページ、終了履歴削除を実装。通知センターのみの表示先を空配列として指定できる。バナーとセンターは同じ通知ID・期限・操作ロックを使い、終了履歴に操作callbackを復元しない。

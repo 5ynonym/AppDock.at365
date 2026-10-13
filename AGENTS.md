@@ -31,7 +31,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 
 - [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell Appletは描画を所有する。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
-- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。複数の同時Shell/Windowは未実装。
+- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。Appletの複数Window/複数Shellの同時表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
 - 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いmainのSettingsEditingSessionで共有し、useSettingsEditorは本体用アダプターとする。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
 - Applet設定は詳細タブと設定ページの左インデックスを入口とし、同じShell本文と編集状態を共用する。横断検索は左だけに結果を表示し、右本文はページ全体を保つ。Applet本文内のローカル検索を追加しない。

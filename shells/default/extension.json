@@ -17,7 +17,8 @@
       "page.home": "home.html",
       "page.settings": "settings.html",
       "page.notifications": "notification-center.html",
-      "notification.banner": "notifications.html"
+      "notification.banner": "notifications.html",
+      "notification.desktop": "notifications.html"
     }
   }
 }

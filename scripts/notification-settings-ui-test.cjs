@@ -222,10 +222,10 @@ async function close() {
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     assert.equal(
       await p.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
-      true,
+      false,
     );
     checks.push(
-      'static catalog includes mandatory host, stopped Applet and retained unknown types; future targets locked',
+      'static catalog includes mandatory host, stopped Applet and retained unknown types; desktop enabled and Windows locked',
     );
     await command(ids.node + '.publish');
     await command(ids.native + '.publish');

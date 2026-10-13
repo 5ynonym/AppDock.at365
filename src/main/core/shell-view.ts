@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /** Same local-file boundary for built-in and external presentation surfaces. */
-export function createShellView(folder: string, entry: string, preload: string) {
+export function createShellView(folder: string, entry: string, preload: string, additionalArguments: string[] = []) {
   const file = fs.realpathSync(path.resolve(folder, entry));
   const relative = path.relative(fs.realpathSync(folder), file);
   if (relative.startsWith('..') || path.isAbsolute(relative))
@@ -12,6 +12,7 @@ export function createShellView(folder: string, entry: string, preload: string) 
   const view = new WebContentsView({
     webPreferences: {
       preload,
+      additionalArguments,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

@@ -7,6 +7,7 @@ import {
   notificationTypeKey,
   notificationSettingKey,
   resolveNotificationPolicy,
+  availableNotificationTargets,
 } from '../../../src/shared/notification-types';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { SettingsInput } from '../../../src/shared/settings-ui/SettingsInput';
@@ -120,7 +121,10 @@ export function NotificationSettings({
                           type="checkbox"
                           aria-label={type.title + 'の' + targetTitles[target]}
                           checked={policy.selectedTargets.includes(target)}
-                          disabled={target !== 'banner' || type.requiredTargets.includes(target)}
+                          disabled={
+                            !availableNotificationTargets.includes(target) ||
+                            type.requiredTargets.includes(target)
+                          }
                           onChange={(e) =>
                             change(type, {
                               targets: e.target.checked
@@ -130,7 +134,7 @@ export function NotificationSettings({
                           }
                         />
                         {targetTitles[target]}
-                        {target !== 'banner'
+                        {!availableNotificationTargets.includes(target)
                           ? '（未対応）'
                           : type.requiredTargets.includes(target)
                             ? '（必須）'

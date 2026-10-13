@@ -186,7 +186,7 @@ test('mandatory condition is enforced for UI saves and externally received overr
   assert.deepEqual(resolved.lifetime, { type: 'condition' });
   assert.equal(resolved.dismissible, false);
 });
-test('valid future targets are retained but never silently routed to banner', () => {
+test('desktop is available while future Windows targets never silently route to banner', () => {
   const settings = createDefaultSettings(),
     type = { ...definition(), ...owner, ownerTitle: 'Fixture', ownerState: 'running' };
   settings.notificationPreferences = { overrides: [row({ targets: ['desktop', 'windows'] })] };
@@ -194,6 +194,8 @@ test('valid future targets are retained but never silently routed to banner', ()
     'desktop',
     'windows',
   ]);
+  assert.deepEqual(p.resolveNotificationPolicy(type, settings).targets, ['desktop']);
+  settings.notificationPreferences = { overrides: [row({ targets: ['windows'] })] };
   assert.equal(p.resolveNotificationPolicy(type, settings).reason, 'no-available-targets');
 });
 test('typed dedupe isolates kinds but shares the owner quota', (t) => {
@@ -267,6 +269,10 @@ test('route changes preserve active ID and deadline; losing all available target
   assert.equal(f.service.list()[0].expiresAt, due);
   assert.equal(f.service.list()[0].id, a.notificationId);
   f.prefs([row({ targets: ['desktop'] })]);
+  assert.equal(f.service.list()[0].status, 'active');
+  assert.equal(f.service.list()[0].expiresAt, due);
+  assert.deepEqual(f.service.list()[0].targets, ['desktop']);
+  f.prefs([row({ targets: ['windows'] })]);
   assert.equal(f.service.list()[0].status, 'withdrawn');
 });
 test('Applet global gate does not disable host warning, stopped generation cannot resolve or replay actions', async (t) => {
@@ -336,4 +342,32 @@ test('safe persisted kind identity survives restart without callbacks or private
   assert.equal(read.list()[0].ownerId, owner.ownerId);
   assert.equal(read.list()[0].status, 'interrupted');
   read.flush();
+});
+
+test('reserved desktop defaults from 0.30 manifests remain readable while the new Shell region requires its API version', (t) => {
+  const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-manifest-unit-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{};');
+  fs.writeFileSync(path.join(dir, 'notifications.html'), '<html></html>');
+  const manifest = {
+    apiVersion: 1,
+    id: 'fixture.compat',
+    name: 'Fixture',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'worker.cjs',
+    minimumHostVersion: '0.30.0',
+    capabilities: ['notifications', 'shell'],
+    notificationTypes: [definition({ defaultTargets: ['desktop'] })],
+  };
+  const write = () => fs.writeFileSync(path.join(dir, 'extension.json'), JSON.stringify(manifest));
+  write();
+  const { readManifest } = require('../out/main/main/core/extensions');
+  assert.deepEqual(readManifest(dir).notificationTypes[0].defaultTargets, ['desktop']);
+  manifest.shell = { apiVersion: 1, views: { 'notification.desktop': 'notifications.html' } };
+  write();
+  assert.throws(() => readManifest(dir), /0.31.1/);
+  manifest.minimumHostVersion = '0.31.1';
+  write();
+  assert.equal(readManifest(dir).shell.views['notification.desktop'], 'notifications.html');
 });

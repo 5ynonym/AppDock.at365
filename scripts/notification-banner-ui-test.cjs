@@ -12,8 +12,8 @@ const root = ${JSON.stringify(root)};
 app.setPath('userData', path.join(__dirname,'chromium'));
 const { NotificationService } = require(path.join(root,'out/main/main/core/notification-service'));
 const { NotificationHistoryStore } = require(path.join(root,'out/main/main/core/notification-history'));
-const { NotificationBannerHost } = require(path.join(root,'out/main/main/core/notification-banner-host'));
-const { NotificationBannerController } = require(path.join(root,'out/main/main/core/notification-banner-controller'));
+const { NotificationSurfaceHost } = require(path.join(root,'out/main/main/core/notification-surface-host'));
+const { NotificationSurfaceController } = require(path.join(root,'out/main/main/core/notification-surface-controller'));
 let fixture;
 app.whenReady().then(async()=>{
  const window = new BrowserWindow({width:1000,height:800,webPreferences:{sandbox:true}});
@@ -27,7 +27,7 @@ app.whenReady().then(async()=>{
  {id:'fixture.partial',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
  {id:'fixture.stalled',folder:__dirname,version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'stalled.html'}}},
  ];
- const host=new NotificationBannerHost({window,controller:new NotificationBannerController(service,()=>dark),preload:path.join(root,'out/main/main/notification-banner-preload.js'),
+ const host=new NotificationSurfaceHost({window,controller:new NotificationSurfaceController(service,()=>dark),preload:path.join(root,'out/main/main/notification-surface-preload.js'),
  providers:()=>providers,selected:()=>selected,ready:()=>true,settings:()=>({accent:true}),
  execute:async(id,command)=>{if(command!=='fixture.own')throw Error('Not owned');return id;},
  layer:()=>{},failed:(m)=>console.error(m)});

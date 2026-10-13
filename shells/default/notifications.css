@@ -139,3 +139,5 @@ button:focus-visible {
     justify-content: flex-start;
   }
 }
+
+.desktop-lane .notification-actions { max-width:100%; }

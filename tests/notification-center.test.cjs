@@ -69,7 +69,7 @@ test('active/history ID union uses live content and safe ended summaries; none i
     b = f.publish({ history: 'session' }),
     c = f.publish({ history: 'none' });
   assert.equal(f.model().items.length, 3);
-  assert.equal(f.service.bannerItems().length, 0);
+  assert.equal(f.service.targetItems('banner').length, 0);
   f.service.end('host.fixture', a);
   f.service.end('host.fixture', b);
   f.service.end('host.fixture', c);

@@ -4,17 +4,18 @@ import type {
 } from '../../shared/notifications';
 import type { NotificationService } from './notification-service';
 
-/** Public presentation projection and operations; native lifetime stays in BannerHost. */
-export class NotificationBannerController {
+/** Shared presentation projection; native Window/View lifetime stays in the surface host. */
+export class NotificationSurfaceController {
   constructor(
     private service: NotificationService,
     private dark: () => boolean,
+    readonly target: 'banner' | 'desktop' = 'banner',
   ) {}
   subscribe(callback: () => void) {
     return this.service.subscribe(callback);
   }
   items() {
-    return this.service.bannerItems();
+    return this.service.targetItems(this.target);
   }
   snapshot(
     sessionId: string,
@@ -22,6 +23,7 @@ export class NotificationBannerController {
   ): NotificationBannerModel {
     return {
       schemaVersion: 1,
+      surface: this.target,
       contextId: 'primary',
       sessionId,
       revision: this.service.revision,
@@ -36,6 +38,6 @@ export class NotificationBannerController {
     await this.service.invoke(request);
   }
   delivery(ids: string[], state: 'showing' | 'hidden' | 'failed') {
-    this.service.setBannerDelivery(ids, state);
+    this.service.setDelivery(this.target, ids, state);
   }
 }

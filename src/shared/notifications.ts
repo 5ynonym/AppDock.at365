@@ -48,6 +48,7 @@ export interface NotificationBannerModel {
   revision: number;
   dark: boolean;
   items: NotificationItem[];
+  surface?: 'banner' | 'desktop';
   viewport: { width: number; maxHeight: number };
 }
 export interface NotificationBannerApi extends ShellAppletApi {
@@ -60,6 +61,7 @@ export interface NotificationBannerApi extends ShellAppletApi {
   act(request: NotificationActionRequest): Promise<void>;
   resize(height: number): Promise<void>;
   focusHost(): Promise<void>;
+  openCenter(): Promise<void>;
   onFocus(callback: () => void): () => void;
   onChanged(callback: (model: NotificationBannerModel) => void): () => void;
 }

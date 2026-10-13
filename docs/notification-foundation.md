@@ -1,6 +1,6 @@
 # 通知基盤とDefault Shellへの移行設計
 
-状態: 段階1を本体0.29.0、段階2を本体0.30.0、段階3を本体0.31.0として実装済み。段階4以降は未実装。現行の型・bridge・保存契約は[通知基盤](notifications.md)、実測と制約は[検証記録](../VERIFICATION.md)を正本とする。本書は今回確定した設計と次の実装範囲を記す。
+状態: 段階1を本体0.29.0、段階2を本体0.30.0、段階3を本体0.31.0、段階4を本体0.31.1として実装済み。段階5と即時保存は未実装。現行の型・bridge・保存契約は[通知基盤](notifications.md)、実測と制約は[検証記録](../VERIFICATION.md)を正本とする。本書は今回確定した設計と次の実装範囲を記す。
 
 設定は将来、未保存状態を管理しない即時保存へ移行する。今回の未保存警告は通知基盤の最初の発行元であり、基盤の前提にはしない。通知センターなどの追加と即時保存化は独立して進める。
 
@@ -15,8 +15,8 @@
 | 1 | 実装済み | 通知サービス、操作管理、履歴保存、複数バナー、Default Shell、既存未保存警告の接続 |
 | 2 | 実装済み | 種類カタログ、通知設定、方針解決、Node/.NETの最小種類指定API |
 | 3 | 実装済み | 通知センター、active/履歴一覧、既読、検索、終了履歴削除 |
-| 4・次回の推奨範囲 | 未実装 | トレイ付近の独自デスクトップ通知、表示先adapterの拡張 |
-| 5 | 未実装 | Windows表示先、旧通知APIの基盤への接続 |
+| 4 | 実装済み | トレイ付近の独自デスクトップ通知、表示先adapterの拡張 |
+| 5・次回の範囲 | 未実装 | Windows表示先、旧通知APIの基盤への接続 |
 | 独立した移行 | 未実装 | 設定の即時保存、未保存警告発行元の削除 |
 
 種類別の通知方針を共通化するため、通知設定を通知センターより先に実装する。段階4・5の順序は変更可能だが、Windows側で保持・操作を表現できない通知の閲覧先として段階3のセンターを前提にする。未実装の表示先を製品UIで選択可能にせず、新APIをMCPへ自動公開しない。
@@ -28,12 +28,12 @@
 | [TypedNotifications](../src/main/core/typed-notifications.ts) | 種類の検証、保存済み方針の適用、episode/世代の対応、設定変更と停止時の撤回 |
 | [NotificationService](../src/main/core/notification-service.ts) | Electron非依存の通知ID/revision、期限、所有者内集約、状態遷移、操作関数・要求ID・通知単位ロック |
 | [NotificationHistoryStore](../src/main/core/notification-history.ts) | 安全な履歴の投影、読込・原子的保存、保持上限、破損・未知schema時の退避 |
-| [NotificationBannerController](../src/main/core/notification-banner-controller.ts) | バナーモデル、表示中通知の操作受付、配送状態 |
-| [NotificationBannerHost](../src/main/core/notification-banner-host.ts) | 非モーダルView、provider解決、接続/ready、寸法・zoom・重なり順、Shell切替・復旧 |
+| [NotificationSurfaceController](../src/main/core/notification-surface-controller.ts) | バナーモデル、表示中通知の操作受付、配送状態 |
+| [NotificationSurfaceHost](../src/main/core/notification-surface-host.ts) | 非モーダルView、provider解決、接続/ready、寸法・zoom・重なり順、Shell切替・復旧 |
 | [Default Shell](../shells/default/notifications.tsx) | プレーンテキスト、操作、縦スタック、展開・スクロール、キーボード・読み上げ |
 | [SettingsNotificationSource](../src/main/core/settings-notification-source.ts) | 設定の通知条件、文言、保存/破棄/編集へ戻る処理、表示文脈 |
 
-SettingsEditingSession→SettingsNotificationSource→TypedNotifications→NotificationService→BannerController→BannerHost→Shellという接続とし、サービスから履歴ストアへ安全な記録を投影する。操作管理はサービス内部に実装した。別のNotificationActionRegistryクラスは作っていない。
+SettingsEditingSession→SettingsNotificationSource→TypedNotifications→NotificationService→SurfaceController→SurfaceHost→Shellという接続とし、サービスから履歴ストアへ安全な記録を投影する。操作管理はサービス内部に実装した。別のNotificationActionRegistryクラスは作っていない。
 
 本体からDefault ShellのReact部品をimportせず、復旧時にも同じDefault Shell entryを使用する。[Shell基盤](shell-foundation.md)に従い、内容ControllerとネイティブViewの寿命を分離する。dirty、draft、保存/破棄という操作種別、SettingsEditingSessionへの参照は汎用サービスへ置かない。設定固有の接続は削除可能な発行元へ閉じ込める。
 
@@ -50,7 +50,7 @@ SettingsEditingSession→SettingsNotificationSource→TypedNotifications→Notif
 | actions | 最大3件。発行元は安定key/label/primary/disabled/runを指定し、Shellには不透明なidのみ渡す |
 | lifetime | timed / manual / condition。timedは1〜2,147,483,647ms |
 | dismissible / busy | 全体dismissの許可と操作中状態。conditionはdismissible:false |
-| targets | 現行受付はbannerまたは空配列。型のdesktop/windowsは将来用で、受付時に拒否 |
+| targets | 現行受付はbanner/desktopの複数指定または空配列。windowsは段階5まで受付時に拒否 |
 | history / historyText | persistent / session / none。persistentには安全な保存用title/bodyが必須 |
 | status | active / resolved / dismissed / expired / withdrawn / interrupted |
 | delivery | 表示先ごとのpending / showing / hidden / failed / ended |
@@ -60,9 +60,9 @@ SettingsEditingSession→SettingsNotificationSource→TypedNotifications→Notif
 
 同じ所有者・キーのactive通知は同じIDで更新し、終了後の再発は新IDになる。同一通知のhistory方針は変更できない。通常更新はtimedの期限を延長せず、restartTimerを明示した場合に受付時刻から再設定する。期限はmainで実時間として管理し、非表示時間も進み、期限・一覧・操作を再照合する。
 
-内部APIはupsert/list/bannerItems/historyEntries/end/withdrawSource/invoke/subscribe等で構成する。endは発行元がresolved/withdrawnを指定する。Shellへ関数、任意コマンド、任意URL、設定値を渡さない。
+内部APIはupsert/list/targetItems/setDelivery/historyEntries/end/withdrawSource/invoke/subscribe等で構成する。endは発行元がresolved/withdrawnを指定する。Shellへ関数、任意コマンド、任意URL、設定値を渡さない。
 
-操作要求はnotificationId/revision/requestId/typeと、invoke時のactionIdを持つ。BannerHostはWebContents/mainFrame/URL/現sessionを、Controllerは表示中の通知を、Serviceはactive/revision/操作ID/busyを検査する。要求IDを最大512件保持し、同じ内容の再送には同じ結果を返す。違う内容での再利用は拒否する。この重複排除は起動中の有限キャッシュであり、再起動をまたぐexactly-once保証ではない。
+操作要求はnotificationId/revision/requestId/typeと、invoke時のactionIdを持つ。SurfaceHostはWebContents/mainFrame/URL/現sessionを、Controllerは表示中の通知を、Serviceはactive/revision/操作ID/busyを検査する。要求IDを最大512件保持し、同じ内容の再送には同じ結果を返す。違う内容での再利用は拒否する。この重複排除は起動中の有限キャッシュであり、再起動をまたぐexactly-once保証ではない。
 
 通知単位のロックで別要求からの同時押下も防ぐ。ボタンを押しただけでは解消せず、発行元が成功後にendする。失敗・確認キャンセルは通知を維持し、再試行は新しい要求IDで行う。終了時に操作関数を回収し、開始済み副作用を巻き戻さない。遅い完了で終了通知を再表示しない。
 
@@ -225,7 +225,7 @@ on/offと寿命の判断は実通知を作る前に行い、未保存のUI値を
 
 無効な種類の本文を通常履歴へ残して実質的な通知を続けない。診断に必要な抑制件数/理由は内容を含めず集約し、発生ごとにログを増やさない。すでに存在する終了履歴は保持方針どおり残す。
 
-段階2では実装済みのbannerだけが選択可能。desktop/windowsは未実装と表示する場合も操作不能にし、旧Windows通知が動くことを新しい表示先の実装済みと扱わない。段階3では「通知センターのみ」を明示選択でき、内部ではtargets:[]にする。必須通知のrequiredTargetsは引き続き解除できない。センターはすべてのactive/対象履歴の閲覧口なので、通常の通知先チェックボックスとして二重登録しない。
+現行はbanner/desktopを選択可能。windowsは未実装のため操作不能とし、旧Windows通知が動くことを新しい表示先の実装済みと扱わない。段階3では「通知センターのみ」を明示選択でき、内部ではtargets:[]にする。必須通知のrequiredTargetsは引き続き解除できない。センターはすべてのactive/対象履歴の閲覧口なので、通常の通知先チェックボックスとして二重登録しない。
 
 同期元で選ばれた表示先がこのPCで未対応なら、その選択を保存したまま理由を表示する。利用可能な選択先が1つでもあればそこへ配送し、なければ新規受付はsuppressed:no-available-targetsとする。段階3で明示的にセンターのみを選んだ場合は、センターを利用可能な閲覧先として判定する。既存activeもすべての選択先を失う場合はwithdrawnと理由を記録して終了する。対応先の追加だけで過去イベントを再送しない。必須通知は定義で確保したbannerを保つ。利用可否は実装・設定の対応可否を指し、トレイ格納、ページ非表示、Shellの一時復旧中を利用不能にはしない。受付後の実配送の失敗はdeliveryへ記録し、業務上のresolvedにはしない。
 
@@ -262,7 +262,7 @@ Appletの種類別設定を実際に機能させるため、従来段階4に置�
 
 段階2の構成補足: TypedNotificationsが種類とepisodeの対応、設定適用、停止時撤回を所有し、既存サービスは期限/操作/履歴を所有する。公開Applet APIはminimumHostVersion:0.30.0とnotifications capabilityを必要とする。発行頻度はApplet単位でバースト20件、毎秒10件補充。endは頻度制限から除外する。履歴はschemaVersion:1を維持しownerKind/ownerId/typeId/endReasonを任意追加、旧記録は種類不明として読める。SDK AssemblyVersion 0.10.0を維持して既存Appletとの共有assembly契約を保つ。
 
-利用可能先は現在bannerのみとし、専用adapter registryは段階4で追加する。通知設定は既存page.settingsのauxiliary.notificationTypesで定義を渡し、共通shared関数でフォーム用の方針を求める。保存制約はmainでも再検査する。同期で保持した適用不能な行を理由に別の設定編集を妨げないよう、意味上の保存制約は変更された上書き行へ適用する。
+利用可能先はbanner/desktop。専用adapter registryクラスを増やさず、targetItems/setDeliveryと共通SurfaceHostへ接続する。通知設定は既存page.settingsのauxiliary.notificationTypesで定義を渡し、共通shared関数でフォーム用の方針を求める。保存制約はmainでも再検査する。同期で保持した適用不能な行を理由に別の設定編集を妨げないよう、意味上の保存制約は変更された上書き行へ適用する。
 
 ## 段階3: 通知センター
 
@@ -312,11 +312,15 @@ PC専用notifications/update-receipt.jsonにschemaVersion:1と成功結果bytes�
 
 ## 段階4: 独自デスクトップ通知
 
-段階2の表示先利用可否と方針解決にデスクトップadapterを追加し、サービスから表示・更新・終了を要求し、adapterから配送状態を返す。現在のsetBannerDeliveryも共通adapter契約へ接続する。種類設定でdesktopを選択可能にし、必須/許可先と保存済みの秒数を共用する。通知の終状態と表示先の状態は別のまま保持する。未対応、抑制、失敗の理由をモデルに追加する場合は共有型・履歴読込との互換を同時に更新する。
+availableNotificationTargetsへdesktopを追加し、targetItems/setDeliveryを共通化した。バナー専用Host/Controller/preloadをNotificationSurfaceHost/Controller/notification-surface-preloadへ整理し、同じ公開bridgeとDefault Shellカードを2表示先で使う。通知の内容・状態・期限・操作ロックはサービスの1件のまま、NotificationDesktopHostは独立Windowの寿命と配置だけを扱う。
 
-本体が専用Windowを管理し、Shellの候補領域notification.desktopがカードを描く。View寿命と内容Controllerを分離し、Default Shell内でカード表現を共用できる。通知ID・期限・操作要求とロックをバナー/センターと共有し、新規表示でfocusを奪わない。
+notification.desktopの追加ShellはminimumHostVersion:0.31.1以上。desktop配送を必須とするAppletにも同版の指定を推奨するが、旧版から予約済みdesktopを宣言していた種類の読込は維持する。モデルsurfaceで表示先を知らせ、openCenterで通常のセンターへ移動する。チャネル・View・URL・mainFrame・sessionを表示先ごとに束縛し、他領域からの操作を拒否する。未提供/故障のdesktop領域だけをDefault Shellへ戻す。
 
-トレイ座標を取得できればその作業領域内に配置し、取れなければ選定した画面の作業領域端へ置く。複数通知は積み、超過分はセンターへ到達する導線を設ける。タスクバー方向、DPI/複数画面、画面変更、全画面/ロック時の抑制、クリック時のfocus方針は実装前に実機条件で確定する。抑制中もtimed期限は進み、抑制解除を理由に終了通知を再表示しない。
+Windowはdesktop対象がある時だけ生成し、最後の対象を外す/終了するとView・Window・query workerを破棄する。showInactiveで新着時のfocusを保ち、明示クリックで操作できる。本体画面の表示状態とは独立。幅440/高さ600またはworkArea60%を上限とし、トレイ側の画面/隅を優先、座標不明なら本体の画面/作業領域端へ配置する。DIPを使用し、画面変更時に再計算する。カードは最大3件と展開・スクロール、センターへの導線を共用する。
+
+Windowsの[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)がACCEPTS_NOTIFICATIONSの時だけ表示し、対象がある間1秒間隔で問い合わせる。ロック/サスペンド、本体の全画面中もhiddenへ抑制する。抑制はactive/期限を変更せず、期限切れを解除後に再表示しない。InputHostのhookを作らない専用queryモードを使い、既存の入力/ジェスチャーモードを維持した。query失敗は非表示/ログとセンター閲覧、明示再試行へ限定し、worker再起動ループを避ける。
+
+段階4の追加で新しい保存ファイルや設定キーを増やさず、予約済みdesktop識別子を有効化したため0.31.1。実測・物理ロックや複数画面の未確認範囲はVERIFICATIONを参照する。次は段階5のWindows adapterと旧show統合、続けて全設定の即時保存へ進む。
 
 ## 段階5: Windows通知と旧APIの基盤統合
 

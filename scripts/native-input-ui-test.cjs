@@ -136,7 +136,10 @@ async function execute(id) {
     await sleep(170);
     await clear();
     await execute(ids[1] + '.send.test');
-    assert.ok((await events()).some((e) => e.includes('A') && e.includes('Control')));
+    await until(
+      async () => (await events()).some((e) => e.includes('A') && e.includes('Control')),
+      'native .NET input delivered',
+    );
     checks.push(
       'real Node WebBrowserTools eleven commands and .NET WindowsTools use shared native input; explicit denial, one global input grant without read permission',
     );

@@ -90,7 +90,7 @@ function App() {
   return (
     <div
       ref={lane}
-      className="notification-lane"
+      className={'notification-lane ' + (model.surface === 'desktop' ? 'desktop-lane' : '')}
       style={{ maxHeight: model.viewport.maxHeight }}
       onFocusCapture={(e) => {
         focused.current =
@@ -172,6 +172,14 @@ function App() {
       {all.length > 3 && (
         <button className="notification-more" onClick={() => setExpanded(!expanded)}>
           {expanded ? '折りたたむ' : 'ほか' + (all.length - 3) + '件を表示'}
+        </button>
+      )}
+      {model.surface === 'desktop' && (
+        <button
+          className="notification-more"
+          onClick={() => void api.openCenter().catch((e) => setError(String(e)))}
+        >
+          通知センターを開く（{all.length}件）
         </button>
       )}
       {error && all.length > 0 && (

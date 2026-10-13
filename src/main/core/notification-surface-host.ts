@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { defaultShellId, shellView } from '../../shared/shell';
 import type { NotificationBannerModel } from '../../shared/notifications';
-import type { NotificationBannerController } from './notification-banner-controller';
+import type { NotificationSurfaceController } from './notification-surface-controller';
 import { createShellView } from './shell-view';
 type Surface = {
   view: WebContentsView;
@@ -24,8 +24,8 @@ type Surface = {
   signature: string;
   settingsSignature: string;
 };
-/** Nonmodal banner lane; the service, not the View, owns notifications and timers. */
-export class NotificationBannerHost {
+/** Shared Shell notification surface; the service owns content, operations and deadlines. */
+export class NotificationSurfaceHost {
   private active?: Surface;
   private preparing?: Surface;
   private failures = new Set<string>();
@@ -39,16 +39,23 @@ export class NotificationBannerHost {
     private options: {
       window: BrowserWindow;
       preload: string;
-      controller: NotificationBannerController;
+      controller: NotificationSurfaceController;
       providers(): ExtensionSnapshot[];
       selected(): string;
       ready(): boolean;
       settings(provider: string): Record<string, unknown>;
       execute(provider: string, command: string): Promise<unknown>;
       layer(): void;
+      failures?: Set<string>;
+      visible?(): boolean;
+      viewport?(): NotificationBannerModel['viewport'];
+      arrange?(view: WebContentsView | undefined, height: number, visible: boolean): void;
+      focusHost?(): void;
+      openCenter?(): Promise<void>;
       failed(message: string, unavailable: boolean): void;
     },
   ) {
+    this.failures = options.failures ?? this.failures;
     const bound = (e: IpcMainInvokeEvent, action = false) => {
       const s = [this.active, this.preparing].find((s) => s && e.sender === s.view.webContents);
       if (
@@ -61,11 +68,11 @@ export class NotificationBannerHost {
         throw Error('Notification session is not bound');
       return s;
     };
-    ipcMain.handle('notification-banner:connect', (e) => {
+    ipcMain.handle(this.channel('connect'), (e) => {
       const s = bound(e);
       return { sessionId: s.session, providerAppletId: s.provider, snapshot: this.model(s) };
     });
-    ipcMain.handle('notification-banner:ready', (e, session) => {
+    ipcMain.handle(this.channel('ready'), (e, session) => {
       const s = bound(e);
       if (s.session !== session) throw Error('Stale notification session');
       if (s.ready) return;
@@ -79,7 +86,7 @@ export class NotificationBannerHost {
       }
       this.refresh();
     });
-    ipcMain.handle('notification-banner:act', async (e, request) => {
+    ipcMain.handle(this.channel('act'), async (e, request) => {
       bound(e, true);
       try {
         await options.controller.act(request);
@@ -87,23 +94,32 @@ export class NotificationBannerHost {
         this.refresh();
       }
     });
-    ipcMain.handle('notification-banner:resize', (e, height) => {
+    ipcMain.handle(this.channel('resize'), (e, height) => {
       const s = bound(e);
       if (!Number.isFinite(height) || height < 1 || height > 6000)
         throw Error('Invalid banner height');
       s.height = Math.ceil(height);
       this.layout();
     });
-    ipcMain.handle('notification-banner:focusHost', (e) => {
+    ipcMain.handle(this.channel('focusHost'), (e) => {
       bound(e, true);
+      if (options.focusHost) {
+        options.focusHost();
+        return;
+      }
       if (this.previousFocus && !this.previousFocus.isDestroyed()) this.previousFocus.focus();
       else options.window.webContents.focus();
       this.previousFocus = undefined;
     });
-    ipcMain.handle('notification-banner:getSettings', (e) => options.settings(bound(e).provider));
-    ipcMain.handle('notification-banner:executeCommand', (e, id) =>
+    ipcMain.handle(this.channel('getSettings'), (e) => options.settings(bound(e).provider));
+    ipcMain.handle(this.channel('executeCommand'), (e, id) =>
       options.execute(bound(e, true).provider, id),
     );
+    ipcMain.handle(this.channel('openCenter'), (e) => {
+      bound(e, true);
+      if (!options.openCenter) throw Error('Notification center unavailable');
+      return options.openCenter();
+    });
     this.stop = options.controller.subscribe(() => {
       if (!this.queued) {
         this.queued = true;
@@ -120,6 +136,14 @@ export class NotificationBannerHost {
     options.window.on('restore', () => this.refresh());
     options.window.once('closed', () => this.dispose());
   }
+  private channel(name: string) {
+    return 'notification-' + this.options.controller.target + ':' + name;
+  }
+  private region(): 'notification.banner' | 'notification.desktop' {
+    return this.options.controller.target === 'desktop'
+      ? 'notification.desktop'
+      : 'notification.banner';
+  }
   private candidate() {
     const available = (id: string) =>
       this.options
@@ -129,12 +153,13 @@ export class NotificationBannerHost {
             p.id === id &&
             p.enabled &&
             p.state === 'running' &&
-            shellView(p.shell, 'notification.banner') &&
+            shellView(p.shell, this.region()) &&
             !this.failures.has(p.id + ':' + p.version),
         );
     return available(this.options.selected()) ?? available(defaultShellId);
   }
   private viewport() {
+    if (this.options.viewport) return this.options.viewport();
     const zoom = this.options.window.webContents.getZoomFactor();
     const [width, height] = this.options.window.getContentSize();
     return {
@@ -149,8 +174,7 @@ export class NotificationBannerHost {
     const w = this.options.window;
     return (
       !w.isDestroyed() &&
-      w.isVisible() &&
-      !w.isMinimized() &&
+      (this.options.visible ? this.options.visible() : w.isVisible() && !w.isMinimized()) &&
       this.options.ready() &&
       this.options.controller.items().length > 0
     );
@@ -159,8 +183,9 @@ export class NotificationBannerHost {
     try {
       const { view, url } = createShellView(
         p.folder,
-        shellView(p.shell, 'notification.banner')!,
+        shellView(p.shell, this.region())!,
         this.options.preload,
+        ['--appdock-notification-surface=' + this.options.controller.target],
       );
       view.setBackgroundColor('#00000000');
       const s: Surface = {
@@ -212,7 +237,7 @@ export class NotificationBannerHost {
       const ids = this.options.controller.items().map((i) => i.id);
       if (!this.options.ready() || !ids.length) {
         for (const s of [this.active, this.preparing]) {
-          if (s) s.view.webContents.send('notification-banner:changed', this.model(s));
+          if (s) s.view.webContents.send(this.channel('changed'), this.model(s));
         }
         this.layout();
         return;
@@ -248,12 +273,12 @@ export class NotificationBannerHost {
         const signature = JSON.stringify(this.model(s));
         if (signature !== s.signature) {
           s.signature = signature;
-          s.view.webContents.send('notification-banner:changed', this.model(s));
+          s.view.webContents.send(this.channel('changed'), this.model(s));
         }
         const settings = JSON.stringify(this.options.settings(s.provider));
         if (settings !== s.settingsSignature) {
           s.settingsSignature = settings;
-          s.view.webContents.send('notification-banner:settingsChanged');
+          s.view.webContents.send(this.channel('settingsChanged'));
         }
       }
       this.layout();
@@ -266,7 +291,8 @@ export class NotificationBannerHost {
     const s = this.active;
     const visible = !!s?.ready && this.visible();
     s?.view.setVisible(visible);
-    if (s && visible) {
+    if (this.options.arrange) this.options.arrange(s?.view, s?.height ?? 114, visible);
+    else if (s && visible) {
       const viewport = this.viewport(),
         zoom = this.options.window.webContents.getZoomFactor();
       const [width] = this.options.window.getContentSize();
@@ -287,7 +313,7 @@ export class NotificationBannerHost {
     if (!this.active?.ready || !this.visible()) return;
     this.previousFocus = webContents.getFocusedWebContents() ?? undefined;
     this.active.view.webContents.focus();
-    this.active.view.webContents.send('notification-banner:focus');
+    this.active.view.webContents.send(this.channel('focus'));
   }
   retry() {
     this.failures.clear();
@@ -309,7 +335,8 @@ export class NotificationBannerHost {
       'focusHost',
       'getSettings',
       'executeCommand',
+      'openCenter',
     ])
-      ipcMain.removeHandler('notification-banner:' + channel);
+      ipcMain.removeHandler(this.channel(channel));
   }
 }

@@ -1,17 +1,30 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using System.Windows;
 using AppDock.Runtime;
 
 namespace AppDock.InputHost;
 internal static class Program
 {
-    [STAThread] public static int Main()
+    [DllImport("shell32.dll")] private static extern int SHQueryUserNotificationState(out int state);
+    private static async Task<int> NotificationState(TextWriter output)
+    {
+        await using var peer = new JsonRpcConnection(Console.In, output);
+        await peer.ReadAsync((method, p) => {
+            if (method != "notifications.state") throw new ArgumentException("Unknown notification query.");
+            var result = SHQueryUserNotificationState(out var state);
+            return Task.FromResult<object?>(new { accepts = result >= 0 && state == 5 });
+        });
+        return 0;
+    }
+    [STAThread] public static int Main(string[] args)
     {
         if (!Console.IsInputRedirected) return 2;
         Console.InputEncoding = Encoding.UTF8; Console.OutputEncoding = new UTF8Encoding(false);
         var output = Console.Out; Console.SetOut(Console.Error);
+        if (args.SequenceEqual(new[] { "--notification-state" })) return NotificationState(output).GetAwaiter().GetResult();
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         using var engine = new GestureEngine(app.Dispatcher);
         _ = Task.Run(async () => {

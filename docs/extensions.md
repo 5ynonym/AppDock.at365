@@ -278,6 +278,6 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 
 同じ所有者/typeId/dedupeKeyのactiveを更新します。通常更新は既存の期限を維持し、restartTimer:trueだけが現在の設定で期限を再設定します。所有者50件の上限は全種類で共有、発行頻度はバースト20件/毎秒10件補充です。終了は頻度制限を受けません。方針変更通知は再取得の合図で、通知本文や履歴を含みません。通知方針の購読はNode/.NETともコマンドや他の通知と並行し得るため、再評価処理が必要ならAppletで排他を設けます。
 
-通知先の保存値は複数選択に対応しますが、現在の新APIの配送はbannerだけです。desktop/windowsは将来のadapter用の宣言/保存識別子として扱い、旧Windows通知経路を新APIの利用可能先に数えません。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
+通知先の保存値は複数選択に対応しますが、現在の新APIの配送はbanner/desktopです。windowsは将来のadapter用の宣言/保存識別子として扱い、旧Windows通知経路を新APIの利用可能先に数えません。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
 
-本体0.31.0ではtargets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。未対応desktop/windowsだけの選択は引き続き理由付きsuppressedとなり、勝手にセンターのみへ置換しません。
+本体0.31.0ではtargets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。旧版と併用する種類の予約済みdesktop宣言は読込可能で、0.30.0では未対応先として抑制されます。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。未対応windowsだけの選択は理由付きsuppressedとなり、勝手にセンターのみへ置換しません。

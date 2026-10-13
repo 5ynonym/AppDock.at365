@@ -8,7 +8,8 @@ export type ShellRegion =
   | 'page.home'
   | 'page.notifications'
   | 'page.settings'
-  | 'notification.banner';
+  | 'notification.banner'
+  | 'notification.desktop';
 export function shellView(
   shell: { ui?: string; views?: Record<string, string> } | undefined,
   region: ShellRegion,

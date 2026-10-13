@@ -103,8 +103,9 @@ import {
 } from '../shared/notification-types';
 import { NotificationService } from './core/notification-service';
 import { NotificationHistoryStore } from './core/notification-history';
-import { NotificationBannerHost } from './core/notification-banner-host';
-import { NotificationBannerController } from './core/notification-banner-controller';
+import { NotificationSurfaceHost } from './core/notification-surface-host';
+import { NotificationDesktopHost } from './core/notification-desktop-host';
+import { NotificationSurfaceController } from './core/notification-surface-controller';
 import { SettingsNotificationSource } from './core/settings-notification-source';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
@@ -182,7 +183,8 @@ if (locked) {
   }
 }
 let window: BrowserWindow | null = null;
-let notificationBanner: NotificationBannerHost | undefined;
+let notificationBanner: NotificationSurfaceHost | undefined;
+let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationService: NotificationService | undefined;
 let typedNotifications: TypedNotifications | undefined;
 let settingsNotificationSource: SettingsNotificationSource | undefined;
@@ -404,6 +406,7 @@ const changed = () => {
       lastEditingRoute = navigation.state.route as 'settings' | 'extensions';
     if (!quitting) settingsNotificationSource?.refresh();
     notificationBanner?.refresh();
+    notificationDesktop?.refresh();
     shellHost?.refresh();
     shellPageHost?.refresh();
     overlayHost?.refresh();
@@ -1097,6 +1100,7 @@ function registerIpc() {
     overlayHost?.retry();
     shellPageHost?.retry();
     notificationBanner?.retry();
+    notificationDesktop?.retry();
   });
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
@@ -1637,10 +1641,10 @@ async function initialize() {
       await navigation.navigate(lastEditingRoute);
     },
   });
-  notificationBanner = new NotificationBannerHost({
+  notificationBanner = new NotificationSurfaceHost({
     window,
-    preload: path.join(__dirname, 'notification-banner-preload.js'),
-    controller: new NotificationBannerController(
+    preload: path.join(__dirname, 'notification-surface-preload.js'),
+    controller: new NotificationSurfaceController(
       notificationService,
       () => nativeTheme.shouldUseDarkColors,
     ),
@@ -1650,12 +1654,29 @@ async function initialize() {
     ready: () => startupReady && !quitting,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     execute: executeShellCommand,
+    openCenter: () => executeCommand('appdock.notifications.open'),
     layer: () => overlayHost?.layout(),
     failed: (message, unavailable) => {
       log.write('error', 'notifications', message);
       if (unavailable)
         void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
     },
+  });
+  notificationDesktop = new NotificationDesktopHost({
+    service: notificationService,
+    parent: window,
+    nativeExecutable: path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
+    preload: path.join(__dirname, 'notification-surface-preload.js'),
+    dark: () => nativeTheme.shouldUseDarkColors,
+    tray: () => tray ?? undefined,
+    providers: () => manager.snapshot(),
+    selected: () =>
+      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    ready: () => startupReady && !quitting,
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
+    execute: executeShellCommand,
+    openCenter: () => executeCommand('appdock.notifications.open'),
+    failed: (message) => log.write('error', 'notifications', message),
   });
   shellHost = new ShellHost({
     window,
@@ -1759,45 +1780,56 @@ async function initialize() {
     create: (request) =>
       request.kind === 'notifications'
         ? new NotificationCenterController(request, {
-            service: notificationService!, applets: allApplets, dark: () => nativeTheme.shouldUseDarkColors, changed,
-            confirmDeletion: async (count) => (await dialog.showMessageBox(window!, {
-              type:'warning',message:'通知履歴を'+count+'件削除しますか？',detail:'終了した通知の履歴だけを削除します。',
-              buttons:['キャンセル','削除'],defaultId:0,cancelId:0,
-            })).response===1,
+            service: notificationService!,
+            applets: allApplets,
+            dark: () => nativeTheme.shouldUseDarkColors,
+            changed,
+            confirmDeletion: async (count) =>
+              (
+                await dialog.showMessageBox(window!, {
+                  type: 'warning',
+                  message: '通知履歴を' + count + '件削除しますか？',
+                  detail: '終了した通知の履歴だけを削除します。',
+                  buttons: ['キャンセル', '削除'],
+                  defaultId: 0,
+                  cancelId: 0,
+                })
+              ).response === 1,
           })
         : request.kind === 'settings'
-        ? new SettingsPageSession(request, {
-            navigation: settingsNavigation,
-            editor: settingsEditing,
-            host: snapshot,
-            changed,
-            auxiliary: settingsPageAuxiliary,
-            actions: settingsPageActions,
-            release: releaseSettingsView,
-            resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
-          })
-        : request.kind === 'home'
-          ? new HomePageSession(request, {
-              applets: allApplets,
-              commands: uiCommands,
-              pins: () => settings.value.pinnedCommands,
-              appletOrder: () => settingsEditing.draft.appletOrder,
-              dark: () => nativeTheme.shouldUseDarkColors,
-              execution: homeExecution,
-              navigate: executeCommand,
-              openApplet: (id) => navigation.navigate('extensions', undefined, id),
-            })
-          : new LogPageSession(request, {
-              entries: () => log.entries,
-              sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-              dark: () => nativeTheme.shouldUseDarkColors,
-              openDirectory: async () => {
-                const error = await shell.openPath(log.directory);
-                if (error) throw Error(error);
-              },
-              sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+          ? new SettingsPageSession(request, {
+              navigation: settingsNavigation,
+              editor: settingsEditing,
+              host: snapshot,
               changed,
-            }),
+              auxiliary: settingsPageAuxiliary,
+              actions: settingsPageActions,
+              release: releaseSettingsView,
+              resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
+            })
+          : request.kind === 'home'
+            ? new HomePageSession(request, {
+                applets: allApplets,
+                commands: uiCommands,
+                pins: () => settings.value.pinnedCommands,
+                appletOrder: () => settingsEditing.draft.appletOrder,
+                dark: () => nativeTheme.shouldUseDarkColors,
+                execution: homeExecution,
+                navigate: executeCommand,
+                openApplet: (id) => navigation.navigate('extensions', undefined, id),
+              })
+            : new LogPageSession(request, {
+                entries: () => log.entries,
+                sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+                dark: () => nativeTheme.shouldUseDarkColors,
+                openDirectory: async () => {
+                  const error = await shell.openPath(log.directory);
+                  if (error) throw Error(error);
+                },
+                sourceChanged: (source) =>
+                  window?.webContents.send('dock:logSourceChanged', source),
+                changed,
+              }),
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     shortcut: async (key) => {
@@ -1980,9 +2012,11 @@ async function initialize() {
       const result = JSON.parse(resultBytes);
       updater.state.phase = result.message;
       if (result.ok === true) {
-        publishUpdateResult(resultBytes, { typed:typedNotifications!,
-          receiptFile:path.join(dataDirectory,'notifications','update-receipt.json'),
-          openDetails:() => executeCommand('appdock.updates.open'),warn:message=>log.write('warn','updates',message),
+        publishUpdateResult(resultBytes, {
+          typed: typedNotifications!,
+          receiptFile: path.join(dataDirectory, 'notifications', 'update-receipt.json'),
+          openDetails: () => executeCommand('appdock.updates.open'),
+          warn: (message) => log.write('warn', 'updates', message),
         });
       } else updater.state.completion = { ok: false, message: String(result.message) };
       log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
@@ -2201,6 +2235,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   notificationBanner?.dispose();
+  notificationDesktop?.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();

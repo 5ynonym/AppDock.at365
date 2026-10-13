@@ -67,6 +67,7 @@ const id = (v: unknown): v is string =>
   /^[a-z0-9][a-z0-9._-]{0,100}$/.test(v) &&
   !['constructor', 'prototype', '__proto__'].includes(v);
 const targetNames = ['banner', 'desktop', 'windows'];
+export const availableNotificationTargets: NotificationTarget[] = ['banner', 'desktop'];
 const targets = (v: unknown): v is NotificationTarget[] =>
   Array.isArray(v) &&
   v.length <= 3 &&
@@ -201,6 +202,7 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       defaultLevel: 'info',
       canDisable: true,
       disabledControlReason: '',
+      allowedTargets: ['banner', 'desktop', 'windows'],
       requiredTargets: [],
       lifetimePolicy: 'userDuration',
       defaultDurationSeconds: 6,
@@ -237,7 +239,7 @@ export function resolveNotificationPolicy(
         : (type.defaultDurationSeconds ?? null)
       : null;
   const enabled = !type.canDisable || (row?.enabled ?? type.defaultEnabled);
-  const available = selectedTargets.filter((t) => t === 'banner');
+  const available = selectedTargets.filter((t) => availableNotificationTargets.includes(t));
   const reason = !enabled
     ? 'type-disabled'
     : type.ownerKind === 'applet' && !settings.host.notifications
