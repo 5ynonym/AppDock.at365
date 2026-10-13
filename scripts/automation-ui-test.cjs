@@ -337,6 +337,30 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     checks.push(
       'GUI register and self test; real SDK initialize/list/read; unrelated TOML retained',
     );
+    const registeredBytes = fs.readFileSync(configFile, 'utf8');
+    const markerId = registeredBytes.match(/^# BEGIN AppDock MCP (appdock_[a-f0-9]{16})$/m)[1];
+    fs.writeFileSync(configFile, original + '# END AppDock MCP ' + markerId + '\n');
+    assert.equal(
+      (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.registration,
+      'absent',
+    );
+    await section.getByRole('button', { name: '登録・修復', exact: true }).click();
+    await until(
+      () => fs.readFileSync(configFile, 'utf8') === registeredBytes,
+      'GUI repair after external uninstall',
+    );
+    fs.writeFileSync(configFile, original + '# BEGIN AppDock MCP ' + markerId + '\n');
+    await section.getByRole('button', { name: '登録を解除', exact: true }).click();
+    await until(() => fs.readFileSync(configFile, 'utf8') === original, 'GUI orphan unregister');
+    await section.getByRole('button', { name: '登録・修復', exact: true }).click();
+    await until(
+      () => fs.readFileSync(configFile, 'utf8') === registeredBytes,
+      'GUI re-register after orphan cleanup',
+    );
+    checks.push(
+      'external uninstall orphan END repaired through GUI; orphan BEGIN unregistered; unrelated TOML retained',
+    );
+
     await until(
       async () =>
         (await call(client, 'appdock_get_applet', { id: fixtureId })).applet.state === 'running',

@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-14: Codex登録修復のコミット前検証（0.35.1）
+
+- 利用者から実環境での動作成功申告あり。追加差分7ファイルをレビューし、所有情報・同名表不在・独立した一意コメント・TOML意味一致、範囲外bytes保持、バックアップ・原子的保存を確認。未解決の指摘なし。本体標準回帰と登録/MCP GUIを必要回帰とし、SDK/兄弟repoは変更していない。
+- 型検査と標準test（updater/main/renderer/Default Shell/fixture buildを含む）を新規実行、**387/387、fail/skip 0**。試験tree **7992d7115a8a64ecfd54efc26d50ac6547b04c3f**、検証前後・stage/作業内容が一致。以後の追記は本記録のみ。
+- 固定0.35.1 EXEの登録/解除ボタン・既存MCP・許可/設定/再起動・両テーマ3幅の **16群**は先行成功証跡を再利用。製品/試験スクリプト/package/lockfile/toolchain・結果・完全ログ・EXEの全保存hashを再照合し一致。過去の部分回帰を標準回帰の代用にはしていない。実利用への操作は今回追加していない。
+- 製品の追加修正・再発行・版更新なし。EXEのSHA256 **842c897f679f118cf9e6dc32a6f49f0ebdb58f1ca38f8fa88fc9e0ccde9c2fed** を保持。[再利用用証跡](.artifacts/commit-validation-codex-orphan-20261014/validation.json)へtree・コマンド/終了コード・ログhash・再利用元と照合結果・最終commit/treeを保存する。新GUIフォルダーはなく、直前の整理/保護結果を維持。mainへローカルコミットし、push・Release・deployは行わない。
+
+## 2026-10-14: 外部アンインストール後のCodex再登録修復（0.35.1）
+
+- 実利用config.tomlを秘密値を出さず読み取り確認。AppDockの同名MCP表と開始コメントがなく、配置IDの終了コメントだけが残っており、旧range検査で登録・解除ともに「登録範囲が変更されています」となる原因を確認。配置別automation.jsonには同じ設定ファイルの所有情報が現存する。実利用設定への書込・deploy・実クライアント再接続は行っていない。
+- 保存済み所有情報があり、登録本体がなく、開始/終了のいずれかの独立コメントが1行だけ残り、その1行除去前後でTOML値が完全一致する場合だけ再登録/解除できるよう修正。状態確認は読み取り専用。コメント重複・逆順・行内追加・文字列内マーカー・所有情報なし・残存同名表は拒否を維持する。発行前レビューで原子的保存と直前bytes照合、範囲外の意味/bytes保持とバックアップを確認し、未解決の指摘なし。
+- 型検査・build、関連回帰 **50/50、fail/skip 0**。登録/解除、LF/CRLF/EOF、状態確認の非書込、バックアップ、曖昧な範囲の拒否を追加検証。新規試験の引用符構文と版更新後のworkspace不一致は検証中に解消。install --frozen-lockfileは同じ依存を再利用し、lockfile・待機例外・供給網検査は変更していない。
+- ソースGUI **16群**（automation-source-1791917406374）と、固定EXEのhash一致コピーによるGUI **16群**（automation-portable-1791917592204）が終了0。配布EXEでは終了コメントのみの再登録と開始コメントのみの解除を実ボタンで検証し、他のTOML bytes保持・既存MCP18ツール・許可/設定/再起動・両テーマ3幅も成功。対象の子プロセス残存なし。
+- 設定・保存ファイル・公開APIの追加/削除がないため0.35.0→**0.35.1**のパッチ更新。本体publishだけを更新、publish.bat終了0。EXE **144130681 bytes**、SHA256 **842c897f679f118cf9e6dc32a6f49f0ebdb58f1ca38f8fa88fc9e0ccde9c2fed**。FileVersion/package/feed/同梱Shellが一致し、feedのsize/hashを照合。未変更Applet・全体ZIPは対象外。この修復差分は未コミット、push/Release/deployもしていない。
+- [証跡](.artifacts/codex-orphan-repair-20261014/validation.json)に実設定の非機密判定、ログhash・入力hash・結果を保存。[整理](.artifacts/codex-orphan-repair-20261014/cleanup.json)は直前の照合済み保護対象と新規成功2profileを保持、削除0件。実利用側は新EXEへ更新後「登録・修復」とCodex再読み込みが必要。実アプリからのアンインストール操作自体は今回再実行せず、確認済みの残存状態を隔離configで再現した。全標準回帰はこの修復段階では未実行。
+
 ## 2026-10-14: TTS連携のコミット前検証（0.35.0）
 
 - mainのTTS差分をレビュー。専用許可の初期OFF・独立保存、既存API互換、所有者とruntime世代、APIキーの接続先束縛・非露出、停止/終了、速度方式と設定モデル/検索を確認。製品修正を要する未解決の指摘なし。本体標準回帰とTTS・共通API/MCP・設定Shell/検索を必要回帰とした。兄弟repo製品と.NET SDKは変更していない。

@@ -63,6 +63,28 @@ function range(text: string, id: string) {
   else if (text[finish] === '\n') finish++;
   return { a, b: finish, block: text.slice(a, finish) };
 }
+// An external uninstall may leave one delimiter comment after deleting the table.
+// Remove only that standalone comment, with recorded ownership and identical TOML values.
+function removedRegistration(text: string, id: string, name: string, ownedHash?: string) {
+  if (!ownedHash) return text;
+  const start = '# BEGIN AppDock MCP ' + id;
+  const end = '# END AppDock MCP ' + id;
+  const a = text.indexOf(start),
+    b = text.indexOf(end);
+  if ((a < 0 && b < 0) || (a >= 0 && b >= 0)) return text;
+  const marker = a >= 0 ? start : end;
+  const at = a >= 0 ? a : b;
+  if ((at > 0 && text[at - 1] !== '\n') || text.indexOf(marker, at + marker.length) >= 0)
+    return text;
+  let finish = at + marker.length;
+  if (text.slice(finish, finish + 2) === '\r\n') finish += 2;
+  else if (text[finish] === '\n') finish++;
+  else if (finish !== text.length) return text;
+  const config = parsed(text);
+  if (config.mcp_servers?.[name] !== undefined) return text;
+  const without = text.slice(0, at) + text.slice(finish);
+  return isDeepStrictEqual(config, parsed(without)) ? without : text;
+}
 export function registrationBlock(id: string, endpoint: string, token: string, name = 'AppDock') {
   codexServerName(name);
   if (
@@ -80,10 +102,10 @@ export function registrationStatus(
   ownedHash?: string,
 ) {
   try {
-    const text = read(codexConfigPath(file)),
+    const name = blockName(expectedBlock),
+      text = removedRegistration(read(codexConfigPath(file)), id, name, ownedHash),
       config = parsed(text),
-      r = range(text, id),
-      name = blockName(expectedBlock);
+      r = range(text, id);
     if (!r && !config.mcp_servers?.[name]) return { registration: 'absent' as const };
     if (
       r &&
@@ -115,16 +137,17 @@ export function changeRegistration(
 ) {
   file = codexConfigPath(file);
   const before = read(file),
-    config = parsed(before),
-    r = range(before, id),
-    name = blockName(block);
+    name = blockName(block),
+    cleaned = removedRegistration(before, id, name, ownedHash),
+    config = parsed(cleaned),
+    r = range(cleaned, id);
   if (r && r.block !== block && hash(r.block) !== ownedHash)
     throw Error('登録内容が外部で変更されています。上書きせず確認してください。');
-  if (remove && !r) return undefined;
+  if (remove && !r && cleaned === before) return undefined;
   const previousName = r ? blockName(r.block) : undefined;
   if (!remove && previousName && previousName !== name)
     throw Error('登録名を変える場合は、一度登録を解除してから登録し直してください。');
-  const without = r ? before.slice(0, r.a) + before.slice(r.b) : before;
+  const without = r ? cleaned.slice(0, r.a) + cleaned.slice(r.b) : cleaned;
   // A marker inside a TOML string, or keys appended into our table, must not erase unrelated data.
   const stripped = parsed(without),
     expected = parsed(before);

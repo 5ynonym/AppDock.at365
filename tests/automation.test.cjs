@@ -217,6 +217,58 @@ test('registration preserves exact unrelated TOML, detects ownership collisions 
   fs.writeFileSync(file, original + `[mcp_servers.${id}]\nurl="http://other.test"\n`);
   assert.throws(() => changeRegistration(file, id, a));
 });
+test('external uninstall leaves one delimiter; owned comment alone can be repaired or removed', (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    id = 'appdock_0123456789abcdef';
+  const block = registrationBlock(id, 'http://127.0.0.1:34567/mcp', 'a'.repeat(64));
+  const original =
+    '# unrelated\r\nmodel = "example"\r\n[mcp_servers.other]\r\nurl = "http://example.test/mcp"\r\n';
+  fs.writeFileSync(file, original);
+  const owned = changeRegistration(file, id, block);
+  for (const marker of ['BEGIN', 'END']) {
+    for (const newline of ['\n', '\r\n', '']) {
+      const removed = original + '# ' + marker + ' AppDock MCP ' + id + newline;
+      fs.writeFileSync(file, removed);
+      assert.equal(registrationStatus(file, id, block, owned).registration, 'absent');
+      assert.equal(fs.readFileSync(file, 'utf8'), removed); // Status never writes.
+      changeRegistration(file, id, block, owned);
+      assert.equal(fs.readFileSync(file, 'utf8'), original + block);
+      assert.equal(fs.readFileSync(file + '.appdock-backup', 'utf8'), removed);
+      assert.equal(registrationStatus(file, id, block, owned).registration, 'registered');
+      fs.writeFileSync(file, removed);
+      changeRegistration(file, id, block, owned, true);
+      assert.equal(fs.readFileSync(file, 'utf8'), original);
+      assert.equal(changeRegistration(file, id, block, owned, true), undefined);
+    }
+  }
+});
+test('uninstall recovery never accepts missing ownership, live table, strings or ambiguous delimiters', (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    id = 'appdock_0123456789abcdef';
+  const block = registrationBlock(id, 'http://127.0.0.1:34567/mcp', 'a'.repeat(64));
+  const owned = changeRegistration(file, id, block);
+  const end = '# END AppDock MCP ' + id + '\n';
+  const examples = [
+    { text: end, hash: undefined },
+    { text: '[mcp_servers.AppDock]\nurl = "http://other/mcp"\n' + end, hash: owned },
+    { text: 'value = """\n' + end + '"""\n', hash: owned },
+    { text: "value = '''\n" + end + "'''\n", hash: owned },
+    { text: end + end, hash: owned },
+    { text: end + '# BEGIN AppDock MCP ' + id + '\n', hash: owned },
+    { text: '# END AppDock MCP ' + id + ' extra\n', hash: owned },
+  ];
+  for (const { text, hash } of examples) {
+    fs.writeFileSync(file, text);
+    assert.equal(registrationStatus(file, id, block, hash).registration, 'conflict');
+    for (const remove of [false, true]) {
+      assert.throws(() => changeRegistration(file, id, block, hash, remove));
+      assert.equal(fs.readFileSync(file, 'utf8'), text);
+    }
+  }
+});
+
 test('marker inside multiline TOML string and malformed TOML are rejected without damage', (t) => {
   const f = fixture(t),
     file = path.join(f.base, 'config.toml'),
