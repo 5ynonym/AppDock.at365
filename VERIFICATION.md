@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-14: Gmail非表示復帰のコミット前確認（0.35.2）
+
+- 利用者から機能の動作確認済み申告あり。対象9ファイルの差分を再確認し、先行の発行前レビューから製品・試験・依存の入力hashが一致することを確認。未解決の指摘なし。
+- 対象差分をstageした後、型検査と本体標準回帰を新規実行し、391/391・fail/skip 0・終了0。Gmail標準回帰21/21と、同じ固定0.35.2 EXE/Gmail0.10.0を用いたGUI8群も新規実行し成功。先行の部分回帰を本体全回帰の代用にはしていない。
+- 検証前後のstage treeは本体9ed614b200aa994414d431833f4fda2b2d189088、Gmail b19becf146d59ecb50acd9b431d7b298bcc611beで一致。stageと作業内容も一致し、未追跡の検証入力なし。検証後の変更は両repoのVERIFICATIONのみとし、最終tree/commitを[証跡](.artifacts/commit-validation-gmail-auto-return-20261014/validation.json)へ記録する。
+- Node24.21.0・pnpm12.10.1・.NET SDK10.0.401を使用。完全ログとSHA256、試験入力・実行方式・兄弟repo・固定配布物を証跡へ保存。Gmail再ビルド後の全8ファイルは既存ZIPの内容と一致し、ホストEXE/更新ZIPのhashも不変。製品修正・版更新・再梱包は不要。
+- 今回の固定EXE GUIは[8群の結果](../Applet.Gmail.at365/.artifacts/auto-return-1791920625399/result.json)。同一方式の成功試験はsource3回・portable2回で、直近3回以内なので整理対象なし。失敗調査・固定EXE・再利用用証跡を保持。mainへローカルコミットし、push/Release/deployは行わない。
+
+## 2026-10-14: Gmail非表示時の開始ページ復帰（0.35.2）
+
+- WebAccountDefinitionへ任意のreturnToStartOnHideSettingを追加。自身のboolean設定・settings capability・observeOriginと開始URLのoriginを検証する。ホスト全体の設定と保存ファイルは追加せず、未宣言/OFFの従来動作を保持するため本体はパッチ更新。
+- 発行前レビュー1回：切替前Viewの限定、選択先保持、実Surfaceの表示寿命とviewport(null)の区別、認証・同一文書hash移動、遅延読込/再表示/停止、設定・保存領域・API・影響先を確認。未解決の指摘なし。読込中はdid-stop-loadingで再判定し、表示先変更中の一時非表示はmicrotaskでまとめる。Gmail固有IDをホストへ追加していない。
+- dev.bat run typecheck、dev.bat run buildが終了0。機能別回帰web-accounts/web-accounts-auto-return/applet-pagesは20/20、fail/skip 0。Gmail標準回帰は21/21。今回は本体標準全回帰、SDK/.NET Applet/無関係なApplet GUIは実行していない。
+- Gmailのscripts/test-auto-return.cjsを固定0.35.2 EXEの隔離コピーで実行し、8群・終了0。OFF保持、ON保存、UI/コマンドの枠切替、本体ページ切替、最小化/×、表示先変更、入力/query保持と全体reloadなし、遅延読込と再表示取消、認証保護、再起動を確認。発行物と隔離EXEのSHA256は一致。結果は[GUI証跡](../Applet.Gmail.at365/.artifacts/auto-return-1791920189301/result.json)、ログと発行hashは[検証証跡](.artifacts/gmail-auto-return-20261014/validation.json)。
+- 初回GUIは旧ShellのDOM待ちとWebContents列挙順への依存を修正。遅延fixtureは別queryで文書遷移を区別。portableのPlaywright直接launchはNSISからInspector出力が届かずタイムアウトしたため、既存CDP/electron-main-helper方式へ試験のみ修正。旧試験プロセスの終了を確認し、同じ固定EXEで8群を再検証した。製品の追加修正・再発行は不要。
+- package版変更の構成検出へdev.bat install --offline --frozen-lockfileで対応（終了0）。依存版・lockfile・待機/供給網ポリシーに変更なし。publish.batは終了0、単一EXE/update.jsonは0.35.2で一致。EXEは144133211 bytes、SHA256 3f3408bd98f8bb2bfe1411f839fd5684551a7b7876e71ff7b64960efbc3d722c。
+- テスト保管：source成功は直近3回、portable成功は1回なので削除候補なし。失敗/接続待ちの調査証跡は保持し、再利用用固定EXEとvalidationも保護。実Googleの受信・下書き処理は未確認。commit/push/Release/deployは行っていない。
+
 ## 2026-10-14: Codex登録修復のコミット前検証（0.35.1）
 
 - 利用者から実環境での動作成功申告あり。追加差分7ファイルをレビューし、所有情報・同名表不在・独立した一意コメント・TOML意味一致、範囲外bytes保持、バックアップ・原子的保存を確認。未解決の指摘なし。本体標準回帰と登録/MCP GUIを必要回帰とし、SDK/兄弟repoは変更していない。

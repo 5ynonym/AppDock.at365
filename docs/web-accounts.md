@@ -32,6 +32,14 @@ Windowsでは起動前に`CalculateNativeWinOcclusion`をdisable-featuresへ追�
 
 URLは宣言したHTTPS origin内、観測先もその1つに限定します。ui/observerは実パスでもApplet内のファイルだけを許可し、observerは100KB以内。任意の`itemOpener`も同じ資産境界・100KB上限の関数式ファイルです。既定の画面枠は左236px・上146pxを予約します。UIが`viewport`で変更できます。最小ウィンドウ900×640、既定1280×900です。
 
+## 非表示時の開始ページへの復帰
+
+任意のmanifest `returnToStartOnHideSetting:string`は、自身が宣言したboolean設定のキーです。settings capabilityが必要で、開始URLのoriginはobserveOriginと一致しなければなりません。最低ホスト版は0.35.2です。未宣言または設定がONでなければ従来の画面保持を継続します。
+
+ONでは、実際に表示していたSurfaceが非表示・最小化・本体の別ページへ移ったときに、選択中のViewを開始URLのhashへ戻し、navigationRevisionでローカルUIの開始タブへの復帰を通知します。アカウント切替では切替前のViewだけを戻し、切替先とローカルUIのタブは保持します。viewport(null)によるローカルタブの切替、フォーカス移動、同じ枠の再選択、停止時の破棄、表示先変更中の一時的な非表示は対象外です。
+
+同じorigin・pathnameの読み込み済み文書だけにisolated world 1001でhash移動を行います。query、ログインsession、WebContentsを保持し、全体reload・Window表示を行いません。開始hashにいる場合は移動しません。読み込み中ならdid-stop-loadingまで待ち、再表示・OFF・停止・認証画面などになっていれば中止します。サービス自身がhash移動へ応答する際の入力・下書きの扱いはサービス側の仕様です。
+
 ## Node/RPC
 
 画像要求は各アカウントのsessionとcredentials:includeを使用します。Googleの認証依存画像URLは未認証で取り直すと標準画像を返すためです。Cookieの適用と送信先はChromiumの当該セッションに閉じ、他アカウントのCookieをコピーしません。転送先の厳密なorigin制限とサイズ/時間上限は維持します。cycleは保存と既存Viewの切替だけを行い、未表示のUIは作成せず、非表示/最小化や現在のフォーカスを保ちます。明示的なopenは従来どおりウィンドウを表示します。

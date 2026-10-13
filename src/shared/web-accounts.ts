@@ -8,6 +8,7 @@ export interface WebAccountDefinition {
   keepActive?: boolean;
   avatarOrigins?: string[];
   externalLinkSetting?: string;
+  returnToStartOnHideSetting?: string;
 }
 export interface WebAccount {
   id: string;

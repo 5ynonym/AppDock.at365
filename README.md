@@ -21,7 +21,7 @@
 
 .NET 10 RuntimeがないPCでは、[Microsoftの.NET 10ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から「.NET Runtime」のWindows x64版をインストールしてください。.NET 10 SDKや.NET 10 Desktop Runtimeが入っているPCは、含まれる.NET Runtimeを利用できます。`dotnet --list-runtimes` に `Microsoft.NETCore.App 10.0.x` が表示されることを確認してください。追加の動作環境が必要なAppletは、そのAppletの案内に従ってください。
 
-Electron 44.6.0を使用します。Appletの画面は宣言に応じて本体ページまたは別ウィンドウで表示できます。Gmailは両方に対応します。
+Electron 44.6.0を使用します。Appletの画面は宣言に応じて本体ページまたは別ウィンドウで表示できます。Gmailは両方に対応します。対応するWebアカウントAppletでは、Applet自身の設定から非表示時に開始ページへ戻す動作をON/OFFできます。Gmail 0.10.0の「非表示になったら受信トレイへ戻す」はAppDock 0.35.2以降で利用できます。
 
 この配布版は未署名です。
 

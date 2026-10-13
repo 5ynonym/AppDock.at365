@@ -131,6 +131,12 @@ export function validateWebAccounts(
   )
     throw Error('webAccounts.externalLinkSetting must be a setting key');
   if (
+    value.returnToStartOnHideSetting !== undefined &&
+    (typeof value.returnToStartOnHideSetting !== 'string' ||
+      !/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(value.returnToStartOnHideSetting))
+  )
+    throw Error('webAccounts.returnToStartOnHideSetting must be a setting key');
+  if (
     value.avatarOrigins !== undefined &&
     (!Array.isArray(value.avatarOrigins) || value.avatarOrigins.length > 10)
   )
@@ -151,6 +157,11 @@ export function validateWebAccounts(
     !allowedWebNavigation(value.url, value.origins)
   )
     throw Error('webAccounts URL and observeOrigin must match declared origins');
+  if (value.returnToStartOnHideSetting !== undefined) {
+    const start = new URL(value.url);
+    if (start.origin !== value.observeOrigin)
+      throw Error('returnToStartOnHideSetting requires a start URL on observeOrigin');
+  }
   asset(folder, value.ui);
   const observer = asset(folder, value.observer);
   if (fs.statSync(observer).size > 100000) throw Error('Web observer is too large');
@@ -191,6 +202,9 @@ export class WebAccountController {
   private disposed = false;
   private opening?: Promise<void>;
   private navigationRevision = 0;
+  private surfaceWasVisible = false;
+  private visibilityCheckPending = false;
+  private returnAfterLoad = new WeakSet<WebContentsView>();
   private openingExternal = false;
   private reads = new Map<string, Promise<unknown>>();
   private generation = new Map<string, number>();
@@ -682,7 +696,10 @@ export class WebAccountController {
       }
       this.changed();
     });
-    wc.on('did-stop-loading', () => this.changed());
+    wc.on('did-stop-loading', () => {
+      this.changed();
+      if (this.returnAfterLoad.delete(view)) void this.returnHiddenViewToStart(view);
+    });
     wc.on('did-navigate', () => this.changed());
     wc.on('did-navigate-in-page', () => this.changed());
     wc.on('did-fail-load', (_event, code, _description, _url, main) => {
@@ -743,7 +760,65 @@ export class WebAccountController {
       }, 2000);
     for (const a of this.state.accounts) this.view(a.id);
   }
+  private async returnHiddenViewToStart(view: WebContentsView) {
+    const key = this.definition.returnToStartOnHideSetting;
+    if (this.disposed || !key || this.services.settings?.()[key] !== true) return;
+    if (this.surface?.visible && this.attached === view) return;
+    const wc = view.webContents;
+    if (wc.isDestroyed()) return;
+    if (wc.isLoadingMainFrame()) {
+      this.returnAfterLoad.add(view);
+      return;
+    }
+    const start = new URL(this.definition.url);
+    let current: URL;
+    try {
+      current = new URL(wc.getURL());
+    } catch {
+      return;
+    }
+    // Only change a settled service document's route. Authentication and other
+    // documents must keep their URL, input and navigation unchanged.
+    if (current.origin !== start.origin || current.pathname !== start.pathname) return;
+    if (current.hash === start.hash) return;
+    try {
+      await wc.executeJavaScriptInIsolatedWorld(1001, [
+        {
+          code: `(() => {
+          const start = new URL(${JSON.stringify(this.definition.url)});
+          if (location.origin !== start.origin || location.pathname !== start.pathname) return;
+          if (location.hash !== start.hash) location.hash = start.hash;
+        })()`,
+        },
+      ]);
+    } catch {
+      if (!this.disposed && !wc.isDestroyed())
+        this.services.failed('非表示のWeb画面を開始ページへ戻せませんでした。');
+    }
+  }
+  private checkSurfaceVisibility() {
+    if (this.visibilityCheckPending || this.disposed) return;
+    this.visibilityCheckPending = true;
+    // Coalesce layout callbacks while moving the same surface between hosts.
+    queueMicrotask(() => {
+      this.visibilityCheckPending = false;
+      if (this.disposed) return;
+      const visible = this.surface?.visible === true;
+      const hidden = this.surfaceWasVisible && !visible;
+      this.surfaceWasVisible = visible;
+      if (
+        hidden &&
+        this.definition.returnToStartOnHideSetting &&
+        this.services.settings?.()[this.definition.returnToStartOnHideSetting] === true
+      ) {
+        if (this.attached) void this.returnHiddenViewToStart(this.attached);
+        this.navigationRevision++;
+        this.changed();
+      }
+    });
+  }
   private layout() {
+    this.checkSurfaceVisibility();
     if (!this.window || !this.attached) return;
     const { width: w, height: h } = this.surface!.size;
     const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
@@ -772,10 +847,12 @@ export class WebAccountController {
   }
   private show(id: string) {
     if (!this.window) return;
-    if (this.attached) {
-      this.park(this.attached);
-    }
-    this.attached = this.view(id);
+    const next = this.view(id);
+    const previous = this.attached;
+    if (previous) this.park(previous);
+    this.attached = next;
+    if (previous && previous !== next && this.surface?.visible)
+      void this.returnHiddenViewToStart(previous);
     this.layout();
     this.changed();
   }

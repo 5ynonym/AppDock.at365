@@ -177,7 +177,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 リボンの上寄せ/下寄せ・セパレーターと既存設定の移行は[Appletページとリボン](docs/applet-pages.md)を参照してください。隔離GUIは`scripts/ribbon-layout-ui-test.cjs`、本体ショートカットは「設定 → ショートカット」のコマンド一覧で編集します。Applet個別設定/キー編集は詳細上部の独立したタブへ集約します。表示順・共有編集は[ホスト開発ガイド](docs/host-development.md#appletの表示順)、隔離GUIは`scripts/applet-order-ui-test.cjs`を参照してください。
 
-WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](docs/web-accounts.md)を参照してください。
+WebアカウントのNode navigateコマンド、externalLinkSettingとreturnToStartOnHideSettingの自身のboolean設定による制御は、[WebアカウントAPI](docs/web-accounts.md)を参照してください。非表示復帰はWebAccountControllerがSurfaceの可視状態を判定し、ローカルUIのviewport(null)と区別します。関連回帰はtests/web-accounts-auto-return.test.cjs、実WebContentsの試験は兄弟Gmailのscripts/test-auto-return.cjsで実行します。
 
 manifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・保存済み入力の維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
 

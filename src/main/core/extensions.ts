@@ -93,6 +93,17 @@ function readManifest(
         ))
     )
       throw Error('externalLinkSettingには自身のboolean設定とsettings capabilityが必要です。');
+    if (
+      m.webAccounts.returnToStartOnHideSetting !== undefined &&
+      (!m.capabilities?.includes('settings') ||
+        !(parseSettingDefinitions(m.settings) ?? []).some(
+          (setting) =>
+            setting.key === m.webAccounts.returnToStartOnHideSetting && setting.type === 'boolean',
+        ))
+    )
+      throw Error(
+        'returnToStartOnHideSettingには自身のboolean設定とsettings capabilityが必要です。',
+      );
   }
   delete m.sourceKind;
   if (m.id === 'appdock.default-shell' && sourceKind !== 'builtin')
