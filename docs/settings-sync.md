@@ -54,3 +54,5 @@ notificationPreferences.overridesはsettings.jsonの任意フィールドです�
 省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。設定の即時保存や外部revisionの競合保護を共用し、通知設定も共通の即時保存経路を使います。詳細は[通知契約](notifications.md)を参照してください。
 
 通知センターの既読/履歴削除とnotifications/update-receipt.jsonの受付済み記録はPC専用です。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。
+
+TTSの通常設定は共有settings.jsonのtts、APIキーはPC専用rootのtts-key.json（safeStorage暗号化・接続先ハッシュに紐付け）へ保存します。生成音声とジョブはメモリ上だけで保持し、共有data/と登録素材へ追加しません。詳細は[TTS連携](tts-design.md#設定と保存)を参照してください。

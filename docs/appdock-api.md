@@ -6,14 +6,14 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 - `src/main/core/appdock-api.ts`のAppDockApiはMCPの起動状態から独立した単一インスタンスです。MCPはHTTPアダプター、Appletは既存JSON-lines RPCの`host.appdock.call`から呼びます。AppletにHTTPポート・Bearer token・Codex登録は不要です。
 - 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。各操作で`callers`（mcp/applet）、`permissions`、入力JSON SchemaとMCP情報を宣言します。新規処理はAppDockApiのhandlersへ登録し、共通dispatcherが公開先・必要許可・Schemaを検証します。MCP列挙も同じ公開先を使うため、Applet RPC/SDK/MCPの通信実装を追加する必要はありません。既存のcommands.executeから公開コマンドを増やす場合も新しいツールは不要です。
-- Appletは13操作、MCPは11操作を公開します。公開情報・設定・コマンド、Applet管理、ショートカット・ジェスチャー・リボン・トレイ編集に加え、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
+- Appletは20操作、MCPは18操作を公開します。公開情報・設定・コマンド、Applet管理、ショートカット・ジェスチャー・リボン・トレイ編集に加え、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
 - 自分のStorage/Secrets、通知、UI登録等の既存APIは引き続き用途別の入口を使います。これらをMCPへ自動公開しません。リモートWebページにはこのAPIやホストIPCを渡しません。
 
 ## 宣言と許可
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境の初期値は全9項目ONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境の初期値は既存9項目ON、useTtsはOFFです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -105,3 +105,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 ## 描画モデルAPI
 
 `ui.ribbon.get`、`ui.assets.get`、`ui.actions.invoke`を共通操作カタログへ追加。既存の編集用`ribbon.get`とは独立する。モデル・操作ID・MCP公開範囲・Shell roleは[Shell API](shell-api.md)を参照。
+
+## TTS読み上げ
+
+最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。

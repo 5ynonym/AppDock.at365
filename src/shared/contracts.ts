@@ -20,6 +20,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  tts?: import('./tts').TtsSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];
   gestures?: import('./gestures').GestureSettings;

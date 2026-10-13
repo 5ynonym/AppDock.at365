@@ -178,3 +178,33 @@ body,
     width: 100%;
   }
 }
+
+.tts-settings > div {
+  margin: 20px 0;
+}
+.tts-settings > div > label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tts-settings > div > label > input,
+.tts-settings > div > label > textarea {
+  width: min(100%, 700px);
+}
+.tts-settings > div > label > textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.tts-settings > div > button {
+  margin: 12px 8px 0 0;
+}
+.tts-settings .setting-row > textarea {
+  width: 55%;
+  min-height: 120px;
+}
+@media (max-width: 900px) {
+  .tts-settings .setting-row > textarea {
+    width: 100%;
+  }
+}

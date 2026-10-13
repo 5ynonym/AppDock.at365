@@ -35,6 +35,7 @@ export const hostSettingsPages = [
   ['appearance', '表示'],
   ['general', '一般'],
   ['notifications', '通知'],
+  ['tts', '読み上げ'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカット'],
@@ -78,6 +79,18 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
     ],
     ['startMinimized', 'トレイから起動', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
+  ],
+  tts: [
+    ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],
+    ['apiKey', 'APIキー', 'このPCに暗号化保存。空欄で認証なし'],
+    ['model', 'TTSモデル'],
+    ['defaultVoice', '既定のボイス'],
+    ['defaultSpeed', '読み上げ速度'],
+    ['speedMode', '速度の適用先', 'AppDockの再生速度 サーバーの生成速度'],
+    ['voicesSource', 'ボイス一覧の取得方式'],
+    ['voicesPath', 'ボイス一覧のパス'],
+    ['manualVoices', '手動ボイス一覧'],
+    ['preview', '試聴と停止', 'テキストを入力して読み上げ'],
   ],
   notifications: [['notifications', 'Appletからの通知を許可', '種類別設定・通知先・表示時間']],
   ribbon: [['ribbon', 'リボン', '表示 配置 並べ替え 上部 下部 セパレーター']],
@@ -133,6 +146,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     title,
     (
       {
+        useTts: 'TTSサーバーへ接続し、テキストから音声を生成・再生します。',
         read: '公開された状態・設定・コマンド一覧を取得します。',
         execute: '公開されたコマンドを実行します。',
         write: '本体とAppletが公開した設定を変更します。',
@@ -300,6 +314,8 @@ export function settingsPaths(
   switch (page.id) {
     case 'appearance':
       return ['theme', 'shellProviders'].map((k) => ['host', k]);
+    case 'tts':
+      return [['tts']];
     case 'notifications':
       return [['host', 'notifications'], ['notificationPreferences']];
     case 'general':

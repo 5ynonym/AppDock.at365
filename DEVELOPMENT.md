@@ -10,7 +10,7 @@
 | ホストとAppletの開発 | [ホスト開発](docs/host-development.md)、[Applet開発](docs/applet-development.md)、[Applet API](docs/extensions.md) |
 | 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
-| TTS連携の設計（未実装） | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
+| TTSサーバー連携・読み上げAPI | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
 | 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |

@@ -216,8 +216,13 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 9);
-    assert.ok(Object.values((await snapshot()).appletApi.permissions).every((v) => v === true));
+    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 10);
+    assert.equal((await snapshot()).appletApi.permissions.useTts, false);
+    assert.ok(
+      Object.entries((await snapshot()).appletApi.permissions)
+        .filter(([k]) => k !== 'useTts')
+        .every(([, v]) => v === true),
+    );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Applet：/ }).count(), 0);
@@ -225,10 +230,13 @@ async function grant(id, permissions) {
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 7);
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 10);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 8);
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
-      assert.equal(await control.isChecked(), true);
+      assert.equal(
+        await control.isChecked(),
+        !(await control.getAttribute('aria-label')).includes('TTS'),
+      );
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
     assert.ok(

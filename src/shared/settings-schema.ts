@@ -1,3 +1,4 @@
+import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { parseShellProviders } from './shell';
 import { parseNotificationPreferences } from './notification-types';
 import { parseKeybindings, withKeybindings } from './keybindings';
@@ -17,6 +18,7 @@ import {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const createDefaultSettings = (): Settings => ({
+  tts: defaultTtsSettings(),
   appletOrder: [],
   gestures: defaultGestures(),
   gestureDefaultsInitialized: [],
@@ -209,6 +211,7 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    tts: parseTtsSettings(value.tts),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
     gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),

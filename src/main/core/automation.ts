@@ -23,6 +23,7 @@ interface LocalConfig {
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
   allowEditRibbon: boolean;
+  allowUseTts: boolean;
   allowEditTray: boolean;
   port: number;
   token: string;
@@ -78,6 +79,7 @@ export class AutomationService {
       allowEditShortcuts: false,
       allowEditGestures: false,
       allowEditRibbon: false,
+      allowUseTts: false,
       allowEditTray: false,
       port: 0,
       token: '',
@@ -98,6 +100,7 @@ export class AutomationService {
           typeof c.allowWrite !== 'boolean' ||
           (c.allowExecute !== undefined && typeof c.allowExecute !== 'boolean') ||
           (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
+          (c.allowUseTts !== undefined && typeof c.allowUseTts !== 'boolean') ||
           (c.allowEditTray !== undefined && typeof c.allowEditTray !== 'boolean') ||
           (c.allowEditRibbon !== undefined && typeof c.allowEditRibbon !== 'boolean') ||
           (c.allowEditGestures !== undefined && typeof c.allowEditGestures !== 'boolean') ||
@@ -118,6 +121,7 @@ export class AutomationService {
         c.allowEditShortcuts ??= false;
         c.allowEditGestures ??= false;
         c.allowEditRibbon ??= false;
+        c.allowUseTts ??= false;
         c.allowEditTray ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
@@ -138,6 +142,7 @@ export class AutomationService {
   }
   allowed(
     key:
+      | 'allowUseTts'
       | 'allowWrite'
       | 'allowExecute'
       | 'allowManageApplets'
@@ -147,6 +152,7 @@ export class AutomationService {
       | 'allowEditTray',
   ) {
     if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
+    if (key === 'allowUseTts') return true;
     if (key === 'allowWrite' || key === 'allowExecute') return true;
     return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
   }
@@ -167,6 +173,7 @@ export class AutomationService {
       allowEditShortcuts: this.config.allowEditShortcuts,
       allowEditGestures: this.config.allowEditGestures,
       allowEditRibbon: this.config.allowEditRibbon,
+      allowUseTts: this.config.allowUseTts,
       allowEditTray: this.config.allowEditTray,
       port: this.config.port,
       running: !!this.server,
@@ -295,6 +302,12 @@ export class AutomationService {
           this.config.serverName = codexServerName(action.name);
           this.save();
           message = '登録名を保存しました。既存の登録は解除してから登録し直してください。';
+          break;
+        case 'setTts':
+          if (typeof action.allowed !== 'boolean') throw Error('読み上げの許可が不正です。');
+          this.config.allowUseTts = action.allowed;
+          this.save();
+          message = 'このPCの読み上げ許可を保存しました。';
           break;
         case 'setExecution':
           if (typeof action.allowed !== 'boolean') throw Error('コマンド実行の許可が不正です。');

@@ -69,14 +69,20 @@ function setup(t) {
 test('Applet grants are default-on, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
   const f = setup(t);
   assert.equal((await f.call('system.getInfo')).ok, true);
-  assert.ok(Object.values(f.access.get()).every((v) => v === true));
-  assert.equal(Object.keys(f.access.get()).length, 9);
+  assert.equal(f.access.get().useTts, false);
+  assert.ok(
+    Object.entries(f.access.get())
+      .filter(([k]) => k !== 'useTts')
+      .every(([, v]) => v === true),
+  );
+  assert.equal(Object.keys(f.access.get()).length, 10);
   f.grant({});
   assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
   for (const method of automationMethods.filter(
     (m) =>
+      !m.startsWith('tts.') &&
       !m.startsWith('input.') &&
       !m.startsWith('ui.') &&
       m !== 'commands.execute' &&

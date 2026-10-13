@@ -71,6 +71,7 @@ export class AppDockApi {
       applets(): AutomationApplet[];
       commands(): AutomationCommand[];
       execute(id: string): Promise<unknown>;
+      ttsAllowed?(): boolean;
       executable(): boolean;
       version: string;
       instanceId: string;
@@ -101,6 +102,7 @@ export class AppDockApi {
   private permissions(appletId?: string) {
     if (appletId !== undefined) return this.options.appletPermissions?.(appletId) ?? {};
     return {
+      useTts: this.options.ttsAllowed?.() ?? false,
       read: true,
       execute: this.options.executable(),
       write: this.options.writable(),

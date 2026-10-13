@@ -13,6 +13,7 @@ import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
 import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
+import { TtsSettingsForm } from './TtsSettings';
 import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
@@ -76,6 +77,8 @@ export function SettingsForm({
         onDelete={() => void invoke('deleteWebApplet')}
       />
     );
+  if (category === 'tts')
+    return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
   if (category === 'notifications')
     return <NotificationSettings editor={editor} types={aux.notificationTypes ?? []} />;
   if (category === 'codex')

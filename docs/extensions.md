@@ -291,3 +291,7 @@ manifestのcommands[]に任意のshellRequirement: { region: "ribbon", state: "v
 runtime登録・動的置換はmanifestの条件を解除できず、別名も同じ条件です。available/disabledReasonとExtensionManager.executeの直前検査を共用し、UI・キー・トレイ・MCP・他Applet経由を揃えます。IDを書き換えたり、別Appletへ転送したり、実行のために割り当てや有効状態を変更したりしません。取得後の状態変化では実行を拒否します。型付きViewの一時操作を新設した契約ではなく、任意DOM/JavaScript/renderer RPCは追加しません。詳細は[領域別割り当て](shell-region-assignment.md)。
 
 native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.OutputEncoding=new UTF8Encoding(false)をConsole.In/Out取得前に設定し、wire用stdoutを確保して通常ログはstderrへ出してください。UTF-8の状態理由をWindows既定の文字コードで読むとJSONの引用符まで破損するため、ASCIIのみのfixture成功を文字コード契約の検証に代用しません。
+
+## TTS読み上げ
+
+最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。

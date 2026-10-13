@@ -108,6 +108,10 @@ import { NotificationSurfaceController } from './core/notification-surface-contr
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
 import { AppDockApi, AutomationError } from './core/appdock-api';
+import { TtsService } from './core/tts-service';
+import { TtsSecrets } from './core/tts-secrets';
+import { playTtsWave } from './core/tts-player';
+import { defaultTtsSettings } from '../shared/tts';
 import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
 import { automationApplets, automationCommands } from './core/automation-commands';
 import type { AutomationAction } from '../shared/automation';
@@ -316,8 +320,48 @@ const sendInput =
     if (!id || !nativeInput) throw Error('入力機能は準備中です。');
     return nativeInput.send(method, params, id, context);
   };
+const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-key.json'), {
+  encrypt: (value) => {
+    if (!safeStorage.isEncryptionAvailable()) throw Error('APIキーの暗号化が利用できません。');
+    return safeStorage.encryptString(value).toString('base64');
+  },
+  decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+});
+const ttsOwner = (id?: string) =>
+  id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp';
+const tts = new TtsService({
+  settings: () => settings.value.tts ?? defaultTtsSettings(),
+  key: (url) => ttsSecrets.get(url),
+  canUse: (owner, speak) => {
+    if (quitting) return false;
+    if (owner === 'host') return startupReady;
+    if (owner === 'mcp') return mcpAllowed('allowUseTts') && (!speak || mcpAllowed('allowExecute'));
+    const item = [...(manager?.items.values() ?? [])].find(
+      (e) => owner === ttsOwner(e.manifest.id),
+    );
+    const grants =
+      item && ['starting', 'running'].includes(item.state)
+        ? appletApiAccess.get(item.manifest)
+        : {};
+    return !!grants.read && !!grants.useTts && (!speak || !!grants.execute);
+  },
+  play: playTtsWave,
+  fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
+  changed: () => changed(),
+  audit: (owner, id, state, code) =>
+    log.write(
+      'info',
+      owner.startsWith('applet:') ? owner.split(':')[1] : owner === 'host' ? 'host' : 'automation',
+      '[TTS] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
+    ),
+});
+const previewJobs = new Set<string>();
 const operationApi = new AppDockApi({
   handlers: {
+    'tts.speak': async (params, id) => tts.speak(ttsOwner(id), params),
+    'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
+    'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
+    'tts.stop': async (params, id) => ({ ...(await tts.stop(ttsOwner(id), params.jobId)) }),
     'ui.ribbon.get': async (_params, id) => {
       const permissions = externalUiPermissions(id);
       return {
@@ -360,6 +404,7 @@ const operationApi = new AppDockApi({
     const e = manager?.items.get(id);
     return e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
   },
+  ttsAllowed: () => mcpAllowed('allowUseTts'),
   writable: () => mcpAllowed('allowWrite'),
   executable: () => mcpAllowed('allowExecute'),
   manageable: () => mcpAllowed('allowManageApplets'),
@@ -819,6 +864,20 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         })),
       },
     };
+  if (id === 'tts')
+    return {
+      tts: {
+        ...ttsSecrets.status(settings.value.tts?.baseUrl ?? ''),
+        jobs: [...previewJobs].flatMap((id) => {
+          try {
+            return [tts.get('host', id)];
+          } catch {
+            previewJobs.delete(id);
+            return [];
+          }
+        }),
+      },
+    };
   if (id === 'permissions') return { permissions: host.appletApi };
   return {};
 }
@@ -852,6 +911,21 @@ function settingsPageActions(
       if (!isShellRegion(region)) throw Error('領域が不正です。');
       await retryShell(region);
     };
+  if (page.id === 'tts') {
+    actions.ttsSetKey = async ([value]) => {
+      ttsSecrets.set(settings.value.tts?.baseUrl ?? '', value);
+      tts.reconcile(true);
+      changed();
+    };
+    actions.ttsVoices = async () => tts.voices('host');
+    actions.ttsPreview = async ([text, requestId]) => {
+      const job = tts.speak('host', { text, requestId });
+      previewJobs.add(job.jobId as string);
+      while (previewJobs.size > 512) previewJobs.delete(previewJobs.values().next().value!);
+      return job;
+    };
+    actions.ttsStop = async () => tts.stopAll();
+  }
   if (page.id === 'general') {
     actions.refreshLaunchState = async () => {
       const result = await launch.refresh();
@@ -941,6 +1015,7 @@ function settingsPageActions(
               'setShortcutEditing',
               'setGestureEditing',
               'setRibbonEditing',
+              'setTts',
               'setTrayEditing',
             ]
           : [
@@ -955,11 +1030,14 @@ function settingsPageActions(
             ];
       if (!value || !permitted.includes(value.kind))
         throw Error('このページでは利用できない操作です。');
-      return automation!.action(value);
+      const reply = await automation!.action(value);
+      tts.reconcile();
+      return reply;
     };
     if (page.id === 'permissions')
       actions.setAppletApiPermissions = async ([value]) => {
         appletApiAccess.set(value);
+        tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
         changed();
       };
@@ -1125,13 +1203,16 @@ function registerIpc() {
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
     appletApiAccess.set(permissions);
+    tts.reconcile();
     for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
     log.write('info', 'host', '[Applet API] shared permissions updated');
     changed();
   });
-  handle('dock:automation', (action: AutomationAction) => {
+  handle('dock:automation', async (action: AutomationAction) => {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
-    return automation.action(action);
+    const reply = await automation.action(action);
+    tts.reconcile();
+    return reply;
   });
   handle('dock:settingsInputsFlushed', (id) => {
     if (typeof id !== 'string') throw Error('Invalid input flush');
@@ -1484,6 +1565,7 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    tts.reconcile();
     typedNotifications?.reconcile();
     for (const e of manager.items.values())
       if (!['starting', 'running'].includes(e.state)) nativeInput?.cancelApplet(e.manifest.id);
@@ -1492,6 +1574,7 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
+    tts.reconcile();
     typedNotifications?.reconcile();
     applySettings();
     void syncHotKeys(true);
@@ -2250,6 +2333,7 @@ app.on('before-quit', (event) => {
   shellPageHost?.dispose();
   void (async () => {
     for (const stop of [
+      () => tts.close(),
       () => automation?.close(),
       () => gestures?.close(),
       () => nativeInput?.close(),

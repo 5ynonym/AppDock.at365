@@ -41,6 +41,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  tts?: { apiKeyConfigured: boolean; error?: string; jobs: import('./tts').TtsJob[] };
   shellRegions?: import('./shell').ShellRegionsSnapshot;
   notificationTypes?: import('./notification-types').NotificationTypeEntry[];
   applets?: ExtensionSnapshot[];

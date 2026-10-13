@@ -1,12 +1,12 @@
 # TTSサーバー連携と読み上げAPIの設計
 
-状態: **未実装の設計案**。本文の設定キー・API名・既定値は追加予定の契約であり、現在のAppDockで利用できる機能を示すものではない。実装・版更新・発行は別の作業とする。
+状態: **実装済み**。AppDock 0.35.0のTTS設定・API・再生・取消の契約を示す。実測条件と結果は[検証記録](../VERIFICATION.md)へ記載する。
 
 ## 目的と初期範囲
 
 OpenAI互換のTTSサーバーへテキストを送り、生成した音声をAppDockが動作するPCで再生する。Node/.NET AppletとMCPは同じ共通操作APIを利用する。TTSサーバーやMCPクライアント側での再生は行わない。
 
-初期実装の範囲:
+提供範囲:
 
 - 接続先1件、任意のAPIキー、モデル、既定のボイス・速度の設定。
 - 音声生成と順次再生、ボイス一覧、受付IDによる状態取得・停止。
@@ -42,12 +42,13 @@ TtsServiceは受付・設定解決・キュー・HTTP・状態・取消を所有
 
 共有settings.jsonに任意のttsオブジェクトを追加する。未設定では接続・生成・再生を開始しない。
 
-| キー案 | 内容・既定値 |
+| キー | 内容・既定値 |
 | --- | --- |
 | `tts.baseUrl` | APIベースURL。未設定は空。例: `http://host:8080/v1` |
 | `tts.model` | モデルID。未設定は空 |
 | `tts.defaultVoice` | 省略時に使うボイスID。未設定は空 |
 | `tts.defaultSpeed` | 0.25～4.0の有限数。既定1.0 |
+| `tts.speedMode` | playback（既定）またはserver。速度の適用先 |
 | `tts.voicesSource` | endpointまたはmanual。既定endpoint |
 | `tts.voicesPath` | ベースURL配下の相対パス。既定audio/voices |
 | `tts.manualVoices` | 手動ボイスのid/name配列。既定空配列 |
@@ -56,7 +57,7 @@ URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。
 
 APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化方式に合わせてPC専用rootのホスト用秘密領域へ保存する。Applet別SecretsのIDを流用しない。暗号化不可の場合は平文へフォールバックしない。キーの登録・置換・削除はホスト設定画面に限定し、Applet/MCPへ値を返さない。必要な状態表示にはapiKeyConfiguredだけを使う。
 
-キーは正規化した接続先に紐付ける。URL変更時に以前のキーを別の接続先へ自動送信しない。キー未設定ならAuthorizationヘッダーなし、設定済みの場合だけBearer認証とする。秘密情報の保存失敗は画面へ返し、成功扱いしない。
+キーはPC専用rootのtts-key.jsonへ暗号化保存し、正規化した接続先のハッシュに紐付ける。URL変更時に以前のキーを別の接続先へ自動送信しない。キー未設定ならAuthorizationヘッダーなし、設定済みの場合だけBearer認証とする。秘密情報の保存失敗は画面へ返し、成功扱いしない。
 
 生成音声は共有data/・登録通知音に保存しない。初期実装はサイズ制限付きメモリ保持を優先し、ジョブ終了時に音声参照を解放する。ファイルが必要になった場合だけPC専用一時領域を使い、正常終了・取消・次回起動時に自分のファイルだけ回収する。本文・音声・ジョブ履歴の永続保存は行わない。
 
@@ -72,6 +73,8 @@ Default Shellと追加Shellは同じ公開モデル・操作を使用する。�
 
 ### 音声生成
 
+サーバーのWAVはPCM/floatのRIFF形式を受け付ける。圧縮WAV・RF64等は初期対応外。
+
 末尾スラッシュを正規化したベースURLにaudio/speechを追加してJSONをPOSTする。URL結合で/v1等のベースパスを失わない。
 
 ```json
@@ -84,7 +87,7 @@ Default Shellと追加Shellは同じ公開モデル・操作を使用する。�
 }
 ```
 
-速度はサーバーのspeedへ渡し、AppDockでは等速再生する。二重に倍速にしない。この指定は生成音声の速度であり、再生中の速度変更ではない。サーバーが速度を無視した場合のローカル補正は初期範囲外。
+playback（既定）ではサーバーへspeed=1を送り、プレイヤーのplaybackRateへ指定速度を設定し、preservesPitchで音程を保つ。serverでは指定速度をサーバーのspeedへ渡し、AppDockは等速再生する。二重に変更せず、サーバー拒否時の自動再生成も行わない。速度はジョブ受付時に確定し、再生中の変更は行わない。
 
 本文はUnicodeコードポイントで1～4096文字、空白だけの本文は拒否する。切詰め・自動分割はしない。モデル固有の上限がさらに厳しい場合は生成失敗とする。Node/.NET/MCPでホスト側の同じ検証を使う。
 
@@ -118,7 +121,7 @@ OpenAI互換はボイス一覧APIの互換性まで保証しない。404/405は�
 
 次の4操作をappDockOperationsへ追加し、callersはmcp/appletとする。操作名は言語非依存、説明は日本語とする。
 
-| 操作名案 | MCPツール名案 | 入力 | 結果 |
+| 操作名 | MCPツール名 | 入力 | 結果 |
 | --- | --- | --- | --- |
 | `tts.speak` | `appdock_tts_speak` | text、任意voice/speed、requestId | jobId、state、completion:accepted |
 | `tts.voices.list` | `appdock_tts_list_voices` | なし | voices、source:endpoint/manual |
@@ -131,10 +134,10 @@ requestIdは呼出し側が作る1～100文字の一意ID。同じ所有者・�
 
 受付と重複判定記録は一体で作成する。容量不足など受付失敗ではジョブを作らない。終了済み記録は最大512件かつ終了後30分までとし、稼働中の記録を追い出さない。期限切れ・再起動をまたぐ重複防止は保証しない。応答消失時に新しいrequestIdで自動再送しない。
 
-jobIdは起動単位の推測困難なIDとする。状態には本文・キー・音声・生のサーバー応答を含めない。createdAt/updatedAtはUTCのISO 8601、失敗時はerror:{code,message}を返す。未知ID・記録消失・他所有者のIDはNOT_FOUND。終了済みジョブへの停止は既存状態を返し、再実行しない。
+jobIdは起動単位の推測困難なIDとする。状態には本文・キー・音声・生のサーバー応答を含めない。終了時に本文・ボイス・接続設定・秘密値への参照を解放し、重複判定は入力のハッシュだけを保持する。createdAt/updatedAtはUTCのISO 8601、失敗時はerror:{code,message}を返す。未知ID・記録消失・他所有者のIDはNOT_FOUND。終了済みジョブへの停止は既存状態を返し、再実行しない。
 
 ```ts
-// 将来のNode Appletでの使用例。現行ホストには未実装。
+// appdock-api capabilityと読み上げの許可が必要。
 const job = await context.appdock.call('tts.speak', {
   text: '処理が完了しました。',
   voice: 'voice-a',
@@ -143,6 +146,18 @@ const job = await context.appdock.call('tts.speak', {
 });
 const current = await context.appdock.call('tts.jobs.get', { jobId: job.jobId });
 await context.appdock.call('tts.stop', { jobId: job.jobId });
+```
+
+```csharp
+var job = await context.AppDock.CallAsync("tts.speak", new {
+    text = "処理が完了しました。",
+    voice = "voice-a",
+    speed = 1.4,
+    requestId = Guid.NewGuid().ToString()
+}, token);
+var id = job.GetProperty("jobId").GetString();
+var state = await context.AppDock.CallAsync("tts.jobs.get", new { jobId = id }, token);
+await context.AppDock.CallAsync("tts.stop", new { jobId = id }, token);
 ```
 
 .NETは既存context.AppDock.CallAsyncから同じ操作名を呼ぶ。Nodeの型付き操作一覧・入出力型と共通Schemaを更新する。起動前・終了中は既存NOT_READY契約に従う。
@@ -165,14 +180,15 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 初期実装では生成から再生までを1件ずつ順番に実行する。先行生成や並列生成は行わず、TTS同士の重なりを防ぐ。既存通知音とは別キューで、通知音との重なりは許容する。
 
-| 制限 | 初期値案 |
+| 制限 | 初期値 |
 | --- | --- |
 | 稼働中ジョブ | 全体16件。待機・生成・再生を含む |
 | キュー待ち | 受付から10分。超過はfailed |
 | 生成・受信 | 開始から180秒 |
 | 音声受信 | 最大64MiB |
 | 再生可能時間 | デコード後10分以下。超過は再生前に拒否 |
-| 再生監視 | 音声長+30秒。終了通知がなければfailed |
+| 再生監視 | 音声長÷再生速度+30秒。終了通知がなければfailed |
+| デコード後の容量 | PCM/float WAVのみ。推定256MiB以下 |
 
 初期値は内部定数として試験し、変更には実測の根拠を残す。件数・サイズ・時間に加え、デコードによるメモリ増加も検証する。
 
@@ -188,7 +204,7 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 受付前の入力・未設定・許可・容量エラーはAPIエラー。受付後の生成・受信・再生失敗はジョブのfailed。自動再生成・再生は行わない。
 
-| コード案 | 意味 |
+| コード | 意味 |
 | --- | --- |
 | INVALID_ARGUMENT | 空本文、不正速度、入力上限超過 |
 | TTS_NOT_CONFIGURED | 接続先またはモデル未設定 |
@@ -204,7 +220,11 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 一覧取得の5秒期限もTTS_TIMEOUTとする。サーバーのエラー本文には入力テキストが含まれる可能性があるため、そのままUI・MCP・ログへ流さない。公開エラーはHTTP状態などの安全な情報に限る。
 
-## 実装順序と影響先
+## 実装構成と保守
+
+サービスはsrc/main/core/tts-service.ts、音声再生はtts-player.ts、秘密保存はtts-secrets.ts、共有型・設定検証はsrc/shared/tts.ts、Default Shellの設定フォームはshells/default/settings/TtsSettings.tsx。共通APIカタログ・設定・許可・本体寿命を接続する。
+
+以下は変更時の確認順序を示す。
 
 1. 共通Schema・型・設定既定値・秘密保存・useTts許可と移行を追加する。
 2. TTSクライアント・TtsService・再生アダプターを追加し、疑似サーバーで成功・失敗・取消を確認する。
@@ -214,9 +234,11 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 主な対象はsrc/shared/appdock-api.ts、src/main/core/appdock-api.ts、src/main/index.ts、設定Schema/カタログ、Applet/MCPの許可保存、Shell設定モデル・描画、Nodeの共通API型と関連試験。新規サービスはsrc/main/core/配下へ置く。既存通信・SDKを一括置換しない。
 
-実装時はREADMEの設定説明、appdock-api/automation/extensionsの契約、settings-syncの保存領域、VERIFICATIONの実測を更新する。設定・保存契約の追加を含むため、完成時の本体版は[共通手順](development-workflow.md)に従ってマイナー更新する。開始時の版を基準に決め、本書で次版を固定しない。文書だけの作業では版更新・発行を行わない。
+利用説明はREADME、API契約は本書とappdock-api/automation/extensions、保存領域はsettings-sync、実測はVERIFICATIONへ記載する。TTS設定とPC専用キー保存の追加により、[共通手順](development-workflow.md)に従って本体を0.34.1から0.35.0へマイナー更新した。未変更Appletの再発行は不要。
 
 ## 検証と受入条件
+
+型検査とbuild後にtests/tts.test.cjs、共通API/MCP・設定・音声の関連回帰を実行する。dotnet build tests/fixtures/dotnet/AppDock.Extensions.TtsProbe/AppDock.Extensions.TtsProbe.csproj -c ReleaseでSDKプローブを用意し、dev.bat node scripts/tts-ui-test.cjs [固定EXE]で隔離したNode/.NET/MCPと設定画面・再生を直列検証する。APPDOCK_TTS_REAL=1の明示指定時だけ、既知のTTSサーバーへ短い検証文を送って両ボイスの実再生を確認する。通常のGUI試験はローカル疑似サーバーだけを使う。
 
 | 対象 | 確認内容 |
 | --- | --- |

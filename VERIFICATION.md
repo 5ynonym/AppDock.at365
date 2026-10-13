@@ -1,5 +1,25 @@
 # 検証記録
 
+## 2026-10-14: TTS連携のコミット前検証（0.35.0）
+
+- mainのTTS差分をレビュー。専用許可の初期OFF・独立保存、既存API互換、所有者とruntime世代、APIキーの接続先束縛・非露出、停止/終了、速度方式と設定モデル/検索を確認。製品修正を要する未解決の指摘なし。本体標準回帰とTTS・共通API/MCP・設定Shell/検索を必要回帰とした。兄弟repo製品と.NET SDKは変更していない。
+- 型検査成功。標準test（updater/main/renderer/Default Shell/fixtureのbuildを含む）は **385/385、fail/skip 0**。初回384成功/1失敗はTTS完了記録の15ms実時間期限が並列負荷で観測前に切れたテスト競合。テストのDate.nowを固定し、期限直前・期限到達・新サービスでの記録不在を検証するよう修正後、全標準回帰を再実行した。元の失敗ログも保持。製品コードは変更していない。
+- .NET TtsProbe/ApiProbeのRelease build成功。固定配布EXEでTTS **9群**、MCP既存操作 **15群**、ソースのNode/.NET共通API **5群**、設定Shell **9群**、設定検索 **7群**を直列・隔離profileで確認、全終了コード0。新ページのカタログ全項目のanchor、即時保存/競合/復旧、許可と再生/停止/終了を確認。試験終了後の対象プロセス残存なし。
+- 試験treeは **54db186b617c27c513c73d9c03a4553d1b39a6f0**、試験前後とstage/作業内容が一致。検証後の追加は本記録のみ。発行済みEXEのSHA256は **1adff8f7a601d0b3c424a2df5e34402f0436eb704d4692460aae1b560ce2b2cf** のまま。製品/版/依存変更なしのため再publish・再版更新は不要。両ボイス1.4倍速の先行実サーバー試験は同一固定EXEのhashを照合し、今回の新規実行と分けて保存した。
+- [再利用用証跡](.artifacts/commit-validation-tts-20261014/validation.json)にtree、コマンド/終了コード/完全ログhash、ツール/依存/fixture/発行物hash、GUI結果を保存。コミット後のSHA/treeを同記録へ追加する。[整理記録](.artifacts/commit-validation-tts-20261014/cleanup.json): 対象試験フォルダー54件を照合、直近成功・検証参照・失敗/不明を保持し削除0件。push・Release・実利用先deployは行わない。
+
+## 2026-10-14: TTSサーバー連携の実装・ローカル発行（0.35.0）
+
+- main 3388f05上で実装。読み上げ設定、接続先に紐付くPC専用暗号化APIキー、TTS専用のApplet/MCP独立許可（初期OFF）、共通4操作、ジョブの所有者・重複判定・生成/再生/停止/回収を追加。設定・保存ファイルの追加により0.34.1→0.35.0のマイナー更新。同梱Default Shellも0.35.0。Applet製品・依存・lockfile/toolchainを変更せず、本体だけをpublishへ発行。コミット・push・Release・実利用先deployは行わない。
+- 発行前レビューは設定/Schema/秘密保存、API公開先・許可・所有者、再生/取消/終了寿命、Shellモデル・入力・文書と試験を対象に実施。実試験で停止後のexecuteJavaScript待機が残り、停止API/ホスト終了が待ち続ける不具合を検出した。プレイヤー破棄・取消を明示的なPromiseで待機経路へ接続して修正。レビューで接続先変更後の古いボイス候補と試聴画面の配置も修正し、設定取得条件変更時の候補消去と専用CSSを追加。修正後に再検証し、発行を妨げる指摘は残っていない。
+- 実サーバーのOpenAPIにはspeed 0.25～4があるが、1.7B-Baseのボイスクローンbackendはspeed≠1にHTTP 400（等速のみ対応）を返した。AppDockの既定方式をplaybackとし、サーバー等速生成＋playbackRate/preservesPitchで速度を適用する。server方式も選択可能で、二重適用・拒否時の自動再生成をしない。仕様変更を設計/利用文書へ反映。
+- 型検査・main/renderer/Default Shellのbuild成功。TTS 15件を含む共通API/MCP・設定/ページ・preferences・登録音声の関連回帰 **59/59、fail/skip 0**。新規.NET TtsProbeと既存ApiProbeのRelease build成功。Node/.NETの共通API・即時保存・許可・旧入口・MCP再入・テーマ/画面幅/再起動の実GUI回帰 **5群**（applet-api-source-1791915686923）成功。
+- 固定単一EXEのSHA256一致コピーを隔離profileで起動し、TTS実プロセス試験 **11群**（tts-ui-1791915965315）成功。設定からの一覧/試聴、キー暗号化とモデル/ログ非露出、Node/.NET SDK、MCP4操作・重複防止、31秒WAVの再生開始/停止、MCP許可取消後の停止/状態取得、実サーバーのyui/yui-quietgirlを1.4倍速で再生完了、再生中のホスト終了を検査。実rendererのplaybackRate=1.4・preservesPitch=trueも照合。試験終了後に同profileのElectron/.NETプロセス残存なし。
+- 実サーバーはhttp://alice:8080/v1、モデル1.7B-Base、キーなし。短い固定検証文の音声はWAVコンテナー/デコード/endedまで確認した。物理スピーカーからの聴感・音程品質、他サーバー、実長10分/64MiB上限の実機再生、非Default ShellのTTS専用フォームは未確認。境界・HTTP失敗・破損/上限超過・待機/生成期限・取消競合・所有者違い・重複期限・速度方式は疑似応答/単体試験で確認。全標準回帰・無関係なGUI/兄弟repo回帰は今回の実装範囲では未実行。
+- package版変更後、pnpmがworkspace記録の変化を検出したためinstall --frozen-lockfileで再構築。終了0、既存lockfileの解決を省略し同じ依存を再利用。供給網検査・7日待機設定・既存の完全版指定例外を保持。publishは一度自動承認レビューに外部配布と判定され拒否されたが、build-portable.cjsのpublish:'never'とローカル生成のみであることを確認して同じpublish.batの実行が承認された。外部公開はしていない。
+- publish.bat終了0。publish/AppDock.at365.exe **144142170 bytes**、SHA256 **1adff8f7a601d0b3c424a2df5e34402f0436eb704d4692460aae1b560ce2b2cf**。EXE FileVersion・package・update.json・同梱Shellは0.35.0、feedのサイズ/hash一致。通常publishとして未変更Applet再発行・全体ZIP作成・旧ZIP整理なし。
+- 証跡は.artifacts/tts-implementation/{typecheck,build,unit-tests,applet-api-gui,gui-real,portable-tts,publish,install}.log、実WAV/real-server.json、各隔離profileのresult.jsonとsettings.png。実行手順と受入条件はdocs/tts-design.mdを参照。リンク・差分検査成功。
+
 ## 2026-10-14: 最新mainへジェスチャー開始判定を統合・コミット検証（0.34.1）
 
 - main be7e5bf（0.34.0、Shell領域割り当て実装/TTS設計を含む）へ今回のworktree差分を3-wayで統合、競合なし。既存mainの変更を保持した。0.33.1試験版を最新minorへ合わせて0.34.1とし、package.json/更新情報/同梱Default Shellを一致させた。設定項目・保存ファイル・公開APIの変更はなく、パッチ更新区分を維持。旧0.33.1の実装・検証は以下の履歴に保持する。

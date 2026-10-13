@@ -17,6 +17,13 @@ const rows: {
   action?: string;
   label?: string;
 }[] = [
+  {
+    key: 'useTts',
+    description: hostSettingItem('permissions', 'useTts').description,
+    mcp: 'allowUseTts',
+    action: 'setTts',
+    label: '読み上げ',
+  },
   { key: 'read', description: hostSettingItem('permissions', 'read').description },
   {
     key: 'execute',
@@ -72,7 +79,7 @@ const rows: {
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
   if (key === 'read' || key === 'sendInput') return [];
   const required: AppletApiPermission[] = applet ? ['read'] : [];
-  if (key !== 'execute') required.push('execute');
+  if (key !== 'execute' && key !== 'useTts') required.push('execute');
   if (key.startsWith('edit')) required.push('write');
   return required.filter((k) => !permissions[k]).map((k) => appletApiPermissionLabels[k]);
 }

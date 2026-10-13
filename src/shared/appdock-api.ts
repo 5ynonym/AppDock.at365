@@ -1,5 +1,114 @@
 // One operation catalog drives MCP tools and both Applet SDK entry points.
 export const appDockOperations = {
+  'tts.speak': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'execute', 'useTts'],
+    name: 'appdock_tts_speak',
+    description:
+      'テキストから音声を生成し、このPCで順番に再生します。受付後jobIdを返します。完了はtts.jobs.getで確認してください。同じrequestIdの再送は保持期間内だけ重複を防ぎます。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 4096,
+        },
+        voice: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 200,
+        },
+        speed: {
+          type: 'number',
+          minimum: 0.25,
+          maximum: 4,
+        },
+        requestId: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 100,
+        },
+      },
+      required: ['text', 'requestId'],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+  },
+  'tts.voices.list': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'useTts'],
+    name: 'appdock_tts_list_voices',
+    description:
+      '設定されたTTSサーバーまたは手動設定からボイスID・表示名の一覧を取得します。一覧非対応と空一覧を区別します。',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  'tts.jobs.get': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read'],
+    name: 'appdock_tts_get_job',
+    description: '自分の読み上げジョブの状態を取得します。本文・APIキー・音声は返しません。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 100,
+        },
+      },
+      required: ['jobId'],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  'tts.stop': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'execute'],
+    name: 'appdock_tts_stop',
+    description:
+      '自分の読み上げジョブを停止します。サーバー内の生成処理まで停止できたことは保証しません。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: {
+          type: 'string',
+          minLength: 1,
+          maxLength: 100,
+        },
+      },
+      required: ['jobId'],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+
   'ui.ribbon.get': {
     callers: ['mcp', 'applet'],
     permissions: ['read'],
@@ -327,6 +436,7 @@ export function operationsFor(caller: ApiCaller) {
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
+  useTts: 'TTSサーバーへの送信・読み上げ',
   sendInput: 'Windowsへのキー・操作メッセージ送信',
   read: '公開情報の取得',
   execute: '公開コマンドの実行',
@@ -350,17 +460,30 @@ export class AppDockApiError extends Error {
     super(message);
   }
 }
+export type AppDockResult<M extends AppDockMethod> = M extends 'tts.speak'
+  ? import('./tts').TtsSpeakResult
+  : M extends 'tts.voices.list'
+    ? import('./tts').TtsVoicesResult
+    : M extends 'tts.jobs.get' | 'tts.stop'
+      ? import('./tts').TtsJob
+      : Record<string, unknown>;
 export interface AppDockClient {
-  call(method: AppDockMethod, params?: Record<string, unknown>): Promise<Record<string, unknown>>;
+  call<M extends AppDockMethod>(
+    method: M,
+    params?: M extends 'tts.speak'
+      ? import('./tts').TtsSpeakInput
+      : M extends 'tts.jobs.get' | 'tts.stop'
+        ? { jobId: string }
+        : Record<string, unknown>,
+  ): Promise<AppDockResult<M>>;
 }
 export function createAppDockClient(
   request: (method: string, params: unknown) => Promise<AppDockReply>,
 ): AppDockClient {
-  return {
-    call: async (method, params = {}) => {
-      const reply = await request('host.appdock.call', { method, params });
-      if (!reply.ok) throw new AppDockApiError(reply.error.code, reply.error.message);
-      return reply.value;
-    },
+  const call = async (method: AppDockMethod, params: Record<string, unknown> = {}) => {
+    const reply = await request('host.appdock.call', { method, params });
+    if (!reply.ok) throw new AppDockApiError(reply.error.code, reply.error.message);
+    return reply.value;
   };
+  return { call: call as AppDockClient['call'] };
 }

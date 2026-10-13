@@ -1,0 +1,53 @@
+import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { atomicWrite } from './settings';
+import { ttsBaseUrl } from '../../shared/tts';
+export class TtsSecrets {
+  constructor(
+    private file: string,
+    private encryption: { encrypt(value: string): string; decrypt(value: string): string },
+  ) {}
+  private endpoint(baseUrl: string) {
+    return createHash('sha256').update(ttsBaseUrl(baseUrl)).digest('hex');
+  }
+  get(baseUrl: string): string | undefined {
+    if (!baseUrl || !fs.existsSync(this.file)) return undefined;
+    try {
+      if (fs.statSync(this.file).size > 32768) throw Error();
+      const v = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      if (v.version !== 1 || typeof v.endpoint !== 'string' || typeof v.key !== 'string')
+        throw Error();
+      if (v.endpoint !== this.endpoint(baseUrl)) return undefined;
+      return this.encryption.decrypt(v.key);
+    } catch {
+      throw Error('TTSのAPIキーを読み取れません。専用欄で再設定してください。');
+    }
+  }
+  set(baseUrl: string, value: unknown) {
+    if (typeof value !== 'string' || value.length > 8192 || /[\r\n\x00-\x1f\x7f]/.test(value))
+      throw Error('APIキーは改行を含まない8192文字以下の文字列です。');
+    if (!value) {
+      if (fs.existsSync(this.file)) fs.unlinkSync(this.file);
+      return;
+    }
+    if (!baseUrl) throw Error('APIキーを保存する前に接続先を設定してください。');
+    atomicWrite(
+      this.file,
+      JSON.stringify({
+        version: 1,
+        endpoint: this.endpoint(baseUrl),
+        key: this.encryption.encrypt(value),
+      }) + '\n',
+    );
+  }
+  status(baseUrl: string) {
+    try {
+      return { apiKeyConfigured: !!this.get(baseUrl) };
+    } catch {
+      return {
+        apiKeyConfigured: false,
+        error: 'TTSのAPIキーを読み取れません。再設定または削除してください。',
+      };
+    }
+  }
+}

@@ -329,7 +329,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       undefined,
     );
     client = await connect(s);
-    assert.equal((await client.listTools()).tools.length, 14);
+    assert.equal((await client.listTools()).tools.length, 18);
     assert.equal(
       (await call(client, 'appdock_get_info')).version,
       require('../package.json').version,

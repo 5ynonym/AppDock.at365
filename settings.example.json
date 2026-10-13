@@ -19,13 +19,8 @@
     "allowSameVersion": false
   },
   "shortcuts": {
-    "appdock.commands.search": [
-      "Ctrl+P",
-      "Ctrl+Shift+P"
-    ],
-    "appdock.settings.open": [
-      "Ctrl+,"
-    ]
+    "appdock.commands.search": ["Ctrl+P", "Ctrl+Shift+P"],
+    "appdock.settings.open": ["Ctrl+,"]
   },
   "globalShortcutCommands": [],
   "trayCommands": [],
@@ -101,11 +96,7 @@
   ],
   "gestures": {
     "wheelDelayMs": 0,
-    "browsers": [
-      "chrome",
-      "msedge",
-      "firefox"
-    ],
+    "browsers": ["chrome", "msedge", "firefox"],
     "bindings": [],
     "indicatorPosition": "gesture-start",
     "enabled": true,
@@ -114,5 +105,15 @@
     "indicatorOpacity": 0.45,
     "requireChromiumWindowClass": false
   },
-  "gestureDefaultsInitialized": []
+  "gestureDefaultsInitialized": [],
+  "tts": {
+    "baseUrl": "",
+    "model": "",
+    "defaultVoice": "",
+    "defaultSpeed": 1,
+    "speedMode": "playback",
+    "voicesSource": "endpoint",
+    "voicesPath": "audio/voices",
+    "manualVoices": []
+  }
 }
