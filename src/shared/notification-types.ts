@@ -67,7 +67,23 @@ const id = (v: unknown): v is string =>
   /^[a-z0-9][a-z0-9._-]{0,100}$/.test(v) &&
   !['constructor', 'prototype', '__proto__'].includes(v);
 const targetNames = ['banner', 'desktop', 'windows'];
-export const availableNotificationTargets: NotificationTarget[] = ['banner', 'desktop'];
+export const legacyNotificationTypeId = 'appdock.legacy';
+const legacyNotificationType: NotificationTypeDefinition = {
+  typeId: legacyNotificationTypeId,
+  title: '旧方式の通知',
+  description: '種類を指定しない旧通知APIの通知です。本文から種類は推定しません。',
+  levels: ['info'],
+  defaultLevel: 'info',
+  defaultEnabled: true,
+  canDisable: true,
+  disabledControlReason: '',
+  allowedTargets: ['banner', 'desktop', 'windows'],
+  defaultTargets: ['windows'],
+  requiredTargets: [],
+  lifetimePolicy: 'userDuration',
+  defaultDurationSeconds: null,
+  history: 'persistent',
+};
 const targets = (v: unknown): v is NotificationTarget[] =>
   Array.isArray(v) &&
   v.length <= 3 &&
@@ -103,6 +119,7 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       !object(v) ||
       Object.keys(v).some((k) => !keys.includes(k)) ||
       !id(v.typeId) ||
+      (!host && v.typeId === legacyNotificationTypeId) ||
       typeof v.title !== 'string' ||
       !v.title.trim() ||
       v.title.length > 100 ||
@@ -207,8 +224,27 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       lifetimePolicy: 'userDuration',
       defaultDurationSeconds: 6,
     },
+    {
+      ...structuredClone(settingsNotificationType),
+      ownerId: 'updates',
+      typeId: 'available',
+      title: '更新のお知らせ',
+      description: '起動時の更新確認で、利用可能な更新を通知します。',
+      levels: ['info'],
+      defaultLevel: 'info',
+      canDisable: true,
+      disabledControlReason: '',
+      allowedTargets: ['banner', 'desktop', 'windows'],
+      defaultTargets: ['windows'],
+      requiredTargets: [],
+      lifetimePolicy: 'userDuration',
+      defaultDurationSeconds: null,
+    },
     ...applets.flatMap((a) =>
-      (a.notificationTypes ?? []).map((t) => ({
+      [
+        ...(a.capabilities?.includes('notifications') ? [legacyNotificationType] : []),
+        ...(a.notificationTypes ?? []),
+      ].map((t) => ({
         ...t,
         ownerKind: 'applet' as const,
         ownerId: a.id,
@@ -239,20 +275,17 @@ export function resolveNotificationPolicy(
         : (type.defaultDurationSeconds ?? null)
       : null;
   const enabled = !type.canDisable || (row?.enabled ?? type.defaultEnabled);
-  const available = selectedTargets.filter((t) => availableNotificationTargets.includes(t));
   const reason = !enabled
     ? 'type-disabled'
     : type.ownerKind === 'applet' && !settings.host.notifications
       ? 'applet-disabled'
       : invalidTargets && type.canDisable
         ? 'type-definition-changed'
-        : selectedTargets.length > 0 && !available.length
-          ? 'no-available-targets'
-          : undefined;
+        : undefined;
   return {
     enabled: !reason,
     selectedTargets,
-    targets: available,
+    targets: [...selectedTargets],
     durationSeconds: seconds,
     lifetime:
       type.lifetimePolicy === 'condition'

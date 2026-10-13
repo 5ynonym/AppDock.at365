@@ -1,6 +1,6 @@
 # 通知基盤とDefault Shellへの移行設計
 
-状態: 段階1を本体0.29.0、段階2を本体0.30.0、段階3を本体0.31.0、段階4を本体0.31.1として実装済み。段階5と即時保存は未実装。現行の型・bridge・保存契約は[通知基盤](notifications.md)、実測と制約は[検証記録](../VERIFICATION.md)を正本とする。本書は今回確定した設計と次の実装範囲を記す。
+状態: 段階1を本体0.29.0、段階2を本体0.30.0、段階3を本体0.31.0、段階4を本体0.31.1、段階5を本体0.32.0として実装済み。即時保存が次の実装。現行の型・bridge・保存契約は[通知基盤](notifications.md)、実測と制約は[検証記録](../VERIFICATION.md)を正本とする。本書は今回確定した設計と次の実装範囲を記す。
 
 設定は将来、未保存状態を管理しない即時保存へ移行する。今回の未保存警告は通知基盤の最初の発行元であり、基盤の前提にはしない。通知センターなどの追加と即時保存化は独立して進める。
 
@@ -16,7 +16,7 @@
 | 2 | 実装済み | 種類カタログ、通知設定、方針解決、Node/.NETの最小種類指定API |
 | 3 | 実装済み | 通知センター、active/履歴一覧、既読、検索、終了履歴削除 |
 | 4 | 実装済み | トレイ付近の独自デスクトップ通知、表示先adapterの拡張 |
-| 5・次回の範囲 | 未実装 | Windows表示先、旧通知APIの基盤への接続 |
+| 5 | 実装済み | Windows表示先、旧通知APIの基盤への接続 |
 | 独立した移行 | 未実装 | 設定の即時保存、未保存警告発行元の削除 |
 
 種類別の通知方針を共通化するため、通知設定を通知センターより先に実装する。段階4・5の順序は変更可能だが、Windows側で保持・操作を表現できない通知の閲覧先として段階3のセンターを前提にする。未実装の表示先を製品UIで選択可能にせず、新APIをMCPへ自動公開しない。
@@ -50,10 +50,10 @@ SettingsEditingSession→SettingsNotificationSource→TypedNotifications→Notif
 | actions | 最大3件。発行元は安定key/label/primary/disabled/runを指定し、Shellには不透明なidのみ渡す |
 | lifetime | timed / manual / condition。timedは1〜2,147,483,647ms |
 | dismissible / busy | 全体dismissの許可と操作中状態。conditionはdismissible:false |
-| targets | 現行受付はbanner/desktopの複数指定または空配列。windowsは段階5まで受付時に拒否 |
+| targets | 現行受付はbanner/desktop/windowsの複数指定または空配列 |
 | history / historyText | persistent / session / none。persistentには安全な保存用title/bodyが必須 |
 | status | active / resolved / dismissed / expired / withdrawn / interrupted |
-| delivery | 表示先ごとのpending / showing / hidden / failed / ended |
+| delivery | 表示先ごとのpending / accepted / showing / hidden / failed / ended |
 | read | falseで作成し、通知センターから明示的に既読にする。解消・期限変更とは独立 |
 
 空targetsは表示なしで管理できる内部契約。段階1には閲覧ページがないため、製品通知の唯一のユーザー導線にはしない。段階3では通知センターだけに表示する通知として使用する。
@@ -320,11 +320,11 @@ Windowはdesktop対象がある時だけ生成し、最後の対象を外す/終
 
 Windowsの[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)がACCEPTS_NOTIFICATIONSの時だけ表示し、対象がある間1秒間隔で問い合わせる。ロック/サスペンド、本体の全画面中もhiddenへ抑制する。抑制はactive/期限を変更せず、期限切れを解除後に再表示しない。InputHostのhookを作らない専用queryモードを使い、既存の入力/ジェスチャーモードを維持した。query失敗は非表示/ログとセンター閲覧、明示再試行へ限定し、worker再起動ループを避ける。
 
-段階4の追加で新しい保存ファイルや設定キーを増やさず、予約済みdesktop識別子を有効化したため0.31.1。実測・物理ロックや複数画面の未確認範囲はVERIFICATIONを参照する。次は段階5のWindows adapterと旧show統合、続けて全設定の即時保存へ進む。
+段階4の追加で新しい保存ファイルや設定キーを増やさず、予約済みdesktop識別子を有効化したため0.31.1。実測・物理ロックや複数画面の未確認範囲はVERIFICATIONを参照する。段階5でWindows adapterと旧show統合を行い、続けて全設定の即時保存へ進む。
 
 ## 段階5: Windows通知と旧APIの基盤統合
 
-既存の [notifications.ts](../src/main/core/notifications.ts) と [notification-routing.ts](../src/main/core/notification-routing.ts) は現段階で別経路を維持している。段階5でWindows adapterへ接続し、portable用protocol、配置/profile識別、クリック起動の安全性を保つ。
+既存の [notifications.ts](../src/main/core/notifications.ts) と [notification-routing.ts](../src/main/core/notification-routing.ts) は0.32.0でNotificationWindowsAdapterへ接続した。portable用protocol、配置/profile識別、クリック起動の安全性を保つ。
 
 旧notifications.show(title, body, options)は通知設定/silent/command/戻り値を保つadapterとして移行する。種類IDのない呼出しは発行元ごとの明示された「旧方式の通知」種類へまとめ、本文から種類を推定しない。host.notificationsと種類別設定の両方を適用し、旧呼出元へは従来の戻り値を維持する。OS受付・ユーザー既読・条件解消を混同しない。Windows側で表現できないボタン/期限/撤去は通知センターへ案内し、別表示先へ無断配送しない。古い起動世代のクリックから失効した操作を実行せず、履歴のcallbackを復元しない。固定Electron版と実Windowsの配送・クリック・再起動で能力差を検証する。設定された秒数は基盤の通知寿命として扱い、Windowsのポップアップ表示時間やmanual指定時の常時表示を保証しない。OS側で消えても基盤がactiveなら通知センターで閲覧/操作できる。この違いを表示先選択の説明に含める。
 
@@ -341,3 +341,15 @@ Windowsの[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windo
 今回の受入確認は汎用発行元の状態・期限・履歴・操作競合、複数表示/スクロール/focus、Shell切替/復旧、設定の入力反映待ち/保存/破棄/失敗保持、モーダルとの重なり順、固定単一EXEを対象にした。試験の範囲と未確認事項を[検証記録](../VERIFICATION.md)で区別する。後続段階では既存回帰を維持し、上記の段階別受入条件を追加する。
 
 段階1の実装時、開発ドライブの祖先ボリュームマウントで更新packが失敗したため、Windows登録済み祖先マウントを認識した。段階3の実更新検証で適用/復旧にも同じ影響が見つかり、更新helper全経路へ祖先ボリュームの認識を統一した。入力/出力自身・通常junction祖先・配布物内のリンク/マウント拒否、apply/recover/extractの範囲・ハッシュ検査は維持する。これは通知設計の変更ではなく発行互換性の修正で、詳細は[更新仕様](updates.md)を参照する。通知基盤の大枠は当初設計を維持し、実装上の契約と将来契約を本書で明確に分けた。
+
+### 段階5の実装結果
+
+NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知状態・既読から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。read/busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
+
+Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protocol末尾16桁。callback URIはランダムtoken、所有者/世代/現行操作を本体で再検査する。通常の種類指定通知のクリックは通知センターへ移動する。複数ボタンはセンターで操作する。旧showのcommandと起動時更新のお知らせは従来どおり直接操作を1回だけ実行する。停止/期限/内容置換後の古いURIは操作できず本体を開く。終了時はcallbackを破棄してOS履歴を残し、再起動で過去の操作を復元しない。
+
+旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
+
+Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveや既読にしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
+
+0.32.0は本体生成の旧通知種類と更新のお知らせ種類の設定対象を追加したためマイナー更新。次は全設定の即時保存と未保存管理の除去。入力途中の値はUIだけに保持し、検証済み値を共通保存サービスへ渡す方針とする。

@@ -1717,3 +1717,11 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ソースのリボン配置・ページ・共有draftおよびDefault Shell強制終了試験は実装時の検証を参照し、当該製品ソース・試験の不変を確認。今回の追加は試験5ファイルの追随とDEVELOPMENTの実装状態訂正、検証記録のみ。標準回帰後tree`dc2b66826daba23fa73e038e88344c94a8b66634`、最終GUI入力tree`25633ad745ab0e1cd202a8116573d71e0bd3807b`。後者からの差分は本検証記録だけと照合し、最終tree/commitを同証跡へ保存する。
 - 0.26.40のEXE/feedは144082059 bytes、SHA256 `eaa966ac066e0c3134c74cd713d3048c1f25f7c6c7e7018decc86d98fd537b6e`を維持し、今回の各portableコピーと一致。版追加・再publishなし。Node24.21.0/pnpm12.10.1/.NET SDK10.0.401、固定依存と入力・試験・発行物のハッシュをvalidation.jsonへ記録。
 - 境界/再解析/使用中を確認して未参照の旧成功settings-notice3件を整理し、各方式の最新3件・再利用参照・固定・失敗/不明資料を保持。隔離試験プロセス残存0。ローカルコミットまででpush・Release・実利用deployなし。
+
+## 2026-10-13 Windows通知統合 / 0.32.0
+
+通知基盤の段階5を実装。Windows adapter、全表示先の設定選択、Applet生成の予約種類appdock.legacy、旧showの署名/null/silent/所有コマンド、起動時更新のお知らせを統合した。更新適用成功は既定banner/6秒を維持する。OS受付はaccepted、OS消去はhiddenとしてactive/既読と分離し、同じ通知IDの内容更新だけを置換する。発行前レビューでconstructor失敗時のcallback回収、shutdown回収とstartup gateを補完した。新たな設定対象種類の追加によりマイナー0.32.0、SDK署名は変更なし。未変更Appletは再発行していない。
+
+証跡: .artifacts/commit-validation-notification-windows-0.32.0-20261013/validation.json、review.md、tree-sealed.txt、inputs.json、fixture-inputs.json、environment.json、seal.json。型検査、標準355/355、通知設定8群、センターsource9/fixed7群、desktop source7群。fixed Windows6群は実Node/.NETプロセス、実WinRT通知履歴のTag/Groupと同ID置換・自身の撤去、Windows Shell URI dispatch、配置/profile別の外側EXEへ起動中/停止後/終了後の到達を検証。物理toastクリック・実Gmail受信は自動化していない。最初の標準失敗2件は将来Windowsの旧期待値、固定試験失敗は.NET fixtureの初期有効化漏れで、製品不具合として扱わず試験を修正し全必要回帰を通した。失敗ログも保存する。
+
+単一EXE 0.32.0: 144124434 bytes、SHA256 7fef8e85b3e705d63c27e98939ae945ee7628a64bd87acf6d870342b6da0c261。publish/update.jsonと隔離fixed EXEを照合。Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401、Windows26300 x64、通常ユーザー、GUI直列。lockfile/toolchain・供給元待機検査を維持。開発ドライブの追加不具合なし。push/Release/deploy未実施。次は即時保存と未保存管理の撤去。

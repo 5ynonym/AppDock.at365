@@ -1,12 +1,12 @@
 # 通知基盤とShell表示
 
-通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、次のWindows表示先と即時保存への方針は[移行設計](notification-foundation.md)を参照する。
+通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 
 ## 本体のサービス
 
 NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、表示されない時間も進む。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
 
-targetsはbanner/desktopの複数指定、または空配列。空配列は通知センターだけに表示する指定。windowsは未実装として拒否する。旧Windows通知APIは別経路を維持する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
+targetsはbanner/desktop/windowsの複数指定、または空配列。空配列は通知センターだけに表示する指定。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
 
 同じ所有者・dedupeKeyのactive通知を更新し、終了後の再発は新IDになる。所有者は本体側が決定する。操作のホスト発行IDは現在の通知revisionと照合し、要求IDを最大512件記憶する。同じ要求の再送は同じ結果、異なる内容でのID再利用はエラーになる。通知単位のロックで別表示先からの二重押下を拒否し、失敗後は明示的に再試行できる。終了・撤回時に操作関数を回収する。
 
@@ -14,11 +14,11 @@ targetsはbanner/desktopの複数指定、または空配列。空配列は通�
 
 ## 通知種類と設定
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。未保存警告はhost/settings/unsaved-changesとして必須banner/condition。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。宣言のない旧通知を本文から分類しない。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。未保存警告はhost/settings/unsaved-changesとして必須banner/condition。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
 
 「設定 → 通知」はpage.settingsの同じ編集セッションを使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体必須警告を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
 
-未保存の編集では配送を変えない。オフの保存は既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbanner/desktopで、windowsはフォームで操作不能。「通知センターのみ」はtargets:[]として選択できる。
+未保存の編集では配送を変えない。オフの保存は既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbanner/desktop/windowsで、3種類とも選択可能。「通知センターのみ」はtargets:[]として選択できる。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
 
@@ -82,3 +82,13 @@ SettingsNotificationSourceだけがSettingsEditingSessionと接続する。dirty
 ## 検証
 
 単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]は実際の設定連携をソース/固定EXEで検証する。shell-page-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
+
+## Windows表示の実装 (0.32.0)
+
+NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知状態・既読から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。read/busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
+
+Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protocol末尾16桁。callback URIはランダムtoken、所有者/世代/現行操作を本体で再検査する。通常の種類指定通知のクリックは通知センターへ移動する。複数ボタンはセンターで操作する。旧showのcommandと起動時更新のお知らせは従来どおり直接操作を1回だけ実行する。停止/期限/内容置換後の古いURIは操作できず本体を開く。終了時はcallbackを破棄してOS履歴を残し、再起動で過去の操作を復元しない。
+
+旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
+
+Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveや既読にしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。

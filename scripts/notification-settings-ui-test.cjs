@@ -141,9 +141,15 @@ async function launch() {
       'host page',
     );
   }
-  for (const page of pages()) page.on('pageerror', e => console.error('RENDERER',page.url(),String(e)));
+  for (const page of pages())
+    page.on('pageerror', (e) => console.error('RENDERER', page.url(), String(e)));
   const ctx = portable ? browser.contexts()[0] : browser;
-  ctx.on('page', page => { page.on('pageerror', e => console.error('RENDERER',page.url(),String(e))); page.on('console', m => { if(m.type()==='error') console.error('CONSOLE',page.url(),m.text()); }); });
+  ctx.on('page', (page) => {
+    page.on('pageerror', (e) => console.error('RENDERER', page.url(), String(e)));
+    page.on('console', (m) => {
+      if (m.type() === 'error') console.error('CONSOLE', page.url(), m.text());
+    });
+  });
   host.setDefaultTimeout(12000);
   await host.waitForFunction(async () => {
     const s = await window.dock?.snapshot();
@@ -157,7 +163,9 @@ async function launch() {
     );
   });
   await require('./shell-overlay-helper.cjs').homePage(host);
-  await host.waitForFunction(() => document.querySelector('.shell')?.getAttribute('data-route') === 'home');
+  await host.waitForFunction(
+    () => document.querySelector('.shell')?.getAttribute('data-route') === 'home',
+  );
 }
 const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
 const storage = (id, key) => {
@@ -224,8 +232,12 @@ async function close() {
       await p.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
       false,
     );
+    assert.equal(
+      await p.getByLabel('Node noticeのWindows通知', { exact: true }).isDisabled(),
+      false,
+    );
     checks.push(
-      'static catalog includes mandatory host, stopped Applet and retained unknown types; desktop enabled and Windows locked',
+      'static catalog includes mandatory host, stopped Applet and retained unknown types; desktop and Windows enabled',
     );
     await command(ids.node + '.publish');
     await command(ids.native + '.publish');
@@ -394,8 +406,22 @@ async function close() {
     success = true;
   } catch (e) {
     console.error(e);
-    for (const page of pages()) console.error('PAGE',page.url(),await page.locator('body').innerText().catch(()=>''));
-    console.error('HOSTSTATE',await host.evaluate(()=>window.dock.snapshot()).then(s=>({route:s.navigation.route,shell:s.shell,logs:s.logs.slice(-5)})).catch(()=>null));
+    for (const page of pages())
+      console.error(
+        'PAGE',
+        page.url(),
+        await page
+          .locator('body')
+          .innerText()
+          .catch(() => ''),
+      );
+    console.error(
+      'HOSTSTATE',
+      await host
+        .evaluate(() => window.dock.snapshot())
+        .then((s) => ({ route: s.navigation.route, shell: s.shell, logs: s.logs.slice(-5) }))
+        .catch(() => null),
+    );
     process.exitCode = 1;
     try {
       await (

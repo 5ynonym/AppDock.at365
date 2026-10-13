@@ -3,6 +3,8 @@ export type NotificationLevel = 'info' | 'warning' | 'error';
 export type NotificationStatus =
   'active' | 'resolved' | 'dismissed' | 'expired' | 'withdrawn' | 'interrupted';
 export type NotificationTarget = 'banner' | 'desktop' | 'windows';
+export type NotificationDeliveryState =
+  'pending' | 'accepted' | 'showing' | 'hidden' | 'failed' | 'ended';
 export type NotificationLifetime =
   { type: 'timed'; milliseconds: number } | { type: 'manual' | 'condition' };
 export interface NotificationItem {
@@ -26,9 +28,7 @@ export interface NotificationItem {
   expiresAt?: number;
   read: boolean;
   targets: NotificationTarget[];
-  delivery: Partial<
-    Record<NotificationTarget, 'pending' | 'showing' | 'hidden' | 'failed' | 'ended'>
-  >;
+  delivery: Partial<Record<NotificationTarget, NotificationDeliveryState>>;
 }
 export interface NotificationHistoryEntry extends Omit<
   NotificationItem,

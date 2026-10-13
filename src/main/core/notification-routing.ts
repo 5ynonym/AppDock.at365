@@ -56,6 +56,10 @@ export class NotificationRoutes {
     this.callbacks.set(token, callback);
     return `${this.protocol}://notification/${token}`;
   }
+  remove(uri: string) {
+    const token = notificationToken([uri], this.protocol);
+    if (token) this.callbacks.delete(token);
+  }
   activate(argv: string[], fallback: () => void) {
     const token = notificationToken(argv, this.protocol);
     if (!token) return false;

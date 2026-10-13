@@ -7,7 +7,6 @@ import {
   notificationTypeKey,
   notificationSettingKey,
   resolveNotificationPolicy,
-  availableNotificationTargets,
 } from '../../../src/shared/notification-types';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { SettingsInput } from '../../../src/shared/settings-ui/SettingsInput';
@@ -17,7 +16,6 @@ const reasonTitles: Record<string, string> = {
   'type-disabled': 'この種類の通知はオフです。',
   'applet-disabled': 'Applet共通設定で停止中です。',
   'type-definition-changed': '通知種類の仕様が変わりました。設定を確認してください。',
-  'no-available-targets': '選択した通知先はこの版では利用できません。',
 };
 export function NotificationSettings({
   editor,
@@ -121,10 +119,7 @@ export function NotificationSettings({
                           type="checkbox"
                           aria-label={type.title + 'の' + targetTitles[target]}
                           checked={policy.selectedTargets.includes(target)}
-                          disabled={
-                            !availableNotificationTargets.includes(target) ||
-                            type.requiredTargets.includes(target)
-                          }
+                          disabled={type.requiredTargets.includes(target)}
                           onChange={(e) =>
                             change(type, {
                               targets: e.target.checked
@@ -134,14 +129,15 @@ export function NotificationSettings({
                           }
                         />
                         {targetTitles[target]}
-                        {!availableNotificationTargets.includes(target)
-                          ? '（未対応）'
-                          : type.requiredTargets.includes(target)
-                            ? '（必須）'
-                            : ''}
+                        {type.requiredTargets.includes(target) ? '（必須）' : ''}
                       </label>
                     ))}
                   </fieldset>
+                  {type.allowedTargets.includes('windows') && (
+                    <p className="muted">
+                      Windows通知の表示時間・消去はWindowsが管理します。ここで指定する時間は通知センターで操作できる期間です。操作はセンターから利用でき、通知によってはクリックで直接開きます。
+                    </p>
+                  )}
                   {type.lifetimePolicy === 'userDuration' ? (
                     <label className="notification-duration">
                       自動消去までの秒数

@@ -59,3 +59,17 @@ test('toast XML uses protocol activation and escapes mail content while retainin
   assert.ok(!toast.includes('\u0000'));
   assert.ok(!notificationXml('title', 'body', false, 'url').includes('<audio'));
 });
+
+test('released Windows routes cannot invoke their old action', () => {
+  const r = new NotificationRoutes('appdock-notify-test');
+  let calls = 0,
+    fallback = 0;
+  const uri = r.add(() => calls++);
+  r.remove(uri);
+  assert.equal(
+    r.activate([uri], () => fallback++),
+    true,
+  );
+  assert.equal(calls, 0);
+  assert.equal(fallback, 1);
+});

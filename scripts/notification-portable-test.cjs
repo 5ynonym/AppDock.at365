@@ -42,6 +42,7 @@ const copies = ['installed', 'test'].map((name) => {
   settings.host.hardwareAcceleration = false;
   settings.globalShortcutCommands = [];
   settings.extensions['test.notification'] = { enabled: true, settings: {} };
+  settings.extensions['fixture.notifications.native'] = { enabled: true, settings: {} };
   fs.writeFileSync(path.join(folder, 'settings.json'), JSON.stringify(settings));
   fs.writeFileSync(
     path.join(folder, 'extensions/notification/extension.json'),
@@ -53,9 +54,30 @@ const copies = ['installed', 'test'].map((name) => {
       runtime: 'node',
       entry: 'index.js',
       capabilities: ['notifications', 'storage'],
+      minimumHostVersion: '0.32.0',
+      notificationTypes: [
+        {
+          typeId: 'message',
+          title: 'Typed notice',
+          description: 'Fixture',
+          levels: ['info'],
+          defaultLevel: 'info',
+          defaultEnabled: true,
+          canDisable: true,
+          disabledControlReason: '',
+          allowedTargets: ['windows', 'banner'],
+          defaultTargets: ['windows'],
+          requiredTargets: [],
+          lifetimePolicy: 'userDuration',
+          defaultDurationSeconds: null,
+          history: 'persistent',
+        },
+      ],
       commands: [
         { id: 'test.notification.send', title: 'Send' },
         { id: 'test.notification.open', title: 'Open' },
+        { id: 'test.notification.typed', title: 'Typed' },
+        { id: 'test.notification.end', title: 'End' },
       ],
     }),
   );
@@ -63,6 +85,9 @@ const copies = ['installed', 'test'].map((name) => {
     path.join(folder, 'extensions/notification/index.js'),
     `
 exports.activate = async context => {
+  let id, n=0;
+  context.commands.register('test.notification.typed','Typed',async()=>{const result=await context.notifications.publish({typeId:'message',title:'Typed '+(++n),body:'Windows fixture',dedupeKey:'same',historyText:{title:'Safe typed',body:'Safe'}}); id=result.notificationId; await context.storage.set('typed',id);});
+  context.commands.register('test.notification.end','End',async()=>context.notifications.end(id));
   context.commands.register('test.notification.open', 'Open', async () => {
     const count = (await context.storage.get('clicks')) || 0;
     await context.storage.set('clicks', count + 1);
@@ -71,6 +96,49 @@ exports.activate = async context => {
     'AppDock synthetic ${name}', 'Gmail-style command notification <&>',
     { silent: true, command: 'test.notification.open' }));
 };`,
+  );
+  const native = path.join(folder, 'extensions/native');
+  fs.mkdirSync(native, { recursive: true });
+  fs.cpSync(
+    path.join(root, 'tests/fixtures/dotnet/AppDock.Notifications/bin/Release/net10.0'),
+    native,
+    { recursive: true },
+  );
+  fs.writeFileSync(
+    path.join(native, 'extension.json'),
+    JSON.stringify({
+      id: 'fixture.notifications.native',
+      name: 'Native Windows fixture',
+      version: '1.0.0',
+      apiVersion: 1,
+      minimumHostVersion: '0.32.0',
+      runtime: 'native',
+      entry: 'NotificationFixture.exe',
+      capabilities: ['notifications', 'storage'],
+      commands: [
+        { id: 'fixture.notifications.native.publish', title: 'Native publish' },
+        { id: 'fixture.notifications.native.action', title: 'Native action' },
+        { id: 'fixture.notifications.native.policy', title: 'Native policy' },
+      ],
+      notificationTypes: [
+        {
+          typeId: 'message',
+          title: 'Native notice',
+          description: 'Fixture',
+          levels: ['info', 'warning'],
+          defaultLevel: 'info',
+          defaultEnabled: true,
+          canDisable: true,
+          disabledControlReason: '',
+          allowedTargets: ['windows'],
+          defaultTargets: ['windows'],
+          requiredTargets: [],
+          lifetimePolicy: 'userDuration',
+          defaultDurationSeconds: null,
+          history: 'persistent',
+        },
+      ],
+    }),
   );
   return { folder, exe, protocol: notificationProtocol(exe, folder, true) };
 });
@@ -162,6 +230,70 @@ const checks = [];
     assert.equal(sha256(copy.exe), hash);
     await start(copy);
   }
+  const copy = copies[0];
+  const typedTag = () => {
+    const file = path.join(copy.folder, 'data/storage/test.notification/typed.json');
+    return (
+      fs.existsSync(file) &&
+      createHash('sha256')
+        .update(JSON.parse(fs.readFileSync(file)))
+        .digest('hex')
+        .slice(0, 16)
+    );
+  };
+  const toastRows = () =>
+    JSON.parse(
+      powershell(
+        `[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null; $rows=@(); foreach($t in [Windows.UI.Notifications.ToastNotificationManager]::History.GetHistory('at365.appdock')){if($t.Content -and $t.Content.DocumentElement -and ([string]$t.Content.DocumentElement.GetAttribute('launch')).StartsWith('${copy.protocol}://notification/')){$rows+=@{tag=$t.Tag;group=$t.Group;xml=$t.Content.GetXml()}}};ConvertTo-Json -Compress -InputObject $rows`,
+      ),
+    );
+  await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.typed'));
+  const first = await until(
+    () => toastRows().find((r) => r.tag === typedTag()),
+    'typed Windows toast',
+  );
+  assert.equal(first.group, copy.protocol.slice(-16));
+  assert.ok(first.xml.includes('Typed 1'));
+  await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.typed'));
+  await until(() => {
+    const rows = toastRows().filter((r) => r.tag === first.tag);
+    return rows.length === 1 && rows[0].xml.includes('Typed 2');
+  }, 'same-ID Windows replacement');
+  await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.end'));
+  await until(
+    () => !toastRows().some((r) => r.tag === first.tag),
+    'Windows end removes owned toast',
+  );
+  checks.push(
+    'typed Node Windows delivery uses stable tag/group, updates replace one OS entry, explicit end retracts it',
+  );
+  await copy.dock.evaluate(() =>
+    window.dock.executeCommand('fixture.notifications.native.publish'),
+  );
+  const native = await until(
+    () => toastRows().find((r) => r.xml.includes('Native notification')),
+    'real .NET typed Windows toast',
+  );
+  const nativeUri = native.xml.match(/launch="([^"]+)"/)[1];
+  activate(copy, nativeUri);
+  await until(
+    () =>
+      copy.browser
+        .contexts()
+        .flatMap((c) => c.pages())
+        .some((p) => p.url().includes('notification-center.html')),
+    'typed toast opens notification center',
+  );
+  await copy.dock.evaluate(() =>
+    window.dock.toggleExtension('fixture.notifications.native', false),
+  );
+  await until(
+    () => !toastRows().some((r) => r.tag === native.tag),
+    'native owner stop retracts Windows toast',
+  );
+  checks.push(
+    'real .NET typed Windows delivery and Shell activation open the notification center; stopping the owner retracts its OS entry',
+  );
   for (const copy of copies) {
     await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.send'));
     copy.uri = await until(() => historyUri(copy), 'native toast in Action Center');

@@ -4,6 +4,7 @@ import type {
   NotificationHistoryEntry,
   NotificationItem,
   NotificationLifetime,
+  NotificationDeliveryState,
 } from '../../shared/notifications';
 import type { NotificationHistoryStore } from './notification-history';
 export interface NotificationInput {
@@ -26,6 +27,8 @@ export interface NotificationInput {
   busy?: boolean;
   bannerVisible?: boolean;
   restartTimer?: boolean;
+  windowsSilent?: boolean;
+  windowsClickAction?: string;
 }
 type Record = {
   item: NotificationItem;
@@ -80,7 +83,7 @@ export class NotificationService {
       !['info', 'warning', 'error'].includes(input.level) ||
       !['persistent', 'session', 'none'].includes(input.history) ||
       !Array.isArray(input.targets) ||
-      input.targets.some((t) => !['banner', 'desktop'].includes(t)) ||
+      input.targets.some((t) => !['banner', 'desktop', 'windows'].includes(t)) ||
       new Set(input.targets).size !== input.targets.length ||
       !['timed', 'manual', 'condition'].includes(input.lifetime?.type) ||
       (input.lifetime.type === 'timed' &&
@@ -89,6 +92,9 @@ export class NotificationService {
           input.lifetime.milliseconds > 2147483647)) ||
       (input.lifetime.type === 'condition' && input.dismissible) ||
       typeof input.dismissible !== 'boolean' ||
+      (input.windowsSilent !== undefined && typeof input.windowsSilent !== 'boolean') ||
+      (input.windowsClickAction !== undefined &&
+        !input.actions?.some((a) => a.key === input.windowsClickAction)) ||
       (input.dedupeKey !== undefined && (!input.dedupeKey || input.dedupeKey.length > 200)) ||
       (input.actions?.length ?? 0) > 3 ||
       input.actions?.some(
@@ -306,12 +312,14 @@ export class NotificationService {
   setDelivery(
     target: NotificationItem['targets'][number],
     ids: string[],
-    state: 'showing' | 'hidden' | 'failed',
+    state: Exclude<NotificationDeliveryState, 'ended'>,
+    remaining?: Exclude<NotificationDeliveryState, 'ended'>,
   ) {
     let changed = false;
     for (const r of this.records.values()) {
       if (r.item.status !== 'active' || !r.item.targets.includes(target)) continue;
-      const next = ids.includes(r.item.id) ? state : 'hidden';
+      const next = ids.includes(r.item.id) ? state : remaining;
+      if (next === undefined) continue;
       if (r.item.delivery[target] !== next) {
         r.item.delivery[target] = next;
         this.persist(r);
@@ -319,6 +327,14 @@ export class NotificationService {
       }
     }
     if (changed) this.changed();
+  }
+  windowsOptions(id: string) {
+    const r = this.records.get(id);
+    const index = r?.input.actions?.findIndex((a) => a.key === r.input.windowsClickAction) ?? -1;
+    return {
+      silent: r?.input.windowsSilent ?? false,
+      actionId: index >= 0 ? r?.item.actions[index]?.id : undefined,
+    };
   }
   invoke(request: NotificationActionRequest): Promise<void> {
     if (

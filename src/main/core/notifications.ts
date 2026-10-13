@@ -1,29 +1,35 @@
 import { app, Notification } from 'electron';
+import { createHash } from 'node:crypto';
+import type { NotificationLevel } from '../../shared/notifications';
 import { notificationProtocol, notificationXml, NotificationRoutes } from './notification-routing';
-
 let routes: NotificationRoutes | undefined;
 let registered = false;
 let registration: { executable: string; args: string[] } | undefined;
-
 export function configureNotifications(executable: string, profile: string, args: string[]) {
   if (process.platform !== 'win32') return;
   routes = new NotificationRoutes(notificationProtocol(executable, profile, app.isPackaged));
-  // Windows launches the outer single EXE, which restores the portable
-  // environment and forwards this URI to the existing instance/profile.
   registration = { executable, args };
 }
-
 export function activateNotification(argv: string[], fallback: () => void) {
   return routes?.activate(argv, fallback) ?? false;
 }
-
-export function showNotification(
-  title: string,
-  body: string,
-  silent: boolean,
-  clicked: () => void,
-) {
-  if (!Notification.isSupported()) return;
+export interface NativeNotificationHandle {
+  close(): void;
+  release(): void;
+}
+export interface NativeNotificationInput {
+  id: string;
+  title: string;
+  body: string;
+  level: NotificationLevel;
+  silent: boolean;
+  clicked(): void;
+  failed(): void;
+  closed(): void;
+}
+/** Only the OS adapter calls this transport; preferences/lifetime stay in NotificationService. */
+export function showNotification(input: NativeNotificationInput): NativeNotificationHandle {
+  if (!Notification.isSupported()) throw Error('Windows notifications unsupported');
   if (routes && registration && !registered)
     registered = app.setAsDefaultProtocolClient(
       routes.protocol,
@@ -31,13 +37,43 @@ export function showNotification(
       registration.args,
     );
   if (routes && !registered) throw Error('Windows通知の起動先を登録できませんでした。');
-  const notification = new Notification(
-    routes
-      ? { toastXml: notificationXml(title, body, silent, routes.add(clicked)) }
-      : { title, body, silent },
-  );
-  // Windows protocol activation is handled by second-instance. Adding a native
-  // click handler as well could execute the same command twice.
-  if (!routes) notification.on('click', clicked);
-  notification.show();
+  const uri = routes?.add(input.clicked);
+  let notification: Notification;
+  try {
+    notification = new Notification(
+      uri
+        ? {
+            toastXml: notificationXml(input.title, input.body, input.silent, uri),
+            id: createHash('sha256').update(input.id).digest('hex').slice(0, 16),
+            groupId: routes!.protocol.slice(-16),
+          }
+        : { title: input.title, body: input.body, silent: input.silent },
+    );
+  } catch (error) {
+    if (uri) routes?.remove(uri);
+    throw error;
+  }
+  if (!routes) notification.on('click', input.clicked);
+  notification.on('failed', input.failed);
+  notification.on('close', input.closed);
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (uri) routes?.remove(uri);
+    notification.removeAllListeners();
+  };
+  try {
+    notification.show();
+  } catch (error) {
+    release();
+    throw error;
+  }
+  return {
+    release,
+    close: () => {
+      release();
+      notification.close();
+    },
+  };
 }

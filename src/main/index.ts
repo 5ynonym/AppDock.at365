@@ -80,11 +80,7 @@ import {
 import type { HostSnapshot, Settings } from '../shared/contracts';
 import { configureWindowRendering } from './core/window-rendering';
 import { trayIdentity } from './core/tray-identity';
-import {
-  configureNotifications,
-  showNotification,
-  activateNotification,
-} from './core/notifications';
+import { configureNotifications, activateNotification } from './core/notifications';
 import {
   activeShortcutApplet,
   configurePageHost,
@@ -105,6 +101,7 @@ import { NotificationService } from './core/notification-service';
 import { NotificationHistoryStore } from './core/notification-history';
 import { NotificationSurfaceHost } from './core/notification-surface-host';
 import { NotificationDesktopHost } from './core/notification-desktop-host';
+import { NotificationWindowsAdapter } from './core/notification-windows-adapter';
 import { NotificationSurfaceController } from './core/notification-surface-controller';
 import { SettingsNotificationSource } from './core/settings-notification-source';
 import { webId } from '../shared/web-applets';
@@ -185,6 +182,7 @@ if (locked) {
 let window: BrowserWindow | null = null;
 let notificationBanner: NotificationSurfaceHost | undefined;
 let notificationDesktop: NotificationDesktopHost | undefined;
+let notificationWindows: NotificationWindowsAdapter | undefined;
 let notificationService: NotificationService | undefined;
 let typedNotifications: TypedNotifications | undefined;
 let settingsNotificationSource: SettingsNotificationSource | undefined;
@@ -407,6 +405,7 @@ const changed = () => {
     if (!quitting) settingsNotificationSource?.refresh();
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
+    notificationWindows?.refresh();
     shellHost?.refresh();
     shellPageHost?.refresh();
     overlayHost?.refresh();
@@ -1628,6 +1627,16 @@ async function initialize() {
         peer.send({ jsonrpc: '2.0', method: 'notifications.changed', params: {} });
     },
   });
+  notificationWindows = new NotificationWindowsAdapter(notificationService, {
+    ready: () => startupReady && !quitting,
+    openCenter: () => executeCommand('appdock.notifications.open'),
+    failed: () =>
+      log.write(
+        'error',
+        'notifications',
+        'Windows通知の表示または操作を完了できません。通知センターから確認できます。',
+      ),
+  });
   settingsNotificationSource = new SettingsNotificationSource(notificationService, {
     typed: typedNotifications,
     editor: settingsEditing,
@@ -2051,15 +2060,24 @@ async function initialize() {
     if (!results.length || quitting) return;
     log.write('info', 'updates', `${results.length}件の更新があります。`);
     try {
-      showNotification(
-        'AppDock — 更新があります',
-        results.map((result) => `${result.name}: ${result.latestVersion}`).join('\n'),
-        true,
-        () => {
-          showWindow();
-          window?.webContents.send('dock:hostCommand', 'appdock.updates.open');
-        },
-      );
+      typedNotifications!.publish({ ownerKind: 'host', ownerId: 'updates' }, 'available', {
+        level: 'info',
+        title: 'AppDock — 更新があります',
+        body: results
+          .map((result) => `${result.name}: ${result.latestVersion}`)
+          .join('\n')
+          .slice(0, 2000),
+        historyText: { title: '更新があります', body: '利用可能な更新があります。' },
+        windowsSilent: true,
+        windowsClickAction: 'details',
+        actions: [
+          {
+            key: 'details',
+            label: '更新画面を開く',
+            run: () => executeCommand('appdock.updates.open'),
+          },
+        ],
+      });
     } catch (error) {
       log.write('error', 'updates', String(error));
     }
@@ -2236,6 +2254,7 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   notificationBanner?.dispose();
   notificationDesktop?.dispose();
+  notificationWindows?.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();

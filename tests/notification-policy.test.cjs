@@ -186,7 +186,7 @@ test('mandatory condition is enforced for UI saves and externally received overr
   assert.deepEqual(resolved.lifetime, { type: 'condition' });
   assert.equal(resolved.dismissible, false);
 });
-test('desktop is available while future Windows targets never silently route to banner', () => {
+test('all declared targets are available without silently adding a banner', () => {
   const settings = createDefaultSettings(),
     type = { ...definition(), ...owner, ownerTitle: 'Fixture', ownerState: 'running' };
   settings.notificationPreferences = { overrides: [row({ targets: ['desktop', 'windows'] })] };
@@ -194,9 +194,10 @@ test('desktop is available while future Windows targets never silently route to 
     'desktop',
     'windows',
   ]);
-  assert.deepEqual(p.resolveNotificationPolicy(type, settings).targets, ['desktop']);
+  assert.deepEqual(p.resolveNotificationPolicy(type, settings).targets, ['desktop', 'windows']);
   settings.notificationPreferences = { overrides: [row({ targets: ['windows'] })] };
-  assert.equal(p.resolveNotificationPolicy(type, settings).reason, 'no-available-targets');
+  assert.equal(p.resolveNotificationPolicy(type, settings).enabled, true);
+  assert.deepEqual(p.resolveNotificationPolicy(type, settings).targets, ['windows']);
 });
 test('typed dedupe isolates kinds but shares the owner quota', (t) => {
   const f = setup(t, [definition(), definition({ typeId: 'other' })]);
@@ -261,7 +262,7 @@ test('delayed expiry cannot reuse an ended episode duration or fail route reconc
   assert.equal(f.service.list().find((i) => i.id === b.notificationId).expiresAt, undefined);
 });
 
-test('route changes preserve active ID and deadline; losing all available targets withdraws', (t) => {
+test('route changes preserve active ID and deadline including Windows and center-only', (t) => {
   const f = setup(t);
   const a = f.typed.publish(owner, 'message', content(), 'run1');
   const due = f.service.list()[0].expiresAt;
@@ -273,7 +274,12 @@ test('route changes preserve active ID and deadline; losing all available target
   assert.equal(f.service.list()[0].expiresAt, due);
   assert.deepEqual(f.service.list()[0].targets, ['desktop']);
   f.prefs([row({ targets: ['windows'] })]);
-  assert.equal(f.service.list()[0].status, 'withdrawn');
+  assert.equal(f.service.list()[0].status, 'active');
+  assert.deepEqual(f.service.list()[0].targets, ['windows']);
+  f.prefs([row({ targets: [] })]);
+  assert.equal(f.service.list()[0].id, a.notificationId);
+  assert.equal(f.service.list()[0].expiresAt, due);
+  assert.deepEqual(f.service.list()[0].targets, []);
 });
 test('Applet global gate does not disable host warning, stopped generation cannot resolve or replay actions', async (t) => {
   const f = setup(t);

@@ -68,3 +68,73 @@ test('sound rejects non-WAV paths and drops work for inactive extensions', async
   );
   await new Promise((resolve) => setImmediate(resolve));
 });
+
+test('legacy API uses declared generated kind while retaining null, silence, global-off and owned command guards', async () => {
+  let value = require('../out/main/shared/settings-schema').createDefaultSettings(),
+    captured,
+    effects = 0;
+  const e = {
+    manifest: { id: 'fixture', capabilities: ['notifications'] },
+    state: 'running',
+    commands: [{ id: 'fixture.open' }],
+    runtimeSession: 'run',
+    child: {},
+  };
+  const typed = {
+    policy: () => ({ enabled: true }),
+    publish: (owner, type, input, generation) => {
+      captured = { owner, type, input, generation };
+    },
+  };
+  const api = createHostApi(
+    {
+      get value() {
+        return value;
+      },
+    },
+    '',
+    () => {},
+    () => {},
+    () => {},
+    async () => effects++,
+    undefined,
+    undefined,
+    {},
+    () => typed,
+  );
+  assert.equal(
+    await api(e, 'host.notifications.show', {
+      title: 'T'.repeat(200),
+      body: 'B'.repeat(700),
+      silent: true,
+      command: 'fixture.open',
+    }),
+    null,
+  );
+  assert.equal(captured.type, 'appdock.legacy');
+  assert.equal(captured.input.title.length, 100);
+  assert.equal(captured.input.body.length, 500);
+  assert.equal(captured.input.windowsSilent, true);
+  assert.equal(captured.input.historyText.body, 'Appletから通知がありました。');
+  await captured.input.actions[0].run();
+  assert.equal(effects, 1);
+  e.runtimeSession = 'next';
+  await assert.rejects(captured.input.actions[0].run(), /変わりました/);
+  captured = undefined;
+  value.host.notifications = false;
+  assert.equal(await api(e, 'host.notifications.show', { title: 'T', body: 'B' }), null);
+  assert.equal(captured, undefined);
+  await assert.rejects(
+    api(e, 'host.notifications.show', { title: 'T', body: 'B', command: 'foreign.open' }),
+    /登録済み/,
+  );
+  const p = require('../out/main/shared/notification-types');
+  const kind = p
+    .notificationCatalog([
+      { id: 'fixture', displayName: 'Fixture', state: 'stopped', capabilities: ['notifications'] },
+    ])
+    .find((t) => t.typeId === 'appdock.legacy');
+  assert.equal(kind.defaultTargets[0], 'windows');
+  assert.equal(kind.defaultDurationSeconds, null);
+  assert.throws(() => p.parseNotificationTypes([kind]), /通知/);
+});

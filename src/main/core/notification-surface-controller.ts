@@ -38,6 +38,6 @@ export class NotificationSurfaceController {
     await this.service.invoke(request);
   }
   delivery(ids: string[], state: 'showing' | 'hidden' | 'failed') {
-    this.service.setDelivery(this.target, ids, state);
+    this.service.setDelivery(this.target, ids, state, 'hidden');
   }
 }

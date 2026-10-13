@@ -202,7 +202,7 @@ test('session/none policies, unsupported interfaces and history omission are exp
   assert.equal(s.list().length, 1);
   assert.equal(store.list().length, 0);
   assert.equal(s.historyEntries().length, 1);
-  assert.throws(() => s.upsert('host.alpha', input({ targets: ['windows'] })), /Invalid/);
+  assert.throws(() => s.upsert('host.alpha', input({ targets: ['unknown'] })), /Invalid/);
   assert.throws(() => s.upsert('host.alpha', input({ historyText: undefined })), /Invalid/);
 });
 test('history handles malformed, newer schemas and write errors without losing runtime notifications', (t) => {

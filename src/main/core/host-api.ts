@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
 import { safeStorage, shell, dialog, nativeTheme } from 'electron';
-import { showNotification } from './notifications';
+import { legacyNotificationTypeId } from '../../shared/notification-types';
 import { queueSound } from './sounds';
 import { RegisteredSounds } from './registered-sounds';
 import type { ExtensionInstance } from './extensions';
@@ -401,15 +401,49 @@ export function createHostApi(
             ))
         )
           throw new Error('このAppletの登録済みコマンドを指定してください。');
-        if (settings.value.host.notifications) {
-          const child = e.child;
-          showNotification(p.title.slice(0, 100), p.body.slice(0, 500), p.silent === true, () => {
-            if (p.command && e.state === 'running' && e.child === child)
-              void executeCommand(p.command).catch(() =>
-                log('error', id, '通知のコマンドを実行できませんでした。'),
-              );
-          });
-        }
+        if (!settings.value.host.notifications) return null;
+        const service = typedNotifications?.();
+        if (!service) throw Error('通知基盤は準備中です。');
+        const owner = { ownerKind: 'applet' as const, ownerId: id };
+        if (!service.policy(owner, legacyNotificationTypeId).enabled) return null;
+        const generation = e.runtimeSession,
+          child = e.child;
+        service.publish(
+          owner,
+          legacyNotificationTypeId,
+          {
+            level: 'info',
+            title: p.title.slice(0, 100),
+            body: p.body.slice(0, 500),
+            windowsSilent: p.silent === true,
+            historyText: { title: '旧方式の通知', body: 'Appletから通知がありました。' },
+            ...(p.command
+              ? {
+                  windowsClickAction: 'open',
+                  actions: [
+                    {
+                      key: 'open',
+                      label: '開く',
+                      run: async () => {
+                        if (
+                          e.state !== 'running' ||
+                          e.child !== child ||
+                          e.runtimeSession !== generation ||
+                          ![
+                            ...e.commands,
+                            ...generatedSettingCommands(id, e.manifest.settings ?? [], true),
+                          ].some((c) => c.id === p.command)
+                        )
+                          throw Error('通知の発行元または操作が変わりました。');
+                        await executeCommand(p.command);
+                      },
+                    },
+                  ],
+                }
+              : {}),
+          },
+          generation,
+        );
         return null;
       }
       case 'host.browser.open': {
