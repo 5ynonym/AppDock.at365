@@ -14,6 +14,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private readonly List<ScheduledTask> schedules = [];
     private readonly SemaphoreSlim commandLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, Func<CancellationToken, Task>> settingsHandlers = new();
+    private readonly ConcurrentDictionary<Guid, Func<CancellationToken, Task>> notificationHandlers = new();
     private JsonElement configuration = settings;
     private readonly object sync = new();
     public string ExtensionId => id;
@@ -105,6 +106,21 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
             configuration = JsonSerializer.SerializeToElement(next, JsonRpcConnection.Json);
         }
     }
+    public async Task<NotificationPublishResult> PublishAsync(NotificationRequest request, CancellationToken cancellationToken = default) =>
+        (await connection.RequestAsync("host.notifications.publish", request, cancellationToken)).Deserialize<NotificationPublishResult>(JsonRpcConnection.Json)!;
+    public async Task<NotificationPolicy> GetPolicyAsync(string typeId, CancellationToken cancellationToken = default) =>
+        (await connection.RequestAsync("host.notifications.policy", new { typeId }, cancellationToken)).Deserialize<NotificationPolicy>(JsonRpcConnection.Json)!;
+    public Task EndAsync(string notificationId, string status = "resolved", CancellationToken cancellationToken = default)
+        => CallAsync("host.notifications.end", new { notificationId, status }, cancellationToken);
+    public IDisposable OnPolicyChanged(Func<CancellationToken, Task> handler)
+    {
+        var key = Guid.NewGuid(); notificationHandlers[key] = handler;
+        return new Registration(() => notificationHandlers.TryRemove(key, out _));
+    }
+    internal async Task ChangeNotificationPolicyAsync()
+    {
+        foreach (var handler in notificationHandlers.Values) await handler(lifetime);
+    }
     public Task ShowAsync(string title, string body, CancellationToken cancellationToken = default) => CallAsync("host.notifications.show", new { title, body }, cancellationToken);
     Task IPageService.OpenAsync(string id, CancellationToken cancellationToken) => CallAsync("host.pages.open", new { id }, cancellationToken);
     public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);
@@ -148,6 +164,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public async ValueTask DisposeAsync()
     {
         settingsHandlers.Clear();
+        notificationHandlers.Clear();
         ScheduledTask[] current; lock (sync) current = schedules.ToArray();
         foreach (var scheduled in current) scheduled.Dispose();
         await Task.WhenAll(current.Select(s => s.Completion));

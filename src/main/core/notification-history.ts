@@ -21,6 +21,10 @@ function valid(entry: NotificationHistoryEntry) {
     [entry.createdAt, entry.updatedAt].every(Number.isFinite) &&
     (entry.endedAt === undefined || Number.isFinite(entry.endedAt)) &&
     typeof entry.read === 'boolean' &&
+    (entry.ownerKind === undefined || ['host', 'applet'].includes(entry.ownerKind)) &&
+    [entry.ownerId, entry.typeId, entry.endReason].every(
+      (v) => v === undefined || (typeof v === 'string' && v.length <= 101),
+    ) &&
     Array.isArray(entry.targets) &&
     entry.targets.every((t) => ['banner', 'desktop', 'windows'].includes(t)) &&
     entry.delivery &&
@@ -55,6 +59,12 @@ export class NotificationHistoryStore {
           id: raw.id,
           revision: 1,
           source: raw.source,
+          ...(raw.ownerKind && raw.ownerId && raw.typeId
+            ? { ownerKind: raw.ownerKind, ownerId: raw.ownerId, typeId: raw.typeId }
+            : {}),
+          ...(typeof raw.endReason === 'string' && raw.endReason.length <= 100
+            ? { endReason: raw.endReason }
+            : {}),
           level: raw.level,
           title: raw.title,
           body: raw.body,

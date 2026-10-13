@@ -20,6 +20,12 @@ run('dotnet', [
   '-c',
   'Release',
 ]);
+run('dotnet', [
+  'build',
+  'tests/fixtures/dotnet/AppDock.Notifications/AppDock.Notifications.csproj',
+  '-c',
+  'Release',
+]);
 for (const name of ['welcome', 'dotnet-demo']) {
   const folder = path.join(root, '.artifacts/test-extensions', name);
   fs.mkdirSync(folder, { recursive: true });

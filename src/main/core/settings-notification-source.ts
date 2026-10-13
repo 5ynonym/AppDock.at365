@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { SettingsEditingSession } from './settings-editing-session';
 import type { NotificationService } from './notification-service';
+import type { TypedNotifications } from './typed-notifications';
 
 /** Temporary consumer; remove this adapter when settings use immediate persistence. */
 export class SettingsNotificationSource {
@@ -9,6 +10,7 @@ export class SettingsNotificationSource {
   constructor(
     private service: NotificationService,
     private options: {
+      typed?: TypedNotifications;
       editor: SettingsEditingSession;
       route(): string;
       busy(): boolean;
@@ -49,15 +51,15 @@ export class SettingsNotificationSource {
         this.refresh();
       }
     };
-    this.id = this.service.upsert('host.settings', {
+    const input = {
       dedupeKey: 'editing',
-      level: message ? 'error' : 'warning',
+      level: message ? ('error' as const) : ('warning' as const),
       title: message ? '変更を保存できません' : '未保存の変更があります',
       body: message.slice(0, 2000) || '設定・ショートカットなどの変更がまだ保存されていません。',
-      lifetime: { type: 'condition' },
+      lifetime: { type: 'condition' as const },
       dismissible: false,
-      targets: ['banner'],
-      history: 'persistent',
+      targets: ['banner' as const],
+      history: 'persistent' as const,
       historyText: {
         title: '設定の未保存変更',
         body: message ? '設定の保存に問題がありました。' : '設定の変更が未保存です。',
@@ -69,6 +71,15 @@ export class SettingsNotificationSource {
         { key: 'discard', label: 'すべて破棄…', run: () => act('discard') },
         { key: 'save', label: 'すべて保存', primary: true, run: () => act('save') },
       ],
-    });
+    };
+    const result = this.options.typed?.publish(
+      { ownerKind: 'host', ownerId: 'settings' },
+      'unsaved-changes',
+      input,
+    );
+    this.id =
+      result?.status === 'accepted'
+        ? result.notificationId
+        : this.service.upsert('host.settings', input);
   }
 }

@@ -46,6 +46,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  notificationTypes?: import('./notification-types').NotificationTypeEntry[];
   applets?: ExtensionSnapshot[];
   commands?: UiCommand[];
   statuses?: GlobalHotKeyStatus[];

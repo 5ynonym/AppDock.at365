@@ -1,3 +1,4 @@
+import { notificationCatalog, notificationSettingKey } from './notification-types';
 import type { ExtensionSnapshot, Settings, SettingDefinition } from './contracts';
 import { createDefaultSettings, parseSettings } from './settings-schema';
 import { validateAppletSettings } from './setting-definitions';
@@ -32,6 +33,7 @@ export const appletSettingsPageId = (id: string) => `applet:${id}`;
 export const hostSettingsPages = [
   ['appearance', '表示'],
   ['general', '一般'],
+  ['notifications', '通知'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカット'],
@@ -69,7 +71,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ],
     ['launch', '現在の起動状態', '状態を確認 管理者として再起動'],
     ['closeToTray', '閉じるとトレイに常駐', 'ウィンドウを閉じた後もAppletを動かします。'],
-    ['notifications', 'デスクトップ通知', 'Appletからの通知を表示します。'],
     [
       'hardwareAcceleration',
       'ハードウェアアクセラレーション',
@@ -77,6 +78,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ],
     ['startMinimized', 'トレイから起動', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
   ],
+  notifications: [['notifications', 'Appletからの通知を許可', '種類別設定・通知先・表示時間']],
   ribbon: [['ribbon', 'リボン', '表示 配置 並べ替え 上部 下部 セパレーター']],
   tray: [
     ['trayClickCommand', 'トレイクリックのコマンド', 'シングルクリック'],
@@ -169,7 +171,6 @@ const generalKeys = [
   'startAtLogon',
   'runAsAdministrator',
   'closeToTray',
-  'notifications',
   'hardwareAcceleration',
   'startMinimized',
 ];
@@ -218,10 +219,18 @@ export function settingsCatalog(
       title,
       kind: 'host' as const,
       json: !['web-accounts', 'permissions', 'codex'].includes(id),
-      items: hostItems[id].map(([key, title, description]) => ({
-        ...item(id, key, title, description),
-        keywords: id === 'appearance' && key === 'theme' ? ['Dark', 'Light', 'System'] : undefined,
-      })),
+      items: [
+        ...hostItems[id].map(([key, title, description]) => ({
+          ...item(id, key, title, description),
+          keywords:
+            id === 'appearance' && key === 'theme' ? ['Dark', 'Light', 'System'] : undefined,
+        })),
+        ...(id === 'notifications'
+          ? notificationCatalog(orderApplets(applets, draft.appletOrder)).map((t) =>
+              item(id, notificationSettingKey(t), t.title, t.ownerTitle + ' ' + t.description),
+            )
+          : []),
+      ],
     })),
     ...orderApplets(applets, draft.appletOrder).map((a) => {
       const id = appletSettingsPageId(a.id);
@@ -290,6 +299,8 @@ export function settingsPaths(
   switch (page.id) {
     case 'appearance':
       return ['theme', 'shellProvider'].map((k) => ['host', k]);
+    case 'notifications':
+      return [['host', 'notifications'], ['notificationPreferences']];
     case 'general':
       return generalKeys.map((k) => ['host', k]);
     case 'tray':

@@ -9,6 +9,10 @@ export interface NotificationItem {
   id: string;
   revision: number;
   source: string;
+  ownerKind?: 'host' | 'applet';
+  ownerId?: string;
+  typeId?: string;
+  endReason?: string;
   level: NotificationLevel;
   title: string;
   body: string;

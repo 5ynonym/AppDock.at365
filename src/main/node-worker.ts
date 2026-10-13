@@ -35,6 +35,12 @@ export interface NodeExtensionContext {
     setOptions(key: string, options: SettingOption[]): Promise<unknown>;
   };
   notifications: {
+    publish(
+      input: import('../shared/notification-types').TypedNotificationInput,
+    ): Promise<import('../shared/notification-types').NotificationPublishResult>;
+    getPolicy(typeId: string): Promise<import('../shared/notification-types').NotificationPolicy>;
+    end(notificationId: string, status?: 'resolved' | 'withdrawn'): Promise<unknown>;
+    onChanged(handler: Handler): () => void;
     show(
       title: string,
       body: string,
@@ -70,6 +76,7 @@ const disposables: (() => void)[] = [];
 let configuration: Record<string, unknown> = {};
 let extension: NodeExtension;
 const settingsHandlers = new Set<Handler>();
+const notificationHandlers = new Set<Handler>();
 const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) => {
   switch (method) {
     case 'activate': {
@@ -128,6 +135,18 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,
         },
         notifications: {
+          publish: (input) => peer.request('host.notifications.publish', input),
+          getPolicy: (typeId) => peer.request('host.notifications.policy', { typeId }),
+          end: (notificationId, status = 'resolved') =>
+            peer.request('host.notifications.end', { notificationId, status }),
+          onChanged: (handler) => {
+            notificationHandlers.add(handler);
+            const stop = () => {
+              notificationHandlers.delete(handler);
+            };
+            disposables.push(stop);
+            return stop;
+          },
           show: (title, body, options) =>
             peer.request('host.notifications.show', { title, body, ...options }),
         },
@@ -199,6 +218,9 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
       await extension.onPanelAction(p.id);
+      return null;
+    case 'notifications.changed':
+      for (const handler of notificationHandlers) await handler();
       return null;
     case 'settings.changed': {
       const changed = JSON.stringify(configuration) !== JSON.stringify(p);

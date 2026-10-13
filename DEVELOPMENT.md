@@ -16,7 +16,7 @@
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
-| 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[移行設計](docs/notification-foundation.md) |
+| 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[通知種類設定と段階的な拡張の設計](docs/notification-foundation.md) |
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 
@@ -226,3 +226,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。
 
 設定横断検索はmainのSettingsNavigationStateがqueryと移動要求を保持し、settings-catalogの静的メタデータだけを照合します。Default ShellのSettingsIndexと安定アンカーが本文全体への移動を担当します。検索値・選択・移動はsettings.jsonへ保存しません。追加回帰は`scripts/settings-search-ui-test.cjs [固定EXE]`で、全本体項目のアンカー、非表示ページの遅延描画、検索/移動/復旧/削除対象を確認します。
+
+## 通知設定の回帰
+
+種類宣言・設定・寿命・所有者の共通回帰はtests/notification-policy.test.cjs。scripts/notification-settings-ui-test.cjs [固定EXE]は実Node/.NETの新APIとDefault Shellの通知設定、親スイッチ、保存/抑制/期限/再起動を検証します。標準testは専用.NET fixtureもRelease buildします。旧Appletの既存APIはscripts/applet-api-ui-test.cjs [固定EXE]、未保存警告はscripts/settings-notice-ui-test.cjs [固定EXE]で確認します。実装契約と次回範囲は[通知設計](docs/notification-foundation.md)を参照してください。

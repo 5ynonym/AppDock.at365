@@ -220,3 +220,9 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
 
 ログだけを差し替えるShell AppletはminimumHostVersion 0.26.42以上でpage.logsを宣言できます。モデル・操作・フォーカス・復旧の契約は[Shellのページ表示](shell-pages.md)を参照してください。
+
+## 通知種類の宣言と設定
+
+種類別通知は[種類指定通知API](extensions.md#種類指定通知api)を使います。notificationTypesをmanifestへ静的宣言し、notifications capabilityとminimumHostVersion:0.30.0を指定してください。停止中も設定一覧へ表示されるため、通知発生後に種類を動的登録しません。IDは名称変更でも維持し、本文から作りません。
+
+Node/.NETの両APIで、保存済みユーザー方針をホストが解決します。Applet側でtargets/lifetimeを上書きしません。persistentには安全な履歴要約を渡し、操作は自Appletの登録済みコマンドに限定します。実機検証はオン/オフ、空欄manual、保存前の未反映、停止後の操作失効、再起動を含めます。新APIの回帰fixtureはtests/fixtures/dotnet/AppDock.Notifications、scripts/notification-settings-ui-test.cjsに置き、製品へ同梱しません。

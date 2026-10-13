@@ -46,3 +46,9 @@ PC専用`settings-backups/`へ検証済み設定を保存し、`last-good.json`�
 ## Windowsの一時的な置換拒否
 
 atomicWriteは一時ファイルを書いた後、WindowsのEPERM/EACCES/EBUSYだけ同じrenameを最大3回、25/50/75ms待って再試行します。各再試行の直前に保存先のbytes/存在状態を最初の状態と比較し、外部更新・削除・新規作成を検出したら拒否します。設定操作やtoggleを再実行するものではなく、revision確認と変更内容は保持します。合計待機は最大150ms、他のエラーや読み取り失敗は即時に返し、一時ファイルは回収します。外部変更のABAや最終確認とrenameの間の別プロセス更新まで排他的に防ぐ仕組みではありません。
+
+## 通知種類の共通設定
+
+notificationPreferences.overridesはsettings.jsonの任意フィールドです。ownerKind/ownerId/typeIdの組で種類ごとにenabled/targets/durationSecondsを上書きします。未導入Applet/削除された種類/未実装の既知表示先を同期で受信しても保持し、PCで実行できない場合は理由付き抑制となります。種類定義、起動世代、利用可否、active状態と履歴はこの共有設定へ保存しません。
+
+省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。共有編集draftや外部revisionの競合保護を共用し、通知設定だけの別保存・即時保存は導入しません。詳細は[通知契約](notifications.md)を参照してください。

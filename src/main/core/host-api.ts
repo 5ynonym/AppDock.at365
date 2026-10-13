@@ -1,3 +1,4 @@
+import type { TypedNotifications } from './typed-notifications';
 import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +37,7 @@ export function createHostApi(
     applets: () => [],
     save: (value, revision) => settings.save(value, revision),
   }),
+  typedNotifications?: () => TypedNotifications | undefined,
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -278,6 +280,112 @@ export function createHostApi(
           changed();
         }
         return null;
+      }
+      case 'host.notifications.publish':
+      case 'host.notifications.policy':
+      case 'host.notifications.end': {
+        requireCapability('notifications');
+        const service = typedNotifications?.();
+        if (!service) throw Error('通知基盤は準備中です。');
+        const owner = { ownerKind: 'applet' as const, ownerId: id };
+        const generation = e.runtimeSession;
+        if (!generation) throw Error('通知の実行世代がありません。');
+        if (method === 'host.notifications.end') {
+          if (
+            Object.keys(p).some((k) => !['notificationId', 'status'].includes(k)) ||
+            typeof p.notificationId !== 'string' ||
+            (p.status !== undefined && !['resolved', 'withdrawn'].includes(p.status))
+          )
+            throw Error('通知終了の引数が不正です。');
+          service.end(
+            owner,
+            p.notificationId,
+            generation,
+            p.status === 'withdrawn' ? 'withdrawn' : 'resolved',
+          );
+          return null;
+        }
+        if (typeof p.typeId !== 'string') throw Error('typeIdが必要です。');
+        const type = e.manifest.notificationTypes?.find((t) => t.typeId === p.typeId);
+        if (!type) throw Error('自身の宣言された通知種類だけを使用できます。');
+        if (method === 'host.notifications.policy') {
+          if (Object.keys(p).some((k) => k !== 'typeId')) throw Error('通知方針の引数が不正です。');
+          return service.policy(owner, p.typeId);
+        }
+        if (
+          Object.keys(p).some(
+            (k) =>
+              ![
+                'typeId',
+                'title',
+                'body',
+                'level',
+                'dedupeKey',
+                'historyText',
+                'actions',
+                'restartTimer',
+              ].includes(k),
+          ) ||
+          (p.restartTimer !== undefined && typeof p.restartTimer !== 'boolean') ||
+          (p.dedupeKey != null && typeof p.dedupeKey !== 'string') ||
+          (p.level != null && !type.levels.includes(p.level)) ||
+          (p.historyText != null &&
+            (!isObject(p.historyText) ||
+              Object.keys(p.historyText).some((k) => !['title', 'body'].includes(k)))) ||
+          (p.actions != null && (!Array.isArray(p.actions) || p.actions.length > 3))
+        )
+          throw Error('通知発行の引数が不正です。');
+        const actions = (p.actions ?? []).map((a: unknown) => {
+          if (
+            !isObject(a) ||
+            Object.keys(a).some(
+              (k) => !['key', 'label', 'primary', 'disabled', 'command'].includes(k),
+            ) ||
+            typeof a.key !== 'string' ||
+            !a.key ||
+            a.key.length > 100 ||
+            typeof a.label !== 'string' ||
+            !a.label ||
+            a.label.length > 100 ||
+            (a.primary !== undefined && typeof a.primary !== 'boolean') ||
+            (a.disabled !== undefined && typeof a.disabled !== 'boolean') ||
+            typeof a.command !== 'string' ||
+            !e.commands.some((c) => c.id === a.command)
+          )
+            throw Error('自身の登録済みコマンドだけを通知操作に使用できます。');
+          const command = a.command;
+          return {
+            key: a.key,
+            label: a.label,
+            primary: a.primary,
+            disabled: a.disabled,
+            run: async () => {
+              if (
+                e.state !== 'running' ||
+                e.runtimeSession !== generation ||
+                !e.commands.some((c) => c.id === command)
+              )
+                throw Error('通知操作の発行元が停止しました。');
+              await executeCommand(command);
+            },
+          };
+        });
+        if (new Set(actions.map((a: { key: string }) => a.key)).size !== actions.length)
+          throw Error('通知操作keyが重複しています。');
+        return service.publish(
+          owner,
+          p.typeId,
+          {
+            title: p.title,
+            body: p.body,
+            level: p.level ?? type.defaultLevel,
+            dedupeKey: p.dedupeKey ?? undefined,
+            historyText: p.historyText ?? undefined,
+            actions,
+            restartTimer: p.restartTimer,
+          },
+          generation,
+        );
       }
       case 'host.notifications.show': {
         requireCapability('notifications');

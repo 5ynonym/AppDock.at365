@@ -39,7 +39,25 @@ public interface ISettingsService
     IDisposable OnChanged(Func<CancellationToken, Task> handler);
     Task SetOptionsAsync(string key, IReadOnlyList<SettingOption> options, CancellationToken cancellationToken = default);
 }
-public interface INotificationService { Task ShowAsync(string title, string body, CancellationToken cancellationToken = default); }
+public interface INotificationService {
+    Task ShowAsync(string title, string body, CancellationToken cancellationToken = default);
+    Task<NotificationPublishResult> PublishAsync(NotificationRequest request, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Typed notifications require AppDock 0.30.0 or later.");
+    Task<NotificationPolicy> GetPolicyAsync(string typeId, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Typed notifications require AppDock 0.30.0 or later.");
+    Task EndAsync(string notificationId, string status = "resolved", CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Typed notifications require AppDock 0.30.0 or later.");
+    IDisposable OnPolicyChanged(Func<CancellationToken, Task> handler)
+        => throw new NotSupportedException("Typed notifications require AppDock 0.30.0 or later.");
+}
+public sealed record NotificationHistoryText(string Title, string Body);
+public sealed record NotificationAction(string Key, string Label, string Command, bool Primary = false, bool Disabled = false);
+public sealed record NotificationRequest(string TypeId, string Title, string Body, string? Level = null, string? DedupeKey = null,
+    NotificationHistoryText? HistoryText = null, IReadOnlyList<NotificationAction>? Actions = null, bool RestartTimer = false);
+public sealed record NotificationPublishResult(string Status, string? NotificationId, string? Reason);
+public sealed record NotificationLifetime(string Type, int? Milliseconds);
+public sealed record NotificationPolicy(bool Enabled, IReadOnlyList<string> SelectedTargets, IReadOnlyList<string> Targets,
+    NotificationLifetime Lifetime, bool Dismissible, int? DurationSeconds, string? Reason);
 public interface IUiService {
     Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default);
     Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default);

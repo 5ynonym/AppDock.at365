@@ -93,6 +93,12 @@ import {
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
 import { mergeWebDefaults } from '../shared/web-applets';
+import { orderApplets } from '../shared/applet-order';
+import { TypedNotifications } from './core/typed-notifications';
+import {
+  notificationCatalog,
+  validateNotificationPreferenceChanges,
+} from '../shared/notification-types';
 import { NotificationService } from './core/notification-service';
 import { NotificationHistoryStore } from './core/notification-history';
 import { NotificationBannerHost } from './core/notification-banner-host';
@@ -176,6 +182,7 @@ if (locked) {
 let window: BrowserWindow | null = null;
 let notificationBanner: NotificationBannerHost | undefined;
 let notificationService: NotificationService | undefined;
+let typedNotifications: TypedNotifications | undefined;
 let settingsNotificationSource: SettingsNotificationSource | undefined;
 let settingsUiBusy = false;
 let lastEditingRoute: 'settings' | 'extensions' = 'settings';
@@ -704,6 +711,7 @@ function syncHotKeys(retry = false) {
 }
 function prepareSettings(value: Settings) {
   let next = parseSettings(value);
+  validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
   webApplets.validateAccounts(next.webApplets.items);
   validateAppletSettings(next, manager.snapshot());
   return initializeWebAppletDefaults(next, settings.value);
@@ -758,6 +766,10 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (page.kind === 'web') return { accounts: host.webAccounts };
   if (id === 'appearance') return { applets: applets.filter((a) => a.shell).map(summary) };
   if (id === 'general') return { launch: host.launch };
+  if (id === 'notifications')
+    return {
+      notificationTypes: notificationCatalog(orderApplets(applets, state.draft.appletOrder)),
+    };
   if (id === 'ribbon') return { applets: applets.map(summary) };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
     return {
@@ -1324,6 +1336,7 @@ async function initialize() {
           manager.executions.get(e.manifest.id, id),
         ),
       settingsCommands,
+      () => typedNotifications,
     ),
     log: log.write,
   });
@@ -1449,6 +1462,7 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    typedNotifications?.reconcile();
     for (const e of manager.items.values())
       if (!['starting', 'running'].includes(e.state)) nativeInput?.cancelApplet(e.manifest.id);
     trayMenu();
@@ -1456,6 +1470,7 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
+    typedNotifications?.reconcile();
     applySettings();
     void syncHotKeys(true);
     void manager.reconcile();
@@ -1593,7 +1608,22 @@ async function initialize() {
       (message) => log.write('error', 'notifications', message),
     ),
   );
+  typedNotifications = new TypedNotifications(notificationService, {
+    settings: () => settings.value,
+    applets: () => manager.snapshot(),
+    generation: (id) => {
+      const e = manager.items.get(id);
+      return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
+    },
+    changed,
+    policyChanged: (id) => {
+      const peer = manager.items.get(id)?.peer;
+      if (peer && !peer.closed)
+        peer.send({ jsonrpc: '2.0', method: 'notifications.changed', params: {} });
+    },
+  });
   settingsNotificationSource = new SettingsNotificationSource(notificationService, {
+    typed: typedNotifications,
     editor: settingsEditing,
     route: () => navigation.state.route,
     busy: () => settingsUiBusy || quitting,
@@ -2155,6 +2185,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   notificationBanner?.dispose();
+  typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();
   overlayHost?.dispose();

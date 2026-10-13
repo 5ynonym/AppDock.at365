@@ -155,6 +155,7 @@ async function until(fn, label) {
     checks.push('public settings region / page-only values / shared session save');
     for (const [name, label] of [
       ['一般', 'スタートアップに登録'],
+      ['通知', 'Appletからの通知を許可'],
       ['リボン', 'リボン設定'],
       ['タスクトレイ', 'タスクトレイ設定'],
       ['ショートカット', 'ショートカットの絞り込み'],
@@ -172,7 +173,7 @@ async function until(fn, label) {
       await shell.getByLabel(label, { exact: true }).first().waitFor();
       assert.deepEqual(await shell.getByRole('alert').allTextContents(), [], `category ${name}`);
     }
-    checks.push('all eleven host categories render with page-scoped models');
+    checks.push('all twelve host categories render with page-scoped models');
     await shell.getByRole('button', { name: 'プロフィール', exact: true }).click();
     await shell.getByLabel('ユーザー名', { exact: true }).fill('Shared unsaved profile');
     const savedProfile = (await host.evaluate(() => window.dock.snapshot())).settings.value.profile

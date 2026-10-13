@@ -18,6 +18,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];
   gestures?: import('./gestures').GestureSettings;
   gestureDefaultsInitialized?: string[];
@@ -119,6 +120,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  notificationTypes?: import('./notification-types').NotificationTypeDefinition[];
   shell?: { apiVersion: 1; ui?: string; views?: Record<string, string> };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;

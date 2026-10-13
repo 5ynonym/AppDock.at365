@@ -68,7 +68,7 @@ export class NotificationService {
       body: r.input.historyText!.body,
     });
   }
-  upsert(source: string, input: NotificationInput) {
+  upsert(source: string, input: NotificationInput, existingId?: string) {
     if (this.closed) throw Error('Notifications are shutting down');
     if (
       !source ||
@@ -109,14 +109,18 @@ export class NotificationService {
     )
       throw Error('Invalid notification');
     this.expire();
-    let r = input.dedupeKey
-      ? [...this.records.values()].find(
-          (r) =>
-            r.item.source === source &&
-            r.item.status === 'active' &&
-            r.input.dedupeKey === input.dedupeKey,
-        )
-      : undefined;
+    let r = existingId
+      ? this.records.get(existingId)
+      : input.dedupeKey
+        ? [...this.records.values()].find(
+            (r) =>
+              r.item.source === source &&
+              r.item.status === 'active' &&
+              r.input.dedupeKey === input.dedupeKey,
+          )
+        : undefined;
+    if (existingId && (!r || r.item.source !== source || r.item.status !== 'active'))
+      throw Error('Notification owner mismatch');
     if (!r) {
       const active = [...this.records.values()].filter((r) => r.item.status === 'active');
       const isHost = source.startsWith('host.');
@@ -186,6 +190,20 @@ export class NotificationService {
     this.changed();
     return r.item.id;
   }
+  identify(id: string, owner: { ownerKind: 'host' | 'applet'; ownerId: string }, typeId: string) {
+    const r = this.records.get(id);
+    if (
+      !r ||
+      (r.item.ownerKind === owner.ownerKind &&
+        r.item.ownerId === owner.ownerId &&
+        r.item.typeId === typeId)
+    )
+      return;
+    Object.assign(r.item, owner, { typeId });
+    r.item.revision++;
+    this.persist(r);
+    this.changed();
+  }
   list(): NotificationItem[] {
     this.expire();
     return structuredClone([...this.records.values()].map((r) => r.item));
@@ -211,9 +229,10 @@ export class NotificationService {
         .map(({ actions: _a, busy: _b, dismissible: _d, ...entry }) => entry),
     ];
   }
-  end(source: string, id: string, status: 'resolved' | 'withdrawn' = 'resolved') {
+  end(source: string, id: string, status: 'resolved' | 'withdrawn' = 'resolved', reason?: string) {
     const r = this.records.get(id);
     if (!r || r.item.source !== source) throw Error('Notification owner mismatch');
+    if (r.item.status === 'active') r.item.endReason = reason;
     this.finish(r, status);
   }
   withdrawSource(source: string) {

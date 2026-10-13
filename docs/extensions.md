@@ -220,3 +220,62 @@ manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣
 公開先をAPIごとのcallers宣言から判定し、Applet専用入力APIを提供します。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
 
 page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参照してください。Shell Appletの自己設定/自己コマンドAPIも共用します。
+
+## 種類指定通知API
+
+最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは従来のWindows通知経路で維持し、種類別設定へ自動変換しません。
+
+```json
+{
+  "minimumHostVersion": "0.30.0",
+  "capabilities": ["notifications"],
+  "notificationTypes": [{
+    "typeId": "new-message",
+    "title": "新着メッセージ",
+    "description": "新しいメッセージを受信したときに通知します。",
+    "levels": ["info", "warning"],
+    "defaultLevel": "info",
+    "defaultEnabled": true,
+    "canDisable": true,
+    "disabledControlReason": "",
+    "allowedTargets": ["banner", "desktop", "windows"],
+    "defaultTargets": ["banner"],
+    "requiredTargets": [],
+    "lifetimePolicy": "userDuration",
+    "defaultDurationSeconds": 10,
+    "history": "persistent"
+  }]
+}
+```
+
+定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。AppletはcanDisable:falseを宣言できません。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
+
+| 操作 | Node context.notifications | .NET context.Notifications |
+| --- | --- | --- |
+| 発行・同じキーの更新 | publish(request) | PublishAsync(NotificationRequest, token) |
+| 保存済みの実効方針取得 | getPolicy(typeId) | GetPolicyAsync(typeId, token) |
+| 所有通知の終了 | end(notificationId, status?) | EndAsync(notificationId, status, token) |
+| 方針変更購読 | onChanged(handler)、解除関数を返す | OnPolicyChanged(handler)、IDisposableを返す |
+
+```javascript
+const unsubscribe = context.notifications.onChanged(async () => {
+  const policy = await context.notifications.getPolicy('new-message');
+  // 必要なら現在の条件を再評価する。過去のイベントは再送しない。
+});
+const result = await context.notifications.publish({
+  typeId: 'new-message', title: 'メッセージを受信しました', body: '内容を確認できます。',
+  dedupeKey: 'inbox', historyText: { title: '新着メッセージ', body: 'メッセージを受信しました。' },
+  actions: [{ key: 'open', label: '確認', command: 'example.mail.open' }]
+});
+if (result.status === 'accepted') await context.notifications.end(result.notificationId, 'resolved');
+```
+
+.NETはNotificationRequest/NotificationHistoryText/NotificationAction/NotificationPublishResult/NotificationPolicyをSDKで提供します。新SDK/Runtimeを使ってビルドし、最低ホスト版を宣言してください。SDKの共有AssemblyVersion 0.10.0と旧ShowAsyncの署名を維持します。古いサービス実装の新メソッドはNotSupportedExceptionとなります。
+
+発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimerだけです。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトル200文字、本文2,000文字、dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
+
+結果はacceptedとnotificationId、またはsuppressedとreasonです。acceptedは登録完了で、表示成功/既読を保証しません。抑制理由はtype-disabled/applet-disabled/type-definition-changed/no-available-targets。不正入力・未知種類・上限/頻度超過はエラーです。endのstatusはresolved/withdrawnのみ、他Appletや古い世代の通知は終了できません。
+
+同じ所有者/typeId/dedupeKeyのactiveを更新します。通常更新は既存の期限を維持し、restartTimer:trueだけが現在の設定で期限を再設定します。所有者50件の上限は全種類で共有、発行頻度はバースト20件/毎秒10件補充です。終了は頻度制限を受けません。方針変更通知は再取得の合図で、通知本文や履歴を含みません。通知方針の購読はNode/.NETともコマンドや他の通知と並行し得るため、再評価処理が必要ならAppletで排他を設けます。
+
+通知先の保存値は複数選択に対応しますが、現在の新APIの配送はbannerだけです。desktop/windowsは将来のadapter用の宣言/保存識別子として扱い、旧Windows通知経路を新APIの利用可能先に数えません。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。

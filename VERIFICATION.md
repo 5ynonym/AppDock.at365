@@ -1,5 +1,26 @@
 # 検証記録
 
+## 2026-10-13: 通知種類・通知設定とApplet API（0.30.0）
+
+- 「設定 → 通知」をpage.settings/Default Shellへ追加。本体とmanifestの静的notificationTypesを一覧化し、停止中のAppletも起動せず表示する。種類別enabled/targets/durationSeconds、既定継承/空欄manual、種類別復元、未導入種類の上書き保持、横断検索を既存の編集・部分JSON・全体保存へ接続した。設定項目追加のため本体を0.29.0→0.30.0へマイナー更新。
+- notificationCatalog/resolveNotificationPolicyは共通shared関数、TypedNotificationsはepisodeと所有者/種類/起動世代の対応と保存後の方針適用を所有する。必須の未保存警告をhost/settings/unsaved-changesへ接続し、共通Appletスイッチで解除できない。オフ保存はwithdrawn、再オンは再送なし、通常更新/表示先変更は既存期限を維持、秒数変更は新規episode/明示restartから適用する。
+- Node/.NETへpublish/policy/end/変更購読を追加。capabilityとminimumHostVersion:0.30.0、宣言済み種類、自所有通知/登録コマンド/現世代、過大入力、所有者50件、バースト20件/毎秒10件を検査する。SDKの共有AssemblyVersion 0.10.0と旧APIを維持。履歴schemaVersion:1へ任意の種類識別情報/終了理由だけを追加し、実行関数や画面用詳細を保存しない。
+- 発行前レビューは上記API・保存領域・所有者/停止・期限・履歴・設定制約・Shellと旧経路を対象に実施。期限タイマー遅延時に終了episodeの方針を再利用し得る境界を修正し、回帰を追加した。設計の実装範囲は維持し、独立Registry/Resolverクラスではなく既存discoveryと共通関数で実装した構成を設計書へ反映した。発行を妨げる指摘なし。
+- 最終stageのtree e9dfbe0a3e58c3925579f55cbfd544ec88277421を固定して、型検査と標準回帰 **334/334、fail/skip 0** 成功。新しい方針回帰12件を含む。.NET専用fixtureとSDK/Runtime/native hostのRelease buildも成功。全コマンド/引数/cwd/終了コード、完全ログ、tree、入力/fixture/成果物SHA256、Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.401/Windows26300 x64の証跡は .artifacts/commit-validation-notifications-0.30.0-20261013/ に保存した。
+- ソースGUI: 新通知設定 **8群**（notification-settings-1791880569532）、既存設定通知 **10群**（settings-notice-1791880531012）、設定Shell **11群**（settings-shell-1791880537920）、navigation **17群**、既存Applet API **5群**成功。新通知設定は実Node/.NETの発行・操作、保存前後の抑制、manual/期限切れ、必須制約、未対応先、停止世代の失効、検索/復元/テーマ、再起動と安全な履歴を確認した。試験専用Appletを製品へ同梱していない。
+- 初回の新GUI試験は起動中のホーム描画と設定ページ選択が競合し、初期ホームの表示待ちを加えて成功。既存Applet API試験は移行前のホストDOM、全体JSON/空白保持、カテゴリ厳密名と旧破棄導線を前提として停止した。Settings Shell helper、現在の部分JSONと未保存マーカー、未保存の実設定値保持/元の値への復元へ試験を更新し、最終ソース/固定EXEとも成功。専用.NET fixtureの初回buildは親Directory.Build.props外のTargetFramework省略で失敗し、net10.0等を明示して解消。失敗ログ/profileを保持した。
+- 通常publish成功。本体単一EXE **0.30.0 / 144,109,931 bytes / SHA256 83398a9dd09f4f98cd802e4e12f675f6d3e549070622794f80f9426aa6b46ba4**。update.jsonの版/size/hashと同梱Default Shell0.30.0が一致。固定コピーで通知設定 **8群**（notification-settings-1791880736284）、設定通知 **9群**（settings-notice-1791880762505）、既存Applet API **5群**成功。EXE/feed/helper/Shellのhashを証跡へ保存した。
+- 旧notifications.showのWindows互換も固定単一EXEの合成通知 **4群**（notification-portable-1791881055602）成功。通知XML/配置別protocol、起動中と終了後のWindows Shell起動先、別配置で実行しないこと、停止済みAppletの操作失効を確認し、試験登録を復元した。物理的なトーストクリック・実メール受信を検証済みとは扱わない。
+- 設計書を段階2実装済み/次回段階3通知センターへ更新し、README/SDK API/設定同期/開発入口へ現行契約を反映。バナーだけが新APIの利用可能先で、desktop/windowsは操作不能、旧通知は共通スイッチで制御する。既存製品Appletの種類別API移行、通知センター、独自デスクトップ、Windows adapter、即時保存、未変更Appletの再発行、Release/全体ZIP/deployは実施していない。物理DPI/スクリーンリーダーと固定EXEの実ユーザー破棄dialog応答は別途未確認。ソースでは既存dialog応答fixtureを実行した。
+- 開発ドライブの祖先マウントは前段階のpack対応で発行成功し、今回は新たなマウント由来の影響なし。固定lockfileのinstall成功、依存/toolchain/待機方針/lockfileに変更なし。エージェントの通常exec環境の0x80070057は既存の環境制約として通常ユーザー実行へ切り替え、Windows管理者昇格はしていない。
+- 試験プロセス残存0。成功した同方式の直近3回を保持し、古い設定通知source成功profile2件（settings-notice-1791872860886、settings-notice-1791873189504）だけを絶対パス・再解析ポイント・使用中プロセス・保護参照の確認後に整理。失敗/状態不明、固定EXE、ビルドfixture、再利用証跡を保持し、今回専用の編集補助ファイルを削除した。検証後は文書のみを補記し、その差分と最終treeを証跡へ保存してコミットする。pushは行わない。
+
+## 2026-10-13: 通知種類設定の設計更新（未実装）
+
+- 通知基盤設計に種類カタログ、種類別オン/オフ・複数表示先・秒数/空欄manual、必須conditionの制約、共有設定の上書きと既定継承、activeへの適用、旧API/共通スイッチの互換方針を追加した。通知設定→通知センター→独自デスクトップ/Windowsの順へ変更し、Node/.NETの最小種類指定APIを通知設定と同じ段階へ前倒しした。
+- 現行0.29.0の通知サービス/履歴/設定Shell/設定同期/旧Applet通知のコードと文書を照合。Registry・PolicyResolver・種類別設定は未実装と明記し、開発入口と現行通知仕様からの参照を更新した。受入条件と即時保存への移行境界を設計書へ記載した。
+- 文書差分、ローカルリンク、Markdownのコードブロック、将来設定例のJSON構文、段階番号を確認。証跡は `.artifacts/notification-preferences-design-20261013/`。今回の変更は文書のみで、製品のビルド/試験/版更新/publishは実施していない。コードや実利用設定は変更していない。
+
 ## 2026-10-13: 通知基盤のコミット前回帰と設計更新（0.29.0）
 
 - [通知基盤の設計](docs/notification-foundation.md)を実装済みのService内部操作管理、現行bridge、targets受付制限、予約枠、既読未実装に合わせて更新。次回の通知センターについてShell本文領域/Controller、activeと履歴のID統合、検索/ページ取得、明示既読、終了履歴削除、バナーと操作ロックの共有、保存不能/再起動、実装順と受入条件を具体化した。独自デスクトップ、Windows/旧API・Applet公開、即時保存は後続として区別する。

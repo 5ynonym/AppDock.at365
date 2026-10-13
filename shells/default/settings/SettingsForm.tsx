@@ -17,6 +17,7 @@ import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
+import { NotificationSettings } from './NotificationSettings';
 import { AppletSettings } from './AppletSettings';
 export interface FormEditor {
   draft: Settings;
@@ -78,6 +79,8 @@ export function SettingsForm({
         onDelete={() => void invoke('deleteWebApplet')}
       />
     );
+  if (category === 'notifications')
+    return <NotificationSettings editor={editor} types={aux.notificationTypes ?? []} />;
   if (category === 'codex')
     return <CodexSettings onOpenPermissions={() => select('permissions')} />;
   if (category === 'permissions')
@@ -302,9 +305,7 @@ export function SettingsForm({
                 起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。再起動する前に、編集中の設定を保存してください。
               </p>
             )}
-            {(
-              ['closeToTray', 'notifications', 'hardwareAcceleration', 'startMinimized'] as const
-            ).map((key) => (
+            {(['closeToTray', 'hardwareAcceleration', 'startMinimized'] as const).map((key) => (
               <SettingRow key={key} pageId={category} itemKey={key}>
                 <Toggle
                   label={hostSettingItem(category, key).title}

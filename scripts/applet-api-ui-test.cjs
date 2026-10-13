@@ -100,6 +100,8 @@ if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'))
 const states = [],
   checks = [];
 let client, page;
+const settingsSurface = require('./settings-shell-helper.cjs').deferred(() =>
+  require('./settings-shell-helper.cjs').settingsPage(page));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const start = Date.now();
@@ -215,12 +217,12 @@ async function grant(id, permissions) {
     assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 9);
     assert.ok(Object.values((await snapshot()).appletApi.permissions).every((v) => v === true));
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('button', { name: '一般', exact: true }).click();
-    assert.equal(await page.getByRole('switch', { name: /^Applet：/ }).count(), 0);
-    await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
-    assert.equal(await page.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
-    await page.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
-    const panel = page.getByRole('region', { name: '操作の許可', exact: true });
+    await settingsSurface.getByRole('button', { name: /^一般/ }).click();
+    assert.equal(await settingsSurface.getByRole('switch', { name: /^Applet：/ }).count(), 0);
+    await settingsSurface.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
+    await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
+    const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
     assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 9);
     assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 7);
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
@@ -266,12 +268,15 @@ async function grant(id, permissions) {
       'revoke while MCP off',
     );
     // A PC-local permission save must not discard an unrelated settings.json draft.
-    await page.getByRole('button', { name: '一般', exact: true }).click();
-    await page.getByRole('button', { name: 'JSON', exact: true }).click();
-    const draftText = (await page.getByRole('textbox', { name: '設定JSON' }).inputValue()) + '\n ';
-    await page.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
-    await page.getByRole('button', { name: '操作の許可', exact: true }).click();
-    await page.getByText('未保存の変更があります', { exact: true }).waitFor();
+    await settingsSurface.getByRole('button', { name: /^一般/ }).click();
+    await settingsSurface.getByRole('button', { name: 'JSON', exact: true }).click();
+    const originalJson = await settingsSurface.getByRole('textbox', { name: '設定JSON' }).inputValue();
+    const draft = JSON.parse(originalJson);
+    draft.host.startMinimized = true;
+    const draftText = JSON.stringify(draft, null, 2);
+    await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
+    await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
+    await settingsSurface.getByText('未保存の変更があります', { exact: true }).waitFor();
     const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
     await childGrant.click();
     await panel.getByText(/未有効：公開情報の取得・公開コマンドの実行・公開設定の変更/).waitFor();
@@ -282,10 +287,12 @@ async function grant(id, permissions) {
       async () => !(await childGrant.isChecked()) && (await childGrant.isEnabled()),
       'revoke child grant',
     );
-    await page.getByRole('button', { name: '一般', exact: true }).click();
-    assert.equal(await page.getByRole('textbox', { name: '設定JSON' }).inputValue(), draftText);
-    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
-    await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+    await settingsSurface.getByRole('button', { name: /^一般/ }).click();
+    await settingsSurface.getByRole('button', { name: 'JSON', exact: true }).click();
+    assert.deepEqual(JSON.parse(await settingsSurface.getByRole('textbox', { name: '設定JSON' }).inputValue()), draft);
+    assert.equal((await snapshot()).settings.value.host.startMinimized, false);
+    await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(originalJson);
+    await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
     checks.push(
       'one permissions page; independent Applet/MCP settings, MCP-off preparation, unmet prerequisites and revocation, fixed read/input exposure, unrelated JSON draft preserved',
     );
@@ -378,10 +385,10 @@ async function grant(id, permissions) {
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
           'horizontal overflow',
         );
-        await page.screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
+        await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
         if (width === 700) {
           await panel.getByText('直接公開なし', { exact: true }).scrollIntoViewIfNeeded();
-          await page.screenshot({
+          await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({
             path: path.join(profile, `permissions-${theme}-${width}-input.png`),
           });
           await panel.getByRole('heading', { name: '操作の許可' }).scrollIntoViewIfNeeded();
@@ -417,7 +424,7 @@ async function grant(id, permissions) {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
-    if (page) await page.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
+    if (page) await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     console.error(error);
     process.exitCode = 1;
   } finally {

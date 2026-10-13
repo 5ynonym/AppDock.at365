@@ -1,3 +1,4 @@
+import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts } from './command-contexts';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -118,6 +119,14 @@ function readManifest(
       }
     }
   }
+  m.notificationTypes = parseNotificationTypes(m.notificationTypes);
+  if (
+    m.notificationTypes.length &&
+    (!m.capabilities?.includes('notifications') ||
+      !m.minimumHostVersion ||
+      compareVersions(m.minimumHostVersion, '0.30.0') < 0)
+  )
+    throw Error('通知種類にはnotifications capabilityとminimumHostVersion:0.30.0以上が必要です。');
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
@@ -458,7 +467,12 @@ class ExtensionManager extends EventEmitter {
         });
       }
       e.child = child;
-      e.peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => this.api(e, method, p));
+      const generation = e.runtimeSession;
+      e.peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => {
+        if (e.child !== child || e.runtimeSession !== generation)
+          throw Error('Appletの実行世代が変わりました。');
+        return this.api(e, method, p);
+      });
       e.peer.on('closed', () => {
         if (e.state === 'running') {
           child.kill();

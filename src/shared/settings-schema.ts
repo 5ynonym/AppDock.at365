@@ -1,3 +1,4 @@
+import { parseNotificationPreferences } from './notification-types';
 import { parseKeybindings, withKeybindings } from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
@@ -232,6 +233,9 @@ export function parseSettings(value: unknown): Settings {
     globalShortcutCommands,
     pinnedCommands,
     appletOrder,
+    ...(value.notificationPreferences === undefined
+      ? {}
+      : { notificationPreferences: parseNotificationPreferences(value.notificationPreferences) }),
     ribbon,
     profile: { ...profile, name: profile.name.trim() },
   };
