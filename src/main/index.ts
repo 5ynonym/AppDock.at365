@@ -1,3 +1,5 @@
+import { ShellProviderRegistry } from './core/shell-provider-registry';
+import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { SettingsPageDefinition } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
@@ -179,6 +181,9 @@ if (locked) {
   }
 }
 let window: BrowserWindow | null = null;
+let shellRegistry: ShellProviderRegistry | undefined;
+const shellStateSent = new Map<string, string>();
+let lastShellRevision = -1;
 let notificationBanner: NotificationSurfaceHost | undefined;
 let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationWindows: NotificationWindowsAdapter | undefined;
@@ -379,15 +384,40 @@ const operationApi = new AppDockApi({
   ready: () => startupReady && !quitting,
 });
 const changed = () => {
-  if (notifyTimer) return;
+  if (quitting || notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
+    if (quitting) return;
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
     notificationWindows?.refresh();
     shellHost?.refresh();
     shellPageHost?.refresh();
     overlayHost?.refresh();
+    shellRegistry?.touch();
+    if (shellRegistry && manager)
+      for (const e of manager.items.values()) {
+        if (
+          !['starting', 'running'].includes(e.state) ||
+          !e.shellStateRequested ||
+          !e.manifest.capabilities?.includes('shell') ||
+          !e.peer ||
+          e.peer.closed
+        )
+          continue;
+        const state = shellRegistry.ownState(e.manifest.id);
+        const signature = e.runtimeSession + ':' + JSON.stringify(state);
+        if (shellStateSent.get(e.manifest.id) !== signature) {
+          shellStateSent.set(e.manifest.id, signature);
+          e.peer.send({ jsonrpc: '2.0', method: 'shell.changed', params: state });
+        }
+      }
+    const shellRevision = shellRegistry?.snapshot().revision;
+    if (shellRevision !== undefined && shellRevision !== lastShellRevision) {
+      lastShellRevision = shellRevision;
+      void syncHotKeys();
+      trayMenu();
+    }
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
   }, 60);
 };
@@ -403,7 +433,7 @@ function showWindow() {
   }
 }
 function trayMenu() {
-  if (!tray || !manager) return;
+  if (quitting || !tray || tray.isDestroyed() || !manager) return;
   const attention = [...manager.items.values()].some((e) => e.state === 'running' && e.attention);
   const icon = nativeImage
     .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
@@ -433,7 +463,9 @@ function trayMenu() {
         : item.type === 'group'
           ? { label: item.title!.replace(/&/g, '&&'), submenu: template(item.children!) }
           : {
-              label: item.title!.replace(/&/g, '&&'),
+              label: (
+                item.title! + (item.disabledReason ? '（' + item.disabledReason + '）' : '')
+              ).replace(/&/g, '&&'),
               enabled: item.enabled,
               ...(item.command === gesturePauseCommand
                 ? { type: 'checkbox' as const, checked: gestures?.paused ?? false }
@@ -625,6 +657,7 @@ function snapshot(): HostSnapshot {
   return {
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
+    shellRegions: shellRegistry?.snapshot(),
     shell: shellHost?.status ?? {
       selected: defaultShellId,
       active: null,
@@ -747,7 +780,11 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   }
   if (page.kind === 'web') return { accounts: host.webAccounts };
-  if (id === 'appearance') return { applets: applets.filter((a) => a.shell).map(summary) };
+  if (id === 'appearance')
+    return {
+      applets: applets.filter((a) => a.shell).map(summary),
+      shellRegions: shellRegistry?.snapshot(),
+    };
   if (id === 'general') return { launch: host.launch };
   if (id === 'notifications')
     return {
@@ -809,6 +846,11 @@ function settingsPageActions(
     actions['open-settings'] = async () => {
       const error = await shell.openPath(settings.file);
       if (error) throw Error(error);
+    };
+  if (page.id === 'appearance')
+    actions.retryShellRegion = async ([region]) => {
+      if (!isShellRegion(region)) throw Error('領域が不正です。');
+      await retryShell(region);
     };
   if (page.id === 'general') {
     actions.refreshLaunchState = async () => {
@@ -1012,6 +1054,28 @@ function settingsPageActions(
     ]),
   );
 }
+async function retryShell(region?: ShellRegion) {
+  if (!shellRegistry) return;
+  const regions = region ? [region] : shellRegions.map((r) => r.id);
+  shellRegistry.retry(region);
+  for (const id of new Set([
+    defaultShellId,
+    ...regions.map((r) => (safeShell ? defaultShellId : shellRegistry!.configured(r))),
+  ])) {
+    const e = manager.items.get(id);
+    if (
+      e?.state === 'error' &&
+      (e.manifest.sourceKind === 'builtin' || settings.value.extensions[id]?.enabled)
+    )
+      await manager.restart(id);
+  }
+  if (!region || region === 'ribbon') shellHost?.retry();
+  if (!region || region === 'overlay.command-palette') overlayHost?.retry();
+  if (!region || region.startsWith('page.')) shellPageHost?.retry(region);
+  if (!region || region === 'notification.banner') notificationBanner?.retry();
+  if (!region || region === 'notification.desktop') notificationDesktop?.retry();
+  changed();
+}
 function registerIpc() {
   const updateTarget = (id?: string) => {
     if (id === undefined) return { version: app.getVersion(), repository: '5ynonym/AppDock.at365' };
@@ -1057,18 +1121,7 @@ function registerIpc() {
   handle('dock:shellPage', (request, bounds) => shellPageHost?.mount(request, bounds));
   handle('dock:closeShellPage', (id) => shellPageHost?.close(id));
   handle('dock:focusShellPage', (id, edge) => shellPageHost?.focus(id, edge));
-  handle('dock:retryShell', async () => {
-    const selected = safeShell
-      ? defaultShellId
-      : settings.value.host.shellProvider || defaultShellId;
-    for (const id of new Set([selected, defaultShellId]))
-      if (manager.items.get(id)?.state === 'error') await manager.restart(id);
-    shellHost?.retry();
-    overlayHost?.retry();
-    shellPageHost?.retry();
-    notificationBanner?.retry();
-    notificationDesktop?.retry();
-  });
+  handle('dock:retryShell', () => retryShell());
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
     appletApiAccess.set(permissions);
@@ -1293,9 +1346,22 @@ async function initialize() {
         ),
       settingsCommands,
       () => typedNotifications,
+      (id) => shellRegistry?.ownState(id),
     ),
     log: log.write,
   });
+  shellRegistry = new ShellProviderRegistry({
+    assignments: () => settings.value.host.shellProviders ?? {},
+    providers: () => manager.shellProviders(),
+    safeMode: safeShell,
+    changed,
+    blocked: (region) =>
+      region !== 'overlay.command-palette' &&
+      region !== 'notification.desktop' &&
+      !!overlayHost?.active,
+  });
+  manager.shellRequirement = (id, requirement) => shellRegistry!.requirement(id, requirement);
+  manager.shellExecution = (id, requirement) => shellRegistry!.lease(id, requirement);
   updater = new PortableUpdates({
     targets: (): UpdateTarget[] => [
       {
@@ -1582,9 +1648,8 @@ async function initialize() {
       notificationService,
       () => nativeTheme.shouldUseDarkColors,
     ),
-    providers: () => manager.snapshot(),
-    selected: () =>
-      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    providers: () => manager.shellProviders(),
+    registry: shellRegistry!,
     ready: () => startupReady && !quitting,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     execute: executeShellCommand,
@@ -1603,9 +1668,8 @@ async function initialize() {
     preload: path.join(__dirname, 'notification-surface-preload.js'),
     dark: () => nativeTheme.shouldUseDarkColors,
     tray: () => tray ?? undefined,
-    providers: () => manager.snapshot(),
-    selected: () =>
-      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    providers: () => manager.shellProviders(),
+    registry: shellRegistry!,
     ready: () => startupReady && !quitting,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     execute: executeShellCommand,
@@ -1618,8 +1682,9 @@ async function initialize() {
     ui: presentation,
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    providers: () => manager.snapshot(),
-    selected: () => settings.value.host.shellProvider || defaultShellId,
+    providers: () => manager.shellProviders(),
+    selected: () => shellRegistry!.configured('ribbon'),
+    registry: shellRegistry!,
     safeMode: safeShell,
     ready: () => startupReady && !quitting,
     failureFile: path.join(dataDirectory, 'shell-failures.json'),
@@ -1678,9 +1743,8 @@ async function initialize() {
   overlayHost = new OverlayHost({
     window,
     preload: path.join(__dirname, 'overlay-preload.js'),
-    providers: () => manager.snapshot(),
-    selected: () =>
-      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    providers: () => manager.shellProviders(),
+    registry: shellRegistry!,
     route: () => navigation.state.route,
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
@@ -1706,9 +1770,8 @@ async function initialize() {
   shellPageHost = new ShellPageHost({
     window,
     preload: path.join(__dirname, 'shell-page-preload.js'),
-    providers: () => manager.snapshot(),
-    selected: () =>
-      safeShell ? defaultShellId : settings.value.host.shellProvider || defaultShellId,
+    providers: () => manager.shellProviders(),
+    registry: shellRegistry!,
     route: () => navigation.state.route,
     ready: () => startupReady && !quitting,
     create: (request) =>

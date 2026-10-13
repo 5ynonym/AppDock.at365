@@ -155,6 +155,7 @@ function App() {
               key={c.id}
               className="secondary"
               disabled={content.busy || !c.available}
+              title={c.disabledReason}
               onClick={() => act(c.actionId)}
             >
               {c.title}

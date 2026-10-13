@@ -1,5 +1,7 @@
 export interface HostSettings {
+  /** Input compatibility only; parseSettings removes this key. */
   shellProvider?: string;
+  shellProviders?: Record<string, string>;
   theme: 'dark' | 'light' | 'system';
   closeToTray: boolean;
   notifications: boolean;
@@ -49,11 +51,13 @@ export interface Command {
   title: string;
 }
 export interface DeclaredCommand extends Command {
+  shellRequirement?: import('./shell').ShellRequirement;
   automation?: boolean;
   activateOnExecute?: boolean;
   aliases?: string[];
 }
 export interface AppletCommand extends DeclaredCommand {
+  disabledReason?: string;
   available: boolean;
   hidden?: boolean;
 }
@@ -165,6 +169,7 @@ export interface LogEntry {
 export interface HostSnapshot {
   navigation: import('./shell').NavigationState;
   shell: import('./shell').ShellStatus;
+  shellRegions?: import('./shell').ShellRegionsSnapshot;
   overlay: { active: boolean; kind: string | null };
   appletApi?: {
     permissions: import('./appdock-api').AppletApiPermissions;

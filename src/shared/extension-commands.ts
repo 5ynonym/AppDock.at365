@@ -1,3 +1,4 @@
+import { isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
 
 export function parseDeclaredCommands(id: string, value: unknown): DeclaredCommand[] | undefined {
@@ -17,6 +18,17 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
       typeof declaration.activateOnExecute !== 'boolean'
     )
       throw new Error('activateOnExecute はtrue / falseで指定してください。');
+    const requirement = declaration.shellRequirement;
+    if (
+      requirement !== undefined &&
+      (!requirement ||
+        typeof requirement !== 'object' ||
+        Array.isArray(requirement) ||
+        Object.keys(requirement).some((k) => !['region', 'state'].includes(k)) ||
+        !isShellRegion((requirement as any).region) ||
+        !['resolved', 'visible'].includes((requirement as any).state))
+    )
+      throw Error('shellRequirementは既知のregionとresolved / visibleです。');
     const aliases = declaration.aliases;
     if (aliases !== undefined) {
       if (!Array.isArray(aliases) || aliases.length > 8)
@@ -34,6 +46,9 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
     }
     return {
       ...command,
+      ...(requirement
+        ? { shellRequirement: requirement as import('./shell').ShellRequirement }
+        : {}),
       ...(declaration.automation !== undefined
         ? { automation: declaration.automation as boolean }
         : {}),

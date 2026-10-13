@@ -98,12 +98,13 @@ export interface ResolvedTrayItem {
   title?: string;
   command?: string;
   enabled?: boolean;
+  disabledReason?: string;
   children?: ResolvedTrayItem[];
 }
 /** Shared by preview and native menu so unavailable commands and separators match. */
 export function resolveTrayMenu(
   items: TrayMenuItem[],
-  commands: { id: string; title: string; available: boolean }[],
+  commands: { id: string; title: string; available: boolean; disabledReason?: string }[],
 ): ResolvedTrayItem[] {
   const catalog = new Map(commands.map((c) => [c.id, c]));
   const result: ResolvedTrayItem[] = [];
@@ -115,7 +116,12 @@ export function resolveTrayMenu(
       if (children.length) result.push({ ...item, children });
     } else {
       const c = catalog.get(item.command);
-      result.push({ ...item, title: c?.title ?? item.command, enabled: c?.available ?? false });
+      result.push({
+        ...item,
+        title: c?.title ?? item.command,
+        enabled: c?.available ?? false,
+        ...(c?.disabledReason ? { disabledReason: c.disabledReason } : {}),
+      });
     }
   }
   if (result.at(-1)?.type === 'separator') result.pop();

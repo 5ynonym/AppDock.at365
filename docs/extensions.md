@@ -281,3 +281,13 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 通知先はbanner/desktop/windowsの複数選択に対応します。Windowsへの配送を必要とするAppletはminimumHostVersion:0.32.0以上を指定してください。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
 
 本体0.31.0ではtargets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。旧版と併用する種類の予約済みdesktop宣言は読込可能で、0.30.0では未対応先として抑制されます。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。0.32.0では予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命や既読と区別します。
+
+## Shellの採用状態と専用コマンド
+
+最低ホスト版は0.34.0。shell capabilityと自Appletの対象領域宣言を必要とします。Nodeはcontext.shell.getState()/onChanged(handler)、.NETはcontext.Shell.GetStateAsync()/OnChanged(handler)、RPCはhost.shell.getStateとホスト発shell.changedです。購読を登録してから初回取得し、古い表示revisionを無視します。初回取得後に通知を受け取り、activate中もViewやreadyを待ちません。状態はprimary・表示revisionと、自分が提供する領域だけのconfigured/resolved/bound/ready/visible/reasonです。他の提供元ID・全設定・パスを返しません。外部操作許可は不要で、能力と本人の稼働世代を検査します。
+
+manifestのcommands[]に任意のshellRequirement: { region: "ribbon", state: "visible" }を指定できます。stateはresolvedまたはvisible、1コマンドに1領域です。resolvedは現在の解決先、visibleは現在のreadyかつ実表示・操作可能なViewで判定します。モーダルで操作を止めている領域もvisible条件を満たしません。activateOnExecute:trueとの併用は拒否します。省略は従来どおりで、自己設定変更や生成された設定コマンドへ条件を自動付与しません。
+
+runtime登録・動的置換はmanifestの条件を解除できず、別名も同じ条件です。available/disabledReasonとExtensionManager.executeの直前検査を共用し、UI・キー・トレイ・MCP・他Applet経由を揃えます。IDを書き換えたり、別Appletへ転送したり、実行のために割り当てや有効状態を変更したりしません。取得後の状態変化では実行を拒否します。型付きViewの一時操作を新設した契約ではなく、任意DOM/JavaScript/renderer RPCは追加しません。詳細は[領域別割り当て](shell-region-assignment.md)。
+
+native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.OutputEncoding=new UTF8Encoding(false)をConsole.In/Out取得前に設定し、wire用stdoutを確保して通常ログはstderrへ出してください。UTF-8の状態理由をWindows既定の文字コードで読むとJSONの引用符まで破損するため、ASCIIのみのfixture成功を文字コード契約の検証に代用しません。

@@ -24,6 +24,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(external, 'extension.json'
 manifest.id = 'fixture.shell';
 manifest.shell = { apiVersion: 1, views: { 'overlay.command-palette': 'overlay.html' } };
 manifest.name = 'Fixture Shell';
+manifest.minimumHostVersion = '0.34.0';
 manifest.capabilities.push('pages', 'appdock-api');
 manifest.commands = ['public', 'private'].map((id) => ({
   id: `fixture.shell.${id}`,
@@ -125,7 +126,8 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
+            p.url().startsWith('appdock://host/index.html') &&
+            !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );
@@ -142,6 +144,15 @@ const shell = () =>
     'Default Shell page',
   );
 async function save(patch) {
+  if (patch.shellProvider) {
+    patch = {
+      ...patch,
+      shellProviders: Object.fromEntries(
+        require('../out/main/shared/shell').shellRegions.map((r) => [r.id, patch.shellProvider]),
+      ),
+    };
+    delete patch.shellProvider;
+  }
   await dock.evaluate(async (patch) => {
     const s = await window.dock.snapshot();
     await window.dock.saveSettings(

@@ -32,6 +32,8 @@ ownerKind/ownerId/typeId/endReasonを任意保存する。旧記録は種類不�
 
 再起動で過去のactive履歴をinterruptedへ変換し、操作を復活させない。現在の発行元が条件を評価して新規通知を作る。通知センターで既読・検索・終了履歴削除を提供する。
 
+バナー・デスクトップ・通知センターの提供元は、それぞれ`host.shellProviders`の`notification.banner`・`notification.desktop`・`page.notifications`で指定します。フォールバックと故障抑止は領域ごと、同じworkerの停止ではそのworkerに依存する領域を失効させます。切替で通知を再発行せず、同じ通知ID・期限・操作状態を使います。通知センターのControllerは検索・ページング・選択を保持します。デスクトップの可視判定は通知専用Windowに従い、本体を隠しても無効にしません。
+
 ## Shellの領域とbridge
 
 minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言できる。

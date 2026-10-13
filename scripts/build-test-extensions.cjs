@@ -26,6 +26,13 @@ run('dotnet', [
   '-c',
   'Release',
 ]);
+for (const name of ['AppDock.ShellProbe', 'AppDock.ShellProbe.Native'])
+  run('dotnet', [
+    'build',
+    'tests/fixtures/dotnet/' + name + '/' + name + '.csproj',
+    '-c',
+    'Release',
+  ]);
 for (const name of ['welcome', 'dotnet-demo']) {
   const folder = path.join(root, '.artifacts/test-extensions', name);
   fs.mkdirSync(folder, { recursive: true });

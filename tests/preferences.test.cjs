@@ -20,6 +20,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
     hardwareAcceleration: true,
+    shellProviders: {},
     startAtLogon: false,
     runAsAdministrator: false,
   });

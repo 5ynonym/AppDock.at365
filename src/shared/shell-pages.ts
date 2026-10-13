@@ -57,7 +57,14 @@ export interface HomePageModel {
   dark: boolean;
   content: {
     stats: { running: number; errors: number; applets: number; commands: number };
-    pins: { id: string; title: string; extension: string; available: boolean; actionId: string }[];
+    pins: {
+      id: string;
+      title: string;
+      extension: string;
+      available: boolean;
+      disabledReason?: string;
+      actionId: string;
+    }[];
     applets: {
       id: string;
       title: string;

@@ -5,7 +5,12 @@ export const hostCommands = [
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },
   { id: 'appdock.applets.open', title: 'Applet一覧を開く', extension: 'AppDock', available: true },
-  { id: 'appdock.notifications.open', title: '通知センターを開く', extension: 'AppDock', available: true },
+  {
+    id: 'appdock.notifications.open',
+    title: '通知センターを開く',
+    extension: 'AppDock',
+    available: true,
+  },
   { id: 'appdock.logs.open', title: 'ログを開く', extension: 'AppDock', available: true },
   { id: 'appdock.updates.open', title: '更新画面を開く', extension: 'AppDock', available: true },
   { id: 'appdock.restart', title: '再起動', extension: 'AppDock', available: true },
@@ -26,6 +31,7 @@ export interface UiCommand extends Command {
   /** Stable owner ID; null is the host, undefined is an unknown saved command. */
   extensionId?: string | null;
   available: boolean;
+  disabledReason?: string;
   hidden?: boolean;
 }
 export const defaultShortcuts: Record<string, string[]> = {

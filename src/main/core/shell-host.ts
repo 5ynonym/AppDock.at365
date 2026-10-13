@@ -1,14 +1,16 @@
+import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import { WebContentsView, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createShellView } from './shell-view';
 import { defaultShellId, shellView, type ShellStatus } from '../../shared/shell';
-import type { ExtensionSnapshot } from '../../shared/contracts';
 import type { UiPresentation } from './ui-presentation';
 
 type Binding = {
   id: string;
+  version: string;
+  generation?: string;
   session: string;
   view: WebContentsView;
   url: string;
@@ -31,7 +33,8 @@ export class ShellHost {
       window: BrowserWindow;
       preload: string;
       ui: UiPresentation;
-      providers(): ExtensionSnapshot[];
+      providers(): ShellProvider[];
+      registry: ShellProviderRegistry;
       selected(): string;
       safeMode: boolean;
       ready(): boolean;
@@ -48,10 +51,33 @@ export class ShellHost {
       const saved = JSON.parse(fs.readFileSync(options.failureFile, 'utf8'));
       if (saved && typeof saved === 'object') this.failedVersions = saved;
     } catch {}
+    options.registry.observe('ribbon', () => ({
+      provider: this.active?.id ?? null,
+      version: this.active?.version,
+      generation: this.active?.generation,
+      session: this.active?.session,
+      ready: !!this.active?.ready,
+      visible:
+        !!this.active?.ready &&
+        !!this.bounds &&
+        !options.window.isDestroyed() &&
+        options.window.isVisible() &&
+        !options.window.isMinimized(),
+      pending: this.pending?.id ?? null,
+    }));
+    options.window.on('show', () => options.registry.touch());
+    options.window.on('hide', () => options.registry.touch());
+    options.window.on('minimize', () => options.registry.touch());
+    options.window.on('restore', () => options.registry.touch());
     const binding = (event: IpcMainInvokeEvent) => {
       const result = [this.active, this.pending].find((b) => b?.view.webContents === event.sender);
       if (
         !result ||
+        !options.registry.usable('ribbon', {
+          provider: result.id,
+          version: result.version,
+          generation: result.generation,
+        }) ||
         event.senderFrame !== event.sender.mainFrame ||
         event.sender.getURL() !== result.url
       )
@@ -100,6 +126,8 @@ export class ShellHost {
       const b = binding(event);
       if (session !== b.session) throw Error('Stale Shell session');
       if (b === this.active) return;
+      if (options.registry.resolve('ribbon').provider?.id !== b.id)
+        throw Error('Superseded Shell session');
       clearTimeout(b.timer);
       b.ready = true;
       const old = this.active;
@@ -150,6 +178,7 @@ export class ShellHost {
     this.layout();
   }
   private layout() {
+    this.options.registry.touch();
     if (!this.active) return;
     this.active.view.setVisible(!!this.bounds);
     if (this.bounds) this.active.view.setBounds(this.bounds);
@@ -158,35 +187,46 @@ export class ShellHost {
     if (this.disposed || !this.options.ready()) return;
     const providers = this.options.providers();
     for (const p of providers) {
+      if (p.id === defaultShellId) continue;
       if (this.failedVersions[p.id] === p.version) this.failed.add(p.id);
       else if (this.failedVersions[p.id]) {
         delete this.failedVersions[p.id];
         this.failed.delete(p.id);
       }
     }
-    let id = this.options.safeMode ? defaultShellId : this.options.selected();
-    const configured = providers.find((p) => p.id === id && p.shell);
-    // A provider may replace only other regions. Ribbon fallback is normal, not a failure.
-    if (configured && !shellView(configured.shell, 'ribbon')) {
-      id = defaultShellId;
-      this.error = null;
-    }
-    const requested = providers.find(
-      (p) => p.id === id && shellView(p.shell, 'ribbon') && p.enabled,
-    );
-    if (id !== defaultShellId && (!requested || this.failed.has(id)))
-      this.error ||= `${id}: 使用できないためDefault Shellを表示しています。`;
-    if (requested?.state === 'error' && !this.failed.has(id)) {
-      this.recordFailure(id, requested.version, 'Shell worker failed');
-    }
-    if (!requested || requested.state !== 'running' || this.failed.has(id)) id = defaultShellId;
+    for (const p of providers)
+      if (this.failed.has(p.id)) this.options.registry.fail('ribbon', p.id, p.version);
+    const configured = providers.find((p) => p.id === this.options.selected());
+    if (
+      !this.options.safeMode &&
+      configured?.state === 'error' &&
+      shellView(configured.shell, 'ribbon')
+    )
+      this.recordFailure(configured.id, configured.version, 'Shell worker failed');
+    const resolution = this.options.registry.resolve('ribbon');
+    const id = resolution.provider?.id;
+    if (!this.failed.has(this.options.selected()))
+      this.error =
+        this.options.safeMode || (configured && !shellView(configured.shell, 'ribbon'))
+          ? null
+          : resolution.reason;
+    const fallback = providers.find((p) => p.id === defaultShellId);
+    if (!id && (!fallback || fallback.state === 'error'))
+      this.recordFailure(defaultShellId, fallback?.version ?? '', 'Default Shell is unavailable');
     if (this.pending && this.pending.id !== id) {
       const cancelled = this.pending;
       this.pending = undefined;
       this.close(cancelled);
     }
     for (const b of [this.active, this.pending]) {
-      if (b && !providers.some((p) => p.id === b.id && p.enabled && p.state === 'running')) {
+      if (
+        b &&
+        !this.options.registry.usable('ribbon', {
+          provider: b.id,
+          version: b.version,
+          generation: b.generation,
+        })
+      ) {
         if (providers.find((p) => p.id === b.id)?.state === 'error')
           this.fail(b, 'Shell worker stopped');
         else {
@@ -200,7 +240,7 @@ export class ShellHost {
         return;
       }
     }
-    if (this.pending?.id !== id && this.active?.id !== id && !this.failed.has(id)) {
+    if (this.pending?.id !== id && this.active?.id !== id && id && !this.failed.has(id)) {
       const p = providers.find(
         (p) => p.id === id && shellView(p.shell, 'ribbon') && p.state === 'running',
       );
@@ -233,6 +273,7 @@ export class ShellHost {
     }
   }
   retry() {
+    this.options.registry.retry('ribbon');
     this.failed.clear();
     this.failedVersions = {};
     this.saveFailures();
@@ -249,6 +290,7 @@ export class ShellHost {
   }
   private recordFailure(id: string, version: string, message: string) {
     if (this.failed.has(id)) return;
+    this.options.registry.fail('ribbon', id, version);
     this.failed.add(id);
     // Default Shell must be attempted on every new launch, including --safe-shell.
     if (id !== defaultShellId) {
@@ -259,7 +301,7 @@ export class ShellHost {
     this.options.log(this.error);
     if (id === defaultShellId) this.options.failed(this.error, () => this.retry());
   }
-  private open(provider: ExtensionSnapshot) {
+  private open(provider: ShellProvider) {
     if (this.pending) this.close(this.pending);
     const { view, url } = createShellView(
       provider.folder,
@@ -268,6 +310,8 @@ export class ShellHost {
     );
     const b: Binding = {
       id: provider.id,
+      version: provider.version,
+      generation: provider.generation,
       session: randomUUID(),
       view,
       url,
@@ -308,6 +352,7 @@ export class ShellHost {
     this.disposed = true;
     for (const b of [this.active, this.pending]) if (b) this.close(b);
     this.active = this.pending = undefined;
+    this.options.registry.touch();
     for (const method of [
       'connect',
       'get',

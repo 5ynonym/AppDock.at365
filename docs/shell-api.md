@@ -27,7 +27,7 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 }
 ```
 
-有効化と使用Shellの選択は別。「設定 → 表示 → Shell」で選択して保存する。保存値は`host.shellProvider`、省略時は`appdock.default-shell`。未導入・無効・失敗時も選択値は書き換えずDefault Shellを使用する。Default Shellの有効状態は本体が保証し、保存された無効指定や起動遅延は適用しない。出自は探索元から決定し、manifestの自己申告は破棄する。外部の予約ID偽装は拒否し、外部Appletの重複IDは両方とも起動しない。
+有効化と領域への割り当ては別。「設定 → 表示 → Shell」でリボンなど領域ごとに選び、即時保存します。保存値は`host.shellProviders`の領域マップ、省略は`appdock.default-shell`。旧`host.shellProvider`だけの入力は固定8領域へ正規化し、次の成功した通常保存で旧キーを除きます。新旧併記は新マップが優先し、空マップでも旧値へ戻りません。未導入・無効・故障時は対象領域だけDefault Shellを使い、保存指定を保持します。Default Shellは常時有効・遅延なし、本体の探索元から出自を検証します。外部の予約ID偽装と重複IDは拒否します。詳細は[領域別割り当て](shell-region-assignment.md)。
 
 ## 描画モデルと共通操作
 

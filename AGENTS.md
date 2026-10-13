@@ -31,7 +31,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 
 - [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell Appletは描画を所有する。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
-- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。Appletの複数Window/複数Shellの同時表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
+- [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。一般Appletの複数Window/同一領域の同時多重表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
 - 設定は[設定基盤](docs/settings-foundation.md)の即時保存を正本とする。SettingsInputSessionは受付調整のみ。本体とShellの入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。
 - Applet設定は詳細タブと設定ページの左インデックスを入口とし、同じShell本文と編集状態を共用する。横断検索は左だけに結果を表示し、右本文はページ全体を保つ。Applet本文内のローカル検索を追加しない。

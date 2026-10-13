@@ -98,6 +98,18 @@ async function until(fn, label) {
         args: [root, `--test-profile=${profile}`, ...extra],
         env,
       });
+      const errorFile = path.join(profile, 'main-error.txt');
+      app
+        .process()
+        .stderr.on('data', (data) =>
+          fs.appendFileSync(path.join(profile, 'electron.log'), String(data)),
+        );
+      await app.evaluate((_electron, errorFile) => {
+        process.prependListener('uncaughtException', (error) => {
+          process.getBuiltinModule('fs').writeFileSync(errorFile, error.stack || String(error));
+          process.exit(1);
+        });
+      }, errorFile);
       context = app.context();
     }
     return until(
@@ -107,9 +119,12 @@ async function until(fn, label) {
   }
   let host = await launch();
   async function close() {
+    if (!app && !portable) return;
     if (app) {
       await app.close();
       app = undefined;
+      if (fs.existsSync(path.join(profile, 'main-error.txt')))
+        throw Error(fs.readFileSync(path.join(profile, 'main-error.txt'), 'utf8'));
     } else {
       await host.evaluate(() => window.dock.executeCommand('appdock.quit')).catch(() => {});
       await until(() => child.exitCode !== null, 'portable shutdown');
@@ -121,7 +136,24 @@ async function until(fn, label) {
     await host.evaluate(async (id) => {
       const s = await window.dock.snapshot();
       await window.dock.saveSettings(
-        { ...s.settings.value, host: { ...s.settings.value.host, shellProvider: id } },
+        {
+          ...s.settings.value,
+          host: {
+            ...s.settings.value.host,
+            shellProviders: Object.fromEntries(
+              [
+                'ribbon',
+                'overlay.command-palette',
+                'page.home',
+                'page.logs',
+                'page.notifications',
+                'page.settings',
+                'notification.banner',
+                'notification.desktop',
+              ].map((region) => [region, id]),
+            ),
+          },
+        },
         s.settings.revision,
       );
     }, id);

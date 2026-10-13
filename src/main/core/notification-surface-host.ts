@@ -1,3 +1,4 @@
+import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   ipcMain,
   webContents,
@@ -7,8 +8,7 @@ import {
   type IpcMainInvokeEvent,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import type { ExtensionSnapshot } from '../../shared/contracts';
-import { defaultShellId, shellView } from '../../shared/shell';
+import { shellView } from '../../shared/shell';
 import type { NotificationBannerModel } from '../../shared/notifications';
 import type { NotificationSurfaceController } from './notification-surface-controller';
 import { createShellView } from './shell-view';
@@ -18,6 +18,7 @@ type Surface = {
   session: string;
   provider: string;
   version: string;
+  generation?: string;
   ready: boolean;
   height: number;
   timer: ReturnType<typeof setTimeout>;
@@ -28,7 +29,6 @@ type Surface = {
 export class NotificationSurfaceHost {
   private active?: Surface;
   private preparing?: Surface;
-  private failures = new Set<string>();
   private unavailable = false;
   private disposed = false;
   private refreshing = false;
@@ -40,13 +40,12 @@ export class NotificationSurfaceHost {
       window: BrowserWindow;
       preload: string;
       controller: NotificationSurfaceController;
-      providers(): ExtensionSnapshot[];
-      selected(): string;
+      providers(): ShellProvider[];
+      registry: ShellProviderRegistry;
       ready(): boolean;
       settings(provider: string): Record<string, unknown>;
       execute(provider: string, command: string): Promise<unknown>;
       layer(): void;
-      failures?: Set<string>;
       visible?(): boolean;
       viewport?(): NotificationBannerModel['viewport'];
       arrange?(view: WebContentsView | undefined, height: number, visible: boolean): void;
@@ -55,11 +54,20 @@ export class NotificationSurfaceHost {
       failed(message: string, unavailable: boolean): void;
     },
   ) {
-    this.failures = options.failures ?? this.failures;
+    options.registry.observe(this.region(), () => ({
+      provider: this.active?.provider ?? null,
+      version: this.active?.version,
+      generation: this.active?.generation,
+      session: this.active?.session,
+      ready: !!this.active?.ready,
+      visible: !!this.active?.ready && this.visible(),
+      pending: this.preparing?.provider ?? null,
+    }));
     const bound = (e: IpcMainInvokeEvent, action = false) => {
       const s = [this.active, this.preparing].find((s) => s && e.sender === s.view.webContents);
       if (
         !s ||
+        !options.registry.usable(this.region(), s) ||
         this.disposed ||
         e.senderFrame !== e.sender.mainFrame ||
         e.sender.getURL() !== s.url ||
@@ -76,6 +84,8 @@ export class NotificationSurfaceHost {
       const s = bound(e);
       if (s.session !== session) throw Error('Stale notification session');
       if (s.ready) return;
+      if (options.registry.resolve(this.region()).provider?.id !== s.provider)
+        throw Error('Superseded notification session');
       s.ready = true;
       clearTimeout(s.timer);
       if (s === this.preparing) {
@@ -145,18 +155,7 @@ export class NotificationSurfaceHost {
       : 'notification.banner';
   }
   private candidate() {
-    const available = (id: string) =>
-      this.options
-        .providers()
-        .find(
-          (p) =>
-            p.id === id &&
-            p.enabled &&
-            p.state === 'running' &&
-            shellView(p.shell, this.region()) &&
-            !this.failures.has(p.id + ':' + p.version),
-        );
-    return available(this.options.selected()) ?? available(defaultShellId);
+    return this.options.registry.resolve(this.region()).provider;
   }
   private viewport() {
     if (this.options.viewport) return this.options.viewport();
@@ -179,7 +178,7 @@ export class NotificationSurfaceHost {
       this.options.controller.items().length > 0
     );
   }
-  private prepare(p: ExtensionSnapshot) {
+  private prepare(p: ShellProvider) {
     try {
       const { view, url } = createShellView(
         p.folder,
@@ -194,6 +193,7 @@ export class NotificationSurfaceHost {
         session: randomUUID(),
         provider: p.id,
         version: p.version,
+        generation: p.generation,
         ready: false,
         height: 114,
         signature: '',
@@ -206,14 +206,14 @@ export class NotificationSurfaceHost {
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
-      this.failures.add(p.id + ':' + p.version);
+      this.options.registry.fail(this.region(), p.id, p.version);
       this.options.failed(p.id + ': 通知領域を読み込めません。', false);
       queueMicrotask(() => this.refresh());
     }
   }
   private fail(s: Surface, reason: string) {
     if (this.disposed || (s !== this.active && s !== this.preparing)) return;
-    this.failures.add(s.provider + ':' + s.version);
+    this.options.registry.fail(this.region(), s.provider, s.version);
     if (s === this.active) this.active = undefined;
     if (s === this.preparing) this.preparing = undefined;
     this.close(s);
@@ -234,6 +234,13 @@ export class NotificationSurfaceHost {
     if (this.disposed || this.refreshing || this.options.window.isDestroyed()) return;
     this.refreshing = true;
     try {
+      // Stop/disable invalidates actions even when a retained surface is hidden or empty.
+      for (const s of [this.active, this.preparing])
+        if (s && !this.options.registry.usable(this.region(), s)) {
+          if (s === this.active) this.active = undefined;
+          if (s === this.preparing) this.preparing = undefined;
+          this.close(s);
+        }
       const ids = this.options.controller.items().map((i) => i.id);
       if (!this.options.ready() || !ids.length) {
         for (const s of [this.active, this.preparing]) {
@@ -288,6 +295,7 @@ export class NotificationSurfaceHost {
   }
   layout() {
     if (this.disposed || this.options.window.isDestroyed()) return;
+    this.options.registry.touch();
     const s = this.active;
     const visible = !!s?.ready && this.visible();
     s?.view.setVisible(visible);
@@ -316,7 +324,7 @@ export class NotificationSurfaceHost {
     this.active.view.webContents.send(this.channel('focus'));
   }
   retry() {
-    this.failures.clear();
+    this.options.registry.retry(this.region());
     this.unavailable = false;
     this.refresh();
   }
@@ -327,6 +335,7 @@ export class NotificationSurfaceHost {
     this.close(this.preparing);
     this.close(this.active);
     this.preparing = this.active = undefined;
+    this.options.registry.touch();
     for (const channel of [
       'connect',
       'ready',

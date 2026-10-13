@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-14: 領域ごとのShell割り当て実装（0.34.0）
+
+- main `51e0372`を起点に[設計](docs/shell-region-assignment.md)の段階1〜5を実装。既存8領域の`host.shellProviders`、Default常時有効、利用不能領域だけのフォールバック、設定・解決・実Viewの区別を共通Registryへ集約した。旧`shellProvider`は入力時に移行し、起動だけでは共有設定を保存しない。新旧併記は新マップを優先し、未知領域・未導入・無効Appletの指定を保持する。設計の大きな変更なし。
+- 即時保存と両入力キューを維持し、settings自身の切替は現在のIPC返信後にflushする。3秒のflush失敗では有効な旧Viewと保存済み指定を保ち、明示再試行で切り替える。View交換でController・検索・保存値を破棄せず、記録中の入力と設定用パレットは閉じる。表示中パレットの提供元は受付時に固定し、無効化・故障は同じ要求をDefaultで継続する。通知の寿命・ID・履歴・センターの検索状態を維持し、banner/desktopを独立解決する。
+- 宣言済み専用コマンドの`shellRequirement`をresolved/visibleで共通検査し、別名・動的登録にもmanifestの条件を継承する。条件なしの既存コマンドと生成設定コマンドの互換を維持。受付後のworker世代・View sessionが失効した共通API呼出しを拒否する。Node/.NET/nativeで自己領域だけの取得・購読、直列配送と古いrevisionの破棄を確認。新API利用を宣言したworker以外へ未知の変更通知を送らない。
+- 発行前レビューでは領域限定の故障抑止、旧statusとの互換、循環しない提供元列挙、worker/View世代、即時保存時の返信/flush順、記録解除、自己状態の情報範囲を確認・修正した。GUI終了時には破棄済みWindow/Trayへの参照が発生したため、Windowの寿命確認、終了中のchanged通知停止、Tray破棄確認を追加。終了時例外を試験失敗へ変える`gui-error-guard.cjs`で関連ソースGUIをやり直し、手動でダイアログを閉じた旧実行を成功証拠に使っていない。
+- 型検査、標準回帰 **370/370**、SDK/Runtimeとnative fixtureのRelease buildが成功。ソースGUI **21種類**が終了コード0（Shell混在/リボン/overlay/page/home/settings/search、通知banner/desktop/center/settings、設定同期、テーマ、host/tray/Applet API/automation/hotkeys/shortcuts/gestures/navigation）。テーマの初回は可視フレーム取得0で失敗し、同条件GPU再実行とsoftware各18切替が成功。ジェスチャーの初回はWindows前面取得に失敗し、同条件再実行では実入力を含め成功した。両失敗のログ・結果を保持し、これらのための製品変更はしていない。
+- 通常`publish.bat`が終了コード0。本体の設定項目追加・廃止により **0.33.0 → 0.34.0** のマイナー更新。単一EXE・Windows版情報・feed・同梱Default Shellは0.34.0、size **144125000**、SHA256 **5c5499037f08a86663b43ea923c3c2394578dac586d71e2da4fd1dea2a71db2a**。固定コピーの同一hashを各試験で照合し、配布EXEの混在、リボン、設定即時保存、検索、desktop、center、通知設定の **7種類**を終了コード0で確認。混在試験はNode/.NET/native、無効化・再有効化・故障と再試行、専用コマンド・自己状態、通知保持・safe起動を含む。配布EXEの設定画面画像も確認した。
+- 版変更によるinstalled workspace不一致は`dev.bat install --frozen-lockfile`で復旧し、lockfile/toolchain/7日待機/依存検査を変更していない。兄弟Appletのソース・配布物、全体ZIP、公開Release、実利用先deployは対象外。物理的OSロック、別アプリ排他全画面、複数実モニターの全組合せ、支援技術、新しい一般Applet複数Windowは今回の検証対象外。
+- [検証証跡](.artifacts/commit-validation-shell-region-20261014/validation.json)にtree、実行環境、各コマンド・終了コード・完全ログhash、発行物、最終文書差分とcommit後treeを保存する。ログは`.artifacts/shell-region-20261014/`。[整理記録](.artifacts/commit-validation-shell-region-20261014/cleanup.json): 同じ試験/方式の直近3成功を残し、確認済み旧成功 **39件**を整理。失敗・不明・以前の終了中断・VERIFICATION参照・固定出力・fixtureを保持し、削除前に絶対パス、プロセス終了、配下再解析ポイントなしを確認した。
+
 ## 2026-10-14: Shellの領域別割り当て設計をmainへ統合
 
 - 設計branch codex/shell-region-design（a398213）をmain a0d5363へ統合。VERIFICATION先頭の競合は双方の検証記録を保持して解消した。製品ソース・設定・依存・配布物は変更しない。

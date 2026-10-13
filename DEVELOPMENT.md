@@ -13,7 +13,7 @@
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
 | 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
-| Shellの領域別割り当て設計 | [領域ごとの指定・復旧・専用コマンドと実装計画（未実装）](docs/shell-region-assignment.md) |
+| Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
@@ -235,3 +235,5 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 種類宣言・設定・寿命・所有者の共通回帰はtests/notification-policy.test.cjs。scripts/notification-settings-ui-test.cjs [固定EXE]は実Node/.NETの新APIとDefault Shellの通知設定、親スイッチ、保存/抑制/期限/再起動を検証します。標準testは専用.NET fixtureもRelease buildします。旧Appletの既存APIはscripts/applet-api-ui-test.cjs [固定EXE]で確認します。即時保存はscripts/settings-shell-ui-test.cjs [固定EXE]で確認します。実装契約と次回範囲は[通知設計](docs/notification-foundation.md)を参照してください。
 
 通知センターの回帰はtests/notification-center.test.cjs、実Node/.NET・更新結果・ページング・再起動・追加Shell復旧はscripts/notification-center-ui-test.cjs [固定EXE]。共有bridgeと既存通知操作ロックを使います。独自デスクトップの回帰はtests/notification-delivery.test.cjsとscripts/notification-desktop-ui-test.cjs [固定EXE]。実Node/.NET・独立Window・focus・抑制・Shell復旧・最後の表示先を外した解放を確認します。InputHostの専用queryモードに通知内容や入力hookを渡しません。次回はWindows表示先と旧show APIを基盤へ接続します。
+
+領域別Shellの回帰は`dev.bat exec node scripts/shell-region-ui-test.cjs [固定EXE]`で、A/B混在・無効化復帰・パレット要求維持・設定Shell自身の即時保存/切替・通知ID/検索状態保持・Node/.NET/native自己状態・専用コマンド・safe起動を検証します。sourceでは入力flushの期限切れとrenderer単独故障も注入し、単体の`tests/shell-region.test.cjs`では正規化・版別故障・世代/session失効を検証します。

@@ -112,7 +112,13 @@ export class UiPresentation {
             : ('top' as const),
           selected: route === item.id,
           enabled,
-          ...(!enabled ? { disabledReason: 'この接続からは実行できません。' } : {}),
+          ...(!enabled
+            ? {
+                disabledReason:
+                  provider?.commands?.find((c) => c.id === action.command)?.disabledReason ??
+                  'この接続からは実行できません。',
+              }
+            : {}),
           ...(item.kind === 'separator' ? {} : { actionId }),
           icon:
             item.id === 'profile'

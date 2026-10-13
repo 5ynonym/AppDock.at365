@@ -3,7 +3,7 @@ import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings, ExtensionSnapshot, HostSnapshot } from '../../../src/shared/contracts';
 import type { SettingsPageModel } from '../../../src/shared/settings-page';
-import { defaultShellId } from '../../../src/shared/shell';
+import { defaultShellId, shellRegions, shellView } from '../../../src/shared/shell';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
 import { VersionCheck } from '../../../src/shared/settings-ui/VersionCheck';
@@ -190,31 +190,73 @@ export function SettingsForm({
         {category === 'appearance' && (
           <>
             <h3>表示</h3>
-            <SettingRow pageId={category} itemKey="shellProvider">
-              <select
-                aria-label="Shell"
-                value={settings.host.shellProvider || defaultShellId}
-                onChange={(e) =>
-                  edit({ ...settings, host: { ...settings.host, shellProvider: e.target.value } })
-                }
-              >
-                <option value={defaultShellId}>Default Shell</option>
-                {settings.host.shellProvider &&
-                  settings.host.shellProvider !== defaultShellId &&
-                  !extensions.some((e) => e.shell && e.id === settings.host.shellProvider) && (
-                    <option value={settings.host.shellProvider} disabled>
-                      未導入のShell ({settings.host.shellProvider})
-                    </option>
-                  )}
-                {extensions
-                  .filter((e) => e.shell && e.id !== defaultShellId)
-                  .map((e) => (
-                    <option key={e.id} value={e.id} disabled={!e.enabled}>
-                      {e.displayName}
-                    </option>
-                  ))}
-              </select>
-            </SettingRow>
+            <h4>Shell</h4>
+            {shellRegions.map(({ id, title }) => {
+              const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
+              const candidates = extensions.filter(
+                (e) => e.id !== defaultShellId && shellView(e.shell, id),
+              );
+              const state = aux.shellRegions?.regions.find((r) => r.region === id);
+              const name = (provider: string | null | undefined) =>
+                provider === defaultShellId
+                  ? 'Default Shell'
+                  : (extensions.find((e) => e.id === provider)?.displayName ??
+                    provider ??
+                    '未生成');
+              return (
+                <SettingRow key={id} pageId={category} itemKey={'shellProviders.' + id}>
+                  <div className="shell-region-controls">
+                    <select
+                      aria-label={title + 'のShell'}
+                      value={configured}
+                      disabled={busy}
+                      onChange={(e) =>
+                        edit({
+                          ...settings,
+                          host: {
+                            ...settings.host,
+                            shellProviders: {
+                              ...settings.host.shellProviders,
+                              [id]: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                    >
+                      <option value={defaultShellId}>Default Shell（常時有効）</option>
+                      {configured !== defaultShellId &&
+                        !candidates.some((e) => e.id === configured) && (
+                          <option value={configured}>{configured}（未導入・領域未提供）</option>
+                        )}
+                      {candidates.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.displayName}
+                          {!e.enabled ? '（無効）' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="muted">
+                      使用先: {name(state?.boundProvider ?? state?.resolvedProvider)}
+                      {state?.pendingProvider ? ' ／適用待ち: ' + name(state.pendingProvider) : ''}
+                    </p>
+                    {state?.reason && (
+                      <>
+                        <p role="status">{state.reason}</p>
+                        <button
+                          disabled={busy}
+                          onClick={() => void invoke('retryShellRegion', [id])}
+                        >
+                          この領域を再試行
+                        </button>
+                        <p className="muted">
+                          workerの再起動が必要な場合は、このAppletの他の領域も再接続します。
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </SettingRow>
+              );
+            })}
             <SettingRow pageId={category} itemKey="theme">
               <select
                 aria-label="テーマ"

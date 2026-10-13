@@ -161,3 +161,20 @@ body,
 .notification-setting-card > button {
   margin-top: 8px;
 }
+
+.shell-region-controls {
+  width: 55%;
+  flex-shrink: 0;
+}
+.shell-region-controls select {
+  width: 100%;
+  max-width: 100%;
+}
+.shell-region-controls p {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .shell-region-controls {
+    width: 100%;
+  }
+}

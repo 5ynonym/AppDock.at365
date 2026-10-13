@@ -1,5 +1,5 @@
+import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import { BrowserWindow, screen, powerMonitor, type Rectangle, type Tray } from 'electron';
-import type { ExtensionSnapshot } from '../../shared/contracts';
 import { NotificationSurfaceHost } from './notification-surface-host';
 import { NotificationSurfaceController } from './notification-surface-controller';
 import { NotificationService } from './notification-service';
@@ -18,7 +18,6 @@ export class NotificationDesktopHost {
   private disposed = false;
   private warned = false;
   private queued = false;
-  private failures = new Set<string>();
   private refreshDisplay = () => this.refresh();
   private lock = () => {
     this.locked = true;
@@ -36,8 +35,8 @@ export class NotificationDesktopHost {
       preload: string;
       dark(): boolean;
       tray(): Tray | undefined;
-      providers(): ExtensionSnapshot[];
-      selected(): string;
+      providers(): ShellProvider[];
+      registry: ShellProviderRegistry;
       ready(): boolean;
       settings(provider: string): Record<string, unknown>;
       execute(provider: string, command: string): Promise<unknown>;
@@ -150,9 +149,8 @@ export class NotificationDesktopHost {
           this.options.dark,
           'desktop',
         ),
-        failures: this.failures,
         providers: this.options.providers,
-        selected: this.options.selected,
+        registry: this.options.registry,
         ready: this.options.ready,
         settings: this.options.settings,
         execute: this.options.execute,
@@ -180,7 +178,7 @@ export class NotificationDesktopHost {
     this.host?.refresh();
   }
   retry() {
-    this.failures.clear();
+    this.options.registry.retry('notification.desktop');
     this.warned = false;
     this.host?.retry();
     void this.query();

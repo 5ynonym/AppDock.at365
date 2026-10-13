@@ -178,3 +178,37 @@ test('removed setting targets remain unavailable and cannot be selected', async 
   await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /見つかりません/);
   await f.act({ kind: 'select', pageId: 'profile' });
 });
+
+test('settings View teardown releases recording while preserving the Controller, saved values and navigation', async () => {
+  let saved = { value: createDefaultSettings(), revision: 1 },
+    released = 0;
+  const editor = new SettingsInputSession({
+    current: () => saved,
+    applets: () => [],
+    save: async (value) => (saved = { value, revision: saved.revision + 1 }),
+    changed() {},
+  });
+  const navigation = { query: 'Shell' };
+  const page = new SettingsPageSession(
+    { id: 'view-replacement', route: 'settings', kind: 'settings', context: 'full' },
+    {
+      editor,
+      navigation,
+      host: () => ({ settings: saved, extensions: [], dark: false }),
+      auxiliary: () => ({}),
+      actions: () => ({}),
+      changed() {},
+      release: () => released++,
+    },
+  );
+  const before = page.snapshot();
+  saved.value.host.theme = 'light';
+  page.viewClosed();
+  const after = page.snapshot();
+  assert.equal(released, 1);
+  assert.equal(after.id, before.id);
+  assert.equal(after.content.editing.sessionId, before.content.editing.sessionId);
+  assert.equal(after.content.query, 'Shell');
+  assert.equal(after.content.values.host.theme, 'light');
+  page.dispose();
+});

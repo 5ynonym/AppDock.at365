@@ -1,3 +1,4 @@
+import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   BrowserWindow,
   ipcMain,
@@ -7,8 +8,7 @@ import {
   type WebContentsView,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import type { ExtensionSnapshot } from '../../shared/contracts';
-import { defaultShellId, shellView } from '../../shared/shell';
+import { shellView } from '../../shared/shell';
 import type { OverlayController } from './overlay-controller';
 import { createShellView } from './shell-view';
 
@@ -18,6 +18,7 @@ type Surface = {
   session: string;
   provider: string;
   version: string;
+  generation?: string;
   ready: boolean;
   revision: number;
   settingsSignature?: string;
@@ -25,18 +26,18 @@ type Surface = {
 };
 /** One modal lane per context. Controllers and providers do not own native layering. */
 export class OverlayHost {
+  private fallbackOnly = false;
   private current?: OverlayController;
   private surface?: Surface;
   private previousFocus?: WebContents;
   private previousRoute = '';
-  private failedProviders = new Set<string>();
   private disposed = false;
   constructor(
     private options: {
       window: BrowserWindow;
       preload: string;
-      providers(): ExtensionSnapshot[];
-      selected(): string;
+      providers(): ShellProvider[];
+      registry: ShellProviderRegistry;
       route(): string;
       execute(provider: string, command: string): Promise<unknown>;
       settings(provider: string): Record<string, unknown>;
@@ -44,11 +45,27 @@ export class OverlayHost {
       failed(message: string): void;
     },
   ) {
+    options.registry.observe('overlay.command-palette', () => ({
+      provider: this.surface?.provider ?? null,
+      version: this.surface?.version,
+      generation: this.surface?.generation,
+      session: this.surface?.session,
+      ready: !!this.surface?.ready,
+      visible:
+        !!this.current &&
+        this.previousRoute === options.route() &&
+        !!this.surface?.ready &&
+        !options.window.isDestroyed() &&
+        options.window.isVisible() &&
+        !options.window.isMinimized(),
+    }));
     const bound = (event: IpcMainInvokeEvent) => {
       const s = this.surface;
       if (
         !s ||
+        !options.registry.usable('overlay.command-palette', s) ||
         !this.current ||
+        this.previousRoute !== options.route() ||
         event.sender !== s.view.webContents ||
         event.senderFrame !== event.sender.mainFrame ||
         event.sender.getURL() !== s.url
@@ -104,6 +121,7 @@ export class OverlayHost {
       return;
     }
     this.cancel('replaced');
+    this.fallbackOnly = false;
     this.previousFocus = this.options.window.isFocused()
       ? (webContents.getFocusedWebContents() ?? this.options.window.webContents)
       : undefined;
@@ -129,22 +147,15 @@ export class OverlayHost {
     this.current?.cancel(reason);
   }
   retry() {
-    this.failedProviders.clear();
+    this.options.registry.retry('overlay.command-palette');
   }
   private present() {
     const controller = this.current;
     if (!controller) return;
-    const providers = this.options.providers();
-    const candidate = (id: string) =>
-      providers.find(
-        (p) =>
-          p.id === id &&
-          p.enabled &&
-          p.state === 'running' &&
-          shellView(p.shell, `overlay.${controller.kind}`) &&
-          !this.failedProviders.has(`${p.id}:${p.version}`),
-      );
-    const provider = candidate(this.options.selected()) ?? candidate(defaultShellId);
+    const provider = this.options.registry.resolve(
+      'overlay.command-palette',
+      this.fallbackOnly,
+    ).provider;
     if (!provider) {
       this.cancel('unavailable');
       this.options.failed('オーバーレイを起動できません。Shellを再試行してください。');
@@ -163,6 +174,7 @@ export class OverlayHost {
         session: randomUUID(),
         provider: provider.id,
         version: provider.version,
+        generation: provider.generation,
         ready: false,
         revision: 0,
         timer: setTimeout(() => this.fail(s, 'ready timeout'), 10000),
@@ -173,14 +185,16 @@ export class OverlayHost {
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
-      this.failedProviders.add(`${provider.id}:${provider.version}`);
+      this.options.registry.fail('overlay.command-palette', provider.id, provider.version);
+      this.fallbackOnly = true;
       this.options.failed(`${provider.id}: オーバーレイを読み込めません。`);
       this.present();
     }
   }
   private fail(s: Surface, reason: string) {
     if (s !== this.surface || !this.current) return;
-    this.failedProviders.add(`${s.provider}:${s.version}`);
+    this.options.registry.fail('overlay.command-palette', s.provider, s.version);
+    this.fallbackOnly = true;
     this.closeSurface();
     this.options.failed(`${s.provider}: ${reason}`);
     this.present();
@@ -188,12 +202,14 @@ export class OverlayHost {
   private closeSurface() {
     const s = this.surface;
     this.surface = undefined;
+    this.options.registry.touch();
     if (!s) return;
     clearTimeout(s.timer);
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(s.view);
     if (!s.view.webContents.isDestroyed()) s.view.webContents.close();
   }
   layout() {
+    this.options.registry.touch();
     const s = this.surface;
     if (!s?.ready || this.options.window.isDestroyed()) return;
     const [width, height] = this.options.window.getContentSize();
@@ -209,14 +225,8 @@ export class OverlayHost {
       this.cancel('owner-navigation');
       return;
     }
-    if (
-      !this.options
-        .providers()
-        .some(
-          (p) =>
-            p.id === s.provider && p.version === s.version && p.enabled && p.state === 'running',
-        )
-    ) {
+    if (!this.options.registry.usable('overlay.command-palette', s)) {
+      this.fallbackOnly = true;
       // Intentional disable/restart must not blacklist a healthy provider.
       this.closeSurface();
       this.present();

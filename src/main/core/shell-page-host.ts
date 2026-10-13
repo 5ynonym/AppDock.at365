@@ -1,3 +1,5 @@
+import { shellRegions, type ShellRegion } from '../../shared/shell';
+import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   ipcMain,
   type BrowserWindow,
@@ -5,8 +7,7 @@ import {
   type WebContentsView,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import type { ExtensionSnapshot } from '../../shared/contracts';
-import { defaultShellId, shellView, settingsShellCompatible } from '../../shared/shell';
+import { shellView } from '../../shared/shell';
 import type { ShellPageRequest, ShellPageViewport } from '../../shared/shell-pages';
 import type { ShellPageController } from './shell-page-controller';
 import { createShellView } from './shell-view';
@@ -17,6 +18,7 @@ type Surface = {
   session: string;
   provider: string;
   version: string;
+  generation?: string;
   ready: boolean;
   revision: number;
   settingsSignature?: string;
@@ -24,10 +26,12 @@ type Surface = {
 };
 /** One nonmodal body slot. Content controllers never own native display or provider recovery. */
 export class ShellPageHost {
+  private switching = false;
+  private deferredProvider?: string;
+  private flushBlocked?: string;
   private current?: ShellPageController;
   private surface?: Surface;
   private bounds: ShellPageViewport | null = null;
-  private failedProviders = new Set<string>();
   private unavailable = false;
   private disposed = false;
   private pendingFocus?: 'first' | 'last';
@@ -36,8 +40,8 @@ export class ShellPageHost {
     private options: {
       window: BrowserWindow;
       preload: string;
-      providers(): ExtensionSnapshot[];
-      selected(): string;
+      providers(): ShellProvider[];
+      registry: ShellProviderRegistry;
       route(): string;
       ready(): boolean;
       create(request: ShellPageRequest): ShellPageController;
@@ -48,10 +52,36 @@ export class ShellPageHost {
       failed(message: string, unavailable: boolean): void;
     },
   ) {
+    for (const { id } of shellRegions.filter((r) => r.id.startsWith('page.')))
+      options.registry.observe(id, () => {
+        const s = this.surface;
+        const current = this.current && 'page.' + this.current.kind === id;
+        return {
+          provider: current ? (s?.provider ?? null) : null,
+          version: s?.version,
+          generation: s?.generation,
+          session: s?.session,
+          ready: !!current && !!s?.ready,
+          visible:
+            !!current &&
+            !!s?.ready &&
+            !!this.bounds &&
+            !options.window.isDestroyed() &&
+            options.window.isVisible() &&
+            !options.window.isMinimized() &&
+            this.current?.route === options.route(),
+          pending: current ? (this.deferredProvider ?? null) : null,
+          reason:
+            current && this.flushBlocked
+              ? '設定画面の入力受付待ちです。再試行してください。'
+              : null,
+        };
+      });
     const bound = (event: IpcMainInvokeEvent, active = false) => {
       const s = this.surface;
       if (
         !s ||
+        !options.registry.usable(this.region(), s) ||
         !this.current ||
         this.current.route !== options.route() ||
         event.sender !== s.view.webContents ||
@@ -146,12 +176,14 @@ export class ShellPageHost {
   }
   close(id?: string) {
     if (id !== undefined && id !== this.current?.id) return;
+    this.flushBlocked = this.deferredProvider = undefined;
     this.current?.dispose?.();
     this.current = undefined;
     this.bounds = null;
     this.unavailable = false;
     this.pendingFocus = undefined;
     this.closeSurface();
+    this.options.registry.touch();
   }
   focus(id: string, edge: 'first' | 'last') {
     if (id !== this.current?.id || !this.bounds || !['first', 'last'].includes(edge)) return;
@@ -178,21 +210,11 @@ export class ShellPageHost {
     )
       throw Error('Invalid page viewport');
   }
+  private region(): ShellRegion {
+    return ('page.' + this.current!.kind) as ShellRegion;
+  }
   private candidate() {
-    const region = `page.${this.current!.kind}` as const;
-    const available = (id: string) =>
-      this.options
-        .providers()
-        .find(
-          (p) =>
-            p.id === id &&
-            p.enabled &&
-            p.state === 'running' &&
-            shellView(p.shell, region) &&
-            (region !== 'page.settings' || settingsShellCompatible(p)) &&
-            !this.failedProviders.has(`${region}:${p.id}:${p.version}`),
-        );
-    return available(this.options.selected()) ?? available(defaultShellId);
+    return this.options.registry.resolve(this.region()).provider;
   }
   private present() {
     if (!this.current || !this.options.ready()) return;
@@ -218,6 +240,7 @@ export class ShellPageHost {
         session: randomUUID(),
         provider: p.id,
         version: p.version,
+        generation: p.generation,
         ready: false,
         revision: 0,
         timer: setTimeout(() => this.fail(s, 'ready timeout'), 10000),
@@ -228,14 +251,14 @@ export class ShellPageHost {
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
-      this.failedProviders.add(`page.${this.current.kind}:${p.id}:${p.version}`);
+      this.options.registry.fail(this.region(), p.id, p.version);
       this.options.failed(`${p.id}: ページを読み込めません。`, false);
       this.present();
     }
   }
   private fail(s: Surface, reason: string) {
     if (s !== this.surface || !this.current || this.disposed) return;
-    this.failedProviders.add(`page.${this.current.kind}:${s.provider}:${s.version}`);
+    this.options.registry.fail(this.region(), s.provider, s.version);
     this.closeSurface();
     this.options.failed(`${s.provider}: ${reason}`, false);
     this.present();
@@ -244,6 +267,7 @@ export class ShellPageHost {
     const s = this.surface;
     this.surface = undefined;
     if (!s) return;
+    this.current?.viewClosed?.();
     // The closed view cannot acknowledge further requests; accepted edits already live in main.
     for (const complete of this.flushes.values()) complete();
     if (this.current && !s.view.webContents.isDestroyed() && s.view.webContents.isFocused())
@@ -253,6 +277,7 @@ export class ShellPageHost {
     if (!s.view.webContents.isDestroyed()) s.view.webContents.close();
   }
   layout() {
+    this.options.registry.touch();
     const s = this.surface,
       w = this.options.window;
     if (!s || w.isDestroyed()) return;
@@ -275,6 +300,7 @@ export class ShellPageHost {
       height: Math.max(1, Math.min(height - y, Math.round(this.bounds.height * zoom))),
     });
     s.view.webContents.setZoomFactor(zoom);
+    this.options.registry.touch();
     // Nonmodal pages remain below the settings notice and modal overlay.
     w.contentView.addChildView(s.view);
     this.options.layer();
@@ -286,12 +312,44 @@ export class ShellPageHost {
       return;
     }
     if (!this.options.ready()) return;
+    if (this.surface && !this.options.registry.usable(this.region(), this.surface)) {
+      this.flushBlocked = this.deferredProvider = undefined;
+      this.closeSurface();
+    }
     const provider = this.candidate();
     if (
       this.surface &&
       (provider?.id !== this.surface.provider || provider.version !== this.surface.version)
-    )
-      this.closeSurface();
+    ) {
+      if (this.current.requiresFlush && this.surface.ready) {
+        const key = provider?.id + ':' + provider?.generation;
+        this.deferredProvider = provider?.id;
+        if (!this.switching && this.flushBlocked !== key) {
+          this.switching = true;
+          const surface = this.surface;
+          // Let the current IPC reply finish before the renderer drains its input queue.
+          setImmediate(
+            () =>
+              void this.flush()
+                .then(
+                  () => {
+                    if (this.surface === surface) this.closeSurface();
+                    this.flushBlocked = undefined;
+                  },
+                  () => {
+                    if (this.surface === surface) this.flushBlocked = key;
+                  },
+                )
+                .finally(() => {
+                  this.switching = false;
+                  this.deferredProvider = undefined;
+                  this.refresh();
+                  this.options.registry.touch();
+                }),
+          );
+        }
+      } else this.closeSurface();
+    }
     if (!this.surface) this.present();
     const s = this.surface;
     if (!s) return;
@@ -309,8 +367,10 @@ export class ShellPageHost {
     }
     this.layout();
   }
-  retry() {
-    this.failedProviders.clear();
+  retry(region?: ShellRegion) {
+    if (region && !region.startsWith('page.')) return;
+    this.options.registry.retry(region);
+    this.flushBlocked = undefined;
     this.unavailable = false;
     this.refresh();
   }

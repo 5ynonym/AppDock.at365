@@ -9,5 +9,7 @@ export interface ShellPageController {
   snapshot(): ShellPageModel;
   act(action: ShellPageAction): Promise<unknown>;
   update?(request: ShellPageRequest): void;
+  /** Release View-owned recording/selection without disposing content state. */
+  viewClosed?(): void;
   dispose?(): void;
 }

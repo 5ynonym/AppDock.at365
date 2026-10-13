@@ -19,7 +19,7 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 }
 ```
 
-選択したShell Appletの`page.logs`は全体・詳細の両方に適用する。未提供領域はDefault Shellを使う。リボンとパレットの実装は不要。選択値は既存の`host.shellProvider`を維持し、複数Appletの領域別同時選択と複数Windowは未対応。
+`host.shellProviders["page.logs"]`は全体・Applet詳細・WebApplet管理のログ本文へ共通適用します。未提供・無効・未導入・故障ではこの領域だけDefault Shellを使い、設定値とControllerの条件を保持します。ホーム・設定・通知センターには別の提供元を指定できます。リボンとパレットの実装は不要です。一般Appletの複数Window・同一領域の同時多重表示は未対応です。
 
 ## 責務と寿命
 
@@ -104,3 +104,5 @@ minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本
 設定操作で非表示のWebViewを閉じても現在の設定ページを離れない。閉鎖済み/Windowへ移したAppletページへ遅れて届くViewport更新は状態を変更せず破棄する。表示中ページを閉じた場合は従来どおりホームへ戻る。
 
 本体側のnavigation requestもslotの報告キーへ含める。画面側が先に切り替わって初回報告を本体が拒否した場合、navigation確定後に同じ矩形でも再報告してViewを生成する。
+
+設定本文の通常交換では、現在のIPC応答と入力キューを待ち、候補を再解決します。3秒のflushが失敗した場合は、旧Viewが有効なら交換を保留して再試行を提示します。保存済みの割り当ては巻き戻しません。停止・故障時は保存済み値から復旧し、未確定入力を複製しません。設定Controllerと保存済み値は提供元変更で再生成しません。

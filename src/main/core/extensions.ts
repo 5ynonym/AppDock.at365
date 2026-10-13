@@ -1,3 +1,5 @@
+import { shellView, type ShellRequirement } from '../../shared/shell';
+import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts } from './command-contexts';
 import fs from 'node:fs';
@@ -143,6 +145,20 @@ function readManifest(
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
+  for (const command of commands ?? []) {
+    const requirement = command.shellRequirement;
+    if (
+      requirement &&
+      (!m.capabilities?.includes('shell') ||
+        !shellView(m.shell, requirement.region) ||
+        command.activateOnExecute ||
+        !m.minimumHostVersion ||
+        compareVersions(m.minimumHostVersion, '0.34.0') < 0)
+    )
+      throw Error(
+        'shellRequirementには対象領域の提供、shell capability、minimumHostVersion:0.34.0以上が必要です。activateOnExecuteとは併用できません。',
+      );
+  }
   const settingDefinitions = parseSettingDefinitions(m.settings);
   validateSettingCommandIds(m.id, settingDefinitions ?? [], commands ?? []);
   if (
@@ -186,6 +202,7 @@ type LoadedManifest = ExtensionManifest & {
 };
 export interface ExtensionInstance {
   runtimeSession?: string;
+  shellStateRequested?: boolean;
   attention?: boolean;
   manifest: LoadedManifest;
   state: ExtensionSnapshot['state'];
@@ -212,6 +229,24 @@ interface ManagerOptions {
   log: (level: string, source: string, message: string) => void;
 }
 class ExtensionManager extends EventEmitter {
+  shellRequirement: (id: string, requirement?: ShellRequirement) => string | undefined = () =>
+    undefined;
+  shellExecution?: (id: string, requirement?: ShellRequirement) => (() => boolean) | undefined;
+  shellProviders(): ShellProvider[] {
+    return [...this.items.values()].map((e) => ({
+      id: e.manifest.id,
+      version: e.manifest.version,
+      shell: e.manifest.shell,
+      minimumHostVersion: e.manifest.minimumHostVersion,
+      folder: e.manifest.folder,
+      sourceKind: e.manifest.sourceKind,
+      enabled:
+        e.manifest.sourceKind === 'builtin' ||
+        !!this.settings.value.extensions[e.manifest.id]?.enabled,
+      state: e.state,
+      generation: e.runtimeSession,
+    }));
+  }
   builtinRoots: string[];
   readonly executions = new CommandContexts();
   roots: string[];
@@ -335,8 +370,16 @@ class ExtensionManager extends EventEmitter {
         // Runtime registration (including replace) cannot grant external access.
         automation:
           e.manifest.commands?.some((c) => c.id === command.id && c.automation === true) ?? false,
+        shellRequirement: e.manifest.commands?.find((c) => c.id === command.id)?.shellRequirement,
         available: e.state === 'running',
       });
+    for (const command of catalog.values()) {
+      const reason = this.shellRequirement(e.manifest.id, command.shellRequirement);
+      if (reason) {
+        command.available = false;
+        command.disabledReason = reason;
+      }
+    }
     for (const command of e.manifest.commands ?? [])
       for (const alias of command.aliases ?? []) {
         const target = catalog.get(command.id)!;
@@ -344,6 +387,8 @@ class ExtensionManager extends EventEmitter {
           id: alias,
           title: target.title,
           available: target.available,
+          disabledReason: target.disabledReason,
+          shellRequirement: target.shellRequirement,
           hidden: true,
         });
       }
@@ -447,6 +492,7 @@ class ExtensionManager extends EventEmitter {
   }
   async start(e: ExtensionInstance) {
     e.runtimeSession = randomUUID();
+    e.shellStateRequested = false;
     e.state = 'starting';
     e.error = null;
     this.emit('changed');
@@ -603,13 +649,26 @@ class ExtensionManager extends EventEmitter {
       (x) => x.state === 'running' && x.commands.some((c) => c.id === id),
     );
     if (running) {
+      const reason = this.shellRequirement(
+        running.manifest.id,
+        running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
+      );
+      if (reason) throw Error(reason);
       if (!running.peer || running.peer.closed) throw new Error('拡張との接続が終了しました。');
-      return this.executions.run(running.manifest.id, invocation, (executionId) =>
-        running.peer!.request('command.execute', {
-          id,
-          executionId,
-          ...(invocation ? { invocation } : {}),
-        }),
+      const valid = this.shellExecution?.(
+        running.manifest.id,
+        running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
+      );
+      return this.executions.run(
+        running.manifest.id,
+        invocation,
+        (executionId) =>
+          running.peer!.request('command.execute', {
+            id,
+            executionId,
+            ...(invocation ? { invocation } : {}),
+          }),
+        valid,
       );
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));

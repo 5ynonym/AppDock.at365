@@ -1,6 +1,6 @@
 # 領域ごとのShell割り当てと実装計画
 
-実装状態: 未実装。2026-10-14時点のmain `a0d5363`、AppDock 0.33.0を基準とする。領域ごとにShell Appletを1件指定し、指定先が利用できない領域だけDefault Shellへ戻す。優先順位リストは導入しない。本書の設定・状態モデル・コマンド条件は実装予定の契約であり、現在利用できるAPIとは区別する。
+実装状態: 実装・必要回帰・固定配布物確認済み。AppDock 0.34.0。領域ごとにShell Appletを1件指定し、利用できない領域だけDefault Shellへ戻します。設定の即時保存と通知センター・デスクトップ通知を含むmain `51e0372`を起点に実装しました。優先順位リストは導入しません。現行契約の型は[src/shared/shell.ts](../src/shared/shell.ts)、解決と状態集約は[ShellProviderRegistry](../src/main/core/shell-provider-registry.ts)を正本とします。
 
 現行の責務分離と描画APIは[Shell基盤](shell-foundation.md)、[リボン](shell-api.md)、[オーバーレイ](shell-overlays.md)、[本文](shell-pages.md)、[通知](notifications.md)を引き継ぐ。設定保存と編集は[設定同期](settings-sync.md)と[設定基盤](settings-foundation.md)、コマンドは[Applet API](extensions.md)と[共通操作API](appdock-api.md)に従う。
 
@@ -87,7 +87,7 @@ Aに割り当てた複数領域はそれぞれ復旧対象になる。Aのリボ
 
 ## 提供元の決定と稼働状態
 
-本体mainに領域別の提供元解決と状態集約を置く。実装名の候補は`ShellProviderRegistry`とし、各Hostが同じ判定を利用する。WindowやWebContentsの生成、内容Controllerの操作はRegistryに移さない。提供元の入力はmanifest・有効状態・稼働世代の軽量な情報とし、コマンド一覧を含むmanager.snapshotを解決中に再取得しない。コマンド利用可否からRegistryを参照するため、snapshotと解決器の相互再帰を避ける。
+本体mainに領域別の提供元解決と状態集約を置く。`ShellProviderRegistry`を使い、各Hostが同じ判定を利用する。WindowやWebContentsの生成、内容Controllerの操作はRegistryに移さない。提供元の入力はmanifest・有効状態・稼働世代の軽量な情報とし、コマンド一覧を含むmanager.snapshotを解決中に再取得しない。コマンド利用可否からRegistryを参照するため、snapshotと解決器の相互再帰を避ける。
 
 1. `--safe-shell`なら、保存値を変えずDefault Shellを指定先として扱う。
 2. 保存マップから指定先を取得する。省略はDefault Shell。
@@ -99,7 +99,7 @@ Default Shellの無効化禁止・開始遅延なし・組み込み出自の検�
 
 ### 状態モデル
 
-設定UIとコマンド判定で単一の`selected/active`を使わず、primaryの領域ごとに以下を持つ。名称は実装予定の型として統一する。
+設定UIとコマンド判定で単一の`selected/active`を使わず、primaryの領域ごとに以下を持つ。名称は公開型で統一する。
 
 | フィールド | 意味 |
 | --- | --- |
@@ -182,7 +182,7 @@ HostSnapshotと設定ページの補助モデルへ領域別状態を追加す�
 
 ### 任意の宣言による実行条件
 
-manifestの`commands[]`へ任意の`shellRequirement`を追加する。以下は新しい宣言の抜粋であり、未実装の契約である。
+manifestの`commands[]`へ任意の`shellRequirement`を追加する。以下は宣言の抜粋である。
 
 ```json
 {
@@ -208,7 +208,7 @@ manifestの`commands[]`へ任意の`shellRequirement`を追加する。以下は
 
 ### 自分の採用状態の取得
 
-shell capabilityを持つworker向けに、自Appletの提供領域だけの状態取得と変更購読を追加する。RPC候補は`host.shell.getState`とホスト発の`shell.changed`、Nodeは`context.shell.getState/onChanged`、.NETは同等の非同期取得とイベントとする。返す値はprimary、領域ID、自分がconfigured/resolved/boundか、ready/visible、理由、表示用revisionに限定する。
+shell capabilityを持つworker向けに、自Appletの提供領域だけの状態取得と変更購読を追加する。RPCは`host.shell.getState`とホスト発の`shell.changed`、Nodeは`context.shell.getState/onChanged`、.NETは同等の非同期取得とイベントとする。返す値はprimary、領域ID、自分がconfigured/resolved/boundか、ready/visible、理由、表示用revisionに限定する。
 
 購読してから初回取得し、古いrevisionを無視する。activate中はView未生成のsnapshotを返せるものとし、readyや全Applet起動完了を待たない。自己状態の取得にappdock-apiの外部操作許可は要求せず、shell capability・本人の稼働世代・既存RPC検査を使う。他Appletの情報や任意Viewへのアクセスを追加しない。
 
@@ -257,7 +257,7 @@ Window管理・保存済み設定と入力受付・ナビゲーション・通�
 
 設定項目の追加・廃止を含むため、実装完了時は本体のマイナー版を1つ増やしてパッチを0にする。具体的な版は実装時の未公開変更と照合して確定する。同じ変更の修正・再発行で重ねて増やさない。Default Shellは本体と同時ビルド・単一EXEへ同梱し、未変更の外部Appletを再発行しない。
 
-この設計書だけのコミットでは製品版・ソース・配布物を変更しない。実装時のcommit・push・Release・deploy・mainへの統合は、それぞれ依頼範囲に従う。
+設計書作成時のコミットでは製品版・ソース・配布物を変更していない。実装時のcommit・push・Release・deploy・mainへの統合は、それぞれ依頼範囲に従う。
 
 ## 検証計画
 
@@ -278,3 +278,9 @@ Window管理・保存済み設定と入力受付・ナビゲーション・通�
 段階5では型検査・本体とDefault Shellのビルド、変更関連の回帰を実施する。Node/.NETの契約を追加する段階4ではSDK/Runtime/native hostのRelease buildと実接続・停止試験を含める。実装後にコミットを依頼された場合は[共通手順](development-workflow.md)に従い対象の標準回帰と必要GUIをすべて確認する。
 
 発行物のhash・版・feedと固定コピーを照合し、固定単一EXEでも混在、無効化復旧、設定入力、専用コマンド、safe起動の代表シナリオを実行する。旧単一指定のShell fixtureを残し、既存manifest・bridgeの互換を確認する。結果と未確認条件はVERIFICATIONへ記録し、本書の実装状態を段階ごとに更新する。
+
+## 実装との対応
+
+段階1〜4は共通設定正規化、領域Registry、各表示Host、設定UI、コマンド条件、Node/.NETの自己状態取得・購読へ実装しました。自己状態の初回取得後に変更通知を配送し、旧workerへ未知の通知を送らないようにします。非同期コマンドは受付時のworker世代とView sessionへ実行情報を結び、失効した実行情報を使う後続の共通API呼び出しを拒否します。保存済み処理を巻き戻す契約ではありません。
+
+[領域別回帰](../tests/shell-region.test.cjs)、[混在GUI](../scripts/shell-region-ui-test.cjs)、Node/.NET/native fixtureと既存Shell・設定・通知のGUI回帰を使います。実行結果・修正履歴・版・発行物の照合は[VERIFICATION](../VERIFICATION.md)へ記録し、段階5も完了しました。本体0.34.0と同梱Default Shellを発行し、固定単一EXEで混在・設定・専用コマンド・通知・safe起動を確認しました。

@@ -1,3 +1,4 @@
+import { parseShellProviders } from './shell';
 import { parseNotificationPreferences } from './notification-types';
 import { parseKeybindings, withKeybindings } from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
@@ -22,6 +23,7 @@ export const createDefaultSettings = (): Settings => ({
   webApplets: { items: [], shortcutDefaults: defaultWebShortcutDefaults() },
   schemaVersion: 1,
   host: {
+    shellProviders: {},
     theme: 'dark',
     closeToTray: true,
     notifications: true,
@@ -63,12 +65,8 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   for (const key of ['closeToTray', 'notifications', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
-  if (
-    value.host.shellProvider !== undefined &&
-    (typeof value.host.shellProvider !== 'string' ||
-      !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(value.host.shellProvider))
-  )
-    throw Error('host.shellProvider はShellのIDです。');
+  const shellProviders = parseShellProviders(value.host);
+  const { shellProvider: legacyShellProvider, ...host } = value.host;
   const hardwareAcceleration =
     value.host.hardwareAcceleration === undefined ? true : value.host.hardwareAcceleration;
   if (typeof hardwareAcceleration !== 'boolean')
@@ -220,7 +218,8 @@ export function parseSettings(value: unknown): Settings {
     schemaVersion: value.schemaVersion,
     extensions: value.extensions,
     host: {
-      ...value.host,
+      ...host,
+      shellProviders,
       trayClickCommand,
       trayDoubleClickCommand,
       hardwareAcceleration,

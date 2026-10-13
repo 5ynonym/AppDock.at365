@@ -26,6 +26,9 @@ public static class AppletSession
                         context = new ExtensionContext(parameters.GetProperty("id").GetString()!, parameters.GetProperty("settings"), connection, active.Token);
                         await applet.ActivateAsync(context, active.Token);
                         return context.Contributions;
+                    case "shell.changed":
+                        if (context is not null) await context.ChangeShellAsync(parameters);
+                        return null;
                     case "notifications.changed":
                         if (context is not null) await context.ChangeNotificationPolicyAsync();
                         return null;

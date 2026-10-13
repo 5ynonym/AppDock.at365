@@ -138,6 +138,7 @@ export class HomePageSession implements ShellPageController {
         title: c.title,
         extension: c.extension,
         available: c.available,
+        ...(c.disabledReason ? { disabledReason: c.disabledReason } : {}),
         actionId: action('pin:' + c.id, {
           command: c.id,
           ...(navigationCommands.has(c.id) ? { navigation: true as const } : {}),

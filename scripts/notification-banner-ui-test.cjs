@@ -12,6 +12,7 @@ const root = ${JSON.stringify(root)};
 app.setPath('userData', path.join(__dirname,'chromium'));
 const { NotificationService } = require(path.join(root,'out/main/main/core/notification-service'));
 const { NotificationHistoryStore } = require(path.join(root,'out/main/main/core/notification-history'));
+const { ShellProviderRegistry } = require(path.join(root,'out/main/main/core/shell-provider-registry'));
 const { NotificationSurfaceHost } = require(path.join(root,'out/main/main/core/notification-surface-host'));
 const { NotificationSurfaceController } = require(path.join(root,'out/main/main/core/notification-surface-controller'));
 let fixture;
@@ -23,12 +24,12 @@ app.whenReady().then(async()=>{
  const service=new NotificationService(store);
  let selected='appdock.default-shell', dark=true, executions=0;
  const providers=[
- {id:'appdock.default-shell',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
+ {id:'appdock.default-shell',sourceKind:'builtin',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
  {id:'fixture.partial',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
  {id:'fixture.stalled',folder:__dirname,version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'stalled.html'}}},
  ];
  const host=new NotificationSurfaceHost({window,controller:new NotificationSurfaceController(service,()=>dark),preload:path.join(root,'out/main/main/notification-surface-preload.js'),
- providers:()=>providers,selected:()=>selected,ready:()=>true,settings:()=>({accent:true}),
+ providers:()=>providers,registry:new ShellProviderRegistry({providers:()=>providers,assignments:()=>({'notification.banner':selected}),safeMode:false}),ready:()=>true,settings:()=>({accent:true}),
  execute:async(id,command)=>{if(command!=='fixture.own')throw Error('Not owned');return id;},
  layer:()=>{},failed:(m)=>console.error(m)});
  fixture={window,service,store,host,providers,
@@ -190,7 +191,10 @@ delete env.ELECTRON_RUN_AS_NODE;
     checks.push('provider stop and restart / renderer crash fallback / no duplicate notification');
     await app.evaluate(() => fixture.select('fixture.stalled'));
     await until(
-      () => app.evaluate(() => fixture.host['failures'].has('fixture.stalled:1')),
+      () =>
+        app.evaluate(() =>
+          fixture.host['options'].registry.failed('notification.banner', 'fixture.stalled', '1'),
+        ),
       'ready timeout',
     );
     p = await banner('appdock.default-shell');

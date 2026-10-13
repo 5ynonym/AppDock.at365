@@ -1,4 +1,4 @@
-# 設定基盤とDefault Shell (0.33.0)
+# 設定基盤とDefault Shell
 
 全設定は変更時に検証して即時保存する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
 
@@ -23,6 +23,8 @@ page.settingsはSettingsPageModel schemaVersion:2、追加ShellはminimumHostVer
 公開モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。全Settings/HostSnapshot・他Appletの値は公開しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
 
 全体設定とApplet詳細は同じ本文を使い、全体だけ左インデックスを表示する。停止/無効Appletも編集でき、開くだけで起動しない。onFlush/flushedは切替前の現在入力キューを3秒以内で待つ。成功済み値は切替/故障/Default復旧をまたいで共有し、不正入力をView間で保持しない。Webアカウント削除は保存済み参照を検査する。
+
+「表示」の部分JSONは`host.theme`と`host.shellProviders`です。8領域の選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・自分自身の切替は[領域別割り当て](shell-region-assignment.md)。
 
 ## カタログ・JSON・検索
 

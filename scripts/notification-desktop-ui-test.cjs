@@ -83,7 +83,7 @@ if (!process.argv[2]) {
     }),
   );
   fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate=async()=>{};');
-  initial.host.shellProvider = customId;
+  initial.host.shellProviders = { 'notification.desktop': customId };
   initial.extensions[customId] = { enabled: true, settings: {} };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
@@ -278,7 +278,9 @@ const storage = (id, key) => {
         before,
       );
       assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider,
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders[
+          'notification.desktop'
+        ],
         customId,
       );
       checks.push(

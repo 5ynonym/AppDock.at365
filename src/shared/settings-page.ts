@@ -41,6 +41,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  shellRegions?: import('./shell').ShellRegionsSnapshot;
   notificationTypes?: import('./notification-types').NotificationTypeEntry[];
   applets?: ExtensionSnapshot[];
   commands?: UiCommand[];

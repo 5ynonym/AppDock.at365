@@ -138,7 +138,24 @@ async function select(id) {
   await dock.evaluate(async (id) => {
     const s = await window.dock.snapshot();
     await window.dock.saveSettings(
-      { ...s.settings.value, host: { ...s.settings.value.host, shellProvider: id } },
+      {
+        ...s.settings.value,
+        host: {
+          ...s.settings.value.host,
+          shellProviders: Object.fromEntries(
+            [
+              'ribbon',
+              'overlay.command-palette',
+              'page.home',
+              'page.logs',
+              'page.notifications',
+              'page.settings',
+              'notification.banner',
+              'notification.desktop',
+            ].map((region) => [region, id]),
+          ),
+        },
+      },
       s.settings.revision,
     );
   }, id);

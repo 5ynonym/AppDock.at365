@@ -248,6 +248,9 @@ export class SettingsPageSession implements ShellPageController {
       this.options.changed();
     }
   }
+  viewClosed() {
+    this.options.release?.();
+  }
   dispose() {
     this.disposed = true;
     this.actions.clear();

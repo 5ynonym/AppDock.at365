@@ -452,7 +452,7 @@ async function close() {
       );
       const settings = saved();
       settings.extensions['fixture.center'] = { enabled: true, settings: {} };
-      settings.host.shellProvider = 'fixture.center';
+      settings.host.shellProviders = { 'page.notifications': 'fixture.center' };
       fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     }
     await close();

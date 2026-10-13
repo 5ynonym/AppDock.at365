@@ -25,6 +25,7 @@ fs.cpSync(path.join(root, 'out/shells/default'), external, { recursive: true });
 const manifest = JSON.parse(fs.readFileSync(path.join(external, 'extension.json')));
 manifest.id = 'fixture.shell';
 manifest.name = 'Fixture Shell';
+manifest.minimumHostVersion = '0.34.0';
 manifest.capabilities.push('pages', 'appdock-api');
 manifest.commands = ['public', 'private'].map((id) => ({
   id: `fixture.shell.${id}`,
@@ -144,6 +145,15 @@ const shell = () =>
     'Default Shell page',
   );
 async function save(patch) {
+  if (patch.shellProvider) {
+    patch = {
+      ...patch,
+      shellProviders: Object.fromEntries(
+        require('../out/main/shared/shell').shellRegions.map((r) => [r.id, patch.shellProvider]),
+      ),
+    };
+    delete patch.shellProvider;
+  }
   await dock.evaluate(async (patch) => {
     const s = await window.dock.snapshot();
     await window.dock.saveSettings(
@@ -167,7 +177,7 @@ async function close() {
     let rail = await shell();
     assert.equal(await dock.locator('[data-ribbon-id]').count(), 0);
     assert.equal(await rail.evaluate(() => typeof window.dock), 'undefined');
-    assert.equal(await rail.locator('[data-ribbon-id]').count(), 8);
+    assert.equal(await rail.locator('[data-ribbon-id]').count(), 9);
     checks.push('one independent ribbon, public Shell bridge only');
     if (app) {
       await app.evaluate(({ dialog }) => {
@@ -221,7 +231,7 @@ async function close() {
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.theme === newTheme,
       'save theme',
     );
-    checks.push('navigation and shared unsaved settings retained');
+    checks.push('navigation and immediate settings retained');
     const before = (await dock.evaluate(() => window.dock.snapshot())).settings.revision;
     await rail.evaluate(async () => {
       const m = await window.appdockShell.get();
@@ -234,19 +244,25 @@ async function close() {
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     await until(
       async () =>
-        (await setting.getByLabel('Shell', { exact: true }).inputValue()) === 'missing.shell',
+        (await setting.getByLabel('リボンのShell', { exact: true }).inputValue()) ===
+        'missing.shell',
       'missing provider selection',
     );
     assert.match(
-      await setting.getByLabel('Shell', { exact: true }).locator('option:checked').innerText(),
+      await setting
+        .getByLabel('リボンのShell', { exact: true })
+        .locator('option:checked')
+        .innerText(),
       /未導入/,
     );
-    await setting.getByLabel('Shell', { exact: true }).selectOption('appdock.default-shell');
+    await setting
+      .getByLabel('リボンのShell', { exact: true })
+      .selectOption('appdock.default-shell');
     await settleSettings(setting);
     await until(
       async () =>
-        (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider ===
-        'appdock.default-shell',
+        (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders
+          .ribbon === 'appdock.default-shell',
       'missing provider reset',
     );
     checks.push('missing provider is retained and can be replaced from Default Shell settings');
@@ -380,7 +396,7 @@ async function close() {
       'fallback',
     );
     assert.equal(
-      (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider,
+      (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders.ribbon,
       'fixture.shell',
     );
     checks.push('provider failure falls back without overwriting selection');
@@ -438,7 +454,7 @@ async function close() {
     await close();
     await launch();
     assert.equal(
-      (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider,
+      (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders.ribbon,
       'fixture.stalled',
     );
     assert.ok(!browser.pages().some((p) => p.url().endsWith('/stalled/index.html')));

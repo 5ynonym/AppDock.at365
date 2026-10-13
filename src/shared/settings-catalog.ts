@@ -1,3 +1,4 @@
+import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
 import type { ExtensionSnapshot, Settings, SettingDefinition } from './contracts';
 import { createDefaultSettings, parseSettings } from './settings-schema';
@@ -46,11 +47,11 @@ export const hostSettingsPages = [
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
   appearance: [
-    [
-      'shellProvider',
-      'Shell',
-      'Shell Appletが担当する領域だけを差し替え、ほかの領域はDefault Shellを使います。有効にしてから選択してください。',
-    ],
+    ...shellRegions.map(({ id, title }): [string, string, string] => [
+      'shellProviders.' + id,
+      title + 'のShell',
+      '領域ごとにShellを指定します。利用できない場合はDefault Shellを使います。無効なAppletの割り当ても保持します。',
+    ]),
     ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
   ],
   general: [
@@ -298,7 +299,7 @@ export function settingsPaths(
   }
   switch (page.id) {
     case 'appearance':
-      return ['theme', 'shellProvider'].map((k) => ['host', k]);
+      return ['theme', 'shellProviders'].map((k) => ['host', k]);
     case 'notifications':
       return [['host', 'notifications'], ['notificationPreferences']];
     case 'general':

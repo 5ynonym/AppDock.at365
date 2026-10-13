@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は`ribbon`、`overlay.command-palette`、[ページ表示](shell-pages.md)の`page.logs`・`page.home`・`page.settings`、非モーダルの[通知領域](notifications.md)`notification.banner`。選択値は既存の`host.shellProvider`1件を維持する。複数Appletの領域別同時選択、複数ウィンドウは後続。たとえばパレットだけを提供するmanifestは以下。
+公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`page.logs`・`page.home`・`page.settings`・`page.notifications`、`notification.banner`・`notification.desktop`です。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -75,3 +75,7 @@ Default Shellも利用できない場合は要求を取消して最小ネイテ�
 次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログは本文領域のHostと取得/購読・絞り込み契約を使い、`page.logs`で描画する。詳細は[Shellのページ表示](shell-pages.md)。過去ログ・日付検索・消去、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
 
 関連検証: `tests/command-palette.test.cjs`、manifest/boundary/presentation回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、既存Shell/トレイ/ページ/設定通知/ホストコマンド試験。実測は[VERIFICATION](../VERIFICATION.md)。
+
+## 領域別指定とパレットの寿命
+
+開いた要求の提供元は固定し、割り当て変更は次回表示から適用します。停止・無効化・故障では現在の要求をDefault Shellへ引き継ぎ、別の外部Shellへ自動転送しません。選択結果・実行中状態・取消・フォーカス復帰は既存Controllerが維持します。設定と解決先、現在のViewが異なる間は領域状態に適用待ちを表示します。

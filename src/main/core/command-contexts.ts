@@ -15,15 +15,17 @@ export class CommandContexts {
       controller: AbortController;
       window?: string;
       source?: string;
+      valid?: () => boolean;
     }
   >();
   async run<T>(
     appletId: string,
     invocation: { session: string; window: string; source: string } | undefined,
     execute: (id: string) => Promise<T>,
+    valid?: () => boolean,
   ): Promise<T> {
     const id = randomUUID();
-    const entry = { appletId, ...invocation, controller: new AbortController() };
+    const entry = { appletId, ...invocation, valid, controller: new AbortController() };
     this.pending.set(id, entry);
     try {
       return await execute(id);
@@ -36,6 +38,10 @@ export class CommandContexts {
     if (id === undefined || id === null) return {};
     const entry = typeof id === 'string' ? this.pending.get(id) : undefined;
     if (!entry || entry.appletId !== appletId) throw Error('コマンドの実行情報が失効しています。');
+    if (entry.valid && !entry.valid()) {
+      entry.controller.abort();
+      throw Error('コマンドのShell対象が失効しています。');
+    }
     return { signal: entry.controller.signal, window: entry.window, source: entry.source };
   }
   cancel(session: string) {

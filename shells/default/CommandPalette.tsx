@@ -153,7 +153,9 @@ export function CommandPalette({
                     {c.title}
                     <small title={c.extension}>
                       <span className="command-id">{c.id}</span>
-                      {!c.available && <span> · Applet起動後に利用できます</span>}
+                      {!c.available && (
+                        <span> · {c.disabledReason ?? 'Applet起動後に利用できます'}</span>
+                      )}
                       {pinned && <span className="pin-badge">PINNED</span>}
                     </small>
                   </div>

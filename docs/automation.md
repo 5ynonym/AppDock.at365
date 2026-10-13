@@ -342,3 +342,5 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 ## Applet専用操作
 
 input.sendKeys/input.appCommandはMCPの列挙・直接実行に公開しません。Appletが明示公開するコマンドからの呼出しは全Applet共通の許可で実行できます。[公開先と許可](appdock-api.md)を参照してください。
+
+Shell専用コマンドに宣言された`shellRequirement`も共通最終実行経路で検査します。automationの公開宣言・PC専用権限に加えて対象領域の解決先/可視状態が必要で、一覧取得後の切替では実行を拒否します。未採用でも条件を省略した自己設定コマンドは従来どおりです。詳細は[Applet API](extensions.md#shellの採用状態と専用コマンド)。

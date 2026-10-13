@@ -38,6 +38,7 @@ export function createHostApi(
     save: (value, revision) => settings.save(value, revision),
   }),
   typedNotifications?: () => TypedNotifications | undefined,
+  shellState?: (id: string) => import('../../shared/shell').OwnShellState | undefined,
 ) {
   return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -72,6 +73,12 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.shell.getState': {
+        requireCapability('shell');
+        if (!shellState) throw Error('Shell状態APIは準備中です。');
+        e.shellStateRequested = true;
+        return shellState(id);
+      }
       case 'host.appdock.call':
         if (!appdockCall) throw Error('AppDock操作APIは準備中です。');
         return appdockCall(e, p);

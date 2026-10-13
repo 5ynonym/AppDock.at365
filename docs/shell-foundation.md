@@ -27,7 +27,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | notification.desktop | NotificationServiceとNotificationDesktopHost/SurfaceController | [通知基盤](notifications.md) |
 | notification.banner | NotificationServiceとNotificationSurfaceController | [通知基盤](notifications.md) |
 
-選択はhost.shellProviderの1件、表示コンテキストはprimary、通常本文の本体Windowは1つ。通知専用の独立Windowは同じサービスのdesktop射影を表示する。各領域で選択Appletの宣言を解決し、未提供領域はDefault Shellを使う。複数の提供元を領域ごとに同時選択する設定はない。通常Appletのcommands/settings/pagesとの併用は可能で、Shell未選択でも有効Appletの通常機能は動作する。
+割り当ては`host.shellProviders`の領域IDからApplet IDへのマップ。共通カタログの8領域ごとに1件指定でき、省略はDefault Shellです。`ShellProviderRegistry`が軽量なmanifest・有効状態・起動世代から提供元と理由を解決し、各HostがViewの接続状態を報告します。設定を保存しても指定Appletを有効化しません。表示コンテキストはprimary、通常本文の本体Windowは1つ、通知専用Windowはdesktop射影を表示します。未割り当ての有効Appletも通常のcommands/settings/pagesを利用できます。設定移行・切替・再試行・状態とコマンド条件は[領域別割り当て](shell-region-assignment.md)を参照してください。
 
 Shell Hostは位置・zoom・ready・接続元・表示順序・フォーカス・破棄を扱い、検索や設定保存等の機能判断は内容Controllerへ置く。ページ、オーバーレイ、リボンの寿命を分離し、1つのViewの破棄で他領域やAppletの処理を止めない。
 
@@ -63,7 +63,7 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 設定の左右領域とApplet詳細の設定本文は`page.settings`で共用する。選択ページの値だけを配信し、入力の受付・保存はmainの共有編集セッションへ接続する。境界は[設定基盤](settings-foundation.md)を参照する。Appletインデックス・横断検索・項目移動も同じ公開契約で提供する。
 
-Appletの複数Window・複数Shellの同時表示は未実装。通知専用Windowは共通通知射影へ限定し、Applet Surfaceを多重化しない。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
+一般Appletの複数Window・同一領域の同時多重表示は未実装。通知専用Windowは共通通知射影へ限定し、Applet Surfaceを多重化しない。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 
 タイトルバー等の残りの画面、過去ログ/日付検索、内蔵会話UIはこの基盤だけでは提供しない。追加時に個別の目的と公開契約を決める。
 

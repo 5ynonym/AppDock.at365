@@ -7,7 +7,8 @@
     "startMinimized": false,
     "hardwareAcceleration": true,
     "trayClickCommand": "appdock.open",
-    "trayDoubleClickCommand": null
+    "trayDoubleClickCommand": null,
+    "shellProviders": {}
   },
   "updates": {
     "hostSource": "github:5ynonym/AppDock.at365",

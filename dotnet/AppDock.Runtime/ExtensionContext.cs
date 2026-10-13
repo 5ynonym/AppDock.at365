@@ -6,7 +6,7 @@ namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
     IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
-    IAppDockService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
+    IAppDockService, IShellService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
@@ -15,6 +15,9 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     private readonly SemaphoreSlim commandLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, Func<CancellationToken, Task>> settingsHandlers = new();
     private readonly ConcurrentDictionary<Guid, Func<CancellationToken, Task>> notificationHandlers = new();
+    private readonly ConcurrentDictionary<Guid, Func<OwnShellState, CancellationToken, Task>> shellHandlers = new();
+    private readonly SemaphoreSlim shellChanges = new(1, 1);
+    private long shellRevision = -1;
     private JsonElement configuration = settings;
     private readonly object sync = new();
     public string ExtensionId => id;
@@ -28,6 +31,28 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
             throw new AppDockApiException(error.GetProperty("code").GetString()!, error.GetProperty("message").GetString()!);
         }
         return reply.GetProperty("value").Clone();
+    }
+    public IShellService Shell => this;
+    public async Task<OwnShellState> GetStateAsync(CancellationToken cancellationToken = default)
+    {
+        var state = (await connection.RequestAsync("host.shell.getState", new { }, cancellationToken)).Deserialize<OwnShellState>(JsonRpcConnection.Json)!;
+        lock (sync) { shellRevision = Math.Max(shellRevision, state.Revision); }
+        return state;
+    }
+    IDisposable IShellService.OnChanged(Func<OwnShellState, CancellationToken, Task> handler)
+    {
+        var key = Guid.NewGuid(); shellHandlers[key] = handler;
+        return new Registration(() => shellHandlers.TryRemove(key, out _));
+    }
+    internal async Task ChangeShellAsync(JsonElement value)
+    {
+        await shellChanges.WaitAsync(lifetime);
+        try {
+            var state = value.Deserialize<OwnShellState>(JsonRpcConnection.Json)!;
+            lock (sync) { if (state.Revision <= shellRevision) return; shellRevision = state.Revision; }
+            foreach (var handler in shellHandlers.Values) await handler(state, lifetime);
+        }
+        finally { shellChanges.Release(); }
     }
     public ICommandService Commands => this;
     public ITrayService Tray => this;
@@ -165,6 +190,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     {
         settingsHandlers.Clear();
         notificationHandlers.Clear();
+        shellHandlers.Clear();
         ScheduledTask[] current; lock (sync) current = schedules.ToArray();
         foreach (var scheduled in current) scheduled.Dispose();
         await Task.WhenAll(current.Select(s => s.Completion));
