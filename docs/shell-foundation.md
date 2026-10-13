@@ -20,7 +20,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | --- | --- | --- |
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
-| page.settings | SettingsPageSessionとSettingsEditingSession | [設定基盤](settings-foundation.md) |
+| page.settings | SettingsPageSessionとSettingsInputSession | [設定基盤](settings-foundation.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.notifications | NotificationCenterController | [通知基盤](notifications.md) |

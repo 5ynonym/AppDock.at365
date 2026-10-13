@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const http = require('node:http');
 const fs = require('node:fs');
@@ -84,6 +85,22 @@ async function until(fn, label) {
     } catch {}
     await new Promise((r) => setTimeout(r, 100));
   }
+  if (dock)
+    for (const p of dock
+      .context()
+      .pages()
+      .filter((p) => p.url().endsWith('/settings.html')))
+      console.error(
+        'WEB-DIAGNOSTIC',
+        await p
+          .evaluate(() => ({
+            title: document.querySelector('h1')?.textContent,
+            status: [...document.querySelectorAll('[role=status],[role=alert]')].map(
+              (e) => e.textContent,
+            ),
+          }))
+          .catch(() => null),
+      );
   throw Error(label);
 }
 const snapshot = () => dock.evaluate(() => window.dock.snapshot());
@@ -111,7 +128,7 @@ async function start() {
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
   });
-  dock = await app.firstWindow();
+  dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   dock.setDefaultTimeout(15000);
   await until(async () => (await snapshot()).startupReady, 'startup');
 }
@@ -182,7 +199,7 @@ async function remote(id) {
       (await dock.getByLabel('WebAppletのページ遷移', { exact: true }).inputValue()) === 'none',
     'manifest navigation',
   );
-  await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(dock);
   let s = await until(async () => {
     const s = await snapshot();
     return s.settings.value.webApplets.items.length ? s : null;
@@ -210,11 +227,12 @@ async function remote(id) {
     0,
   );
   await dock.getByLabel('WebAppletの名前', { exact: true }).fill('編集中のWeb');
+  await settleSettings(dock);
   const beforeAccounts = await snapshot(),
     settingsBytes = fs.readFileSync(path.join(profile, 'settings.json'));
   const accountFile = path.join(profile, 'data', 'web-applets', 'accounts.json');
   await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
-  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true, level: 1 }).waitFor();
   const originalAccountFile = fs.readFileSync(accountFile);
   const initialName = (await snapshot()).webAccounts[0].name;
   const initialInput = dock.locator('.web-account-row').first().locator('input');
@@ -225,7 +243,7 @@ async function remote(id) {
   assert.deepEqual(fs.readFileSync(accountFile), originalAccountFile);
   assert.equal(
     await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
-    1,
+    0,
   );
   await dock.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
   await until(async () => (await snapshot()).webAccounts.length === 2, 'immediate add');
@@ -252,7 +270,7 @@ async function remote(id) {
     'Enter and blur keep the confirmed name',
   );
   await spareInput.fill('予備のアカウント');
-  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).click();
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true, level: 1 }).click();
   await until(
     async () => (await snapshot()).webAccounts[1].name === '予備のアカウント',
     'mouse focus loss commits the name',
@@ -278,7 +296,7 @@ async function remote(id) {
     0,
   );
   assert.equal(await categories.getByRole('button', { name: /^WebApplet/ }).count(), 0);
-  await dock.getByText('未保存の変更があります', { exact: true }).waitFor();
+  assert.equal(await dock.getByText('未保存の変更があります', { exact: true }).count(), 0);
   assert.equal(
     await dock
       .getByRole('button', { name: 'ログイン情報をクリア', exact: true })
@@ -381,18 +399,14 @@ async function remote(id) {
   assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), settingsBytes);
   assert.equal(JSON.parse(settingsBytes).webApplets.accounts, undefined);
   assert.equal(JSON.parse(fs.readFileSync(accountFile)).accounts[0].name, '個人用（変更）');
-  await dock
-    .locator('.settings-categories')
-    .getByRole('button', { name: 'ショートカット', exact: true })
-    .click();
-  assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
-  await categories.getByRole('button', { name: /^Webアカウント/ }).click();
   await categories.getByRole('button', { name: /^一般/ }).click();
-  assert.equal(await dock.getByLabel('設定JSON', { exact: true }).inputValue(), invalidJson);
-  await dock.getByLabel('設定JSON', { exact: true }).fill(validJson);
-  await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
+  assert.equal(
+    await dock.getByLabel('設定JSON', { exact: true }).count(),
+    0,
+    'leaving drops invalid input and restores form mode',
+  );
   await manageWeb();
-  await dock.getByLabel('WebAppletの名前', { exact: true }).fill('ユキのWeb');
+  await dock.getByLabel('WebAppletの名前', { exact: true }).fill('変更したWeb');
   await dock.getByLabel('WebAppletのページ遷移', { exact: true }).selectOption('same-origin');
   manifestName = 'Web側の変更';
   await dock.getByRole('button', { name: 'Web側の推奨設定を取得', exact: true }).click();
@@ -401,17 +415,20 @@ async function remote(id) {
       dock
         .locator('.web-applet-settings [role="status"]')
         .textContent()
-        .then((t) => t.includes('内容を確認')),
+        .then((t) => t.includes('設定へ反映')),
     'refresh defaults',
   );
-  assert.equal(await dock.getByLabel('WebAppletの名前', { exact: true }).inputValue(), 'ユキのWeb');
+  assert.equal(
+    await dock.getByLabel('WebAppletの名前', { exact: true }).inputValue(),
+    '変更したWeb',
+  );
   assert.equal(
     await dock.getByLabel('WebAppletのページ遷移', { exact: true }).inputValue(),
     'same-origin',
   );
-  await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(dock);
   await until(
-    async () => (await snapshot()).settings.value.webApplets.items[0].name === 'ユキのWeb',
+    async () => (await snapshot()).settings.value.webApplets.items[0].name === '変更したWeb',
     'save manual overrides',
   );
   assert.equal((await snapshot()).webAccounts[0].name, '個人用（変更）');
@@ -419,9 +436,9 @@ async function remote(id) {
   await dock.getByRole('tab', { name: '設定', exact: true }).click();
   assert.equal(await dock.locator('.web-account-row').count(), 0);
   await dock.getByRole('button', { name: 'Webアカウントを管理', exact: true }).click();
-  await dock.getByRole('heading', { name: 'Webアカウント', exact: true }).waitFor();
+  await dock.getByRole('heading', { name: 'Webアカウント', exact: true, level: 1 }).waitFor();
   checks.push(
-    'independent account page and file: immediate add/rename/delete, cancellation/confirmation warnings, used-account guard, unchanged settings revision/bytes and retained valid/invalid drafts',
+    'independent account page and file: immediate add/rename/delete, cancellation/confirmation warnings, used-account guard, unchanged settings revision/bytes and immediately saved values and invalid input discarded on navigation',
   );
   checks.push('manual name/navigation override survives explicit defaults refresh');
   let web = await remote(id);
@@ -697,9 +714,9 @@ async function remote(id) {
   await dock.locator('[data-ribbon-id="extensions"]').click();
   await dock
     .locator('.sidebar-extensions')
-    .getByRole('button', { name: /^ユキのWeb/ })
+    .getByRole('button', { name: /^変更したWeb/ })
     .click();
-  const toggle = dock.getByRole('switch', { name: 'ユキのWebを有効にする', exact: true });
+  const toggle = dock.getByRole('switch', { name: '変更したWebを有効にする', exact: true });
   await toggle.click();
   await until(() => web.isClosed(), 'disable closes view');
   await until(

@@ -19,11 +19,14 @@ export interface HomePageRequest {
   id: string;
   route: 'home';
   kind: 'home';
-  /** Read-only projection from the host's shared editor, never a second draft. */
+  /** Read-only projection from saved host settings. */
   appletOrder: string[];
 }
 export type ShellPageRequest =
-  LogPageRequest | HomePageRequest | import('./settings-page').SettingsPageRequest | import('./notification-center').NotificationCenterRequest;
+  | LogPageRequest
+  | HomePageRequest
+  | import('./settings-page').SettingsPageRequest
+  | import('./notification-center').NotificationCenterRequest;
 export interface ShellPageViewport {
   x: number;
   y: number;
@@ -71,7 +74,10 @@ export interface HomePageModel {
   };
 }
 export type ShellPageModel =
-  LogPageModel | HomePageModel | import('./settings-page').SettingsPageModel | import('./notification-center').NotificationCenterModel;
+  | LogPageModel
+  | HomePageModel
+  | import('./settings-page').SettingsPageModel
+  | import('./notification-center').NotificationCenterModel;
 export interface HomeCommandResult {
   message: string;
   error: string;

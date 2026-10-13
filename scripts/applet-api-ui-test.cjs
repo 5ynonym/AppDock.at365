@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Real Node/.NET Applet processes, shared API, local permission UI and isolated MCP.
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -101,7 +102,8 @@ const states = [],
   checks = [];
 let client, page;
 const settingsSurface = require('./settings-shell-helper.cjs').deferred(() =>
-  require('./settings-shell-helper.cjs').settingsPage(page));
+  require('./settings-shell-helper.cjs').settingsPage(page),
+);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const start = Date.now();
@@ -267,16 +269,18 @@ async function grant(id, permissions) {
         (await mcpWrite.isEnabled()),
       'revoke while MCP off',
     );
-    // A PC-local permission save must not discard an unrelated settings.json draft.
+    // A PC-local permission save must preserve an unrelated immediate settings.json write.
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     await settingsSurface.getByRole('button', { name: 'JSON', exact: true }).click();
-    const originalJson = await settingsSurface.getByRole('textbox', { name: '設定JSON' }).inputValue();
+    const originalJson = await settingsSurface
+      .getByRole('textbox', { name: '設定JSON' })
+      .inputValue();
     const draft = JSON.parse(originalJson);
     draft.host.startMinimized = true;
     const draftText = JSON.stringify(draft, null, 2);
     await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(draftText);
     await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
-    await settingsSurface.getByText('未保存の変更があります', { exact: true }).waitFor();
+    await settleSettings(page);
     const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
     await childGrant.click();
     await panel.getByText(/未有効：公開情報の取得・公開コマンドの実行・公開設定の変更/).waitFor();
@@ -289,12 +293,15 @@ async function grant(id, permissions) {
     );
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     await settingsSurface.getByRole('button', { name: 'JSON', exact: true }).click();
-    assert.deepEqual(JSON.parse(await settingsSurface.getByRole('textbox', { name: '設定JSON' }).inputValue()), draft);
-    assert.equal((await snapshot()).settings.value.host.startMinimized, false);
+    assert.deepEqual(
+      JSON.parse(await settingsSurface.getByRole('textbox', { name: '設定JSON' }).inputValue()),
+      draft,
+    );
+    assert.equal((await snapshot()).settings.value.host.startMinimized, true);
     await settingsSurface.getByRole('textbox', { name: '設定JSON' }).fill(originalJson);
     await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
     checks.push(
-      'one permissions page; independent Applet/MCP settings, MCP-off preparation, unmet prerequisites and revocation, fixed read/input exposure, unrelated JSON draft preserved',
+      'one permissions page; independent Applet/MCP settings, MCP-off preparation, unmet prerequisites and revocation, fixed read/input exposure, immediate shared settings preserved',
     );
     for (const label of ['公開情報の取得', '公開コマンドの実行', '公開設定の変更']) {
       await panel.getByRole('switch', { name: 'Applet：' + label, exact: true }).click();
@@ -385,10 +392,14 @@ async function grant(id, permissions) {
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
           'horizontal overflow',
         );
-        await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
+        await (
+          await require('./settings-shell-helper.cjs').settingsPage(page)
+        ).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
         if (width === 700) {
           await panel.getByText('直接公開なし', { exact: true }).scrollIntoViewIfNeeded();
-          await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({
+          await (
+            await require('./settings-shell-helper.cjs').settingsPage(page)
+          ).screenshot({
             path: path.join(profile, `permissions-${theme}-${width}-input.png`),
           });
           await panel.getByRole('heading', { name: '操作の許可' }).scrollIntoViewIfNeeded();
@@ -424,7 +435,12 @@ async function grant(id, permissions) {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
-    if (page) await (await require('./settings-shell-helper.cjs').settingsPage(page)).screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
+    if (page)
+      await (
+        await require('./settings-shell-helper.cjs').settingsPage(page)
+      )
+        .screenshot({ path: path.join(profile, 'failure.png') })
+        .catch(() => {});
     console.error(error);
     process.exitCode = 1;
   } finally {

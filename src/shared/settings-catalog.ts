@@ -211,7 +211,7 @@ function definitionTerms(definition: SettingDefinition): string[] {
 }
 export function settingsCatalog(
   applets: ExtensionSnapshot[],
-  draft: Settings,
+  current: Settings,
 ): SettingsPageDefinition[] {
   return [
     ...hostSettingsPages.map(([id, title]) => ({
@@ -226,13 +226,13 @@ export function settingsCatalog(
             id === 'appearance' && key === 'theme' ? ['Dark', 'Light', 'System'] : undefined,
         })),
         ...(id === 'notifications'
-          ? notificationCatalog(orderApplets(applets, draft.appletOrder)).map((t) =>
+          ? notificationCatalog(orderApplets(applets, current.appletOrder)).map((t) =>
               item(id, notificationSettingKey(t), t.title, t.ownerTitle + ' ' + t.description),
             )
           : []),
       ],
     })),
-    ...orderApplets(applets, draft.appletOrder).map((a) => {
+    ...orderApplets(applets, current.appletOrder).map((a) => {
       const id = appletSettingsPageId(a.id);
       return {
         id,
@@ -388,19 +388,18 @@ function assertScope(value: unknown, paths: SettingsPath[], prefix: string[] = [
     assertScope(child, matching, [...prefix, key]);
   }
 }
-/** Validate an isolated page, then merge only its allowed leaves into the current draft. */
+/** Validate an isolated page, then merge only its allowed leaves into persisted settings. */
 export function applySettingsJson(
-  draft: Settings,
+  current: Settings,
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
   text: string,
-  validate = true,
 ): Settings {
   if (new TextEncoder().encode(text).length > settingsTextLimit)
     throw Error('JSONは1MB以下にしてください。');
   const value = JSON.parse(text);
   if (!object(value) || !page.json) throw Error('部分JSONはオブジェクトで指定してください。');
-  const next = structuredClone(draft);
+  const next = structuredClone(current);
   if (page.kind === 'web') {
     assertScope(value, [['webApplets', 'items']]);
     const rows = value.webApplets?.items;
@@ -412,7 +411,6 @@ export function applySettingsJson(
     );
     const row = webItem(next, page);
     for (const key of webKeys) writePath(row, [key], rows[0][key]);
-    if (!validate) return next;
     const check = createDefaultSettings();
     check.webApplets.items = [row];
     const parsed = parseSettings(check).webApplets.items[0];
@@ -421,11 +419,6 @@ export function applySettingsJson(
   }
   const paths = settingsPaths(page, applets);
   assertScope(value, paths);
-  if (!validate) {
-    if (page.kind === 'applet') next.extensions[page.owner!] ??= { enabled: false, settings: {} };
-    for (const p of paths) writePath(next, p, readSettingsPath(value, p));
-    return next;
-  }
   const check = createDefaultSettings();
   for (const p of paths)
     if (p[0] === 'extensions') check.extensions[p[1]] ??= { enabled: false, settings: {} };
@@ -443,24 +436,11 @@ export function applySettingsJson(
     normalized,
     page.kind === 'applet' ? applets.filter((a) => a.id === page.owner) : [],
   );
-  for (const p of paths) writePath(next, p, readSettingsPath(normalized, p));
-  return next;
-}
-export function settingsPageChanged(
-  draft: Settings,
-  saved: Settings,
-  page: SettingsPageDefinition,
-  applets: ExtensionSnapshot[],
-) {
-  if (!page.json) return false;
-  try {
-    return (
-      JSON.stringify(settingsProjection(draft, page, applets)) !==
-      JSON.stringify(settingsProjection(saved, page, applets))
-    );
-  } catch {
-    return true;
+  for (const p of paths) {
+    if (p[0] === 'extensions') next.extensions[p[1]] ??= { enabled: false, settings: {} };
+    writePath(next, p, readSettingsPath(normalized, p));
   }
+  return next;
 }
 const normalize = (text: string) => text.normalize('NFKC').toLowerCase();
 export function searchSettings(pages: SettingsPageDefinition[], query: string): SettingsItem[] {

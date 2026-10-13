@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process'),
   net = require('node:net');
@@ -14,7 +15,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.extensions['missing.applet'] = { enabled: false, settings: { private: 'never-in-shell' } };
 settings.host.closeToTray = false;
-for (const id of ['fixture.settings-shell', 'fixture.stalled-settings'])
+for (const id of ['fixture.settings-shell', 'fixture.stalled-settings', 'fixture.old-settings'])
   settings.extensions[id] = { enabled: true, settings: {} };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const fixture = path.join(profile, 'extensions', 'fixture.settings');
@@ -40,6 +41,7 @@ fs.cpSync(path.join(root, 'out/shells/default'), external, { recursive: true });
 const manifest = JSON.parse(fs.readFileSync(path.join(external, 'extension.json')));
 manifest.id = 'fixture.settings-shell';
 manifest.name = 'Settings shell fixture';
+manifest.minimumHostVersion = '0.33.0';
 manifest.shell = { apiVersion: 1, views: { 'page.settings': 'settings.html' } };
 fs.writeFileSync(path.join(external, 'extension.json'), JSON.stringify(manifest));
 const stalled = path.join(profile, 'extensions', 'fixture.stalled-settings');
@@ -50,6 +52,12 @@ fs.writeFileSync(
 );
 fs.writeFileSync(path.join(stalled, 'worker.cjs'), 'exports.activate=async()=>{};');
 fs.writeFileSync(path.join(stalled, 'settings.html'), '<body>Not ready</body>');
+const old = path.join(profile, 'extensions', 'fixture.old-settings');
+fs.cpSync(external, old, { recursive: true });
+fs.writeFileSync(
+  path.join(old, 'extension.json'),
+  JSON.stringify({ ...manifest, id: 'fixture.old-settings', minimumHostVersion: '0.32.0' }),
+);
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 async function until(fn, label) {
   const end = Date.now() + 20000;
@@ -135,187 +143,177 @@ async function until(fn, label) {
     );
     await host.evaluate(() => window.dock.navigate('settings'));
     let shell = await settingsPage();
-    await shell.getByLabel('テーマ', { exact: true }).waitFor();
-    await require('./shell-page-layout-helper.cjs').exerciseLayout(host, shell, app, 'settings');
-    checks.push('settings fill the host area across notification, resize and zoom changes');
-    const model = await shell.evaluate(() => window.appdockPage.connect().then((c) => c.snapshot));
-    assert.deepEqual(Object.keys(model.content.values), ['host']);
-    assert.deepEqual(Object.keys(model.content.values.host), ['theme']);
-    assert.equal(JSON.stringify(model).includes('never-in-shell'), false);
+    assert.equal((await modelOf(shell)).schemaVersion, 2);
+    assert.equal((await modelOf(shell)).content.editing.dirty, undefined);
+    assert.equal(
+      await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+      0,
+    );
+    assert.equal(JSON.stringify(await modelOf(shell)).includes('never-in-shell'), false);
     assert.equal(await shell.evaluate(() => typeof window.dock), 'undefined');
+    await require('./shell-page-layout-helper.cjs').exerciseLayout(host, shell, app, 'settings');
     await shell.getByLabel('テーマ', { exact: true }).selectOption('light');
-    await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(
-      () =>
-        host.evaluate(() =>
-          window.dock.snapshot().then((s) => s.settings.value.host.theme === 'light'),
-        ),
-      'save theme',
+    await settleSettings(shell);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.theme,
+      'light',
     );
-    checks.push('public settings region / page-only values / shared session save');
-    for (const [name, label] of [
-      ['一般', 'スタートアップに登録'],
-      ['通知', 'Appletからの通知を許可'],
-      ['リボン', 'リボン設定'],
-      ['タスクトレイ', 'タスクトレイ設定'],
-      ['ショートカット', 'ショートカットの絞り込み'],
-      ['マウスジェスチャー', 'マウスジェスチャーを有効にする'],
-      ['Webアカウント', 'Webアカウント設定'],
-      ['操作の許可', '操作の許可'],
-      ['Codex連携', 'Codex連携'],
-      ['プロフィール', 'ユーザー名'],
-      ['バージョン情報・更新', 'バージョン情報・更新'],
-    ]) {
+    checks.push(
+      'schema 2 page-only public model, no global save or dirty state, immediate durable theme and native layout',
+    );
+    const category = async (name) => {
       await shell
-        .getByRole('complementary', { name: '設定一覧' })
-        .getByRole('button', { name, exact: true })
+        .locator('.settings-categories button')
+        .filter({ has: shell.locator('span[title="' + name + '"]') })
         .click();
-      await shell.getByLabel(label, { exact: true }).first().waitFor();
-      assert.deepEqual(await shell.getByRole('alert').allTextContents(), [], `category ${name}`);
-    }
-    checks.push('all twelve host categories render with page-scoped models');
-    await shell.getByRole('button', { name: 'プロフィール', exact: true }).click();
-    await shell.getByLabel('ユーザー名', { exact: true }).fill('Shared unsaved profile');
-    const savedProfile = (await host.evaluate(() => window.dock.snapshot())).settings.value.profile
-      .name;
-    await shell.getByRole('button', { name: 'Webアカウント', exact: true }).click();
-    await shell.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
-    await until(
-      () => host.evaluate(() => window.dock.snapshot().then((s) => s.webAccounts.length === 1)),
-      'immediate web account',
-    );
-    await shell.getByRole('button', { name: '操作の許可', exact: true }).click();
-    const grant = shell.getByRole('switch', { name: 'Applet：公開情報の取得', exact: true });
-    await grant.click();
-    await until(
-      () =>
-        host.evaluate(() =>
-          window.dock.snapshot().then((s) => s.appletApi.permissions.read === false),
-        ),
-      'immediate permission',
-    );
+    };
+    await category('プロフィール');
+    await shell.getByLabel('ユーザー名', { exact: true }).fill('Immediate profile');
+    await settleSettings(shell);
     assert.equal(
-      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
-      savedProfile,
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).profile.name,
+      'Immediate profile',
     );
-    assert.equal(
-      (await host.evaluate(() => window.dock.settingsEditing())).draft.profile.name,
-      'Shared unsaved profile',
-    );
-    await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await shell.getByText('すべて保存されています', { exact: true }).waitFor();
-    checks.push('Web account and permission immediate saves preserve independent shared draft');
-    await shell
-      .getByRole('complementary', { name: '設定一覧' })
-      .getByRole('button', { name: '表示', exact: true })
-      .click();
-    for (const width of [1280, 900, 700]) {
-      if (app)
-        await app.evaluate(
-          ({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 680),
-          width,
-        );
-      await shell.waitForTimeout(100);
-      assert.ok(await shell.getByLabel('テーマ', { exact: true }).isVisible());
-      const sizes = await shell.evaluate(() => ({
-        w: innerWidth,
-        scroll: document.documentElement.scrollWidth,
-      }));
-      assert.ok(sizes.scroll <= sizes.w + 1);
-      await shell.screenshot({ path: path.join(profile, `settings-${width}.png`) });
-    }
-    checks.push(
-      app
-        ? 'full settings area at 1280 / 900 / 700; no horizontal overflow'
-        : 'fixed EXE settings area at initial window size; no horizontal overflow',
-    );
-    await shell.getByRole('button', { name: 'JSON', exact: true }).click();
-    await shell.getByLabel('設定JSON').fill('{bad');
-    await until(() => shell.getByRole('alert').count(), 'invalid JSON');
-    await shell.getByRole('button', { name: '一般', exact: true }).click();
-    assert.equal(await shell.getByLabel('設定JSON').inputValue(), '{bad');
-    checks.push('partial JSON rejects navigation and keeps raw text');
-    await host.evaluate(() => window.dock.navigate('home'));
-    await host.evaluate(() => window.dock.navigate('settings'));
-    shell = await settingsPage();
-    assert.equal(await shell.getByLabel('設定JSON').inputValue(), '{bad');
-    await shell.getByLabel('設定JSON').fill('{"host":{"theme":"light"}}');
-    await shell.getByRole('button', { name: 'フォーム', exact: true }).click();
-    await host.evaluate(() => window.dock.navigate('extensions'));
-    await host
-      .getByRole('complementary', { name: 'Applet一覧' })
-      .getByRole('button', { name: /Settings fixture/ })
-      .click();
-    await host.getByRole('tab', { name: '設定', exact: true }).click();
-    shell = await settingsPage();
-    await require('./shell-page-layout-helper.cjs').assertLayout(host, shell, app, true);
-    await shell.getByLabel('Fixture text', { exact: true }).fill('shared from detail');
-    await shell.getByLabel('Fixture amount', { exact: true }).fill('-');
-    await host.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await host.getByRole('alert').first().waitFor();
-    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '-');
-    await host.evaluate(() => window.dock.navigate('settings'));
-    shell = await settingsPage();
-    assert.equal(
-      await shell.getByLabel('Fixture text', { exact: true }).inputValue(),
-      'shared from detail',
-    );
-    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '-');
-    await shell.getByLabel('Fixture amount', { exact: true }).fill('7');
-    await shell.getByRole('button', { name: 'JSON', exact: true }).click();
-    const part = JSON.parse(await shell.getByLabel('設定JSON').inputValue());
-    assert.deepEqual(Object.keys(part.extensions), ['fixture.settings']);
-    assert.equal(part.extensions['fixture.settings'].settings['text.value'], 'shared from detail');
-    await shell.getByRole('button', { name: 'フォーム', exact: true }).click();
-    await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(
-      () =>
-        host.evaluate(() =>
-          window.dock
-            .snapshot()
-            .then((s) => s.settings.value.extensions['fixture.settings'].settings.amount === 7),
-        ),
-      'save shared detail',
-    );
-    assert.notEqual(
-      (await host.evaluate(() => window.dock.snapshot())).extensions.find(
-        (a) => a.id === 'fixture.settings',
-      ).state,
-      'running',
-    );
-    checks.push(
-      'detail/full body reuse, numeric raw buffer, dotted key JSON, whole-session save without starting Applet',
-    );
-    // Composition is not accepted until compositionend; simulate the browser event contract.
-    const input = shell.getByLabel('Fixture text', { exact: true });
-    await input.evaluate((el) => {
+    const name = shell.getByLabel('ユーザー名', { exact: true });
+    await name.evaluate((el) => {
       el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '変換中');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '変換確定');
       el.dispatchEvent(
-        new InputEvent('input', { bubbles: true, isComposing: true, data: '変換中' }),
+        new InputEvent('input', { bubbles: true, isComposing: true, data: '変換確定' }),
       );
     });
     assert.equal(
-      (await modelOf(shell)).content.values.extensions['fixture.settings'].settings['text.value'],
-      'shared from detail',
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      'Immediate profile',
     );
-    await input.evaluate((el) =>
-      el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '変換中' })),
+    await name.evaluate((el) =>
+      el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '変換確定' })),
     );
+    await settleSettings(shell);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      '変換確定',
+    );
+    // Rapid confirmed events must serialize without losing a newer character.
+    await name.fill('');
+    await name.pressSequentially('Rapid typing');
+    await settleSettings(shell);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      'Rapid typing',
+    );
+    await shell
+      .getByLabel('アバター画像を選択', { exact: true })
+      .setInputFiles(path.join(root, 'assets/icon.png'));
     await until(
       async () =>
-        (await modelOf(shell)).content.values.extensions['fixture.settings'].settings[
-          'text.value'
-        ] === '変換中',
-      'IME confirmed',
+        !!(await host.evaluate(() => window.dock.snapshot())).settings.value.profile.avatar,
+      'avatar immediate',
     );
-    checks.push('composition held locally until confirmation');
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.avatar,
+      'data/assets/profile/icon.png',
+    );
+    checks.push(
+      'text and rapid typing persist immediately; IME remains local until confirmed; avatar saves original bytes/name without staging',
+    );
+    if (app) {
+      await app.evaluate(() => {
+        const r = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')(
+          './out/main/main/core/settings',
+        );
+        globalThis.immediateSaveFixture = {
+          original: r.SettingsStore.prototype.save,
+          prototype: r.SettingsStore.prototype,
+        };
+        r.SettingsStore.prototype.save = function () {
+          throw Error('synthetic disk save failure');
+        };
+      });
+      await name.fill('Rejected input');
+      await shell.getByRole('alert').first().waitFor();
+      assert.equal(await name.inputValue(), 'Rejected input');
+      assert.equal(
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+        'Rapid typing',
+      );
+      await app.evaluate(() => {
+        globalThis.immediateSaveFixture.prototype.save = globalThis.immediateSaveFixture.original;
+        delete globalThis.immediateSaveFixture;
+      });
+      await name.fill('Retry confirmed');
+      await settleSettings(shell);
+      assert.equal(
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+        'Retry confirmed',
+      );
+      checks.push(
+        'save-failure fixture preserves local input and durable value; explicit corrected input saves after recovery',
+      );
+    }
+    await category('Settings fixture');
+    await shell.getByLabel('Fixture amount', { exact: true }).fill('-');
+    await shell.getByRole('alert').first().waitFor();
+    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '-');
+    assert.notEqual(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.settings'
+      ]?.settings.amount,
+      '-',
+    );
+    await shell.getByLabel('Fixture amount', { exact: true }).fill('9');
+    await settleSettings(shell);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.settings'
+      ].settings.amount,
+      9,
+    );
+    await shell.getByLabel('Fixture text', { exact: true }).fill('Shared durable text');
+    await settleSettings(shell);
+    await shell.getByRole('button', { name: 'JSON', exact: true }).click();
+    await shell.getByLabel('設定JSON').fill('{invalid');
+    await shell.getByRole('alert').first().waitFor();
+    assert.equal('text' in (await host.evaluate(() => window.dock.settingsEditing())), false);
+    await category('表示');
+    await category('Settings fixture');
+    assert.equal(
+      await shell.getByLabel('Fixture text', { exact: true }).inputValue(),
+      'Shared durable text',
+    );
+    await shell.getByRole('button', { name: 'JSON', exact: true }).click();
+    const before = JSON.parse(await shell.getByLabel('設定JSON').inputValue());
+    before.extensions['fixture.settings'].settings.amount = 11;
+    await shell.getByLabel('設定JSON').fill(JSON.stringify(before));
+    await settleSettings(shell);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.settings'
+      ].settings.amount,
+      11,
+    );
+    await shell.getByRole('button', { name: 'フォーム', exact: true }).click();
+    checks.push(
+      'incomplete numbers/JSON never enter main state; correction and valid scoped JSON save, leaving the page drops local incomplete input',
+    );
     await provider('fixture.settings-shell');
     shell = await providerPage('fixture.settings-shell');
-    assert.equal(await shell.getByLabel('Fixture text', { exact: true }).inputValue(), '変換中');
-    assert.equal((await modelOf(shell)).content.editing.conflict, true);
-    const denied = await shell.evaluate(async () => {
+    assert.equal(
+      await shell.getByLabel('Fixture text', { exact: true }).inputValue(),
+      'Shared durable text',
+    );
+    // A stale page projection cannot overwrite an externally changed field.
+    const stale = await modelOf(shell);
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      const v = structuredClone(s.settings.value);
+      v.extensions['fixture.settings'].settings.amount = 12;
+      await window.dock.saveSettings(v, s.settings.revision);
+    });
+    const rejected = await shell.evaluate(async (old) => {
       const m = (await window.appdockPage.connect()).snapshot;
+      const next = structuredClone(old.content.values);
+      next.extensions['fixture.settings'].settings.amount = 13;
       try {
         await window.appdockPage.act({
           id: m.id,
@@ -328,7 +326,8 @@ async function until(fn, label) {
             action: {
               type: 'page-values',
               pageId: m.content.page.id,
-              value: { host: { theme: 'dark' } },
+              before: old.content.values,
+              value: next,
             },
           },
         });
@@ -336,13 +335,19 @@ async function until(fn, label) {
       } catch {
         return true;
       }
-    });
-    assert.equal(denied, true);
+    }, stale);
+    assert.equal(rejected, true);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.settings'
+      ].settings.amount,
+      12,
+    );
     checks.push(
-      'independent public Shell fixture, revision conflict and out-of-scope edit rejected',
+      'public compatible custom Shell shares persisted values; stale same-field edit cannot overwrite an external update',
     );
     if (app) {
-      await app.evaluate(({ webContents }) => {
+      await app.evaluate(({ webContents }) =>
         webContents
           .getAllWebContents()
           .find(
@@ -350,64 +355,65 @@ async function until(fn, label) {
               w.getURL().includes('/fixture.settings-shell/') &&
               w.getURL().endsWith('/settings.html'),
           )
-          .forcefullyCrashRenderer();
-      });
+          .forcefullyCrashRenderer(),
+      );
       shell = await providerPage('appdock.default-shell');
-      assert.equal(await shell.getByLabel('Fixture text', { exact: true }).inputValue(), '変換中');
-      checks.push('crashed custom Shell restores accepted input in Default Shell');
+      assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+      checks.push('crashed settings provider falls back with persisted settings intact');
     }
-    await provider('fixture.stalled-settings');
-    await until(
-      () =>
-        context
-          .pages()
-          .some(
-            (p) =>
-              p.url().includes('/fixture.stalled-settings/') && p.url().endsWith('/settings.html'),
-          ),
-      'unready settings surface created',
-    );
+    await provider('fixture.old-settings');
     shell = await providerPage('appdock.default-shell');
-    assert.equal(await shell.getByLabel('Fixture text', { exact: true }).inputValue(), '変換中');
-    await shell.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
-    await shell.getByText('すべて保存されています', { exact: true }).waitFor();
+    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+    checks.push(
+      'pre-0.33 settings provider falls back per region without loading incompatible controls',
+    );
+    await provider('fixture.stalled-settings');
+    shell = await providerPage('appdock.default-shell');
+    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+    await host.evaluate(() => window.dock.navigate('home'));
+    const state = await host.evaluate(() => window.dock.settingsEditing());
+    for (const key of ['draft', 'dirty', 'buffers', 'text', 'avatarChanged', 'saveError'])
+      assert.equal(key in state, false);
+    assert.equal(
+      context.pages().some((p) => p.url().endsWith('/notifications.html')),
+      false,
+    );
+    checks.push(
+      'no global draft, partial buffer, staged avatar or unsaved banner survives navigation',
+    );
     await close();
     host = await launch(['--safe-shell']);
     await until(
       () => host.evaluate(() => window.dock.snapshot().then((s) => s.startupReady)),
-      'safe startup',
+      'restart',
     );
     await host.evaluate(() => window.dock.navigate('settings'));
-    await providerPage('appdock.default-shell');
-    checks.push('unready provider fallback / safe-shell / session-wide reload');
-    fs.writeFileSync(
-      path.join(profile, 'result.json'),
-      JSON.stringify(
-        {
-          success: true,
-          checks,
-          profile,
-          mode: portable ? 'portable' : 'source',
-          sha256: portable ? hash(portable) : undefined,
-        },
-        null,
-        2,
-      ),
+    shell = await providerPage('appdock.default-shell');
+    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    assert.equal(saved.extensions['fixture.settings'].settings.amount, 12);
+    assert.equal(saved.profile.avatar, 'data/assets/profile/icon.png');
+    assert.equal(saved.extensions['missing.applet'].settings.private, 'never-in-shell');
+    checks.push(
+      'restart and safe Shell retain immediate settings/assets and unrelated private values',
     );
-    console.log(
-      JSON.stringify(
-        {
-          success: true,
-          checks,
-          profile,
-          mode: portable ? 'portable' : 'source',
-          sha256: portable ? hash(portable) : undefined,
-        },
-        null,
-        2,
-      ),
-    );
+    const result = {
+      success: true,
+      profile,
+      checks,
+      mode: portable ? 'portable' : 'source',
+      sha256: portable ? hash(portable) : null,
+    };
+    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result));
   } finally {
+    if (app)
+      await app
+        .evaluate(() => {
+          if (globalThis.immediateSaveFixture)
+            globalThis.immediateSaveFixture.prototype.save =
+              globalThis.immediateSaveFixture.original;
+        })
+        .catch(() => {});
     await close();
   }
 })().catch((e) => {

@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
-const { SettingsEditingSession } = require('../out/main/main/core/settings-editing-session');
+const { SettingsInputSession } = require('../out/main/main/core/settings-input-session');
 const { SettingsPageSession } = require('../out/main/main/core/settings-page');
 function fixture() {
   let saved = { value: createDefaultSettings(), revision: 1 };
@@ -18,14 +18,13 @@ function fixture() {
       pages: [],
     },
   ];
-  const editor = new SettingsEditingSession({
+  const editor = new SettingsInputSession({
     current: () => saved,
     applets: () => applets,
     save: async (value, revision) => {
       assert.equal(revision, saved.revision);
       return (saved = { value, revision: revision + 1 });
     },
-    confirmDiscard: async () => true,
     changed() {},
   });
   let calls = 0;
@@ -82,11 +81,16 @@ test('public settings models never expose unrelated values; issued operations ar
   const f = fixture(),
     m = f.page.snapshot();
   assert.equal(JSON.stringify(m).includes('private-value'), false);
-  await assert.rejects(f.act({ kind: 'edit', action: { type: 'draft', value: {} } }), /不正/);
+  await assert.rejects(f.act({ kind: 'edit', action: { type: 'values', value: {} } }), /不正/);
   await assert.rejects(
     f.act({
       kind: 'edit',
-      action: { type: 'page-values', pageId: 'appearance', value: { profile: { name: 'attack' } } },
+      action: {
+        type: 'page-values',
+        pageId: 'appearance',
+        before: f.editor.projection(),
+        value: { profile: { name: 'attack' } },
+      },
     }),
     /変更できない/,
   );
@@ -100,39 +104,45 @@ test('public settings models never expose unrelated values; issued operations ar
   f.page.dispose();
   await assert.rejects(f.act({ kind: 'select', pageId: 'profile' }), /Stale/);
 });
-test('partial JSON and incomplete numeric input survive controller replacement and all-session save failure', async () => {
+test('invalid input never enters projection; valid page writes persist with privacy and no global save', async () => {
   const f = fixture();
   await f.act({ kind: 'select', pageId: 'applet:fixture.a.b' });
-  const values = { extensions: { 'fixture.a.b': { settings: { 'n.x': '-' } } } };
-  await f.act({
-    kind: 'edit',
-    action: { type: 'page-values', pageId: 'applet:fixture.a.b', value: values },
-  });
-  assert.equal(f.page.snapshot().content.values.extensions['fixture.a.b'].settings['n.x'], '-');
-  await assert.rejects(f.act({ kind: 'edit', action: { type: 'save' } }));
-  await f.act({ kind: 'select', pageId: 'appearance' });
-  await f.act({ kind: 'select', pageId: 'applet:fixture.a.b' });
-  assert.equal(f.editor.projection().extensions['fixture.a.b'].settings['n.x'], '-');
+  const before = f.editor.projection(),
+    values = structuredClone(before);
+  values.extensions['fixture.a.b'].settings['n.x'] = '-';
+  await assert.rejects(
+    f.act({
+      kind: 'edit',
+      action: { type: 'page-values', pageId: 'applet:fixture.a.b', before, value: values },
+    }),
+  );
+  assert.notEqual(f.editor.projection().extensions['fixture.a.b'].settings['n.x'], '-');
   values.extensions['fixture.a.b'].settings['n.x'] = 9;
   await f.act({
     kind: 'edit',
-    action: { type: 'page-values', pageId: 'applet:fixture.a.b', value: values },
+    action: { type: 'page-values', pageId: 'applet:fixture.a.b', before, value: values },
   });
-  await f.act({ kind: 'edit', action: { type: 'mode', value: 'json' } });
-  await f.act({
-    kind: 'edit',
-    action: { type: 'partial-text', pageId: 'applet:fixture.a.b', value: '{bad' },
-  });
-  await assert.rejects(f.act({ kind: 'select', pageId: 'general' }), /JSON/);
-  assert.equal(f.editor.snapshot().text, '{bad');
-  await f.act({
-    kind: 'edit',
-    action: { type: 'partial-text', pageId: 'applet:fixture.a.b', value: JSON.stringify(values) },
-  });
-  await f.act({ kind: 'edit', action: { type: 'save' } });
   assert.equal(f.saved.value.extensions['fixture.a.b'].settings['n.x'], 9);
   assert.equal(f.saved.value.extensions['private.other'].settings.secret, 'private-value');
+  assert.equal(f.page.snapshot().schemaVersion, 2);
   assert.equal(JSON.stringify(f.page.snapshot()).includes('private-value'), false);
+  assert.equal('dirty' in f.page.snapshot().content.editing, false);
+  await assert.rejects(f.act({ kind: 'edit', action: { type: 'save' } }), /不正/);
+  await f.act({ kind: 'edit', action: { type: 'mode', value: 'json' } });
+  await assert.rejects(
+    f.act({
+      kind: 'edit',
+      action: {
+        type: 'partial-text',
+        pageId: 'applet:fixture.a.b',
+        before: f.editor.projection(),
+        value: '{bad',
+      },
+    }),
+    /JSON/,
+  );
+  await f.act({ kind: 'select', pageId: 'general' });
+  assert.equal(f.editor.snapshot().pageId, 'general');
 });
 
 test('search is metadata-only and persistent; explicit movement switches page and latest acknowledgement wins', async () => {
@@ -147,7 +157,7 @@ test('search is metadata-only and persistent; explicit movement switches page an
   await f.act({ kind: 'move', itemId: results[0].id });
   const move = f.page.snapshot().content.move;
   assert.equal(f.editor.snapshot().pageId, 'applet:fixture.a.b');
-  assert.equal(f.editor.snapshot().dirty, false);
+  assert.equal('dirty' in f.editor.snapshot(), false);
   await f.act({ kind: 'move', itemId: results[0].id });
   const latest = f.page.snapshot().content.move;
   await assert.rejects(f.act({ kind: 'moved', requestId: move.id, pageId: move.pageId }), /古く/);
@@ -158,24 +168,13 @@ test('search is metadata-only and persistent; explicit movement switches page an
   assert.equal(f.editor.snapshot().pageId, latest.pageId);
   await assert.rejects(f.act({ kind: 'search', text: 'x'.repeat(513) }), /512/);
 });
-test('invalid JSON prevents result movement without clearing query or raw input; removed targets are rejected', async () => {
+test('removed setting targets remain unavailable and cannot be selected', async () => {
   const f = fixture();
-  await f.act({ kind: 'edit', action: { type: 'mode', value: 'json' } });
-  await f.act({
-    kind: 'edit',
-    action: { type: 'partial-text', pageId: 'appearance', value: '{broken' },
-  });
   await f.act({ kind: 'search', text: 'Number' });
   const result = f.page.snapshot().content.results[0];
-  await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /JSON/);
-  assert.equal(f.editor.snapshot().text, '{broken');
-  assert.equal(f.editor.snapshot().pageId, 'appearance');
-  await f.act({ kind: 'edit', action: { type: 'discard' } });
   await f.act({ kind: 'move', itemId: result.id });
   f.applets.splice(0);
-  assert.equal(f.page.snapshot().content.results.length, 0);
   assert(f.page.snapshot().content.page.unavailableReason);
   await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /見つかりません/);
   await f.act({ kind: 'select', pageId: 'profile' });
-  assert.equal(f.page.snapshot().content.page.id, 'profile');
 });

@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -30,7 +31,10 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   await dialog.waitFor({ state: 'hidden' });
   assert(await add.evaluate((el) => el === document.activeElement));
   assert.deepEqual((await snapshot()).settings.value.keybindings, original);
-  assert(await page.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled());
+  assert.equal(
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+    0,
+  );
   await until(
     async () => (await snapshot()).globalHotKeys.some((status) => status.registered),
     'global registration resumes after cancel',
@@ -47,7 +51,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   });
   await until(
     async () => !(await conflict.innerText()).includes('無効'),
-    'external edit reaches shared draft',
+    'external edit reaches saved settings',
   );
   await dialog.getByRole('button', { name: '適用', exact: true }).click();
   await dialog.getByRole('alert').filter({ hasText: '編集中に割り当てが変更されました' }).waitFor();
@@ -84,11 +88,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
     position,
   );
   assert(await add.evaluate((el) => el === document.activeElement));
-  assert.deepEqual(
-    (await snapshot()).settings.value.keybindings,
-    original,
-    'apply updates shared draft only',
-  );
+  await save();
   const assigned = page.locator('[data-shortcut-command="test.a.second"] [data-binding-id]');
   const id = await assigned.getAttribute('data-binding-id');
   await save();
@@ -110,7 +110,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
     original,
   );
 
-  // Deletion immediately updates the shared draft and can be discarded before saving.
+  // Deletion immediately updates the saved settings and can be discarded before saving.
   await assigned.getByRole('button', { name: /その他の操作/ }).click();
   assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
     '編集',
@@ -120,12 +120,11 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   await page.getByRole('menuitem', { name: '削除', exact: true }).click();
   assert.equal(await page.getByRole('alertdialog').count(), 0);
   assert.equal(await assigned.count(), 0);
+  await save();
   assert.equal(
-    (await snapshot()).settings.value.keybindings.find((row) => row.id === id).key,
-    'Ctrl+F8',
+    (await snapshot()).settings.value.keybindings.some((row) => row.id === id),
+    false,
   );
-  await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
-  assert(await assigned.isVisible());
 
   // Repeated additions restore focus and viewport, and default to this Applet.
   for (let i = 0; i < 2; i++) {
@@ -151,9 +150,9 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
     assert.equal(await page.getByRole('alertdialog').count(), 0);
   }
   await save();
-  assert.equal(await assigned.count(), 1);
+  assert.equal(await assigned.count(), 0);
   checks.push(
-    'Applet dialog / cancel and focus / Enter and special modifier keys / target validation / enabled state / shared draft and save / same-key tail insertion / immediate deletion and discard / repeated addition without scrolling / left-aligned assignments',
+    'Applet dialog / cancel and focus / Enter and special modifier keys / target validation / enabled state / saved settings and save / same-key tail insertion / immediate deletion persists / repeated addition without scrolling / left-aligned assignments',
   );
 
   for (const theme of ['dark', 'light']) {
@@ -162,7 +161,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
     }, theme);
     for (const width of [1280, 900, 700]) {
       await page.setViewportSize({ width, height: 760 });
-      await assigned.locator('.applet-shortcut-edit').click();
+      await page.locator('[data-binding-id="overview.extra"] .applet-shortcut-edit').click();
       await ready();
       const bounds = await dialog.boundingBox();
       assert(

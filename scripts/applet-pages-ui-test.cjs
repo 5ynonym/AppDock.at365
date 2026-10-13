@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -127,7 +128,7 @@ async function launch() {
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
   });
-  dock = await app.firstWindow();
+  dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   await until(() => {
     rail = app
       .context()
@@ -307,41 +308,12 @@ async function launch() {
       .getByLabel('設定JSON', { exact: true })
       .fill(JSON.stringify(noticeDraft));
     await button('Gmail').click();
-    const noticeUi = await until(
-      () =>
-        app
-          .context()
-          .pages()
-          .find((page) => page.url().endsWith('/notifications.html')),
-      'Gmail unsaved notice renderer',
-    );
-    await noticeUi
-      .getByRole('region', { name: /未保存の変更があります|変更を保存できません/ })
-      .waitFor();
+    await settleSettings(dock);
     assert.equal(
       await gmailUi.getByPlaceholder('送信元・件名・アカウント名で検索').inputValue(),
       '保持',
     );
     assert.equal((await snapshot()).selected, account);
-    assert.equal(
-      await app.evaluate(({ BrowserWindow }) => {
-        const window = BrowserWindow.getAllWindows().find((w) =>
-          w.webContents.getURL().startsWith('appdock://host/'),
-        );
-        return window.contentView.children.at(-1).webContents.getURL();
-      }),
-      require('node:url').pathToFileURL(path.join(root, 'out/shells/default/notifications.html'))
-        .href,
-    );
-    await noticeUi.screenshot({ path: path.join(profile, 'gmail-settings-notice.png') });
-    await noticeUi.getByRole('button', { name: 'すべて保存', exact: true }).click();
-    await until(
-      async () =>
-        (await noticeUi
-          .getByRole('region', { name: /未保存の変更があります|変更を保存できません/ })
-          .count()) === 0,
-      'Gmail notice save',
-    );
     assert.equal(
       await dock.evaluate(async () => (await window.dock.snapshot()).settings.value.profile.name),
       'Gmail overlay fixture',
@@ -350,9 +322,7 @@ async function launch() {
       await app.evaluate(({ webContents }, id) => !!webContents.fromId(id), contentsId),
       true,
     );
-    checks.push(
-      'floating notice above nested Gmail views / search and account retained / host draft saved without rebuilding mail contents',
-    );
+    checks.push('immediate settings preserve Gmail search/account and native WebContents');
     await setDisplay('at365.gmail', 'gmail', 'window');
     await button('Gmail').click();
     assert.equal(
@@ -463,10 +433,14 @@ async function launch() {
     await (await settingsUi()).getByLabel('Gmailをリボンに表示').uncheck();
     await button('Gmailを上へ').click();
     await (await settingsUi()).getByLabel('設定をリボンに表示').uncheck();
-    await button('変更をすべて保存').click();
+    await settleSettings(dock);
     await until(
       async () => (await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count()) === 0,
       'Hidden Gmail',
+    );
+    await until(
+      async () => (await rail.locator('[data-ribbon-id="settings"]').count()) === 0,
+      'Hidden Settings',
     );
     assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
     await button('ホーム').click();
@@ -493,6 +467,10 @@ async function launch() {
     restartSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
     await launch();
+    await until(
+      async () => (await rail.locator('[data-ribbon-id="settings"]').count()) === 0,
+      'Hidden Settings',
+    );
     assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
     assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.executeCommand('at365.gmail.open'));

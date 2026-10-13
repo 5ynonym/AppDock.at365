@@ -14,11 +14,11 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。空配列
 
 ## 通知種類と設定
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。未保存警告はhost/settings/unsaved-changesとして必須banner/condition。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
 
-「設定 → 通知」はpage.settingsの同じ編集セッションを使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体必須警告を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
+「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
 
-未保存の編集では配送を変えない。オフの保存は既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbanner/desktop/windowsで、3種類とも選択可能。「通知センターのみ」はtargets:[]として選択できる。
+検証して即時保存したオフは既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbanner/desktop/windowsで、3種類とも選択可能。「通知センターのみ」はtargets:[]として選択できる。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
 
@@ -71,17 +71,13 @@ NotificationDesktopHostは通知がある間だけ独立Windowと表示可否que
 
 Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shellも利用不能なdesktopはdelivery:failedとログを使い、勝手にバナーへ配送しない。バナーのDefault Shell全故障時に使うネイティブdialogをdesktopへ複製しない。
 
-## 現在の未保存警告
+## 即時保存への移行
 
-SettingsNotificationSourceだけがSettingsEditingSessionと接続する。dirty状態の1期間を1通知に集約し、通常はwarning、parseError/saveError時はerror。同じ通知で保存・確認付き全体破棄・直前編集ページへの移動を提供する。入力の反映待ち、最新session/revision、既存の保存・確認処理を使う。
-
-設定/Appletページではバナーだけ非表示にし、保存成功/破棄確定/未保存解消でresolvedにする。保存失敗/確認キャンセルでは維持する。設定値・JSON・画像を通知へ複製しない。履歴は固定の安全な要約だけを保存する。host.notificationsの既存Applet向けスイッチでこの警告を無効化しない。
-
-将来の即時保存化ではこの発行元を削除できる。保存失敗・再試行の通知も保存サービスへ委譲し、通知基盤で編集内容を管理しない。
+0.33.0でSettingsNotificationSourceと未保存種類/保存・破棄操作を削除した。通知基盤は編集状態を持たず、設定エラーは現在の設定ページへ表示する。通常の保存成功通知を出さない。過去の未保存通知の終了履歴は保持期限まで読め、操作を復元しない。
 
 ## 検証
 
-単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]は実際の設定連携をソース/固定EXEで検証する。shell-page-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
+単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-shell-ui-test.cjsは即時保存とShell復旧を確認する。shell-page-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
 
 ## Windows表示の実装 (0.32.0)
 

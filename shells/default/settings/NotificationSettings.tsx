@@ -24,8 +24,8 @@ export function NotificationSettings({
   editor: FormEditor;
   types: NotificationTypeEntry[];
 }) {
-  const draft = editor.draft;
-  const overrides = draft.notificationPreferences?.overrides ?? [];
+  const settings = editor.value;
+  const overrides = settings.notificationPreferences?.overrides ?? [];
   const change = (type: NotificationTypeEntry, patch?: Partial<NotificationPreference>) => {
     const key = notificationTypeKey(type),
       current = overrides.find((r) => notificationTypeKey(r) === key);
@@ -38,7 +38,7 @@ export function NotificationSettings({
         ...current,
         ...patch,
       });
-    editor.edit({ ...draft, notificationPreferences: { overrides: next } });
+    editor.edit({ ...settings, notificationPreferences: { overrides: next } });
   };
   const owners = [...new Set(types.map((t) => JSON.stringify([t.ownerKind, t.ownerId])))];
   const unknown = overrides.filter(
@@ -53,9 +53,9 @@ export function NotificationSettings({
         </div>
         <Toggle
           label="Appletからの通知を許可"
-          checked={draft.host.notifications}
+          checked={settings.host.notifications}
           onChange={(notifications) =>
-            editor.edit({ ...draft, host: { ...draft.host, notifications } })
+            editor.edit({ ...settings, host: { ...settings.host, notifications } })
           }
         />
       </div>
@@ -68,7 +68,7 @@ export function NotificationSettings({
           <section key={owner} aria-label={rows[0].ownerTitle + 'の通知'}>
             <h3>{rows[0].ownerTitle}</h3>
             {rows.map((type) => {
-              const policy = resolveNotificationPolicy(type, draft);
+              const policy = resolveNotificationPolicy(type, settings);
               const row = overrides.find(
                 (r) => notificationTypeKey(r) === notificationTypeKey(type),
               );
@@ -192,7 +192,7 @@ export function NotificationSettings({
               <button
                 onClick={() =>
                   editor.edit({
-                    ...draft,
+                    ...settings,
                     notificationPreferences: {
                       overrides: overrides.filter(
                         (r) => notificationTypeKey(r) !== notificationTypeKey(row),

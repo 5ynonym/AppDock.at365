@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Two isolated placements simulate file-sync delivery. No live accounts or real sync service.
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -109,6 +110,7 @@ async function start(p) {
         .find((p) => p.url().startsWith('appdock://host/')),
     'host',
   );
+  state.dock = require('./settings-aware-page.cjs').settingsAwarePage(state.dock);
   state.dock.setDefaultTimeout(15000);
   state.snapshot = () => state.dock.evaluate(() => window.dock.snapshot());
   await until(async () => (await state.snapshot()).startupReady, 'startup');
@@ -190,20 +192,22 @@ async function gmail(s) {
   checks.push('rename-delivered settings apply while running');
   await b.dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   await b.dock.getByRole('button', { name: 'プロフィール設定を開く', exact: true }).click();
-  await b.dock.getByLabel('ユーザー名').fill('保持する下書き');
+  await b.dock.getByLabel('ユーザー名').fill('即時保存');
+  await settleSettings(b.dock);
+  assert.equal((await b.snapshot()).settings.value.profile.name, '即時保存');
   await update(a, (v) => (v.profile.name = '相手の名前'));
   deliverShared(a, b);
   await until(
     async () => (await b.snapshot()).settings.value.profile.name === '相手の名前',
     'remote name',
   );
-  assert.equal(await b.dock.getByLabel('ユーザー名').inputValue(), '保持する下書き');
-  await b.dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
   await until(
-    async () => (await b.dock.getByText(/別の場所で設定が/).count()) > 0,
-    'draft conflict',
+    async () => (await b.dock.getByLabel('ユーザー名').inputValue()) === '相手の名前',
+    'external value shown',
   );
-  checks.push('dirty draft stays intact and stale save is rejected');
+  checks.push(
+    'immediate local setting persists and received external setting replaces the canonical value',
+  );
   const broken = '{broken';
   fs.writeFileSync(path.join(pb.base, 'settings.json'), broken);
   await until(async () => (await b.snapshot()).settings.recovered, 'invalid receipt');
@@ -281,19 +285,24 @@ async function gmail(s) {
   const current = (await a.snapshot()).settings;
   await a.dock.evaluate(
     ({ current, avatar }) =>
-      window.dock.saveSettings(current.value, current.revision, new Uint8Array(avatar), 'ユキ.png'),
+      window.dock.saveSettings(
+        current.value,
+        current.revision,
+        new Uint8Array(avatar),
+        'fixture.png',
+      ),
     { current, avatar },
   );
   deliverShared(a, b);
   await until(
-    async () => (await b.snapshot()).settings.value.profile.avatar.endsWith('/ユキ.png'),
+    async () => (await b.snapshot()).settings.value.profile.avatar.endsWith('/fixture.png'),
     'avatar ref',
   );
   const before = (await b.snapshot()).avatarUrl;
   assert.ok(before);
-  const file = path.join(pa.base, 'data', 'assets', 'profile', 'ユキ.png');
+  const file = path.join(pa.base, 'data', 'assets', 'profile', 'fixture.png');
   fs.appendFileSync(file, Buffer.from('fixture image receipt'));
-  deliverFile(file, path.join(pb.base, 'data', 'assets', 'profile', 'ユキ.png'));
+  deliverFile(file, path.join(pb.base, 'data', 'assets', 'profile', 'fixture.png'));
   await until(async () => (await b.snapshot()).avatarUrl !== before, 'image-only update');
   checks.push('original avatar filename is retained and image-only delivery invalidates display');
   await uiA.locator('.sound-file').scrollIntoViewIfNeeded();

@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
@@ -117,7 +118,7 @@ async function launch() {
       env,
     });
     browser = app.context();
-    host = await app.firstWindow();
+    host = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   } else {
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
@@ -150,6 +151,7 @@ async function launch() {
       if (m.type() === 'error') console.error('CONSOLE', page.url(), m.text());
     });
   });
+  host.on('pageerror', (e) => console.error('RENDERER', String(e)));
   host.setDefaultTimeout(12000);
   await host.waitForFunction(async () => {
     const s = await window.dock?.snapshot();
@@ -184,14 +186,11 @@ async function settingsPage() {
   return p;
 }
 async function save(p) {
-  await p.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-  await p.getByText('すべて保存されています', { exact: true }).waitFor();
+  await settleSettings(p);
   await until(
     () =>
       p.evaluate(() =>
-        window.appdockPage
-          .connect()
-          .then((c) => !c.snapshot.content.editing.dirty && !c.snapshot.content.editing.pending),
+        window.appdockPage.connect().then((c) => !c.snapshot.content.editing.pending),
       ),
     'saved model',
   );
@@ -222,10 +221,9 @@ async function close() {
     await launch();
     let p = await settingsPage();
     assert.equal(
-      await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).isDisabled(),
-      true,
+      await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
+      0,
     );
-    assert.equal(await p.getByLabel('未保存の変更のバナー', { exact: true }).isDisabled(), true);
     await p.getByRole('switch', { name: 'Stopped noticeを通知', exact: true }).waitFor();
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     assert.equal(
@@ -237,7 +235,7 @@ async function close() {
       false,
     );
     checks.push(
-      'static catalog includes mandatory host, stopped Applet and retained unknown types; desktop and Windows enabled',
+      'static catalog includes host types without obsolete settings warning, stopped Applet and retained unknown types; desktop and Windows enabled',
     );
     await command(ids.node + '.publish');
     await command(ids.native + '.publish');
@@ -252,8 +250,6 @@ async function close() {
     checks.push('real Node and .NET API publish accepted banners; owned command actions execute');
     p = await settingsPage();
     await p.getByRole('switch', { name: 'Node noticeを通知', exact: true }).click();
-    await command(ids.node + '.publish');
-    assert.equal(storage(ids.node, 'result').status, 'accepted');
     await save(p);
     await command(ids.node + '.publish');
     assert.equal(storage(ids.node, 'result').reason, 'type-disabled');
@@ -266,9 +262,7 @@ async function close() {
       .getByRole('region', { name: 'Native notification', exact: true })
       .count();
     assert.equal(nativeRegions, 1);
-    checks.push(
-      'unsaved preference does not affect dispatch; saved off withdraws active and suppresses new without disabling other owners',
-    );
+    checks.push('immediate off withdraws active and suppresses new without disabling other owners');
     p = await settingsPage();
     await p.getByRole('switch', { name: 'Node noticeを通知', exact: true }).click();
     await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('1');
@@ -326,7 +320,7 @@ async function close() {
     );
     p = await settingsPage();
     await p.getByLabel('Native noticeの表示時間', { exact: true }).fill('0');
-    await p.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(p);
     await p.getByRole('alert').waitFor();
     assert.equal(await p.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(), '0');
     assert.equal(
@@ -346,7 +340,7 @@ async function close() {
     await until(() => storage(ids.native, 'changed') === true, 'native policy event');
     await until(() => storage(ids.node, 'changed') === true, 'node policy event');
     checks.push(
-      'invalid form is retained and blocks save; global gate and policy subscriptions work for both SDKs',
+      'invalid form remains local and never persists; global gate and policy subscriptions work for both SDKs',
     );
     await p.getByLabel('設定を検索', { exact: true }).fill('Stopped notice');
     await p.getByRole('option').filter({ hasText: 'Stopped notice' }).click();
@@ -415,6 +409,17 @@ async function close() {
           .innerText()
           .catch(() => ''),
       );
+    console.error(
+      'HOSTDOM',
+      await host.evaluate(() => ({
+        main: document.querySelector('main')?.outerHTML?.slice(0, 6000),
+        hidden: document.querySelector('.settings-page')?.hidden,
+        slots: [...document.querySelectorAll('.shell-page-slot')].map((e) => ({
+          rect: e.getBoundingClientRect().toJSON(),
+          html: e.outerHTML,
+        })),
+      })),
+    );
     console.error(
       'HOSTSTATE',
       await host

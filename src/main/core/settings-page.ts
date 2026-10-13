@@ -8,8 +8,8 @@ import type {
   SettingsNavigationState,
 } from '../../shared/settings-page';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
-import { settingsPageChanged, searchSettings } from '../../shared/settings-catalog';
-import type { SettingsEditingSession } from './settings-editing-session';
+import { searchSettings } from '../../shared/settings-catalog';
+import type { SettingsInputSession } from './settings-input-session';
 import type { ShellPageController } from './shell-page-controller';
 
 export class SettingsPageSession implements ShellPageController {
@@ -28,7 +28,7 @@ export class SettingsPageSession implements ShellPageController {
   constructor(
     private request: SettingsPageRequest,
     private options: {
-      editor: SettingsEditingSession;
+      editor: SettingsInputSession;
       navigation?: SettingsNavigationState;
       host(): HostSnapshot;
       auxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary;
@@ -101,9 +101,6 @@ export class SettingsPageSession implements ShellPageController {
               id: p.id,
               title: p.title,
               owner: p.owner,
-              dirty:
-                !!state.buffers[p.id] ||
-                settingsPageChanged(state.draft, host.settings.value, p, host.extensions),
             }))
           : [],
       query: this.request.context === 'full' ? this.navigation.query : '',
@@ -123,14 +120,9 @@ export class SettingsPageSession implements ShellPageController {
       editing: {
         sessionId: state.sessionId,
         editRevision: state.editRevision,
-        dirty: state.dirty,
         pending: state.pending,
-        conflict: state.dirty && state.revision !== host.settings.revision,
-        error: this.error || state.parseError || state.saveError,
+        error: this.error,
         mode: state.mode,
-        text: state.mode === 'json' ? state.text : '',
-        avatarChanged: state.avatarChanged,
-        avatarLoading: state.avatarLoading,
       },
       actions: Object.fromEntries([...this.actions].map(([key, a]) => [key, a.id])),
       auxiliary: page.unavailableReason ? {} : this.options.auxiliary(page),
@@ -141,7 +133,7 @@ export class SettingsPageSession implements ShellPageController {
       this.revision++;
     }
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: this.id,
       contextId: 'primary',
       kind: 'settings',
@@ -186,8 +178,6 @@ export class SettingsPageSession implements ShellPageController {
           .flatMap((p) => p.items)
           .find((i) => i.id === op.itemId);
         if (!item) throw Error('設定対象が見つかりません。検索結果を更新してください。');
-        if (state.mode === 'json' && state.parseError)
-          throw Error('JSONの内容を修正してから移動してください。');
         await this.options.editor.act({
           ...action,
           action: { type: 'select-page', pageId: item.pageId },
@@ -233,24 +223,9 @@ export class SettingsPageSession implements ShellPageController {
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
       } else if (op.kind === 'edit') {
-        if (
-          ![
-            'mode',
-            'page-values',
-            'partial-text',
-            'avatar',
-            'avatar-loading',
-            'save',
-            'discard',
-            'reload',
-          ].includes(op.action.type)
-        )
+        if (!['mode', 'page-values', 'partial-text', 'avatar', 'reload'].includes(op.action.type))
           throw Error('設定操作が不正です。');
-        if (
-          (op.action.type === 'avatar' ||
-            (op.action.type === 'avatar-loading' && op.action.value)) &&
-          state.pageId !== 'profile'
-        )
+        if (op.action.type === 'avatar' && state.pageId !== 'profile')
           throw Error('画像はプロフィールで選択してください。');
         await this.options.editor.act({ ...action, action: op.action });
       } else if (op.kind === 'invoke') {

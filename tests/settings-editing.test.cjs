@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
-const { SettingsEditingSession } = require('../out/main/main/core/settings-editing-session');
+const { SettingsInputSession } = require('../out/main/main/core/settings-input-session');
 const {
   settingsCatalog,
   settingsProjection,
@@ -24,9 +24,8 @@ const applets = [
 function fixture() {
   let saved = { value: createDefaultSettings(), revision: 1, path: 'test' };
   let fail = false,
-    saves = 0,
-    confirm = true;
-  const session = new SettingsEditingSession({
+    saves = 0;
+  const session = new SettingsInputSession({
     current: () => saved,
     applets: () => applets,
     save: async (value, revision) => {
@@ -35,7 +34,6 @@ function fixture() {
       saves++;
       return (saved = { ...saved, value, revision: revision + 1 });
     },
-    confirmDiscard: async () => confirm,
     changed: () => {},
   });
   const act = (action, operationId = crypto.randomUUID()) => {
@@ -59,9 +57,6 @@ function fixture() {
     set fail(v) {
       fail = v;
     },
-    set confirm(v) {
-      confirm = v;
-    },
     external() {
       saved = {
         ...saved,
@@ -71,55 +66,106 @@ function fixture() {
     },
   };
 }
-test('editing retains invalid JSON, failed save, external conflict, avatar and confirmed discard', async () => {
+test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {
   const f = fixture();
   await f.act({ type: 'select-page', pageId: 'profile' });
   await f.act({ type: 'mode', value: 'json' });
-  await f.act({ type: 'partial-text', pageId: 'profile', value: '{broken' });
-  await assert.rejects(f.act({ type: 'mode', value: 'form' }), /JSON/);
-  await assert.rejects(f.act({ type: 'save' }), /JSON/);
-  assert.equal(f.session.snapshot().text, '{broken');
+  await assert.rejects(
+    f.act({
+      type: 'partial-text',
+      pageId: 'profile',
+      before: f.session.projection(),
+      value: '{broken',
+    }),
+    /JSON/,
+  );
+  assert.equal(f.saves, 0);
+  assert.equal('text' in f.session.snapshot(), false);
+  assert.equal('dirty' in f.session.snapshot(), false);
   await f.act({
     type: 'partial-text',
     pageId: 'profile',
-    value: JSON.stringify({ profile: { name: 'Draft', avatar: null } }),
+    before: f.session.projection(),
+    value: JSON.stringify({ profile: { name: 'Saved', avatar: null } }),
   });
-  await f.act({ type: 'avatar', bytes: new Uint8Array([137, 80]), name: 'test.png' });
+  assert.equal(f.saved.value.profile.name, 'Saved');
   f.fail = true;
-  await assert.rejects(f.act({ type: 'save' }), /disk failure/);
-  assert.equal(f.session.snapshot().draft.profile.name, 'Draft');
-  assert.equal(f.session.snapshot().avatarChanged, true);
+  const before = f.session.value,
+    next = { ...before, profile: { ...before.profile, name: 'Rejected' } };
+  await assert.rejects(f.act({ type: 'values', before, value: next }), /disk failure/);
+  assert.equal(f.saved.value.profile.name, 'Saved');
+  assert.equal(f.session.snapshot().pending, false);
   f.fail = false;
-  f.external();
-  await assert.rejects(f.act({ type: 'save' }), /revision conflict/);
-  f.confirm = false;
-  await f.act({ type: 'discard' });
-  assert.equal(f.session.snapshot().dirty, true);
-  f.confirm = true;
-  await f.act({ type: 'discard' });
-  assert.equal(f.session.snapshot().draft.profile.name, 'External');
-  assert.equal(f.session.snapshot().avatarChanged, false);
+  await f.act({ type: 'values', before, value: next });
+  assert.equal(f.saved.value.profile.name, 'Rejected');
+  await f.act({ type: 'avatar', bytes: new Uint8Array([137, 80]), name: 'fixture.png' });
+  assert.equal('avatarChanged' in f.session.snapshot(), false);
+  await f.act({ type: 'select-page', pageId: 'applet:test.a.b' });
+  const raw = f.session.projection();
+  raw.extensions['test.a.b'].settings['x.y'] = '-';
+  await assert.rejects(
+    f.act({
+      type: 'page-values',
+      pageId: 'applet:test.a.b',
+      before: f.session.projection(),
+      value: raw,
+    }),
+  );
+  assert.notEqual(f.saved.value.extensions['test.a.b']?.settings['x.y'], '-');
+  await f.act({ type: 'select-page', pageId: 'appearance' });
+  assert.equal(f.session.snapshot().pageId, 'appearance');
 });
-test('editing rejects stale writes and replays operation once', async () => {
+test('stale view writes are rejected and operation ID replay saves once', async () => {
   const f = fixture(),
-    s = f.session.snapshot();
-  await f.act({ type: 'draft', value: { ...s.draft, profile: { name: 'One', avatar: null } } });
+    s = f.session.snapshot(),
+    id = crypto.randomUUID();
+  const action = {
+    type: 'values',
+    before: s.value,
+    value: { ...s.value, profile: { name: 'One', avatar: null } },
+  };
+  await f.act(action, id);
+  await f.act(action, id);
+  assert.equal(f.saves, 1);
   await assert.rejects(
     f.session.act({
       sessionId: s.sessionId,
       editRevision: s.editRevision,
       operationId: 'stale',
-      action: { type: 'draft', value: s.draft },
+      action,
     }),
     /別の画面/,
   );
-  const id = crypto.randomUUID();
-  await f.act({ type: 'save' }, id);
-  await f.act({ type: 'save' }, id);
-  assert.equal(f.saves, 1);
   f.external();
-  assert.equal(f.session.snapshot().draft.profile.name, 'External');
+  assert.equal(f.session.snapshot().value.profile.name, 'External');
+  await assert.rejects(f.act(action), /同じ設定/);
 });
+test('field merge preserves unrelated external updates, detects same-field conflicts, and treats arrays atomically', () => {
+  const { mergeSettingsInput } = require('../out/main/shared/settings-input');
+  const a = { host: { theme: 'light', startMinimized: false }, items: [1] },
+    b = { host: { theme: 'dark', startMinimized: false }, items: [1] },
+    c = { host: { theme: 'light', startMinimized: true }, items: [1], future: 'keep' };
+  assert.deepEqual(mergeSettingsInput(a, b, c), {
+    ...c,
+    host: { theme: 'dark', startMinimized: true },
+  });
+  assert.throws(
+    () => mergeSettingsInput(a, b, { ...c, host: { theme: 'system', startMinimized: true } }),
+    /同じ設定/,
+  );
+  assert.throws(
+    () => mergeSettingsInput(a, { ...a, items: [2] }, { ...a, items: [3] }),
+    /同じ設定/,
+  );
+  assert.throws(() => mergeSettingsInput(a, { ...a, items: [NaN] }, a), /不正/);
+});
+test('old settings Shell falls back only for settings; schema 2 providers are accepted', () => {
+  const { settingsShellCompatible } = require('../out/main/shared/shell');
+  assert.equal(settingsShellCompatible({ id: 'fixture', minimumHostVersion: '0.32.0' }), false);
+  assert.equal(settingsShellCompatible({ id: 'fixture', minimumHostVersion: '0.33.0' }), true);
+  assert.equal(settingsShellCompatible({ id: 'appdock.default-shell' }), true);
+});
+
 test('all JSON pages round-trip only selected ranges; unknown owners, leaves and order survive', () => {
   const value = createDefaultSettings();
   value.extensions['test.a.b'] = {

@@ -33,7 +33,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。Appletの複数Window/複数Shellの同時表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
-- 編集状態は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)に従いmainのSettingsEditingSessionで共有し、useSettingsEditorは本体用アダプターとする。不正JSON・未保存画像・revision・保存失敗を保持し、通知へdraftを複製しない。設定外ではWindow上部の浮動通知から保存/確認付き破棄を行う。
+- 設定は[設定基盤](docs/settings-foundation.md)の即時保存を正本とする。SettingsInputSessionは受付調整のみ。本体とShellの入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。
 - Applet設定は詳細タブと設定ページの左インデックスを入口とし、同じShell本文と編集状態を共用する。横断検索は左だけに結果を表示し、右本文はページ全体を保つ。Applet本文内のローカル検索を追加しない。
 - 更新・通常再起動は--restore-viewと画面選択を復元し、終了中のselected(null)でホームへ上書きしない。Appletの復元はstartupReadyと対象runningを待つ。
 
@@ -43,15 +43,15 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - 外部コマンド公開はApplet自身のmanifest宣言に従う。本体へApplet固有の許可一覧を置かず、IDの接頭辞・別名・runtime登録から公開権限を推測しない。停止中の自動有効化を避け、設定変更とコマンド実行を分離する。
 - 自己設定APIのcapability・非公開キー・activate中の契約を保持し、SettingsCommandsへ接続する。外部更新のexpectedRevision・dryRun・原子的保存・公開項目制限を維持する。再入のBUSY/SELF_CALLとNode/.NETの対応を確認する。
 - MCPはlocalhostのHost/Origin/token検査と登録TOMLの所有範囲を維持する。監査ログに引数・認証・生の例外を追加しない。受付・保存完了・OS登録・対象アプリでの効果確認を区別する。
-- 操作許可のUIは専用カテゴリへ集約し、Applet/MCPの独立した列、PC専用即時保存、共有draft保持を維持する。前提不足でも保存済みON/OFFを保ち、他の許可を自動変更しない。
-- Applet管理は共通AppletManagementへ集約する。enabledの保存と再起動を分け、無効Appletを再起動で有効化しない。設定アクションは自身の宣言済みコマンドに限定し、二重実行防止と未保存入力を保つ。
+- 操作許可のUIは専用カテゴリへ集約し、Applet/MCPの独立した列、PC専用保存と共有設定の独立性を維持する。前提不足でも保存済みON/OFFを保ち、他の許可を自動変更しない。
+- Applet管理は共通AppletManagementへ集約する。enabledの保存と再起動を分け、無効Appletを再起動で有効化しない。設定アクションは自身の宣言済みコマンドに限定し、二重実行防止と保存済み入力を保つ。
 - 保存場所と受信・復旧は[設定同期](docs/settings-sync.md)に従う。ログは共通Host APIを使い、停止処理中はhost.logだけを受け付ける。停止完了後・異常終了後の要求や停止中の他APIを許可しない。
 
 ## 入力とトレイ
 
 - [条件付きショートカット](docs/keybindings.md)と[ジェスチャー](docs/gestures.md)を正本とする。本体・ローカルUI・Web・Windows入力は共通resolver/dispatcherへ接続し、押下時の条件、保存順、同一コマンド1回、再入防止・取消を維持する。
 - Applet条件は実Windowフォーカスと表示Surfaceで判定する。ownerはコマンド登録元IDを使い、ID接頭辞で推測しない。新規Applet割当はowner、本体/不明はapp。manifestの初期値は初回だけ適用し、解除した行を再生成しない。
-- 一覧は全コマンドの平坦な2列表示。表示順を実行順に流用せず、追加後の検索・スクロールを保持する。編集・順序パネルの一時入力は適用時に共有draftへ戻し、外部更新との競合を検査する。削除は確認なし、保存前の全体破棄で復元する。
+- 一覧は全コマンドの平坦な2列表示。表示順を実行順に流用せず、追加後の検索・スクロールを保持する。編集・順序パネルの一時入力は適用時に即時保存し、外部更新との競合を検査する。削除は確認なしで即時保存する。
 - 正常なWindows登録状態を行に表示せず、記録中の一時解除と実登録エラーを区別する。エラーの表示キャッシュをbackendやdraftへ戻さない。
 - ジェスチャーは本体InputHostが管理し、Appletへ二重フックを持たせない。開始HWND、方向転換取消、右クリック復元、捕捉キーの解放、ホイール積算/破棄、対象変更取消を実入力で確認する。連続操作への固定待機は加えず、再入防止は維持する。
 - トレイは[専用仕様](docs/tray-menu.md)。メニュー外の固定設定/終了、未知コマンドと配置、空配列、グループ解除時の子、単/ダブルクリック独立割当を維持する。外部編集は各専用コマンドと許可・共通revisionへ接続し、保存時に割当操作を実行しない。

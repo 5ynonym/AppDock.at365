@@ -121,7 +121,7 @@ test('declarations reject identity duplication, Applet mandatory claims, invalid
   assert.equal(
     p.parseNotificationTypes(
       [
-        p.settingsNotificationType && {
+        {
           ...definition(),
           canDisable: false,
           requiredTargets: ['banner'],
@@ -166,12 +166,23 @@ test('preferences distinguish inheritance and explicit null; reject invalid and 
 test('mandatory condition is enforced for UI saves and externally received overrides', () => {
   const settings = createDefaultSettings(),
     next = structuredClone(settings),
-    type = p.settingsNotificationType;
+    type = {
+      ...definition({
+        canDisable: false,
+        requiredTargets: ['banner'],
+        lifetimePolicy: 'condition',
+        defaultDurationSeconds: undefined,
+      }),
+      ownerKind: 'host',
+      ownerId: 'required',
+      ownerTitle: 'Host',
+      ownerState: 'running',
+    };
   next.notificationPreferences = {
     overrides: [
       {
         ownerKind: 'host',
-        ownerId: 'settings',
+        ownerId: 'required',
         typeId: type.typeId,
         enabled: false,
         targets: [],
@@ -281,7 +292,7 @@ test('route changes preserve active ID and deadline including Windows and center
   assert.equal(f.service.list()[0].expiresAt, due);
   assert.deepEqual(f.service.list()[0].targets, []);
 });
-test('Applet global gate does not disable host warning, stopped generation cannot resolve or replay actions', async (t) => {
+test('Applet global gate does not disable host updates, stopped generation cannot resolve or replay actions', async (t) => {
   const f = setup(t);
   let sideEffects = 0;
   f.prefs([row({ durationSeconds: null })]);
@@ -304,10 +315,7 @@ test('Applet global gate does not disable host warning, stopped generation canno
   const item = f.service.list().find((i) => i.id === a.notificationId);
   f.global(false);
   assert.equal(f.service.list().find((i) => i.id === item.id).status, 'withdrawn');
-  assert.equal(
-    f.typed.policy({ ownerKind: 'host', ownerId: 'settings' }, 'unsaved-changes').enabled,
-    true,
-  );
+  assert.equal(f.typed.policy({ ownerKind: 'host', ownerId: 'updates' }, 'applied').enabled, true);
   await assert.rejects(
     f.service.invoke({
       notificationId: item.id,

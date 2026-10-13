@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -35,19 +36,10 @@ const ribbonIds = (group) =>
     .locator(`.ribbon-${group} [data-ribbon-id]`)
     .evaluateAll((elements) => elements.map((element) => element.dataset.ribbonId));
 const save = async () => {
-  const before = (await dock.evaluate(() => window.dock.snapshot())).settings.revision;
-  await button('変更をすべて保存').click();
-  await dock
-    .locator('.settings-toolbar:visible')
-    .getByText('すべて保存されています', { exact: true })
-    .waitFor();
-  await dock.waitForFunction(
-    async (before) => (await window.dock.snapshot()).settings.revision > before,
-    before,
-  );
+  await settleSettings(dock);
   const revision = await rail.evaluate(async () => (await window.appdockShell.get()).revision);
   await rail.waitForFunction(
-    (revision) => Number(document.querySelector('.activity-rail')?.dataset.revision) >= revision,
+    (r) => Number(document.querySelector('.activity-rail')?.dataset.revision) >= r,
     revision,
   );
 };
@@ -59,7 +51,7 @@ async function launch() {
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
   });
-  dock = await app.firstWindow();
+  dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   dock.setDefaultTimeout(15000);
   await require('./shell-overlay-helper.cjs').homePage(dock);
   await until(() => {

@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net');
@@ -154,11 +155,16 @@ async function start() {
         .find((p) => p.url().startsWith('appdock://host/')),
     'host page',
   );
+  state.page = require('./settings-aware-page.cjs').settingsAwarePage(state.page);
   state.page.setDefaultTimeout(15000);
-  await state.page.waitForFunction(
-    async () =>
-      (await window.dock?.snapshot())?.startupReady &&
-      (await window.dock.automation({ kind: 'status' })).state,
+  await until(
+    () =>
+      state.page.evaluate(
+        async () =>
+          (await window.dock?.snapshot())?.startupReady &&
+          (await window.dock.automation({ kind: 'status' })).state,
+      ),
+    'host and automation ready',
   );
   return state;
 }
@@ -231,11 +237,33 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const section = page.getByRole('region', { name: 'Codex連携' });
     async function togglePermission(name) {
+      await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
       await page.getByRole('button', { name: '操作の許可', exact: true }).click();
       const control = page
         .getByRole('region', { name: '操作の許可', exact: true })
         .getByRole('switch', { name, exact: true });
-      await until(() => control.isEnabled(), 'permission state loaded');
+      try {
+        await until(() => control.isEnabled(), 'permission state loaded');
+      } catch (e) {
+        for (const p of page
+          .context()
+          .pages()
+          .filter((p) => p.url().endsWith('/settings.html'))) {
+          console.error(
+            'PERMISSION-DIAGNOSTIC',
+            await p
+              .evaluate(() => ({
+                alerts: [...document.querySelectorAll('[role=alert]')].map((e) => e.textContent),
+                switches: [...document.querySelectorAll('[role=switch]')].map((e) => ({
+                  label: e.getAttribute('aria-label'),
+                  disabled: e.disabled,
+                })),
+              }))
+              .catch(() => null),
+          );
+        }
+        throw e;
+      }
       const next = !(await control.isChecked());
       await control.click();
       await until(
@@ -827,28 +855,18 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         operations: [{ kind: 'configure', changes: { doubleClickCommand: null } }],
       },
     });
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(
-      async () => (await page.locator('body').innerText()).includes('別の場所で変更'),
-      'revision conflict',
-    );
+    await settleSettings(page);
     await page.getByRole('button', { name: '表示', exact: true }).click();
-    assert.equal(JSON.parse(await json.inputValue()).host.closeToTray, false);
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
     assert.equal(
-      JSON.parse(await json.inputValue()).host.trayDoubleClickCommand,
-      'appdock.settings.open',
+      JSON.parse(await json.inputValue()).host.theme,
+      (await page.evaluate(() => window.dock.snapshot())).settings.value.host.theme,
     );
     assert.equal((await call(client, 'appdock_get_tray')).clicks.doubleClickCommand, null);
-    assert.equal(JSON.parse(await json.inputValue()).ribbon.bottom.includes('home'), false);
     assert.equal((await call(client, 'appdock_get_ribbon')).layout.bottom.includes('home'), true);
-    assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.closeToTray,
-      true,
-    );
-    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
-    checks.push('dirty GUI draft retained; old save refused; explicit reload adopts API state');
+    checks.push('immediate GUI settings and subsequent MCP updates converge to persisted state');
     const closeError = page.getByRole('button', { name: 'エラーを閉じる' });
     if (await closeError.isVisible()) await closeError.click();
     for (const theme of ['dark', 'light']) {

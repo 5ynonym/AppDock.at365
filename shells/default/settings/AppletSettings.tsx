@@ -17,11 +17,11 @@ import { ObjectListSetting } from '../../../src/shared/settings-ui/ObjectListSet
 /** Both entry points render this complete page against the main editing session. */
 export function AppletSettings({
   applet,
-  draft,
+  settings,
   onChange,
 }: {
   applet: ExtensionSnapshot;
-  draft: Settings;
+  settings: Settings;
   onChange(value: Settings): void;
 }) {
   const pageId = appletSettingsPageId(applet.id);
@@ -66,19 +66,19 @@ export function AppletSettings({
           <select
             aria-label={`${page.title}の表示方法`}
             value={
-              draft.extensions[applet.id]?.pages?.[page.id]?.display ??
+              settings.extensions[applet.id]?.pages?.[page.id]?.display ??
               page.defaultDisplay ??
               'page'
             }
             onChange={(event) =>
               onChange({
-                ...draft,
+                ...settings,
                 extensions: {
-                  ...draft.extensions,
+                  ...settings.extensions,
                   [applet.id]: {
-                    ...(draft.extensions[applet.id] ?? { enabled: false, settings: {} }),
+                    ...(settings.extensions[applet.id] ?? { enabled: false, settings: {} }),
                     pages: {
-                      ...draft.extensions[applet.id]?.pages,
+                      ...settings.extensions[applet.id]?.pages,
                       [page.id]: { display: event.target.value as 'page' | 'window' },
                     },
                   },
@@ -103,15 +103,15 @@ export function AppletSettings({
           max={86400}
           step={1}
           value={
-            draft.extensions[applet.id]?.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0
+            settings.extensions[applet.id]?.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0
           }
           onChange={(event) =>
             onChange({
-              ...draft,
+              ...settings,
               extensions: {
-                ...draft.extensions,
+                ...settings.extensions,
                 [applet.id]: {
-                  ...(draft.extensions[applet.id] ?? { enabled: false, settings: {} }),
+                  ...(settings.extensions[applet.id] ?? { enabled: false, settings: {} }),
                   startupDelaySeconds:
                     event.target.value === ''
                       ? ('' as unknown as number)
@@ -159,15 +159,15 @@ export function AppletSettings({
         <p className="empty">このAppletには設定項目がありません。</p>
       )}
       {definitions.map((item) => {
-        const value = draft.extensions[applet.id]?.settings[item.key] ?? item.default;
+        const value = settings.extensions[applet.id]?.settings[item.key] ?? item.default;
         const set = (next: unknown) =>
           onChange({
-            ...draft,
+            ...settings,
             extensions: {
-              ...draft.extensions,
+              ...settings.extensions,
               [applet.id]: {
-                ...(draft.extensions[applet.id] ?? { enabled: false, settings: {} }),
-                settings: { ...draft.extensions[applet.id]?.settings, [item.key]: next },
+                ...(settings.extensions[applet.id] ?? { enabled: false, settings: {} }),
+                settings: { ...settings.extensions[applet.id]?.settings, [item.key]: next },
               },
             },
           });

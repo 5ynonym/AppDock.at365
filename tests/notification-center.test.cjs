@@ -47,10 +47,10 @@ function setup(t, { unknown = false, confirm = async () => true } = {}) {
     act({ type: 'filters', filters: { ...model().filters, tab: 'history' } });
   return { dir, file, history, service, controller, input, publish, act, model, historyTab };
 }
-test('center-only policy is accepted; mandatory warning still requires banner', () => {
+test('center-only policy is accepted; obsolete unsaved warning is absent', () => {
   const s = createDefaultSettings(),
     kind = {
-      ...p.settingsNotificationType,
+      ...p.notificationCatalog([])[0],
       ownerKind: 'applet',
       ownerId: 'fixture',
       canDisable: true,
@@ -61,7 +61,10 @@ test('center-only policy is accepted; mandatory warning still requires banner', 
   };
   assert.equal(p.resolveNotificationPolicy(kind, s).enabled, true);
   assert.deepEqual(p.resolveNotificationPolicy(kind, s).targets, []);
-  assert.deepEqual(p.resolveNotificationPolicy(p.settingsNotificationType, s).targets, ['banner']);
+  assert.equal(
+    p.notificationCatalog([]).some((t) => t.typeId === 'unsaved-changes'),
+    false,
+  );
 });
 test('active/history ID union uses live content and safe ended summaries; none is never retained', async (t) => {
   const f = setup(t);

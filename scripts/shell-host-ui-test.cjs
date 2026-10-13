@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { settingsPage: getSettingsPage, deferred } = require('./settings-shell-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
@@ -125,7 +126,8 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
+            p.url().startsWith('appdock://host/index.html') &&
+            !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );
@@ -213,7 +215,7 @@ async function close() {
     await require('./shell-overlay-helper.cjs').homePage(dock);
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     assert.equal(await setting.getByLabel('テーマ', { exact: true }).inputValue(), newTheme);
-    await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(setting);
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.theme === newTheme,
@@ -240,7 +242,7 @@ async function close() {
       /未導入/,
     );
     await setting.getByLabel('Shell', { exact: true }).selectOption('appdock.default-shell');
-    await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(setting);
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.host.shellProvider ===

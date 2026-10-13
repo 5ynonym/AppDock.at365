@@ -21,12 +21,12 @@ import {
 import { CommandPicker } from '../../../src/shared/settings-ui/CommandPicker';
 
 export function TraySettings({
-  draft,
+  settings,
   extensions,
   commands,
   onChange,
 }: {
-  draft: Settings;
+  settings: Settings;
   extensions: ExtensionSnapshot[];
   commands: UiCommand[];
   onChange(value: Settings): void;
@@ -36,7 +36,7 @@ export function TraySettings({
   const [picker, setPicker] = useState<
     'add' | 'trayClickCommand' | 'trayDoubleClickCommand' | null
   >(null);
-  const items = getTrayMenu(draft, extensions);
+  const items = getTrayMenu(settings, extensions);
   const catalog = trayCommandCatalog(extensions);
   const title = (item: TrayMenuItem) =>
     item.type === 'group'
@@ -61,7 +61,7 @@ export function TraySettings({
   };
   const active = find(items, selected);
   const update = (next: TrayMenuItem[]) =>
-    onChange({ ...draft, trayMenu: next, trayCommands: trayMenuCommandIds(next) });
+    onChange({ ...settings, trayMenu: next, trayCommands: trayMenuCommandIds(next) });
   const modify = (work: (next: TrayMenuItem[]) => void) => {
     const next = structuredClone(items);
     work(next);
@@ -218,20 +218,23 @@ export function TraySettings({
               }
               onClick={() => setPicker(key)}
             >
-              {commandTitle(draft.host[key])}
+              {commandTitle(settings.host[key])}
             </button>
-            {draft.host[key] && (
+            {settings.host[key] && (
               <small className="tray-click-id command-id">
-                {draft.host[key]}
-                {!commands.find((c) => c.id === draft.host[key])?.available &&
+                {settings.host[key]}
+                {!commands.find((c) => c.id === settings.host[key])?.available &&
                   ' · 現在利用できません'}
               </small>
             )}
-            {key === 'trayDoubleClickCommand' && draft.host[key] && (
+            {key === 'trayDoubleClickCommand' && settings.host[key] && (
               <button
                 className="secondary"
                 onClick={() =>
-                  onChange({ ...draft, host: { ...draft.host, trayDoubleClickCommand: null } })
+                  onChange({
+                    ...settings,
+                    host: { ...settings.host, trayDoubleClickCommand: null },
+                  })
                 }
               >
                 未設定に戻す
@@ -356,11 +359,11 @@ export function TraySettings({
           commands={commands.filter(
             (c) => !c.hidden && (picker !== 'add' || !fixedTrayCommands.includes(c.id)),
           )}
-          pins={draft.pinnedCommands}
-          shortcuts={draft.shortcuts}
+          pins={settings.pinnedCommands}
+          shortcuts={settings.shortcuts}
           onChoose={(command) => {
             if (picker === 'add') add('command', command.id);
-            else onChange({ ...draft, host: { ...draft.host, [picker]: command.id } });
+            else onChange({ ...settings, host: { ...settings.host, [picker]: command.id } });
             setPicker(null);
           }}
           onClose={() => setPicker(null)}

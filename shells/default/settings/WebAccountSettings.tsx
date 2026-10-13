@@ -113,11 +113,9 @@ function AccountRow({
 export function WebAccountSettings({
   accounts,
   savedItems,
-  draftItems,
 }: {
   accounts: WebProfile[];
   savedItems: WebApplet[];
-  draftItems: WebApplet[];
 }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -189,7 +187,7 @@ export function WebAccountSettings({
       {accounts.map((account) => {
         const users = [
           ...new Map(
-            [...savedItems, ...draftItems]
+            savedItems
               .filter((item) => item.accountId === account.id)
               .map((item) => [item.id, item.name]),
           ).values(),
@@ -227,7 +225,7 @@ export function WebAccountSettings({
       })}
       {message && <p role="status">{message}</p>}
       <p className="muted">
-        使用中の枠は削除できません。WebAppletから外して設定を保存してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。
+        使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。
       </p>
     </section>
   );

@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -109,7 +110,7 @@ async function launch() {
       },
     };
   }
-  const page = await app.firstWindow();
+  const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   page.setDefaultTimeout(12000);
   await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
   if (app.evaluate)
@@ -130,6 +131,7 @@ async function launch() {
 const checks = [];
 (async () => {
   let { app, page } = await launch();
+  page = require('./settings-aware-page.cjs').settingsAwarePage(page);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   try {
@@ -140,8 +142,7 @@ const checks = [];
         has: page.locator('span[title]').filter({ hasText: new RegExp('^' + name + '$') }),
       });
     const save = async () => {
-      await button('変更をすべて保存').click();
-      await until(() => button('変更をすべて保存').isDisabled(), 'settings saved');
+      await settleSettings(page);
     };
     const choose = async (trigger, id) => {
       await button(trigger).click();
@@ -213,12 +214,12 @@ const checks = [];
       2,
     );
     checks.push(
-      'custom group, mixed Applets, add separator, place, reorder, drag, draft navigation and save',
+      'custom group, mixed Applets, add separator, place, reorder, drag, navigation retains saved edits',
     );
     await select(groupId);
     await page.getByLabel('グループ名', { exact: true }).fill('');
-    await button('変更をすべて保存').click();
-    assert.equal(await button('変更をすべて保存').isDisabled(), false);
+    await settleSettings(page);
+    await page.getByRole('alert').first().waitFor();
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
     await save();
     await button('＋ コマンド').click();
@@ -314,9 +315,9 @@ const checks = [];
     await button('グループを解除').click();
     assert.equal(await commandRow('a.run').count(), 1);
     assert.equal(await commandRow('b.run').count(), 1);
-    // Existing shared discard action must restore all layout edits.
-    await button('変更を破棄して再読み込み').click();
-    await page.locator(`[data-tray-item="${groupId}"]`).waitFor();
+    // Ungrouping is saved immediately; no shared discard state exists.
+    await settleSettings(page);
+    assert.equal(await page.locator(`[data-tray-item="${groupId}"]`).count(), 0);
     for (const theme of ['dark', 'light']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -348,7 +349,9 @@ const checks = [];
         await page.screenshot({ path: path.join(profile, `${theme}-${width}.png`) });
       }
     }
-    checks.push('group dissolve preserves children, discard restores, two themes at three widths');
+    checks.push(
+      'group dissolve preserves children, immediate ungrouping persists, two themes at three widths',
+    );
     const expected = (await snapshot()).settings.value.trayMenu;
     await app.close();
     ({ app, page } = await launch());

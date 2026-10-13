@@ -3,7 +3,7 @@ import type { SettingsPageModel, SettingsPageOperation } from '../../../src/shar
 import { createDefaultSettings } from '../../../src/shared/settings-schema';
 import { settingsProjection } from '../../../src/shared/settings-catalog';
 import type { SettingsControlsApi } from '../../../src/shared/settings-ui/api';
-/** Values absent from this page are local defaults, never another page's draft. */
+/** Values absent from this page are local defaults, never another page's value. */
 export function materialize(model: SettingsPageModel): Settings {
   const merge = (base: any, value: any): any => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return structuredClone(value);
@@ -20,6 +20,30 @@ export class SettingsViewClient {
   private queued = 0;
   private chain = Promise.resolve();
   private listeners = new Set<() => void>();
+  private input?: { pageId: string; values?: Record<string, unknown>; text?: string };
+  private inputVersion = 0;
+  private ownRevision = -1;
+  private display(m: SettingsPageModel) {
+    return this.input?.pageId === m.content.page.id && this.input.values
+      ? { ...m, content: { ...m.content, values: this.input.values } }
+      : m;
+  }
+  text(m: SettingsPageModel) {
+    return this.input?.pageId === m.content.page.id && this.input.text !== undefined
+      ? this.input.text
+      : JSON.stringify(m.content.values, null, 2);
+  }
+  setText(value: string) {
+    const m = this.model!;
+    const before = m.content.values;
+    this.input = { pageId: m.content.page.id, text: value };
+    this.inputVersion++;
+    this.render(this.display(m));
+    void this.act({
+      kind: 'edit',
+      action: { type: 'partial-text', pageId: m.content.page.id, before, value },
+    }).catch(() => {});
+  }
   constructor(
     private render: (model: SettingsPageModel) => void,
     private failed: (text: string) => void,
@@ -30,13 +54,35 @@ export class SettingsViewClient {
     if (m?.kind !== 'settings' || (this.model?.id === m.id && this.model.revision >= m.revision))
       return;
     this.model = m;
-    if (!this.queued) this.render(m);
+    if (!this.queued) this.render(this.display(m));
     for (const fn of this.listeners) fn();
   }
   act(operation: SettingsPageOperation): Promise<any> {
+    if (
+      operation.kind === 'select' ||
+      operation.kind === 'move' ||
+      (operation.kind === 'edit' && ['mode', 'reload'].includes(operation.action.type))
+    ) {
+      this.input = undefined;
+      this.inputVersion++;
+    }
+    const version = this.inputVersion;
     this.queued++;
     const work = this.chain.then(async () => {
+      this.accept((await window.appdockPage.connect()).snapshot);
       const m = this.model!;
+      const inputOperation =
+        operation.kind === 'edit' &&
+        ['page-values', 'partial-text'].includes(operation.action.type);
+      if (
+        operation.kind === 'edit' &&
+        inputOperation &&
+        this.ownRevision === m.content.editing.editRevision
+      )
+        operation = {
+          ...operation,
+          action: { ...operation.action, before: m.content.values },
+        } as SettingsPageOperation;
       const response = (await window.appdockPage.act({
         id: m.id,
         type: 'settings',
@@ -46,6 +92,10 @@ export class SettingsViewClient {
         operation,
       })) as { model: SettingsPageModel; result: unknown };
       this.accept(response.model);
+      if (inputOperation) {
+        this.ownRevision = response.model.content.editing.editRevision;
+        if (version === this.inputVersion) this.input = undefined;
+      }
       this.failed('');
       return response.result;
     });
@@ -61,16 +111,18 @@ export class SettingsViewClient {
       )
       .finally(() => {
         this.queued--;
-        if (!this.queued && this.model) this.render(this.model);
+        if (!this.queued && this.model) this.render(this.display(this.model));
       });
     return work;
   }
   invoke = (name: string, args: unknown[] = []): Promise<any> => {
-    const id = this.model?.content.actions[name];
-    if (!id) return Promise.reject(Error('この設定では利用できない操作です。'));
+    const pageId = this.model?.content.page.id;
     // Long operations (palette, updates) must not hold the input queue or their cancel action.
     return this.chain.then(async () => {
+      this.accept((await window.appdockPage.connect()).snapshot);
       const m = this.model!;
+      const id = m.content.actions[name];
+      if (!id || m.content.page.id !== pageId) throw Error('この設定では利用できない操作です。');
       const response = (await window.appdockPage.act({
         id: m.id,
         type: 'settings',
@@ -86,33 +138,29 @@ export class SettingsViewClient {
   editor(model: SettingsPageModel) {
     const ignore = (p: Promise<unknown>) => void p.catch(() => {});
     return {
-      draft: materialize(model),
-      edit: (draft: Settings) => {
+      value: materialize(this.display(model)),
+      edit: (value: Settings) => {
         const values = settingsProjection(
-          draft,
+          value,
           model.content.page,
           model.content.auxiliary.applets ?? [],
         );
-        this.render({
-          ...model,
-          content: { ...model.content, values, editing: { ...model.content.editing, dirty: true } },
-        });
+        const before = this.model!.content.values;
+        this.input = { pageId: model.content.page.id, values };
+        this.inputVersion++;
+        this.render(this.display(model));
         ignore(
           this.act({
             kind: 'edit',
-            action: { type: 'page-values', pageId: model.content.page.id, value: values },
+            action: { type: 'page-values', pageId: model.content.page.id, before, value: values },
           }),
         );
       },
       setAvatar: this.setAvatar,
-      setAvatarLoading: this.setAvatarLoading,
     };
   }
   setAvatar = (bytes: Uint8Array | null, name?: string) => {
     void this.act({ kind: 'edit', action: { type: 'avatar', bytes, name } }).catch(() => {});
-  };
-  setAvatarLoading = (value: boolean) => {
-    void this.act({ kind: 'edit', action: { type: 'avatar-loading', value } }).catch(() => {});
   };
   controls(): SettingsControlsApi {
     const invoke = this.invoke;

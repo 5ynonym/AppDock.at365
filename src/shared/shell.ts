@@ -1,3 +1,4 @@
+import { compareVersions } from './versions';
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Only these regions are mounted today. Additional page regions need their own public contract. */
@@ -79,3 +80,11 @@ export type NavigationState = {
   section?: 'profile' | 'ribbon';
   appletId?: string;
 };
+
+/** Settings page schema 2 requires immediate-save semantics; older providers fall back per region. */
+export function settingsShellCompatible(provider: { id: string; minimumHostVersion?: string }) {
+  return (
+    provider.id === defaultShellId ||
+    (!!provider.minimumHostVersion && compareVersions(provider.minimumHostVersion, '0.33.0') >= 0)
+  );
+}

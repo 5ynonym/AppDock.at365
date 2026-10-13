@@ -12,18 +12,16 @@ import { createDefaultSettings } from '../../../src/shared/settings-schema';
 import { UpdateCheckTime } from '../../../src/shared/settings-ui/VersionCheck';
 
 export function UpdateSettings({
-  draft,
+  settings,
   edit: onChange,
   appletCount,
-  dirty,
 }: {
-  draft: Settings;
+  settings: Settings;
   edit(next: Settings): void;
   appletCount: number;
-  dirty: boolean;
 }) {
   const edit = (change: (next: Settings) => void) => {
-    const next = structuredClone(draft);
+    const next = structuredClone(settings);
     change(next);
     onChange(next);
   };
@@ -62,16 +60,14 @@ export function UpdateSettings({
       <div className="actions update-actions">
         <button
           className="update-primary"
-          disabled={state.busy || dirty}
-          title={dirty ? '未保存の設定を保存または破棄してください。' : undefined}
+          disabled={state.busy}
           onClick={() => action(() => settingsControls.installUpdates('all'))}
         >
           本体と全Appletを更新
         </button>
         <button
           className="text-button"
-          disabled={state.busy || dirty || appletCount === 0}
-          title={dirty ? '未保存の設定を保存または破棄してください。' : undefined}
+          disabled={state.busy || appletCount === 0}
           onClick={() => action(() => settingsControls.installUpdates('applets'))}
         >
           Appletを一括更新
@@ -79,7 +75,7 @@ export function UpdateSettings({
         <span className="update-check-control">
           <button
             className="text-button"
-            disabled={state.busy || dirty}
+            disabled={state.busy}
             onClick={() => action(() => settingsControls.checkAllUpdates())}
           >
             すべての更新を確認
@@ -90,7 +86,6 @@ export function UpdateSettings({
       <p className="muted">
         本体と全Appletの更新は、更新のある対象をまとめて準備し、最後に確認して1回の再起動で適用します。
       </p>
-      {dirty && <p role="status">更新前に未保存の設定を保存または破棄してください。</p>}
       {error && (
         <p role="alert" className="error-text">
           {error}
@@ -103,7 +98,7 @@ export function UpdateSettings({
             <span>{hostSettingItem('about', 'hostSource').title}</span>
             <SettingsInput
               aria-label="AppDockの更新元"
-              value={draft.updates.hostSource}
+              value={settings.updates.hostSource}
               onChange={(event) =>
                 edit((next) => {
                   next.updates.hostSource = event.target.value;
@@ -114,7 +109,7 @@ export function UpdateSettings({
           </label>
           <button
             className="text-button"
-            disabled={draft.updates.hostSource === createDefaultSettings().updates.hostSource}
+            disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
             onClick={() =>
               edit((next) => {
                 next.updates.hostSource = createDefaultSettings().updates.hostSource;
@@ -139,7 +134,7 @@ export function UpdateSettings({
               <label key={key} {...settingAnchor('about', key)}>
                 <SettingsInput
                   type="checkbox"
-                  checked={draft.updates[key]}
+                  checked={settings.updates[key]}
                   onChange={(event) =>
                     edit((next) => {
                       next.updates[key] = event.target.checked;
@@ -156,7 +151,7 @@ export function UpdateSettings({
                 type="number"
                 min={0}
                 max={3600}
-                value={draft.updates.startupDelaySeconds}
+                value={settings.updates.startupDelaySeconds}
                 onChange={(event) =>
                   edit((next) => {
                     next.updates.startupDelaySeconds = numberInput(event.target.value);
@@ -176,17 +171,17 @@ export function UpdateSettings({
 
 export function AppletUpdateSource({
   extension,
-  draft,
+  settings,
   edit,
 }: {
   extension: ExtensionSnapshot;
-  draft: Settings;
+  settings: Settings;
   edit(next: Settings): void;
 }) {
-  const source = draft.extensions[extension.id]?.updateSource;
+  const source = settings.extensions[extension.id]?.updateSource;
   const defaultSource = extension.updateRepository ? `github:${extension.updateRepository}` : '';
   const change = (value: string | undefined) => {
-    const next = structuredClone(draft);
+    const next = structuredClone(settings);
     const entry = next.extensions[extension.id] ?? { enabled: extension.enabled, settings: {} };
     if (value === undefined) delete entry.updateSource;
     else entry.updateSource = value;

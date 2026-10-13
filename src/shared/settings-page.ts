@@ -13,7 +13,7 @@ export interface SettingsPageRequest {
 }
 /** Page values are an allowlisted projection, never Settings or HostSnapshot. */
 export interface SettingsPageModel {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   contextId: 'primary';
   kind: 'settings';
@@ -25,21 +25,16 @@ export interface SettingsPageModel {
     hostWidth: number;
     page: SettingsPageDefinition;
     values: Record<string, unknown>;
-    navigation: { id: string; title: string; dirty: boolean; owner?: string }[];
+    navigation: { id: string; title: string; owner?: string }[];
     query: string;
     results: (SettingsItem & { pageTitle: string })[];
     move?: { id: string; itemId: string; pageId: string; completed?: boolean };
     editing: {
       sessionId: string;
       editRevision: number;
-      dirty: boolean;
       pending: boolean;
-      conflict: boolean;
       error: string;
       mode: 'form' | 'json';
-      text: string;
-      avatarChanged: boolean;
-      avatarLoading: boolean;
     };
     actions: Record<string, string>;
     auxiliary: SettingsPageAuxiliary;
@@ -57,7 +52,6 @@ export interface SettingsPageAuxiliary {
   accounts?: HostSnapshot['webAccounts'];
   accountReferences?: {
     saved: Pick<Settings['webApplets']['items'][number], 'id' | 'name' | 'accountId'>[];
-    draft: Pick<Settings['webApplets']['items'][number], 'id' | 'name' | 'accountId'>[];
   };
   permissions?: HostSnapshot['appletApi'];
   avatarUrl?: string | null;
@@ -65,7 +59,7 @@ export interface SettingsPageAuxiliary {
 export type SettingsPageOperation =
   | {
       kind: 'edit';
-      action: Exclude<SettingsEdit, { type: 'draft' | 'select-page' }>;
+      action: Exclude<SettingsEdit, { type: 'values' | 'select-page' }>;
     }
   | { kind: 'invoke'; actionId: string; args?: unknown[] }
   | { kind: 'select'; pageId: string }

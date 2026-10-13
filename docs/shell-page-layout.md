@@ -78,7 +78,7 @@ WebApplet管理の設定とショートカット等、本体が描画するパ�
 - ホストバナーの出現・消失・複数行化でViewが追随し、リボン・ステータスバー・通知・オーバーレイへ重ならない。
 - 長いログ・検索結果・設定フォーム・JSONで、意図した領域だけがスクロールする。最終項目まで操作でき、不要な横スクロールを生じない。
 - 詳細内の設定・ログ、WebApplet管理のログ、本体描画の説明・ショートカット・Web設定を切り替えて境界とスクロールを確認する。
-- 設定検索からの項目移動、未保存draft、不正JSON、保存操作、Tab/Shift+Tab、テーマ切替を維持する。
+- 設定検索からの項目移動、即時保存、現在の画面内の不完全入力とエラー、Tab/Shift+Tab、テーマ切替を維持する。
 - 追加Shellへの部分差し替え、Default Shellへの復旧、safe起動、通常Appletページへの遷移を確認する。
 
 既存 `scripts/shell-home-ui-test.cjs`、`shell-page-ui-test.cjs`、`settings-shell-ui-test.cjs` を中心に変更関連試験を選び、固定単一EXEでも表示を確認する。共通の `scripts/shell-page-layout-helper.cjs` で割当領域・Slot・Viewの寸法、通知追加/削除、リサイズ/zoom、長いログの内部スクロールを確認する。実装時のレビュー・版更新・publishは[共通手順](development-workflow.md)に従う。

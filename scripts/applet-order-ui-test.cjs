@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -131,7 +132,7 @@ async function launch() {
 (async () => {
   let app = await launch();
   try {
-    let page = await app.firstWindow();
+    let page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.setDefaultTimeout(12000);
@@ -141,7 +142,8 @@ async function launch() {
       (['Applet', '設定'].includes(name) ? rail : page).getByRole('button', { name, exact: true });
     const navigate = async (name) => {
       await button(name).click();
-      await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+      if (name === '設定') await page.locator('.settings-surface').waitFor();
+      else await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
     };
     const tab = (name) => page.getByRole('tab', { name, exact: true });
     const ids = () =>
@@ -168,13 +170,13 @@ async function launch() {
       ['説明', '設定', 'ショートカット', 'ログ'],
     );
     await tab('設定').click();
-    await page.getByLabel('保持する入力', { exact: true }).fill('未保存の入力');
+    await page.getByLabel('保持する入力', { exact: true }).fill('保存した入力');
     await tab('ショートカット').click();
     assert.equal(await page.locator('[data-shortcut-command]').count(), 1);
     await tab('設定').click();
     assert.equal(
       await page.getByLabel('保持する入力', { exact: true }).inputValue(),
-      '未保存の入力',
+      '保存した入力',
     );
     await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
     assert(await page.getByLabel('Appletを検索', { exact: true }).isDisabled());
@@ -203,19 +205,19 @@ async function launch() {
     ]);
     assert.equal(
       await page.getByLabel('保持する入力', { exact: true }).inputValue(),
-      '未保存の入力',
+      '保存した入力',
     );
-    await button('変更をすべて保存').click();
+    await settleSettings(page);
     await page.waitForFunction(
       async () =>
         (await window.dock.snapshot()).settings.value.appletOrder[0] ===
         'web.11111111-1111-1111-1111-111111111111',
     );
-    assert.equal(saved().extensions['test.a'].settings.text, '未保存の入力');
+    assert.equal(saved().extensions['test.a'].settings.text, '保存した入力');
     assert.deepEqual(saved().keybindings, originalBindings);
     assert.deepEqual(saved().ribbon, originalRibbon);
     checks.push(
-      'toggle / up button / native drag / keyboard move / WebApplet order / shared draft save / dispatcher and ribbon unchanged',
+      'toggle / up button / native drag / keyboard move / WebApplet order / immediate persistence / dispatcher and ribbon unchanged',
     );
     await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
     await navigate('設定');
@@ -236,10 +238,10 @@ async function launch() {
     await tab('ショートカット').click();
     assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F9');
     assert.equal(await page.locator('.applet-shortcuts input').count(), 0);
-    await button('変更を破棄して再読み込み').click();
-    assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F8');
+    await settleSettings(page);
+    assert.equal(await page.locator('.applet-shortcuts kbd').innerText(), 'Ctrl+F9');
     checks.push(
-      'flat commands independent of Applet order / shared draft displayed and discarded in Applet overview',
+      'flat commands independent of Applet order / saved changes displayed in Applet overview',
     );
     for (const theme of ['dark', 'light']) {
       await navigate('設定');
@@ -248,7 +250,7 @@ async function launch() {
         .getByRole('button', { name: '表示', exact: true })
         .click();
       await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
-      await button('変更をすべて保存').click();
+      await settleSettings(page);
       await page.waitForFunction(
         async (theme) => (await window.dock.snapshot()).settings.value.host.theme === theme,
         theme,
@@ -284,7 +286,7 @@ async function launch() {
     assert.deepEqual(errors, []);
     await app.close();
     app = await launch();
-    page = await app.firstWindow();
+    page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
     rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
     await navigate('Applet');
@@ -300,14 +302,14 @@ async function launch() {
     );
     await page.getByRole('switch', { name: 'Appletの並べ替え' }).click();
     await button('順序 test.bを下へ移動').click();
-    await button('変更を破棄して再読み込み').click();
+    await settleSettings(page);
     assert.deepEqual(await ids(), [
       'web.11111111-1111-1111-1111-111111111111',
-      'test.b',
       'test.c',
+      'test.b',
       'test.a',
     ]);
-    checks.push('restart persistence / mode resets / discard restores saved order');
+    checks.push('restart persistence / mode resets / reorder persists immediately');
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify(

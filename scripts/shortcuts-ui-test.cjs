@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -139,7 +140,7 @@ const checks = [];
 (async () => {
   let app = await launch();
   try {
-    let page = await app.firstWindow();
+    let page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     page.setDefaultTimeout(12000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -159,11 +160,7 @@ const checks = [];
       assert(await recorder().evaluate((el) => document.activeElement === el));
     };
     const save = async () => {
-      await button('変更をすべて保存').click();
-      await page
-        .locator('.settings-toolbar:visible')
-        .getByText('すべて保存されています', { exact: true })
-        .waitFor();
+      await settleSettings(page);
     };
     await button('設定').click();
     await page
@@ -247,7 +244,7 @@ const checks = [];
     assert.equal(await dialog().getByLabel('割り当てのいつ・どこで').inputValue(), 'app');
     assert.equal(await dialog().locator('option[value="owner"]').count(), 0);
     await recorder().press('Escape');
-    assert(await button('変更をすべて保存').isDisabled());
+    assert.equal((await page.evaluate(() => window.dock.settingsEditing())).pending, false);
     await filter().fill('not-a-command-here');
     await page.getByText('表示するコマンドはありません。').waitFor();
     await button('絞り込みを解除').click();
@@ -294,7 +291,9 @@ const checks = [];
     fs.writeFileSync(path.join(conflictProfile, 'settings.json'), JSON.stringify(conflictSettings));
     const conflictApp = await launch(conflictProfile);
     try {
-      const cp = await conflictApp.firstWindow();
+      const cp = require('./settings-aware-page.cjs').settingsAwarePage(
+        await conflictApp.firstWindow(),
+      );
       await cp.evaluate(() => window.dock.executeCommand('appdock.open'));
       await until(
         async () =>
@@ -397,6 +396,13 @@ const checks = [];
       'settings header and catalog dark/light at 1280, 900, 700px / filters aligned / no horizontal overflow',
     );
     assert.deepEqual(errors, []);
+    await page.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      const row = s.settings.value.keybindings.find((r) => r.key === 'Ctrl+F8');
+      s.settings.value.keybindings.push({ ...row, id: 'final-order-fixture' });
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await page.locator('[data-binding-id="final-order-fixture"]').waitFor();
     await button('実行順…').click();
     const orderPanel = page.locator('.shortcut-order-dialog');
     await orderPanel.getByLabel('実行順を変更するキー').selectOption('Ctrl+F8');
@@ -420,7 +426,7 @@ const checks = [];
     const persisted = (await snapshot()).settings.value.keybindings;
     await app.close();
     app = await launch();
-    page = await app.firstWindow();
+    page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
     assert.deepEqual((await snapshot()).settings.value.keybindings, persisted);
     checks.push('restart preserves all assignments and their execution order');

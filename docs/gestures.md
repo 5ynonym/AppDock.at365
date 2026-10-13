@@ -1,6 +1,6 @@
 # マウスジェスチャー
 
-入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorのdraft/JSON/revision/atomic writeを共用する。
+入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorの即時保存/revision/atomic writeを共用する。
 
 ## 保存と初期値
 
@@ -30,7 +30,7 @@
 
 ## 検証
 
-- Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、GUIの未保存入力との競合を検査する。
+- Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、編集中の対象行との競合を検査する。
 - `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、共通予約と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
@@ -39,12 +39,12 @@
 ## コマンド一覧と編集パネル
 
 - 設定ページは全コマンドをカタログ順に表示し、未割り当ても残す。非表示の互換コマンドは割り当てがある場合だけ、未確認のコマンドは保存済みIDを使って表示する。検索はコマンド/完全ID/提供元/入力/条件、状態はすべて・割り当て済み・未割り当て。Windowsホットキーの登録エラーはジェスチャーには表示しない。
-- CommandBindingToolbar/CommandBindingListはショートカットと共用する。コマンドと割り当ての2列、＋で直接追加、入力と条件のペアをクリックして編集する。行のメニューは編集・このジェスチャーの実行順・削除。削除確認はなく、保存前は全体の変更破棄で戻せる。追加後に自動スクロールせず、検索/表示位置/focusを保持する。
+- CommandBindingToolbar/CommandBindingListはショートカットと共用する。コマンドと割り当ての2列、＋で直接追加、入力と条件のペアをクリックして編集する。行のメニューは編集・このジェスチャーの実行順・削除。削除確認はなく、追加後に自動スクロールせず、検索/表示位置/focusを保持する。
 - GestureBindingDialogはBindingEditDialogの枠と入力停止/取消/適用を共用する。移動4方向、左/中クリック、ホイール上下を選択ボタンで指定し、キーボードはShortcutCaptureFieldで記録/修飾キー付き特殊キー選択を行う。種類を切り替えてもパネル内の各種類の選択を保持する。Tabは項目移動、Escapeは取消、対応キー自体は特殊キーから指定できる。
 - 条件の共通部分とApplet検索/複数選択はShortcutConditionFieldを使用し、Webブラウザ/指定したexeを追加する。exe名はパスなし、カンマ/改行区切り、1件以上必須。未導入Appletの選択を保持する。新規Appletコマンドはowner、本体/不明コマンドはapp。条件/有効状態だけの変更は元の保存位置、追加/入力変更は移動先入力の末尾へ反映する。
-- パネル内の一時入力は追加/適用時だけ共有draftへ反映し、キャンセル/×/Escapeで破棄する。外部更新で対象行が変わった場合は適用を拒否する。保存形式、2000行上限、JSON/revision/save、入力フック/dispatcherを維持する。編集/実行順パネルの表示中は既存setShortcutRecording契約でホットキーとジェスチャーの実行を停止する。
+- パネル内の一時入力は追加/適用時だけ保存済み設定へ反映し、キャンセル/×/Escapeで破棄する。外部更新で対象行が変わった場合は適用を拒否する。保存形式、2000行上限、JSON/revision/save、入力フック/dispatcherを維持する。編集/実行順パネルの表示中は既存setShortcutRecording契約でホットキーとジェスチャーの実行を停止する。
 - GestureOrderDialogはBindingOrderDialogをショートカットと共用する。元一覧の検索にかかわらず同じgestureの全提供元/条件/無効/不明行を表示。入力選択、番号、ドラッグ・上下ボタン・Alt＋上下、複数入力の一時変更を扱う。同じgestureの既存スロットだけを入れ替え、変更した入力の外部更新は適用全体を拒否し、他入力/他設定の最新変更は保持する。key:Aとkey:Ctrl+Aは別入力で、ショートカットの順序とも独立する。
-- 全体のON/OFFと折りたたみ「動作設定」は一覧上部。対象ブラウザ・除外・距離・ホイール間隔・待機表示を既存共有draftへ反映する。OFF中も一覧と編集は利用できる。
+- 全体のON/OFFと折りたたみ「動作設定」は一覧上部。対象ブラウザ・除外・距離・ホイール間隔・待機表示を既存保存済み設定へ反映する。OFF中も一覧と編集は利用できる。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
 
 

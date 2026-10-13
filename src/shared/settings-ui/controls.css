@@ -1160,9 +1160,6 @@ main {
   margin-left: auto;
   font-size: 10px;
 }
-.unsaved {
-  color: #d5ab66;
-}
 .settings-form {
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -1786,14 +1783,6 @@ summary {
 }
 .settings-layout {
   align-items: start;
-}
-.unsaved-mark {
-  margin-left: auto;
-  font-size: 9px;
-  color: #bd873a;
-}
-.sidebar-extensions .unsaved-mark {
-  color: #bd873a;
 }
 .applet-detail-settings-main .extensions-layout,
 .applet-detail-settings-main .detail,

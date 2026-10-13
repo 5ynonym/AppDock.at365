@@ -48,6 +48,21 @@ fs.writeFileSync(
 fs.writeFileSync(path.join(stalled, 'worker.cjs'), 'exports.activate=async()=>{};');
 fs.writeFileSync(path.join(stalled, 'logs.html'), '<!doctype html><body>Not ready</body>');
 settings.extensions['fixture.stalled'] = { enabled: true, settings: {} };
+settings.notificationPreferences = {
+  overrides: [
+    {
+      ownerKind: 'host',
+      ownerId: 'updates',
+      typeId: 'applied',
+      durationSeconds: null,
+    },
+  ],
+};
+fs.mkdirSync(path.join(profile, 'data'), { recursive: true });
+fs.writeFileSync(
+  path.join(profile, 'data/update-result.json'),
+  JSON.stringify({ ok: true, time: new Date().toISOString(), message: '更新を適用しました。' }),
+);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -266,8 +281,9 @@ async function check(name, action) {
           editRevision: s.editRevision,
           operationId: crypto.randomUUID(),
           action: {
-            type: 'draft',
-            value: { ...s.draft, profile: { ...s.draft.profile, name: 'Notification fixture' } },
+            type: 'values',
+            before: s.value,
+            value: { ...s.value, profile: { ...s.value.profile, name: 'Notification fixture' } },
           },
         });
       });

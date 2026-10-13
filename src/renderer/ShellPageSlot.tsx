@@ -22,26 +22,28 @@ export function ShellPageSlot({
   navigationRequest: number;
 }) {
   const slot = useRef<HTMLDivElement>(null);
+  const navigation = useRef(navigationRequest);
+  navigation.current = navigationRequest;
   const request = useRef<ShellPageRequest>(
     kind === 'notifications'
       ? { id: crypto.randomUUID(), route: 'notifications', kind: 'notifications' }
       : kind === 'settings'
-      ? {
-          id: crypto.randomUUID(),
-          route: settingsContext === 'applet' ? 'extensions' : 'settings',
-          kind: 'settings',
-          context: settingsContext ?? 'full',
-          pageId: settingsPageId,
-        }
-      : kind === 'home'
-        ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
-        : {
+        ? {
             id: crypto.randomUUID(),
-            route: scope!.type === 'all' ? 'logs' : 'extensions',
-            kind: 'logs',
-            scope: scope!,
-            source,
-          },
+            route: settingsContext === 'applet' ? 'extensions' : 'settings',
+            kind: 'settings',
+            context: settingsContext ?? 'full',
+            pageId: settingsPageId,
+          }
+        : kind === 'home'
+          ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
+          : {
+              id: crypto.randomUUID(),
+              route: scope!.type === 'all' ? 'logs' : 'extensions',
+              kind: 'logs',
+              scope: scope!,
+              source,
+            },
   );
   if (request.current.kind === 'home') request.current.appletOrder = appletOrder;
   if (request.current.kind === 'settings') request.current.sidebarWidth = sidebarWidth;
@@ -74,7 +76,7 @@ export function ShellPageSlot({
         element.getClientRects().length && right > x && bottom > y
           ? { x, y, width: right - x, height: bottom - y }
           : null;
-      const report = JSON.stringify([request.current, bounds]);
+      const report = JSON.stringify([request.current, bounds, navigation.current]);
       if (report === lastReport) return;
       lastReport = report;
       void window.dock.shellPage(request.current, bounds).catch((e) => {

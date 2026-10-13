@@ -12,14 +12,12 @@ export function ProfileEditor({
   busy,
   onName,
   onAvatar,
-  onLoading,
 }: {
   name: string;
   avatarUrl: string | null;
   busy: boolean;
   onName(value: string): void;
   onAvatar(bytes: Uint8Array | null, preview: string | null, name?: string): void;
-  onLoading(value: boolean): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const selection = useRef(0);
@@ -28,9 +26,8 @@ export function ProfileEditor({
   useEffect(
     () => () => {
       selection.current++;
-      onLoading(false);
     },
-    [onLoading],
+    [],
   );
   return (
     <div className="profile-editor">
@@ -101,7 +98,6 @@ export function ProfileEditor({
           const request = ++selection.current;
           setError('');
           setLoading(true);
-          onLoading(true);
           try {
             if (file.size > 5 * 1024 * 1024) throw new Error('画像は5MB以下にしてください。');
             const bytes = new Uint8Array(await file.arrayBuffer());
@@ -117,7 +113,6 @@ export function ProfileEditor({
           } finally {
             if (request === selection.current) {
               setLoading(false);
-              onLoading(false);
             }
           }
         }}

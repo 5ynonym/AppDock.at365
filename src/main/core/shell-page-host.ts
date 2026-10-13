@@ -6,7 +6,7 @@ import {
 } from 'electron';
 import { randomUUID } from 'node:crypto';
 import type { ExtensionSnapshot } from '../../shared/contracts';
-import { defaultShellId, shellView } from '../../shared/shell';
+import { defaultShellId, shellView, settingsShellCompatible } from '../../shared/shell';
 import type { ShellPageRequest, ShellPageViewport } from '../../shared/shell-pages';
 import type { ShellPageController } from './shell-page-controller';
 import { createShellView } from './shell-view';
@@ -189,6 +189,7 @@ export class ShellPageHost {
             p.enabled &&
             p.state === 'running' &&
             shellView(p.shell, region) &&
+            (region !== 'page.settings' || settingsShellCompatible(p)) &&
             !this.failedProviders.has(`${region}:${p.id}:${p.version}`),
         );
     return available(this.options.selected()) ?? available(defaultShellId);

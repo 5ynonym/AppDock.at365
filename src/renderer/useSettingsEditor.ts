@@ -1,44 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ExtensionSnapshot, Settings, SettingsSnapshot } from '../shared/contracts';
-import type { SettingsEdit, SettingsEditingState } from '../shared/settings-editing';
+import type { Settings, SettingsSnapshot } from '../shared/contracts';
+import type { SettingsEdit, SettingsInputState } from '../shared/settings-editing';
 import { createDefaultSettings } from '../shared/settings-schema';
-
-/** Input queue and optimistic rendering only; the accepted session belongs to main. */
-export function useSettingsEditor(
-  current: SettingsSnapshot | undefined,
-  _extensions: ExtensionSnapshot[],
-  run: (work: () => Promise<unknown>, message?: string) => Promise<void>,
-) {
-  const [state, setState] = useState<SettingsEditingState>(() => ({
+/** Renderer input queue. No global draft or save/discard state. */
+export function useSettingsEditor(current: SettingsSnapshot | undefined) {
+  const [state, setState] = useState<SettingsInputState>(() => ({
     sessionId: '',
     editRevision: -1,
     revision: current?.revision ?? -1,
-    draft: current?.value ?? createDefaultSettings(),
-    text: '',
+    value: current?.value ?? createDefaultSettings(),
     mode: 'form',
-    dirty: false,
-    parseError: '',
-    saveError: '',
     pending: false,
-    avatarLoading: false,
-    avatarChanged: false,
     pageId: 'appearance',
-    buffers: {},
   }));
-  const local = useRef(state);
+  const [error, setError] = useState('');
+  const local = useRef(state),
+    accepted = useRef<SettingsInputState | undefined>(undefined),
+    queue = useRef(Promise.resolve()),
+    queued = useRef(0),
+    live = useRef(true);
   local.current = state;
-  const accepted = useRef<SettingsEditingState | undefined>(undefined);
-  const queue = useRef(Promise.resolve());
-  const queued = useRef(0);
-  const live = useRef(true);
-  const runRef = useRef(run);
-  runRef.current = run;
-  const receive = (next: SettingsEditingState) => {
+  const receive = (next: SettingsInputState) => {
     if (accepted.current && next.editRevision < accepted.current.editRevision) return;
     accepted.current = next;
-    if (live.current && queued.current === 0) {
-      local.current = next;
+    if (live.current && !queued.current) {
       setState(next);
+      local.current = next;
     }
   };
   useEffect(() => {
@@ -46,87 +33,64 @@ export function useSettingsEditor(
     const refresh = () => {
       void window.dock.settingsEditing().then(receive);
     };
-    const unsubscribe = window.dock.onSettingsEditingChanged(refresh);
+    const stop = window.dock.onSettingsEditingChanged(refresh);
     refresh();
     return () => {
       live.current = false;
-      unsubscribe();
+      stop();
     };
   }, []);
   useEffect(() => {
     void window.dock.settingsEditing().then(receive);
   }, [current?.revision]);
-  const api = useMemo(() => {
-    const optimistic = (patch: Partial<SettingsEditingState>) => {
-      local.current = { ...local.current, ...patch };
-      setState(local.current);
-    };
-    const send = (action: SettingsEdit, patch?: Partial<SettingsEditingState>) => {
-      if (patch) optimistic(patch);
-      queued.current++;
-      const work = queue.current.then(async () => {
-        const base =
-          action.type === 'mode' || !accepted.current
-            ? await window.dock.settingsEditing()
-            : accepted.current;
-        const next = await window.dock.editSettings({
-          sessionId: base.sessionId,
-          editRevision: base.editRevision,
-          operationId: crypto.randomUUID(),
-          action,
-        });
-        receive(next);
+  const ownRevision = useRef(-1);
+  const send = (action: SettingsEdit) => {
+    queued.current++;
+    const work = queue.current.then(async () => {
+      const base = await window.dock.settingsEditing();
+      receive(base);
+      if (action.type === 'values' && ownRevision.current === base.editRevision)
+        action = { ...action, before: base.value };
+      const next = await window.dock.editSettings({
+        sessionId: base.sessionId,
+        editRevision: base.editRevision,
+        operationId: crypto.randomUUID(),
+        action,
       });
-      queue.current = work
-        .catch(async (error) => {
-          accepted.current = await window.dock.settingsEditing();
-          optimistic({ saveError: error instanceof Error ? error.message : String(error) });
-        })
-        .finally(() => {
-          queued.current--;
-          if (!queued.current && accepted.current && !local.current.saveError)
-            receive(accepted.current);
-        });
-      return work;
-    };
-    const ignore = (work: Promise<unknown>) => {
-      void work.catch(() => {});
-    };
-    const setMode = (value: 'form' | 'json') =>
-      ignore(send({ type: 'mode', value }, { mode: value }));
-    const discard = () => runRef.current(() => send({ type: 'discard' }, { saveError: '' }));
-    return {
-      edit: (value: Settings) =>
-        ignore(
-          send(
-            { type: 'draft', value },
-            {
-              draft: value,
-              text: JSON.stringify(value, null, 2),
-              dirty: true,
-              parseError: '',
-              saveError: '',
-            },
-          ),
-        ),
-      setMode,
-      selectPage: (pageId: string) => ignore(send({ type: 'select-page', pageId })),
-      switchToForm: () => {
-        if (local.current.mode === 'json' && local.current.parseError) return false;
-        if (local.current.mode !== 'form') setMode('form');
-        return true;
+      ownRevision.current = next.editRevision;
+      receive(next);
+      setError('');
+    });
+    queue.current = work
+      .catch(async (e) => {
+        accepted.current = await window.dock.settingsEditing();
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        queued.current--;
+        if (!queued.current && accepted.current) receive(accepted.current);
+      });
+    return work;
+  };
+  const api = useMemo(
+    () => ({
+      edit: (value: Settings) => {
+        const before = accepted.current?.value ?? local.current.value;
+        setState({ ...local.current, value });
+        local.current = { ...local.current, value };
+        void send({ type: 'values', before, value }).catch(() => {});
       },
-      setAvatar: (bytes: Uint8Array | null, name?: string) =>
-        ignore(send({ type: 'avatar', bytes, name })),
-      setAvatarLoading: (value: boolean) =>
-        ignore(send({ type: 'avatar-loading', value }, { avatarLoading: value })),
-      save: () =>
-        runRef.current(() => send({ type: 'save' }, { saveError: '' }), '設定を保存しました。'),
-      discard,
-      reset: () => ignore(send({ type: 'reload' }, { saveError: '' })),
+      selectPage: (pageId: string) => {
+        void send({ type: 'select-page', pageId }).catch(() => {});
+      },
+      reset: () => {
+        setError('');
+        void window.dock.settingsEditing().then(receive);
+      },
       flush: () => queue.current,
-    };
-  }, []);
-  return { ...state, ...api, avatarDraft: state.avatarChanged ? true : undefined };
+    }),
+    [],
+  );
+  return { ...state, error, ...api };
 }
 export type SettingsEditor = ReturnType<typeof useSettingsEditor>;

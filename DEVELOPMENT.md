@@ -20,7 +20,7 @@
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 
-本体はTypeScript、描画はReactです。C#/.NETとNode.jsのAppletは別プロセスで実行し、独自WPF/WinForms画面はnative Appletが所有します。設定/APIの内部名extensionsは維持します。ページ共通の保存・未保存通知・詳細タブの契約は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照してください。
+本体はTypeScript、描画はReactです。C#/.NETとNode.jsのAppletは別プロセスで実行し、独自WPF/WinForms画面はnative Appletが所有します。設定/APIの内部名extensionsは維持します。ページ共通の即時保存・詳細タブの契約は[設定パネルの共用](docs/host-development.md#applet設定パネルの共用)を参照してください。
 
 ## 開発環境・ビルド・テスト
 
@@ -37,6 +37,8 @@ Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジ�
 ```
 
 次回からの発行は `.\publish.bat` です。本体EXEと更新JSONを本体のpublishへ生成します。変更したAppletは、それぞれのrepoでpublish.batを実行します。実装・修正の完成時は、[共通手順](docs/development-workflow.md#実装)に従って発行前のレビュー1回と必要な修正・再検証を終え、[版更新の判断](docs/development-workflow.md#版更新の判断)に従って対象モジュールの版を上げて発行します。同じ変更の発行・リリースだけでは版を重ねて増やしません。オールインワンZIPの作成・検証と旧版ZIP整理は、[GitHub Release手順](docs/RELEASING.md)のPrepareで行います。通常publishからは呼び出しません。対象リポジトリ・出力・検証方法は[オールインワン作成](docs/all-in-one.md)を参照してください。`dev.bat` はローカルのNode.jsとpnpmを、そのコマンドの実行中だけPATHへ追加します。開発コマンドもこの入口から実行できます。
+
+開発ドライブのフォルダマウントにドライブ文字を割り当てたり解除したりすると、Nodeが解決する実体パスとpnpmのworkspace記録が変わることがあります。`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`が出たら現在の作業パスと`.pnpm-workspace-state-v1.json`を照合し、対象repoで`dev.bat install --frozen-lockfile`により依存状態を再構築します。lockfileと検査方針は維持します。実行中にパスが変わって発行が失敗した場合は、変更後の環境でビルドから発行し直して確認します。
 
 Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして共有したまま、pnpmの依存インストールを実行しないでください。パッケージのjunctionや`.bin`の起動スクリプトにworktreeの絶対パスが生成され、worktree削除後に元の作業ツリーの発行も失敗します。依存を更新するworktreeは独立した`node_modules`を用意し、削除後は元の作業ツリーで`dev.bat run typecheck`と`publish.bat`が通ることを確認してください。
 
@@ -175,7 +177,7 @@ Secrets APIはElectron safeStorageによるWindowsの暗号化を利用します
 
 WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](docs/web-accounts.md)を参照してください。
 
-manifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・未保存draft維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
+manifestのsettingActionsで設定ページに操作ボタンを表示します。自身の宣言済みコマンドだけを実行し、結果表示・二重実行防止・保存済み入力の維持を共通化します。[Applet API](docs/extensions.md)を参照してください。WallpaperSlideshowの`scripts/test-background-settings-ui.cjs`がnative fixtureを使った統合GUI検証です。
 
 
 ## 共通操作と更新の検証
@@ -204,7 +206,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `scripts/hotkeys-ui-test.cjs`は実Windows入力で登録・競合・解除とnative Appletの実行を確認します。実利用中のPause/F23/F24を避ける場合は`APPDOCK_HOTKEY_TEST_ISOLATED=1`で隔離fixtureだけをF16/F20/Ctrl+Alt+F9へ変更します。試験キーが空いていることを事前に確認し、実利用設定を変更しません。
 
-ショートカットの即時削除と保存前の破棄による復元、停止中Appletの無効行を解除して保存/再起動後も解除を保つこと、他の割り当ての保持、Deleteキーを記録できることも同じGUIで確認します。
+ショートカットの即時保存・削除、停止中Appletの無効行を解除して保存/再起動後も解除を保つこと、他の割り当ての保持、Deleteキーを記録できることも同じGUIで確認します。
 
 タスクトレイの保存形式・移行・編集UI・一時停止コマンドと検証は[タスクトレイ仕様](docs/tray-menu.md)を参照してください。
 
@@ -219,9 +221,9 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.home/page.logs/page.settingsの公開モデル/操作/購読、Default Shellへのホーム・ログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsEditingSessionから読み取ります。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.home/page.logs/page.settingsの公開モデル/操作/購読、Default Shellへのホーム・ログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
 
-設定の受理済み編集はmainのSettingsEditingSessionが保持します。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
+設定の正本は保存済みSettingsStoreです。mainのSettingsInputSessionは選択/モード/操作受付だけを持ちます。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 
 設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。
 
@@ -229,6 +231,6 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 ## 通知設定の回帰
 
-種類宣言・設定・寿命・所有者の共通回帰はtests/notification-policy.test.cjs。scripts/notification-settings-ui-test.cjs [固定EXE]は実Node/.NETの新APIとDefault Shellの通知設定、親スイッチ、保存/抑制/期限/再起動を検証します。標準testは専用.NET fixtureもRelease buildします。旧Appletの既存APIはscripts/applet-api-ui-test.cjs [固定EXE]、未保存警告はscripts/settings-notice-ui-test.cjs [固定EXE]で確認します。実装契約と次回範囲は[通知設計](docs/notification-foundation.md)を参照してください。
+種類宣言・設定・寿命・所有者の共通回帰はtests/notification-policy.test.cjs。scripts/notification-settings-ui-test.cjs [固定EXE]は実Node/.NETの新APIとDefault Shellの通知設定、親スイッチ、保存/抑制/期限/再起動を検証します。標準testは専用.NET fixtureもRelease buildします。旧Appletの既存APIはscripts/applet-api-ui-test.cjs [固定EXE]で確認します。即時保存はscripts/settings-shell-ui-test.cjs [固定EXE]で確認します。実装契約と次回範囲は[通知設計](docs/notification-foundation.md)を参照してください。
 
 通知センターの回帰はtests/notification-center.test.cjs、実Node/.NET・更新結果・ページング・再起動・追加Shell復旧はscripts/notification-center-ui-test.cjs [固定EXE]。共有bridgeと既存通知操作ロックを使います。独自デスクトップの回帰はtests/notification-delivery.test.cjsとscripts/notification-desktop-ui-test.cjs [固定EXE]。実Node/.NET・独立Window・focus・抑制・Shell復旧・最後の表示先を外した解放を確認します。InputHostの専用queryモードに通知内容や入力hookを渡しません。次回はWindows表示先と旧show APIを基盤へ接続します。

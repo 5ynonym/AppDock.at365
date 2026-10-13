@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
@@ -88,15 +89,22 @@ async function connect(port) {
   for (let i = 0; i < 40; i++) {
     try {
       const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
-      const pages = browser.contexts().flatMap((context) => context.pages());
-      const page = pages.find((page) => page.url().startsWith('appdock://host/'));
-      if (!page) {
-        await browser.close();
-        throw Error('host renderer not ready');
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        const pages = browser.contexts().flatMap((context) => context.pages());
+        const page = pages.find((page) => page.url().startsWith('appdock://host/'));
+        if (page) return { browser, page };
+        await wait(100);
       }
-      await require('./shell-overlay-helper.cjs').homePage(page);
-      return { browser, page };
+      const targets = browser
+        .contexts()
+        .flatMap((c) => c.pages())
+        .map((p) => p.url());
+      await browser.close();
+      throw Error('host renderer not ready: ' + targets.join(', '));
     } catch (error) {
+      if (!last || !String(error).includes('ECONNREFUSED'))
+        console.error('CONNECT-DIAGNOSTIC', String(error));
       last = error;
       await wait(200);
     }
@@ -173,17 +181,43 @@ const approve = (inspectPort) =>
 const renderer = (inspectPort, expression) =>
   inspect(
     inspectPort,
-    `${electronExpression}.BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(${JSON.stringify(expression)})`,
+    `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().startsWith('appdock://host/')).executeJavaScript(${JSON.stringify(expression)})`,
   );
-async function restarted(inspectPort, predicate) {
-  for (let attempt = 0; attempt < 40; attempt++) {
+async function surfaceRenderer(inspectPort, file, expression, selector) {
+  const target = `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().endsWith('/shells/default/' + ${JSON.stringify(file)}))`;
+  for (let i = 0; i < 150; i++) {
+    const ready = await inspect(
+      inspectPort,
+      `${target}?.executeJavaScript(${JSON.stringify('!!document.querySelector(' + JSON.stringify(selector) + ')')}) ?? false`,
+    );
+    if (ready)
+      return inspect(inspectPort, `${target}.executeJavaScript(${JSON.stringify(expression)})`);
+    await wait(100);
+  }
+  throw Error('Shell surface not ready: ' + file + ' / ' + selector);
+}
+const settingsRenderer = (port, expression, selector = '.settings-categories') =>
+  surfaceRenderer(port, 'settings.html', expression, selector);
+const ribbonRenderer = (port, expression) =>
+  surfaceRenderer(port, 'index.html', expression, '.activity-rail');
+async function restarted(inspectPort, predicate, previousPid) {
+  const deadline = Date.now() + 60000;
+  let lastError;
+  while (Date.now() < deadline) {
     try {
       const snapshot = await renderer(inspectPort, 'window.dock.snapshot()');
-      if (predicate(snapshot)) return snapshot;
-    } catch {}
+      if (
+        snapshot.startupReady &&
+        predicate(snapshot) &&
+        (previousPid === undefined || (await inspect(inspectPort, 'process.pid')) !== previousPid)
+      )
+        return snapshot;
+    } catch (error) {
+      lastError = String(error);
+    }
     await wait(300);
   }
-  throw Error('restarted host snapshot timed out');
+  throw Error('restarted host snapshot timed out: ' + (lastError || 'predicate was false'));
 }
 (async () => {
   async function freePort() {
@@ -194,19 +228,34 @@ async function restarted(inspectPort, predicate) {
     return port;
   }
   const port = await freePort();
-  const inspectPort = await freePort();
+  let inspectPort = await freePort();
+  while (inspectPort === port) inspectPort = await freePort();
+  fs.writeFileSync(path.join(profile, 'ports.json'), JSON.stringify({ port, inspectPort }));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(
     executable,
-    [`--test-profile=${profile}`, `--remote-debugging-port=${port}`, `--inspect=${inspectPort}`],
-    { env, cwd: profile, windowsHide: false, stdio: 'ignore' },
+    [
+      `--test-profile=${profile}`,
+      `--remote-debugging-port=${port}`,
+      `--inspect=${inspectPort}`,
+      '--enable-logging=file',
+      `--log-file=${path.join(profile, 'electron.log')}`,
+    ],
+    { env, cwd: profile, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  child.stdout.on('data', (data) =>
+    fs.appendFileSync(path.join(profile, 'startup.stdout.log'), data),
+  );
+  child.stderr.on('data', (data) =>
+    fs.appendFileSync(path.join(profile, 'startup.stderr.log'), data),
   );
   let connected;
   const keepAlive = setInterval(() => {}, 1000);
   try {
     connected = await connect(port);
     let { page } = connected;
+    page = require('./settings-aware-page.cjs').settingsAwarePage(page);
     page.setDefaultTimeout(10000);
     const initial = await waitSnapshot(
       page,
@@ -247,7 +296,7 @@ async function restarted(inspectPort, predicate) {
     }
     checks.push('host, Applet and shared last-check times sit beside their check buttons');
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
-    // Both source resets use the shared settings draft and preserve unrelated settings.
+    // Both source resets save immediately and preserve unrelated settings.
     const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
     await appletCard.locator('.applet-update-source > summary').click();
     await appletCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
@@ -255,11 +304,15 @@ async function restarted(inspectPort, predicate) {
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
       '',
     );
-    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    await settleSettings(page);
     assert.equal(
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
-      path.join(profile, 'sources/test.disabled'),
+      '',
     );
+    await appletCard
+      .getByLabel('test.disabledの更新元', { exact: true })
+      .fill(path.join(profile, 'sources/test.disabled'));
+    await settleSettings(page);
     await appletCard.locator('.applet-update-source > summary').click();
     await page.getByText('更新の設定', { exact: true }).click();
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
@@ -272,15 +325,8 @@ async function restarted(inspectPort, predicate) {
     );
     await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(root, 'publish'));
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
-    assert.equal(
-      await page.getByRole('button', { name: 'Appletを一括更新', exact: true }).isDisabled(),
-      true,
-    );
-    assert.equal(
-      await page.getByRole('button', { name: '本体と全Appletを更新', exact: true }).isDisabled(),
-      true,
-    );
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+
+    await settleSettings(page);
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);
     await page.screenshot({ path: path.join(profile, 'updates-settings.png') });
     await page.getByText('更新の設定', { exact: true }).click();
@@ -304,14 +350,21 @@ async function restarted(inspectPort, predicate) {
     await page.screenshot({ path: path.join(profile, 'updates-compact.png') });
     await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).click();
     await waitSnapshot(page, (s) => !s.updates.busy && s.updates.results.length === 3);
-    checks.push('settings save, shared check results, and unsaved-draft update guard');
+    checks.push(
+      'settings save, shared check results, and immediate settings do not block update controls',
+    );
     // Electron dialogs are native. Stub only the final approval UI; the real updater, shutdown, swap and restart all run.
     await approve(inspectPort);
     const combinedPid = await inspect(inspectPort, 'process.pid');
     await page.getByRole('button', { name: '本体と全Appletを更新', exact: true }).click();
     await wait(1500);
-    const updated = await restarted(inspectPort, (snapshot) =>
-      snapshot.extensions.every((e) => e.version === '2.0.0'),
+    const updated = await restarted(
+      inspectPort,
+      (snapshot) =>
+        ['appdock.dotnet-demo', 'test.disabled'].every(
+          (id) => snapshot.extensions.find((e) => e.id === id)?.version === '2.0.0',
+        ),
+      combinedPid,
     );
     assert.equal(updated.extensions.find((e) => e.id === 'appdock.dotnet-demo').enabled, true);
     await restarted(
@@ -320,6 +373,10 @@ async function restarted(inspectPort, predicate) {
         snapshot.extensions.find((e) => e.id === 'appdock.dotnet-demo')?.state === 'running',
     );
     assert.equal(updated.extensions.find((e) => e.id === 'test.disabled').enabled, false);
+    assert.equal(
+      updated.extensions.find((e) => e.id === 'appdock.default-shell').version,
+      hostVersion,
+    );
     const combined = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(combined.ok, true);
     assert.deepEqual(combined.updated.map((item) => item.id).sort(), [
@@ -351,15 +408,19 @@ async function restarted(inspectPort, predicate) {
       ),
       true,
     );
-    assert.equal(await renderer(inspectPort, "!!document.querySelector('.about-page')"), true);
+    assert.equal(
+      await settingsRenderer(inspectPort, "!!document.querySelector('.about-page')", '.about-page'),
+      true,
+    );
     checks.push('update restart overrides startMinimized and restores settings/about');
     checks.push(
       'combined button applies host and all Applets in one job/restart and preserves settings/login/enabled states',
     );
     await approve(inspectPort);
+    const batchPid = await inspect(inspectPort, 'process.pid');
     await renderer(inspectPort, "void window.dock.installUpdates('applets')");
     await wait(1500);
-    await restarted(inspectPort, (s) => !s.updates.busy);
+    await restarted(inspectPort, (s) => !s.updates.busy, batchPid);
     const batch = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(batch.ok, true);
     assert.deepEqual(batch.updated.map((item) => item.id).sort(), [
@@ -368,9 +429,10 @@ async function restarted(inspectPort, predicate) {
     ]);
     checks.push('Applet-only batch keeps host out of the update job');
     await approve(inspectPort);
+    const hostPid = await inspect(inspectPort, 'process.pid');
     await renderer(inspectPort, "void window.dock.installUpdates('host')");
     await wait(1500);
-    await restarted(inspectPort, (s) => s.version === hostVersion && !s.updates.busy);
+    await restarted(inspectPort, (s) => s.version === hostVersion && !s.updates.busy, hostPid);
     const result = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(result.ok, true);
     assert.equal(result.updated[0].id, 'host');
@@ -379,29 +441,31 @@ async function restarted(inspectPort, predicate) {
       'login-fixture',
     );
     checks.push('real single-EXE host replacement and restart through the same helper');
-    await renderer(
+    await ribbonRenderer(
       inspectPort,
       "[...document.querySelectorAll('.activity-rail button')].find(b => b.textContent.trim() === '設定').click()",
     );
     await wait(300);
-    await renderer(
+    await settingsRenderer(
       inspectPort,
       "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === 'バージョン情報・更新').click()",
     );
     await wait(300);
     await approve(inspectPort);
-    await renderer(
+    const individualPid = await inspect(inspectPort, 'process.pid');
+    await settingsRenderer(
       inspectPort,
       "[...document.querySelectorAll('.about-applets button')].find(b => b.textContent.trim() === 'このAppletを更新').click()",
     );
     await wait(1500);
-    await restarted(inspectPort, (s) => !s.updates.busy);
+    await restarted(inspectPort, (s) => !s.updates.busy, individualPid);
     const individual = JSON.parse(fs.readFileSync(path.join(profile, 'data/update-result.json')));
     assert.equal(individual.ok, true);
     assert.equal(individual.updated.length, 1);
+    assert(['appdock.dotnet-demo', 'test.disabled'].includes(individual.updated[0].id));
     checks.push('individual Applet button with same-version reapply');
     // Ordinary restart restores another category and still shows the window.
-    await renderer(
+    await settingsRenderer(
       inspectPort,
       "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === '一般').click()",
     );
@@ -412,7 +476,7 @@ async function restarted(inspectPort, predicate) {
       "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
     );
     await wait(2000);
-    await restarted(inspectPort, (s) => s.version === hostVersion && s.startupReady);
+    await restarted(inspectPort, (s) => s.version === hostVersion && s.startupReady, oldPid);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), oldPid);
     assert.equal(
       await inspect(
@@ -422,7 +486,7 @@ async function restarted(inspectPort, predicate) {
       true,
     );
     assert.equal(
-      await renderer(
+      await settingsRenderer(
         inspectPort,
         "document.querySelector('.settings-categories button.selected')?.textContent.trim()",
       ),
@@ -435,10 +499,11 @@ async function restarted(inspectPort, predicate) {
     await restarted(inspectPort, (s) =>
       s.extensions.some((e) => e.id === 'test.disabled' && e.state === 'running'),
     );
+    const appletPid = await inspect(inspectPort, 'process.pid');
     await renderer(inspectPort, "window.dock.openAppletPage('test.disabled', 'main')");
     await wait(300);
     assert.equal(
-      await renderer(
+      await ribbonRenderer(
         inspectPort,
         "document.querySelector('.activity-rail button.active')?.dataset.ribbonId",
       ),
@@ -449,10 +514,11 @@ async function restarted(inspectPort, predicate) {
       "setTimeout(() => void window.dock.executeCommand('appdock.restart'), 100); void 0",
     );
     await wait(2000);
-    await restarted(inspectPort, (s) => s.startupReady);
+    await restarted(inspectPort, (s) => s.startupReady, appletPid);
+    assert.notEqual(await inspect(inspectPort, 'process.pid'), appletPid);
     await wait(500);
     assert.equal(
-      await renderer(
+      await ribbonRenderer(
         inspectPort,
         "document.querySelector('.activity-rail button.active')?.dataset.ribbonId",
       ),

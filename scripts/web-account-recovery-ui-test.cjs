@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Old settings with a missing/empty roster, using isolated local state and no live accounts.
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
@@ -145,7 +146,7 @@ async function addAndReassign() {
     .click();
   await dock.getByRole('tab', { name: '設定', exact: true }).click();
   await dock.getByLabel('WebAppletのアカウント', { exact: true }).selectOption(id);
-  await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(dock);
   await until(
     async () => (await snapshot()).settings.value.webApplets.items[0].accountId === id,
     'WebApplet reassigned',

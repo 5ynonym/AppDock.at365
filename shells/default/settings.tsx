@@ -196,24 +196,9 @@ function App() {
             </button>
           )}
         </div>
-        {context === 'full' && (
-          <div className="settings-toolbar">
-            <span>{editing.dirty ? '未保存の変更があります' : 'すべて保存されています'}</span>
-            <button
-              disabled={!editing.dirty || editing.pending || editing.avatarLoading}
-              onClick={() => act({ kind: 'edit', action: { type: 'discard' } })}
-            >
-              変更をすべて破棄…
-            </button>
-            <button
-              className="primary"
-              disabled={!editing.dirty || editing.pending || editing.avatarLoading}
-              onClick={() => act({ kind: 'edit', action: { type: 'save' } })}
-            >
-              変更をすべて保存
-            </button>
-          </div>
-        )}
+        <p className="settings-help" role="status">
+          {editing.pending ? '保存中…' : '変更は自動で保存されます。'}
+        </p>
         {page.json && (
           <div className="tabs">
             {(['form', 'json'] as const).map((mode) => (
@@ -232,14 +217,9 @@ function App() {
             {error || editing.error}
           </p>
         )}
-        {editing.conflict && (
-          <p className="error-text" role="alert">
-            別の場所で設定が変わりました。編集中の内容は保持しています。
-          </p>
-        )}
-        {(editing.conflict || editing.error) && (
+        {(error || editing.error) && (
           <button onClick={() => act({ kind: 'edit', action: { type: 'reload' } })}>
-            変更を破棄して再読み込み
+            設定を再読み込み
           </button>
         )}
         <div className="settings-body" key={page.id + editing.mode}>
@@ -248,17 +228,10 @@ function App() {
           ) : editing.mode === 'json' ? (
             <SettingsTextarea
               aria-label="設定JSON"
-              value={editing.text}
+              value={c.text(model)}
               spellCheck={false}
               onChange={(e) => {
-                setModel({
-                  ...model,
-                  content: { ...model.content, editing: { ...editing, text: e.target.value } },
-                });
-                act({
-                  kind: 'edit',
-                  action: { type: 'partial-text', pageId: page.id, value: e.target.value },
-                });
+                c.setText(e.target.value);
               }}
             />
           ) : (

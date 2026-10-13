@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -61,7 +62,11 @@ async function launch() {
     'host page',
   );
   await require('./shell-overlay-helper.cjs').homePage(page);
-  await page.waitForFunction(async () => (await window.dock.snapshot()).startupReady);
+  await until(
+    () => page.evaluate(async () => (await window.dock.snapshot()).startupReady),
+    'host ready',
+  );
+  page = require('./settings-aware-page.cjs').settingsAwarePage(page);
   page.setDefaultTimeout(12000);
   await page.locator('[data-ribbon-id="settings"]').click();
   await category('一般').click();
@@ -74,8 +79,7 @@ const category = (name) =>
 const toggle = (name) => page.getByRole('switch', { name, exact: true });
 const snapshot = () => page.evaluate(() => window.dock.snapshot());
 async function save() {
-  await button('変更をすべて保存').click();
-  await page.getByText('すべて保存されています', { exact: true }).waitFor();
+  await settleSettings(page);
 }
 async function close() {
   await page
@@ -97,14 +101,15 @@ async function close() {
     assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'false');
     assert.equal(await toggle('常に管理者として起動').getAttribute('aria-checked'), 'false');
     await toggle('スタートアップに登録').click();
-    assert.equal((await service.read()).registered, false); // Draft has no OS side effect.
+    await save();
+    assert.equal((await service.read()).registered, true);
     await toggle('閉じるとトレイに常駐').click();
     await category('リボン').click();
     await category('一般').click();
     assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'true');
-    assert.equal(await button('管理者として再起動').isDisabled(), true);
     await save();
     const registered = await service.read();
+    assert.equal(await button('管理者として再起動').isDisabled(), registered.elevated);
     assert.equal(registered.registered, true);
     assert.equal(registered.taskElevated, false);
     assert.equal((await snapshot()).settings.value.host.closeToTray, false);
@@ -119,7 +124,7 @@ async function close() {
     ])
       assert.ok(xml.includes(text), text);
     checks.push(
-      'shared draft has no task side effects; save registers exact portable path, interactive logon and limited privileges',
+      'immediate setting registers exact portable path, interactive logon and limited privileges',
     );
     // Task Scheduler actually runs the published EXE; the running instance receives activation.
     await runPowerShell(
@@ -144,7 +149,7 @@ async function close() {
     );
     if (!registered.administratorAccount && !registered.elevated) {
       await toggle('常に管理者として起動').click();
-      await button('変更をすべて保存').click();
+      await settleSettings(page);
       await page
         .getByText(/このWindowsユーザーは管理者ではありません/)
         .first()
@@ -155,7 +160,7 @@ async function close() {
       await toggle('常に管理者として起動').click();
       await save();
       checks.push(
-        'standard-user elevation refusal preserves saved settings, registered task, and editable draft',
+        'standard-user elevation refusal preserves saved settings, registered task, and local rejected input',
       );
     }
     for (const theme of ['dark', 'light']) {
@@ -207,7 +212,6 @@ async function close() {
     assert.equal((await snapshot()).launch.registered, true);
     assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'true');
     await toggle('スタートアップに登録').click();
-    assert.equal((await service.read()).registered, true);
     await save();
     assert.equal((await service.read()).registered, false);
     await button('状態を確認').click();

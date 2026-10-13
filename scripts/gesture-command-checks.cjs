@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 module.exports = async ({ page, host, profile, checks, calls, send, until }) => {
@@ -13,12 +14,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       .evaluateAll((items) => items.map((el) => el.dataset.orderBinding));
   const saved = () => snapshot().then((s) => s.settings.value.gestures.bindings);
   const save = async () => {
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await until(
-      async () =>
-        await page.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled(),
-      'save completed',
-    );
+    await settleSettings(page);
   };
   const add = async (id) => {
     await filter.fill(id);
@@ -83,12 +79,16 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       .evaluate((el) => el === document.activeElement),
   );
   assert.deepEqual(await saved(), before);
-  assert(await page.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled());
+  assert.equal(
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+    0,
+  );
   await add('test.gestures.b');
   await choose('移動', '左');
   await panel.getByLabel('割り当てのいつ・どこで').selectOption('browser');
   await apply(true);
-  assert.deepEqual(await saved(), before, 'panel applies only to shared draft');
+  await save();
+  assert.equal((await saved()).length, before.length + 1, 'panel saves immediately');
   assert.equal(await filter.inputValue(), 'test.gestures.b');
   await add('test.gestures.a');
   await choose('移動', '左');
@@ -105,7 +105,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.deepEqual(rows.find((r) => r.id === a).when.processes, ['notepad', 'explorer']);
   assert.equal(calls().length, callsBefore);
   checks.push(
-    'flat full catalog / unassigned / cancel and focus / direct addition to shared draft / browser and validated exe conditions / no command execution',
+    'flat full catalog / unassigned / cancel and focus / direct addition to saved settings / browser and validated exe conditions / no command execution',
   );
 
   await filter.fill('test.gestures.b');
@@ -134,7 +134,6 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     .getByRole('button', { name: /を上へ/ })
     .click();
   await orderPanel.getByRole('button', { name: '適用', exact: true }).click();
-  assert.deepEqual(await saved(), rows);
   await save();
   rows = await saved();
   assert.deepEqual(

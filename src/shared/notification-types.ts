@@ -187,30 +187,15 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
     throw Error('通知設定が重複しています。');
   return { overrides: rows };
 }
-export const settingsNotificationType: NotificationTypeEntry = {
-  ownerKind: 'host',
-  ownerId: 'settings',
-  ownerTitle: 'AppDock',
-  ownerState: 'running',
-  typeId: 'unsaved-changes',
-  title: '未保存の変更',
-  description: '未保存の変更や保存できない設定を案内します。',
-  levels: ['warning', 'error'],
-  defaultLevel: 'warning',
-  defaultEnabled: true,
-  canDisable: false,
-  disabledControlReason: '変更を失わないため、設定を保存または破棄するまで表示します。',
-  allowedTargets: ['banner'],
-  defaultTargets: ['banner'],
-  requiredTargets: ['banner'],
-  lifetimePolicy: 'condition',
-  history: 'persistent',
-};
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
   return [
-    structuredClone(settingsNotificationType),
     {
-      ...structuredClone(settingsNotificationType),
+      ownerKind: 'host',
+      ownerTitle: 'AppDock',
+      ownerState: 'running',
+      defaultEnabled: true,
+      history: 'persistent',
+      defaultTargets: ['banner'],
       ownerId: 'updates',
       typeId: 'applied',
       title: '更新適用完了',
@@ -225,7 +210,11 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       defaultDurationSeconds: 6,
     },
     {
-      ...structuredClone(settingsNotificationType),
+      ownerKind: 'host',
+      ownerTitle: 'AppDock',
+      ownerState: 'running',
+      defaultEnabled: true,
+      history: 'persistent',
       ownerId: 'updates',
       typeId: 'available',
       title: '更新のお知らせ',

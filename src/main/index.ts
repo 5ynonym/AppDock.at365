@@ -37,7 +37,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsStore } from './core/settings';
 import { SettingsCommands } from './core/settings-commands';
-import { SettingsEditingSession } from './core/settings-editing-session';
+import { SettingsInputSession } from './core/settings-input-session';
 import { SettingsPageSession } from './core/settings-page';
 import { dataPaths } from './core/data-paths';
 import { WindowsLaunch } from './core/windows-launch';
@@ -103,7 +103,6 @@ import { NotificationSurfaceHost } from './core/notification-surface-host';
 import { NotificationDesktopHost } from './core/notification-desktop-host';
 import { NotificationWindowsAdapter } from './core/notification-windows-adapter';
 import { NotificationSurfaceController } from './core/notification-surface-controller';
-import { SettingsNotificationSource } from './core/settings-notification-source';
 import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
 import { AppDockApi, AutomationError } from './core/appdock-api';
@@ -185,9 +184,6 @@ let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationWindows: NotificationWindowsAdapter | undefined;
 let notificationService: NotificationService | undefined;
 let typedNotifications: TypedNotifications | undefined;
-let settingsNotificationSource: SettingsNotificationSource | undefined;
-let settingsUiBusy = false;
-let lastEditingRoute: 'settings' | 'extensions' = 'settings';
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
@@ -214,8 +210,6 @@ const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(
   () => changed(),
   async () => {
-    if (['settings', 'extensions'].includes(navigation.state.route))
-      lastEditingRoute = navigation.state.route as 'settings' | 'extensions';
     await flushSettingsInputs();
     await shellPageHost?.flush();
   },
@@ -249,7 +243,7 @@ let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
 const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
-const settingsEditing = new SettingsEditingSession({
+const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
   applets: () => (manager ? allApplets() : []),
   save: async (value, revision, avatar, name) => {
@@ -261,18 +255,6 @@ const settingsEditing = new SettingsEditingSession({
       () => commitSettings(next, revision, avatar, name),
     );
   },
-  confirmDiscard: async () =>
-    (
-      await dialog.showMessageBox(window!, {
-        type: 'warning',
-        message: '未保存の変更をすべて破棄しますか？',
-        detail:
-          '設定・ショートカット・Appletの並び順など、すべての未保存変更を破棄します。即時反映操作は対象外です。',
-        buttons: ['キャンセル', 'すべて破棄'],
-        defaultId: 0,
-        cancelId: 0,
-      })
-    ).response === 1,
   changed: () => {
     if (window && !window.isDestroyed()) window.webContents.send('dock:settingsEditingChanged');
     changed();
@@ -400,9 +382,6 @@ const changed = () => {
   if (notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
-    if (['settings', 'extensions'].includes(navigation.state.route))
-      lastEditingRoute = navigation.state.route as 'settings' | 'extensions';
-    if (!quitting) settingsNotificationSource?.refresh();
     notificationBanner?.refresh();
     notificationDesktop?.refresh();
     notificationWindows?.refresh();
@@ -772,7 +751,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'general') return { launch: host.launch };
   if (id === 'notifications')
     return {
-      notificationTypes: notificationCatalog(orderApplets(applets, state.draft.appletOrder)),
+      notificationTypes: notificationCatalog(orderApplets(applets, state.value.appletOrder)),
     };
   if (id === 'ribbon') return { applets: applets.map(summary) };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
@@ -790,22 +769,13 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   if (id === 'profile')
     return {
-      avatarUrl: state.avatarChanged
-        ? state.avatarPreview === null
-          ? null
-          : `appdock://host/draft-avatar?session=${state.sessionId}&v=${state.editRevision}`
-        : host.avatarUrl,
+      avatarUrl: host.avatarUrl,
     };
   if (id === 'web-accounts')
     return {
       accounts: host.webAccounts,
       accountReferences: {
         saved: settings.value.webApplets.items.map(({ id, name, accountId }) => ({
-          id,
-          name,
-          accountId,
-        })),
-        draft: state.draft.webApplets.items.map(({ id, name, accountId }) => ({
           id,
           name,
           accountId,
@@ -847,7 +817,6 @@ function settingsPageActions(
       return result;
     };
     actions.restartAsAdministrator = async () => {
-      if (settingsEditing.snapshot().dirty) throw Error('設定を保存してください。');
       await launch.restartElevated([
         ...launch.args,
         '--restore-view',
@@ -896,7 +865,6 @@ function settingsPageActions(
     actions.checkAllUpdates = async () => updater.check();
     actions.cancelUpdates = async () => updater.cancel();
     actions.installUpdates = async ([id]) => {
-      if (settingsEditing.snapshot().dirty) throw Error('設定を保存してください。');
       return updater.install(target(id, true)!);
     };
     actions.openReleases = async ([id]) => {
@@ -912,8 +880,8 @@ function settingsPageActions(
     actions.renameWebAccount = async ([id, name]) => webApplets.renameAccount(string(id), name);
     actions.deleteWebAccount = async ([id]) => {
       const target = string(id);
-      if (settingsEditing.draft.webApplets.items.some((a) => a.accountId === target))
-        throw Error('編集中のWebAppletがこのアカウントを使用しています。');
+      if (settingsEditing.value.webApplets.items.some((a) => a.accountId === target))
+        throw Error('WebAppletがこのアカウントを使用しています。');
       return webApplets.deleteAccount(target);
     };
     actions.clearWebAccount = async ([id]) => webApplets.clearAccount(string(id));
@@ -986,11 +954,11 @@ function settingsPageActions(
   }
   if (page.kind === 'web') {
     actions.importWebDefaults = async () => {
-      const before = settingsEditing.draft.webApplets.items.find((a) => a.id === page.owner);
+      const before = settingsEditing.value.webApplets.items.find((a) => a.id === page.owner);
       if (!before) throw Error('設定対象が見つかりません。');
       const result = await discoverWebDefaults(before.url);
       const state = settingsEditing.snapshot(),
-        value = state.draft;
+        value = state.value;
       const current = value.webApplets.items.find((a) => a.id === page.owner);
       if (!current || current.url !== before.url) throw Error('読取中に設定が変更されました。');
       value.webApplets.items = value.webApplets.items.map((a) =>
@@ -1000,9 +968,9 @@ function settingsPageActions(
         sessionId: state.sessionId,
         editRevision: state.editRevision,
         operationId: randomUUID(),
-        action: { type: 'draft', value },
+        action: { type: 'values', before: settingsEditing.value, value },
       });
-      return `${result.message} 内容を確認して保存してください。`;
+      return `${result.message} 設定へ反映しました。`;
     };
     actions.openWebAccounts = async () => {
       const state = settingsEditing.snapshot();
@@ -1016,13 +984,13 @@ function settingsPageActions(
     };
     actions.deleteWebApplet = async () => {
       const state = settingsEditing.snapshot();
-      const value = state.draft;
+      const value = state.value;
       value.webApplets.items = value.webApplets.items.filter((a) => a.id !== page.owner);
       await settingsEditing.act({
         sessionId: state.sessionId,
         editRevision: state.editRevision,
         operationId: randomUUID(),
-        action: { type: 'draft', value },
+        action: { type: 'values', before: settingsEditing.value, value },
       });
       const next = settingsEditing.snapshot();
       await settingsEditing.act({
@@ -1077,7 +1045,7 @@ function registerIpc() {
   handle('dock:settingsEditing', () => settingsEditing.snapshot());
   handle('dock:flushSettings', () => shellPageHost?.flush());
   handle('dock:editSettings', async (request) => {
-    if (['save', 'discard', 'reload', 'select-page', 'mode'].includes(request?.action?.type)) {
+    if (['reload', 'select-page', 'mode'].includes(request?.action?.type)) {
       await shellPageHost?.flush();
       request = { ...request, editRevision: settingsEditing.snapshot().editRevision };
     }
@@ -1112,11 +1080,6 @@ function registerIpc() {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
     return automation.action(action);
   });
-  handle('dock:settingsUiContext', (busy) => {
-    if (typeof busy !== 'boolean') throw Error('Invalid settings UI state');
-    settingsUiBusy = busy;
-    if (!quitting) settingsNotificationSource?.refresh();
-  });
   handle('dock:settingsInputsFlushed', (id) => {
     if (typeof id !== 'string') throw Error('Invalid input flush');
     settingsInputFlushes.get(id)?.();
@@ -1129,18 +1092,6 @@ function registerIpc() {
   );
   handle('dock:cancelCommandPalette', (requestId: string) => {
     if (paletteSession?.request.requestId === requestId) paletteSession.cancel('owner-disposed');
-  });
-  handle('dock:confirmDiscardSettings', async () => {
-    const answer = await dialog.showMessageBox(window!, {
-      type: 'warning',
-      message: '未保存の変更をすべて破棄しますか？',
-      detail:
-        '設定・ショートカット・Appletの並び順など、すべての未保存変更を破棄して保存済みの状態へ戻します。Webアカウントの即時反映操作は対象外です。',
-      buttons: ['キャンセル', 'すべて破棄'],
-      defaultId: 0,
-      cancelId: 0,
-    });
-    return answer.response === 1;
   });
   handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
     if (webId(extensionId) && pageId === 'main') return webApplets.open(extensionId);
@@ -1508,19 +1459,6 @@ async function initialize() {
   const renderer = path.resolve(__dirname, '../../renderer');
   protocol.handle('appdock', (request) => {
     const url = new URL(request.url);
-    if (url.host === 'host' && url.pathname === '/draft-avatar') {
-      if (url.searchParams.get('session') !== settingsEditing.snapshot().sessionId)
-        return new Response('Not found', { status: 404 });
-      const bytes = settingsEditing.avatarData();
-      return bytes
-        ? new Response(bytes as BodyInit, {
-            headers: {
-              'Content-Type': bytes[0] === 137 ? 'image/png' : 'image/jpeg',
-              'Cache-Control': 'no-store',
-            },
-          })
-        : new Response('Not found', { status: 404 });
-    }
     if (url.host === 'host' && url.pathname.startsWith('/panel-images/')) {
       const image = [...manager.items.values()]
         .flatMap((extension) => extension.panel?.images ?? [])
@@ -1636,19 +1574,6 @@ async function initialize() {
         'notifications',
         'Windows通知の表示または操作を完了できません。通知センターから確認できます。',
       ),
-  });
-  settingsNotificationSource = new SettingsNotificationSource(notificationService, {
-    typed: typedNotifications,
-    editor: settingsEditing,
-    route: () => navigation.state.route,
-    busy: () => settingsUiBusy || quitting,
-    flush: async () => {
-      await flushSettingsInputs();
-      await shellPageHost?.flush();
-    },
-    edit: async () => {
-      await navigation.navigate(lastEditingRoute);
-    },
   });
   notificationBanner = new NotificationSurfaceHost({
     window,
@@ -1821,7 +1746,7 @@ async function initialize() {
                 applets: allApplets,
                 commands: uiCommands,
                 pins: () => settings.value.pinnedCommands,
-                appletOrder: () => settingsEditing.draft.appletOrder,
+                appletOrder: () => settingsEditing.value.appletOrder,
                 dark: () => nativeTheme.shouldUseDarkColors,
                 execution: homeExecution,
                 navigate: executeCommand,
@@ -1876,7 +1801,7 @@ async function initialize() {
     },
     selected: (key) => {
       // Closing Applet surfaces during shutdown must not overwrite the restart destination.
-      if (!quitting) {
+      if (!quitting && (key || navigation.state.route.startsWith('page:'))) {
         navigation.navigate(key || 'home');
         window?.webContents.send('dock:appletPage', key);
       }

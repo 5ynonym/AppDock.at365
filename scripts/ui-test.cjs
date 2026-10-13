@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,7 +20,9 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     timeout: 30000,
   });
   try {
-    const page = await application.firstWindow();
+    const page = require('./settings-aware-page.cjs').settingsAwarePage(
+      await application.firstWindow(),
+    );
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
     await require('./shell-overlay-helper.cjs').homePage(page);
     assert.deepEqual(await shell.locator('.activity-rail .rail-label').allTextContents(), [
@@ -27,6 +30,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       'Applet',
       '設定',
       'ログ',
+      '通知センター',
       'テーマを切り替え',
     ]);
     const initial = await page.evaluate(async () => ({
@@ -55,7 +59,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.screenshot({ path: path.join(profile, 'dotnet.png') });
     await shell.getByRole('button', { name: '設定', exact: true }).first().click();
     await page.getByLabel('テーマ', { exact: true }).selectOption('light');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(page);
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
@@ -64,13 +68,13 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     const json = page.getByRole('textbox', { name: '設定JSON' });
     await json.fill('{broken json');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await page.getByRole('alert').filter({ hasText: 'JSONの形式' }).waitFor();
+    await settleSettings(page);
+    await page.getByRole('alert').filter({ hasText: 'JSONの内容' }).waitFor();
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
       'light',
     );
-    await page.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
+    await settleSettings(page);
     await page.screenshot({ path: path.join(profile, 'settings-json.png') });
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'settings.png') });
@@ -84,7 +88,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       .click();
     await page.getByRole('tab', { name: '設定', exact: true }).click();
     await page.getByLabel('更新間隔（秒）').fill('10');
-    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(page);
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
         'appdock.dotnet-demo'

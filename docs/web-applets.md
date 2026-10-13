@@ -8,7 +8,7 @@ WebAppletはURLから追加する本体管理のAppletです。配布用のexten
 
 管理入口はApplet一覧の組み込み「WebApplet」です。設定タブに追加/編集、ショートカットタブに将来のサイト用初期値を置きます。設定カテゴリの旧WebApplet入口は削除しました。管理項目`appdock.web-manager`はrendererの選択状態だけに存在し、manifest/runtime snapshot/更新/起動順/リボン/コマンド提供元へ追加しません。各サイトの`web.<UUID>`と保存形式は変更しません。ログタブはWebAppletに関係するsourceだけを表示します。
 
-「Applet → WebApplet → 設定」またはAppletページ上部の「WebAppletを追加」から追加し、名前・HTTP(S)の開始URL・本体ページ/別ウィンドウ・ページ遷移・アカウントを指定して「変更をすべて保存」を押します。既存の共有draft/JSON/revision/競合検出を使い、Applet詳細の設定にも同じ編集内容を表示します。追加・削除は再起動なしで反映します。
+「Applet → WebApplet → 設定」またはAppletページ上部の「WebAppletを追加」から追加し、名前・HTTP(S)の開始URL・本体ページ/別ウィンドウ・ページ遷移・アカウントを指定します。妥当な変更をその都度保存し、Applet詳細と全体設定は同じ保存済み値を表示します。部分JSONとrevisionの競合検査を共用します。追加・削除は再起動なしで反映します。
 
 `settings.json`の`webApplets`は`items:[{id,name,url,accountId,enabled,display,navigation,allowedOrigins,icon,imported?}]`と`shortcutDefaults:[{command,key,enabled,when}]`です。アカウント枠の一覧は含めません。旧設定では空の一覧とリロード=F5・戻る=Alt+左・進む=Alt+右の初期テンプレートを補います。名前/URLを変えてもIDを維持し、リボン配置・ショートカット・表示先を保持します。WebAppletは本体に含まれるため、個別のバージョン確認/更新対象にはしません。
 
@@ -26,7 +26,7 @@ Appletページで停止（無効化）すると、対象WebAppletのリボン�
 
 GmailのPC専用root内`web-accounts/at365.gmail`、アカウント一覧、認証情報、観測処理は参照・変更しません。既存Gmailのログイン移行/コピーも行いません。WebAppletの削除/無効化は対象画面を破棄し、ログイン枠は残します。
 
-「ログイン情報をクリア」「枠を削除」はホストの警告dialog（default/cancelはキャンセル）で確認してから即時実行します。クリアは同じ枠の画面を閉じてCookie/サイトデータ/cache/HTTP認証cacheを消去し、接続を閉じます。枠は残します。削除は枠と保存データを消します。保存済みWebAppletで使用中なら拒否し、dialog中とデータ消去後に割り当てを再検査します。UIでは未保存の割り当ても削除ガードに含め、処理中の枠を参照する設定の保存も拒否します。設定の保存は不要、IDを再利用しません。
+「ログイン情報をクリア」「枠を削除」はホストの警告dialog（default/cancelはキャンセル）で確認してから即時実行します。クリアは同じ枠の画面を閉じてCookie/サイトデータ/cache/HTTP認証cacheを消去し、接続を閉じます。枠は残します。削除は枠と保存データを消します。保存済みWebAppletで使用中なら拒否し、dialog中とデータ消去後に割り当てを再検査します。処理中の枠を参照する設定の保存も拒否します。枠の操作は別ファイルへ即時保存し、IDを再利用しません。
 
 このPCでの明示削除は、先にPC専用のpending-deletion.jsonへ記録してから共有名簿を原子的に更新します。名簿保存失敗時は削除待ち記録を戻し、登録中・設定で参照中の枠を回収しません。未生成のsessionディレクトリはその場で物理削除し、生成済みのsessionは先にデータを消去して、ディレクトリ回収を次回起動まで待ちます。終了時に削除済みsessionを再flushしません。起動時はsession生成前に削除待ちだけを回収します。ロック/権限等で消せなければ記録を保持して後続の起動でも再試行し、UIにも後処理待ちを表示します。
 

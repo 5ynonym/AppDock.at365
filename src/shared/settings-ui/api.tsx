@@ -27,6 +27,6 @@ export function configureSettingsControls(api: SettingsControlsApi) {
   settingsControls = api;
 }
 export interface SettingsControlEditor {
-  draft: Settings;
+  value: Settings;
   edit(value: Settings): void;
 }

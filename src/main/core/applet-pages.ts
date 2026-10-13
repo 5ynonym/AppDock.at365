@@ -37,7 +37,8 @@ export function pageHostShortcut(input: Input, appletId?: string) {
 }
 export function updatePageViewport(key: string | null, area: Rectangle | null) {
   if (key !== null && (!surfaces.has(key) || surfaces.get(key)!.display !== 'page'))
-    throw Error('表示中のAppletページがありません。');
+    // A renderer resize can arrive after the surface was closed or moved to a Window.
+    return;
   if (
     area !== null &&
     (!area ||

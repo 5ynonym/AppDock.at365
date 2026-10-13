@@ -16,31 +16,34 @@ import {
 
 type Placement = 'top' | 'bottom';
 export function RibbonSettings({
-  draft,
+  settings,
   extensions,
   onChange,
 }: {
-  draft: Settings;
+  settings: Settings;
   extensions: ExtensionSnapshot[];
   onChange(value: Settings): void;
 }) {
   const [dragged, setDragged] = useState<string | null>(null);
-  const items = orderRibbon(ribbonItems(extensions, draft.ribbon.separators), draft.ribbon.order);
+  const items = orderRibbon(
+    ribbonItems(extensions, settings.ribbon.separators),
+    settings.ribbon.order,
+  );
   const placement = (id: string): Placement =>
-    draft.ribbon.bottom.includes(id) ? 'bottom' : 'top';
+    settings.ribbon.bottom.includes(id) ? 'bottom' : 'top';
   const retainedOrder = (order: string[]) => [
     ...order,
-    ...draft.ribbon.order.filter((key) => !items.some((item) => item.id === key)),
+    ...settings.ribbon.order.filter((key) => !items.some((item) => item.id === key)),
   ];
   const setPlacement = (id: string, next: Placement) => {
     const order = [...items.map((item) => item.id).filter((key) => key !== id), id];
     onChange({
-      ...draft,
+      ...settings,
       ribbon: {
-        ...draft.ribbon,
+        ...settings.ribbon,
         order: retainedOrder(order),
         bottom: [
-          ...draft.ribbon.bottom.filter((key) => key !== id),
+          ...settings.ribbon.bottom.filter((key) => key !== id),
           ...(next === 'bottom' ? [id] : []),
         ],
       },
@@ -54,12 +57,12 @@ export function RibbonSettings({
     order.splice(from, 1);
     order.splice(to, 0, id);
     onChange({
-      ...draft,
+      ...settings,
       ribbon: {
-        ...draft.ribbon,
+        ...settings.ribbon,
         order: retainedOrder(order),
         bottom: [
-          ...draft.ribbon.bottom.filter((key) => key !== id),
+          ...settings.ribbon.bottom.filter((key) => key !== id),
           ...(placement(target) === 'bottom' ? [id] : []),
         ],
       },
@@ -68,23 +71,23 @@ export function RibbonSettings({
   const addSeparator = (next: Placement) => {
     const id = `separator:${crypto.randomUUID()}`;
     onChange({
-      ...draft,
+      ...settings,
       ribbon: {
-        ...draft.ribbon,
-        separators: [...draft.ribbon.separators, id],
+        ...settings.ribbon,
+        separators: [...settings.ribbon.separators, id],
         order: [...retainedOrder(items.map((item) => item.id)), id],
-        bottom: [...draft.ribbon.bottom, ...(next === 'bottom' ? [id] : [])],
+        bottom: [...settings.ribbon.bottom, ...(next === 'bottom' ? [id] : [])],
       },
     });
   };
   const removeSeparator = (id: string) =>
     onChange({
-      ...draft,
+      ...settings,
       ribbon: {
-        order: draft.ribbon.order.filter((key) => key !== id),
-        hidden: draft.ribbon.hidden.filter((key) => key !== id),
-        bottom: draft.ribbon.bottom.filter((key) => key !== id),
-        separators: draft.ribbon.separators.filter((key) => key !== id),
+        order: settings.ribbon.order.filter((key) => key !== id),
+        hidden: settings.ribbon.hidden.filter((key) => key !== id),
+        bottom: settings.ribbon.bottom.filter((key) => key !== id),
+        separators: settings.ribbon.separators.filter((key) => key !== id),
       },
     });
   const row = (item: RibbonItem, index: number, group: RibbonItem[]) => (
@@ -117,15 +120,15 @@ export function RibbonSettings({
         <SettingsInput
           type="checkbox"
           aria-label={`${item.title}をリボンに表示`}
-          checked={!draft.ribbon.hidden.includes(item.id)}
+          checked={!settings.ribbon.hidden.includes(item.id)}
           onChange={(event) =>
             onChange({
-              ...draft,
+              ...settings,
               ribbon: {
-                ...draft.ribbon,
+                ...settings.ribbon,
                 hidden: event.target.checked
-                  ? draft.ribbon.hidden.filter((id) => id !== item.id)
-                  : [...draft.ribbon.hidden, item.id],
+                  ? settings.ribbon.hidden.filter((id) => id !== item.id)
+                  : [...settings.ribbon.hidden, item.id],
               },
             })
           }
@@ -176,7 +179,7 @@ export function RibbonSettings({
     >
       <h3>{hostSettingItem('ribbon', 'ribbon').title}</h3>
       <p>
-        上寄せ・下寄せを選び、それぞれの並び順と表示を設定できます。行をドラッグするか上下ボタンで並べ替えてから保存してください。
+        上寄せ・下寄せを選び、それぞれの並び順と表示を設定できます。行をドラッグするか上下ボタンで並べ替えると自動保存します。
       </p>
       <p className="muted">
         設定ボタンを非表示にしても、リボンの右クリックや「設定を開く」コマンドから戻れます。
@@ -204,7 +207,7 @@ export function RibbonSettings({
               <h4>{title}</h4>
               <button
                 className="secondary"
-                disabled={draft.ribbon.separators.length >= 50}
+                disabled={settings.ribbon.separators.length >= 50}
                 onClick={() => addSeparator(position)}
               >
                 {title}にセパレーターを追加
@@ -223,7 +226,7 @@ export function RibbonSettings({
       })}
       <button
         className="text-button"
-        onClick={() => onChange({ ...draft, ribbon: defaultRibbon() })}
+        onClick={() => onChange({ ...settings, ribbon: defaultRibbon() })}
       >
         リボンを初期状態に戻す
       </button>

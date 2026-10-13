@@ -164,7 +164,7 @@ function App() {
     ['description', 'settings', 'shortcuts', 'logs'],
   );
   const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
-  const editor = useSettingsEditor(snapshot?.settings, snapshot?.extensions ?? [], action);
+  const editor = useSettingsEditor(snapshot?.settings);
   const settingsViewRestored = useRef(false);
   useEffect(() => {
     if (!snapshot?.startupReady || !editor.sessionId) return;
@@ -197,11 +197,6 @@ function App() {
   useEffect(() => {
     if (webAccountsRequest) editor.selectPage('web-accounts');
   }, [webAccountsRequest]);
-  useEffect(() => {
-    void window.dock
-      .settingsUiContext(busy || editor.pending || editor.avatarLoading)
-      .catch((e) => setError(String(e)));
-  }, [busy, editor.pending, editor.avatarLoading]);
   useEffect(
     () =>
       window.dock.onFlushSettingsInputs((id) => {
@@ -214,7 +209,7 @@ function App() {
   );
   const orderedApplets = orderApplets(
     snapshot?.extensions.filter((e) => e.sourceKind !== 'builtin') ?? [],
-    editor.draft.appletOrder,
+    editor.value.appletOrder,
   );
   const [logSource, setLogSource] = useRestartView<string>('logSource', '');
   useEffect(() => window.dock.onLogSourceChanged(setLogSource), []);
@@ -378,10 +373,6 @@ function App() {
     }
   }
   const goExtension = async (id: string) => {
-    if (editor.mode === 'json' && editor.parseError && editor.pageId !== 'applet:' + id) {
-      setError('JSONの内容を修正してからAppletを切り替えてください。');
-      return;
-    }
     try {
       await window.dock.flushSettings();
     } catch (e) {
@@ -392,10 +383,6 @@ function App() {
     setPage('extensions');
   };
   const goWebManager = () => {
-    if (!editor.switchToForm()) {
-      setError('設定ページのJSONの内容を修正してからWebAppletの設定を開いてください。');
-      return;
-    }
     setSelected(webManagerId);
     setDetailView('settings');
     setPage('extensions');
@@ -430,7 +417,10 @@ function App() {
   ];
   const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
-    if (id === 'appdock.notifications.open') { setPage('notifications'); return; }
+    if (id === 'appdock.notifications.open') {
+      setPage('notifications');
+      return;
+    }
     if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
       if (id === 'appdock.logs.open') setLogSource('');
       setPage(id === 'appdock.applets.open' ? 'extensions' : 'logs');
@@ -572,7 +562,7 @@ function App() {
             {snapshot.settings.syncError}
             {snapshot.settings.recovered && (
               <button
-                disabled={busy || editor.dirty}
+                disabled={busy || editor.pending}
                 onClick={() =>
                   void action(async () => {
                     await window.dock.restoreSettingsBackup(snapshot.settings.revision);
@@ -584,20 +574,14 @@ function App() {
             )}
           </div>
         )}
-        {error &&
-          !(
-            editor.dirty &&
-            page !== 'settings' &&
-            page !== 'extensions' &&
-            editor.saveError === error
-          ) && (
-            <div className="error-banner" role="alert">
-              {error}
-              <button aria-label="エラーを閉じる" onClick={() => setError('')}>
-                <Icon name="close" size={14} />
-              </button>
-            </div>
-          )}
+        {error && (
+          <div className="error-banner" role="alert">
+            {error}
+            <button aria-label="エラーを閉じる" onClick={() => setError('')}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        )}
         {!snapshot ? (
           <div className="loading">Dockに接続しています…</div>
         ) : (
@@ -649,7 +633,7 @@ function App() {
               <ShellPageSlot
                 key="home"
                 kind="home"
-                appletOrder={editor.draft.appletOrder}
+                appletOrder={editor.value.appletOrder}
                 navigationRequest={snapshot.navigation.request}
               />
             )}
@@ -687,17 +671,6 @@ function App() {
                     extension={selectedApplet}
                     view={detailView}
                     onView={(view) => {
-                      if (
-                        (view === 'shortcuts' && !editor.switchToForm()) ||
-                        (view === 'settings' &&
-                          editor.parseError &&
-                          editor.pageId !== 'applet:' + selectedApplet?.id)
-                      ) {
-                        setError(
-                          '設定ページのJSONの内容を修正してから、Appletの設定を開いてください。',
-                        );
-                        return false;
-                      }
                       void window.dock
                         .flushSettings()
                         .then(() => setDetailView(view))
@@ -761,7 +734,7 @@ function App() {
                       ) : undefined
                     }
                     busy={busy}
-                    updateDisabled={editor.dirty}
+                    updateDisabled={editor.pending}
                     run={action}
                   />
                 </div>
@@ -776,7 +749,9 @@ function App() {
                 />
               )}
             </div>
-            {page === 'notifications' && <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />}
+            {page === 'notifications' && (
+              <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
+            )}
             {page === 'logs' && (
               <ShellPageSlot
                 scope={{ type: 'all' }}
@@ -794,7 +769,7 @@ function App() {
         </span>
         <span>
           AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
-          <VersionCheck compact disabled={editor.dirty} />
+          <VersionCheck compact disabled={editor.pending} />
         </span>
         <button onClick={() => void openPalette()}>
           <Icon name="command" size={12} />

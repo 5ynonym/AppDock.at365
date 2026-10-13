@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path');
@@ -71,7 +72,7 @@ module.exports = async function ({
   await shell.screenshot({ path: path.join(profile, 'mcp-ribbon-shell.png') });
   // Existing GUI writes remain visible through the same read API.
   await row('logs').getByRole('checkbox').check();
-  await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(page);
   await until(
     async () => (await read()).items.find((i) => i.id === 'logs').visible,
     'GUI ribbon save',

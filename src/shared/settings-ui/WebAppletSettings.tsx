@@ -32,8 +32,8 @@ export function WebAppletSettings({
   onDelete?(): void;
   onDefaults?(): Promise<string>;
 }) {
-  const { draft, edit } = editor;
-  const data = draft.webApplets;
+  const { value: settings, edit } = editor;
+  const data = settings.webApplets;
   const [selected, setSelected] = useState(itemId ?? data.items[0]?.id ?? '');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,7 +52,7 @@ export function WebAppletSettings({
   const change = (patch: Partial<WebApplet>) => {
     if (item)
       edit({
-        ...draft,
+        ...settings,
         webApplets: {
           ...data,
           items: data.items.map((a) => (a.id === item.id ? { ...a, ...patch } : a)),
@@ -60,7 +60,7 @@ export function WebAppletSettings({
       });
   };
   const changeDefaults = (shortcutDefaults: WebShortcutDefault[]) =>
-    edit({ ...draft, webApplets: { ...data, shortcutDefaults } });
+    edit({ ...settings, webApplets: { ...data, shortcutDefaults } });
   const changeDefault = (index: number, patch: Partial<WebShortcutDefault>) =>
     changeDefaults(
       data.shortcutDefaults.map((row, i) => (i === index ? { ...row, ...patch } : row)),
@@ -69,7 +69,7 @@ export function WebAppletSettings({
     setBusy(true);
     try {
       const account = accounts[0] ?? (await settingsControls.createWebAccount('個人用'));
-      const current = liveEditor.current.draft;
+      const current = liveEditor.current.value;
       const a: WebApplet = {
         id: `web.${crypto.randomUUID()}`,
         name: '新しいWebApplet',
@@ -89,7 +89,7 @@ export function WebAppletSettings({
         },
       });
       setSelected(a.id);
-      setMessage('名前とURLを入力して設定を保存してください。');
+      setMessage('名前とURLを変更すると自動保存します。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'WebAppletを追加できませんでした。');
     } finally {
@@ -123,13 +123,13 @@ export function WebAppletSettings({
       }
       const updated = mergeWebDefaults(current, before, result);
       edit({
-        ...liveEditor.current.draft,
+        ...liveEditor.current.value,
         webApplets: {
           ...live.current,
           items: live.current.items.map((a) => (a.id === before.id ? updated : a)),
         },
       });
-      setMessage(`${result.message} 内容を確認して保存してください。`);
+      setMessage(`${result.message} 設定へ反映しました。`);
     } catch {
       setMessage('取得できませんでした。手動で設定できます。');
     } finally {
@@ -401,7 +401,7 @@ export function WebAppletSettings({
                   canvas.getContext('2d')!.drawImage(image, 0, 0, 32, 32);
                   image.close();
                   if (token === request.current) {
-                    const current = liveEditor.current.draft;
+                    const current = liveEditor.current.value;
                     edit({
                       ...current,
                       webApplets: {
@@ -494,7 +494,7 @@ export function WebAppletSettings({
                   return;
                 }
                 edit({
-                  ...draft,
+                  ...settings,
                   webApplets: { ...data, items: data.items.filter((a) => a.id !== item.id) },
                 });
                 setSelected('');

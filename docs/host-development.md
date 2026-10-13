@@ -65,12 +65,12 @@ window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
-Applet管理一覧は本体renderer、設定カテゴリ・設定用Applet一覧・横断検索はDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsEditingSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
+Applet管理一覧は本体renderer、設定カテゴリ・設定用Applet一覧・横断検索はDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsInputSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
 
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
 3. [mainのregisterIpc](../src/main/index.ts)の既存handleラッパーで受けます。送信元webContents・mainFrame・`appdock://host/index.html`の確認を維持し、引数も実行時に検証します。
-4. [React](../src/renderer/main.tsx)で読み込み・操作・保存・エラーを実装します。設定編集はdraftとrevisionを使い、他の変更が起きた際の古い内容による上書き拒否、画像の保存／復元処理を保ちます。
+4. [React](../src/renderer/main.tsx)で読み込み・操作・保存・エラーを実装します。設定入力は保存済み値とrevisionを使い、他の変更が起きた際の古い内容による上書き拒否、画像の保存／復元処理を保ちます。
 5. 購読はunmount時に解除し、UIテストでは通知の到着まで待ちます。Applet名・項目名・単位・説明を表示し、ユーザーが判断に使わない通信名やプロセス情報を設定画面へ出しません。
 
 `nodeIntegration: false`、`contextIsolation: true`、`sandbox: true`、CSP、外部navigationの禁止を維持します。Appletから提供するパネルはReactでテキストとして描画し、生HTMLやスクリプトを受けません。
@@ -169,7 +169,7 @@ portableランチャーは更新間で実行パスを固定し、tray-identity.t
 
 ## Appletページとリボン
 
-契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、shells/default/settings/RibbonSettings.tsxが下書き編集を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
+契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、shells/default/settings/RibbonSettings.tsxが即時保存する入力を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
 リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
@@ -178,21 +178,15 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 ## Applet設定パネルの共用
 
-- ページ見出し下の`SettingsToolbar`を設定/全Applet詳細で共用し、タブ内と並べ替え欄の保存を集約します。Webアカウントの即時反映ページでも、別の未保存draftを保存できる共通欄を表示します。カテゴリ順は表示/一般/リボン/タスクトレイ/ショートカット/マウスジェスチャー/Webアカウント/操作の許可/Codex連携/プロフィール/バージョン情報・更新です。
-- 他ページで未保存の場合、SettingsNotificationSourceが[通知基盤](notifications.md)へ条件通知を発行し、Default Shell/Shell Appletがバナーを描画します。NotificationSurfaceHostの小さなWebContentsViewをWebより上・モーダルより下へ配置し、背景の領域/入力/寿命を維持します。設定/Appletへ戻るとバナーだけを隠し、保存成功・破棄確定で通知を解消します。表示でfocusを奪わず、通常host IPCは渡しません。
-- draft/JSON/画像/revisionはmainの`SettingsEditingSession`が所有し、host rendererの`useSettingsEditor`は購読と直列入力のアダプターです。通知の保存/破棄は本体の編集サービスへ委譲し、入力反映待ち・最新revision・通知の実行ロックとpendingで二重実行を防ぎます。保存失敗時はdraftと通知を保ち、直前の編集ページへ戻る入口を表示します。通知の破棄はキャンセル既定の警告dialogで確認し、ページ内の従来の再読込操作は維持します。
-- `scripts/settings-notice-ui-test.cjs [publish/AppDock.at365.exe]`は保存共用・4タブ保持・Web管理移動・浮動保存/入力不備・両テーマ・サイズ・復元起動を隔離profileで検証します。開発起動ではnative View順と破棄dialogのキャンセル/確定応答も検証します。親Window単独のcaptureは子Viewを含まないことがあるため、通知/リモート画面を個別にも確認します。
+全体設定とApplet詳細は同じSettingsPageSession/Default Shell本文を使う。0.33.0では保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
 
-- `useSettingsEditor.ts`は`App`で一度だけ生成する編集アダプターです。受理済み編集はmainに保持し、画面の寿命と分離します。フォームとJSON、revision/dirty、プロフィール画像、設定検証、再読込、保存を両ページで共有します。既存SettingsStoreのrevision付き保存を使い、外部変更と競合した下書きを上書きしません。
-- `AppletSettingsPanel.tsx`は上部の独立した設定・ショートカットタブに応じてShellPageSlot（page.settings）/`AppletShortcutOverview`（専用のAppletShortcutDialogで追加・編集）を描画します。設定ページはShortcutsEditorで全コマンドを平坦に表示します。両方がShortcutCommandListとAppletShortcutDialogを共用します。全体ページと詳細の保存操作は同じSettingsEditingSessionへ戻し、保存/破棄対象は全編集内容です。Applet API/manifestの追加はありません。表示順のみsettings.jsonの`appletOrder`で保存します。
-- `ExtensionDetail`はヘッダーと横並びの「説明・設定・ショートカット・ログ」タブを保ち、その下だけ内容を描画します。`detailView`で表示を排他的に管理し、tablist/tab/tabpanelとaria-selected/controls/labelledbyで選択を表します。選択中のタブだけをTab移動対象とし、左右キーで循環、Home/Endで先頭/末尾へ選択とフォーカスを移します。不正JSONで設定・ショートカットへ移れない場合は選択を変更しません。スクロールバーの領域を確保し、設定側のflex配置は幅をstretchしてヘッダーの幅も保ちます。ログはShellの`page.logs`を共用し、選択AppletのIDへsourceを固定して検索・レベル・保存先操作を提供します。リボンのログページのsource選択とは独立し、別Appletの選択でも選択中のタブを維持します。非表示の設定ページはカテゴリ等の選択状態を保持し、編集部品は表示中のページだけに描画して、同じ入力IDやキー記録を二重に持ちません。
-- 詳細タブと全体設定は同じ部分JSONを表示します。不正なJSONがある場合は別範囲への設定内移動を拒否し、同じページで修正できます。プロフィール画像の読み込み中に離れる場合は既存ProfileEditorの後始末で保存待ちを解除します。
-- 詳細設定はパネル内をスクロールし、保存操作とタブは長いフォームでも表示を保ちます。検証は`node scripts/navigation-ui-test.cjs`で行い、実Appletや実利用設定を使わず隔離fixtureへ保存します。
+page.settingsはschemaVersion:2、追加ShellはminimumHostVersion:0.33.0以上。旧提供元は設定領域だけDefault Shellへ戻る。部分JSON・入力キュー・外部競合・検索の正本は[設定基盤](settings-foundation.md)。操作許可とWebアカウントは既存のPC専用/別名簿サービスを維持する。scripts/settings-shell-ui-test.cjs [固定EXE]で即時保存・IME/連続入力・画像・失敗/競合・復旧・再起動を確認する。通知基盤で編集状態を管理しない。
+
 
 ## Appletの表示順
 
 - `shared/applet-order.ts`は保存ID順に既存Appletを並べ、未登録の新規Appletは発見順で末尾へ置きます。不在IDを表示せず、新しい並べ替えでもそのIDは保存配列に保持します。WebAppletも同じ一覧に含みます。既存JSONのappletOrder未指定は空配列で補い、重複・不正ID・500件超を拒否します。
-- `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。共有draftを更新し、保存/破棄は他の未保存設定も含みます。不正JSON・revision競合・保存失敗時に下書きを上書きしません。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
+- `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。並び順は操作時に保存します。revision競合・保存失敗時は保存済み値を維持してエラーを表示します。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
 - rendererのApplet一覧・ホームカード・対象Applet候補に同じ順を使います。ショートカットのコマンド一覧はカタログ順で独立し、一覧内に実行順操作を置きません。専用ShortcutOrderDialogは全カタログを受け取り、提供元をまたいで同じキー内の順番を変更します。Applet表示順で実行順・起動順・ribbon.orderを変更しません。
 - 検証は`tests/applet-order.test.cjs`、`scripts/applet-order-ui-test.cjs`と既存navigation/default-shortcuts/WebApplet UI試験で行います。
 
@@ -202,11 +196,11 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 ## 割り当て操作UIの共用
 
-設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorのdraftへ反映し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
+設定ページとApplet詳細はShortcutCommandListの2列一覧とAppletShortcutDialogの入力を共用します。設定ページだけが検索/状態フィルター/提供元表示/登録エラー・再試行を持ち、Applet詳細は提供元の定義順を維持します。追加/変更/削除はuseSettingsEditorから即時保存し、JSON/revision/saveは複製しません。検索で行が消えてもdialogの一時入力や一覧のfocus復帰を管理します。
 
 設定ジェスチャーも全コマンド一覧へ統一し、CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用します。ShortcutCommandList/ShortcutOrderDialogはキー用、GesturesEditor/GestureOrderDialogはジェスチャー用の保存処理と表示を渡します。AppletShortcutDialogとGestureBindingDialogは入力と条件を構成し、キー記録はShortcutCaptureFieldを共用します。両方のメニューは編集・同入力の実行順・即時削除（confirmDelete=false）。表外portalの位置補正・外側クリック/スクロール/Escape・キーボード移動を維持します。条件の差異と全体設定は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照してください。
 
-詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、共有draft/画面遷移はscripts/navigation-ui-test.cjsを参照してください。
+詳細は[条件付きショートカット](keybindings.md#編集画面と表示順)、[ジェスチャー](gestures.md)。専用GUIはscripts/shortcuts-ui-test.cjs、即時保存/画面遷移はscripts/navigation-ui-test.cjsを参照してください。
 
 ### 設定インデックスと項目移動
 

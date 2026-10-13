@@ -172,7 +172,7 @@ const checks = [];
         });
   let app = await launch();
   try {
-    const dock = await app.firstWindow();
+    const dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     await dock.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
     await dock.evaluate(() => window.dock.executeCommand('appdock.open'));
     await dock.bringToFront();
@@ -298,7 +298,9 @@ const checks = [];
     const persisted = (await dock.evaluate(() => window.dock.snapshot())).settings.value.gestures;
     await app.close();
     app = await launch();
-    const restarted = await app.firstWindow();
+    const restarted = require('./settings-aware-page.cjs').settingsAwarePage(
+      await app.firstWindow(),
+    );
     await restarted.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
     assert.deepEqual(
       (await restarted.evaluate(() => window.dock.snapshot())).settings.value.gestures,

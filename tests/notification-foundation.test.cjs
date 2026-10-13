@@ -4,9 +4,6 @@ const fs = require('node:fs'),
   path = require('node:path');
 const { NotificationService } = require('../out/main/main/core/notification-service');
 const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
-const {
-  SettingsNotificationSource,
-} = require('../out/main/main/core/settings-notification-source');
 function fixture(t) {
   const base = path.resolve(__dirname, '../.artifacts');
   fs.mkdirSync(base, { recursive: true });
@@ -57,17 +54,17 @@ const request = (s, id, extra = {}) => {
     ...extra,
   };
 };
-test('levels, lifecycle, source identity and independent banner visibility', (t) => {
+test('levels, lifecycle, source identity and independent target projection', (t) => {
   const { service: s } = fixture(t);
   const a = s.upsert(
     'host.alpha',
-    input({ level: 'warning', dedupeKey: 'same', bannerVisible: false }),
+    input({ level: 'warning', dedupeKey: 'same', targets: ['windows'] }),
   );
   const b = s.upsert('host.beta', input({ level: 'error', dedupeKey: 'same' }));
   assert.equal(s.targetItems('banner').length, 1);
   assert.equal(s.list().length, 2);
   assert.notEqual(a, b);
-  assert.equal(s.upsert('host.alpha', input({ dedupeKey: 'same', bannerVisible: true })), a);
+  assert.equal(s.upsert('host.alpha', input({ dedupeKey: 'same', targets: ['banner'] })), a);
   assert.deepEqual(
     s.targetItems('banner').map((i) => i.id),
     [a, b],
@@ -264,63 +261,4 @@ test('capacity reserves host slots and permits updates at the owner limit', (t) 
   assert.ok(
     s.upsert('host.settings', input({ lifetime: { type: 'condition' }, dismissible: false })),
   );
-});
-test('settings adapter has one episode, shared actions and is removable without affecting other sources', async (t) => {
-  const { service: s } = fixture(t);
-  const state = {
-    sessionId: 'edit',
-    editRevision: 0,
-    dirty: true,
-    parseError: '',
-    saveError: '',
-    pending: false,
-    avatarLoading: false,
-  };
-  let route = 'home',
-    flushes = 0,
-    operations = 0,
-    fail = true;
-  const source = new SettingsNotificationSource(s, {
-    editor: {
-      snapshot: () => ({ ...state }),
-      act: async (r) => {
-        operations++;
-        assert.equal(r.editRevision, state.editRevision);
-        if (fail) {
-          state.saveError = 'sensitive path';
-          throw Error('failure');
-        }
-        state.dirty = false;
-      },
-    },
-    route: () => route,
-    busy: () => false,
-    flush: async () => {
-      flushes++;
-      state.editRevision++;
-    },
-    edit: async () => {
-      route = 'settings';
-    },
-  });
-  source.refresh();
-  const id = s.list()[0].id;
-  source.refresh();
-  assert.equal(s.list().length, 1);
-  await s.invoke(
-    request(s, id, { actionId: s.list()[0].actions.find((a) => a.label === 'すべて保存').id }),
-  );
-  assert.equal(s.list()[0].level, 'error');
-  assert.equal(s.list()[0].id, id);
-  assert.equal(s.historyEntries()[0].body.includes('sensitive'), false);
-  fail = false;
-  await s.invoke(
-    request(s, id, { actionId: s.list()[0].actions.find((a) => a.label === 'すべて保存').id }),
-  );
-  assert.equal(s.list()[0].status, 'resolved');
-  assert.equal(flushes, 2);
-  assert.equal(operations, 2);
-  s.upsert('host.other', input());
-  s.withdrawSource('host.settings');
-  assert.equal(s.targetItems('banner').length, 1);
 });

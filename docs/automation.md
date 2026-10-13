@@ -18,7 +18,7 @@ Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK]
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
 - `automation.ts`: PC専用設定、暗号化、起動/停止、登録状態、接続テスト。
 - `codex-registration.ts`: smol-tomlで構文・意味を検証した限定範囲の編集。既存ファイル全体を再シリアライズしません。
-- `CodexSettings.tsx`: 設定内の専用ページ。PC専用操作を即時反映し、既存の共有draft/全体保存バーは保持します。
+- `CodexSettings.tsx`: 設定内の専用ページ。PC専用操作を即時反映します。共有設定も即時保存し、全体保存バーはありません。
 
 `dock:automation` IPCは本体Window/mainFrame/URL検査を通し、WebAppletやAppletページへ公開しません。本体のprepareSettings/commitSettingsを共有して保存します。APIからWindows起動登録・UACを呼びません。
 
@@ -54,7 +54,7 @@ Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK]
 
 `{"id":"appdock.settings.update","args":{"changes":{"theme":"light"},"expectedRevision":"<取得したrevision>","dryRun":true}}`で検証します。dryRunでもコマンド実行・書込の両許可とrevision照合が必要です。未知項目・余分な引数・型不一致・空changesを拒否し、指定外を保持して一括保存します。同じ値だけなら書きません。
 
-revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透明な文字列です。本体再起動前の値は使えません。本体の設定コマンドサービスをローカル操作とMCPで共有するため、MCPの停止・再開だけではrevisionの実行IDは変わりません。保存直前にディスクも確認し、未通知の外部更新・破損を上書きしません。GUIのdirty draftを保持し、API更新後に古いGUI版を保存すると既存の競合検査で拒否します。GUI入力を自動保存/破棄しません。ファイル同期の未到着な変更までmergeする保証はありません。
+revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透明な文字列です。本体再起動前の値は使えません。本体の設定コマンドサービスをローカル操作とMCPで共有するため、MCPの停止・再開だけではrevisionの実行IDは変わりません。保存直前にディスクも確認し、未通知の外部更新・破損を上書きしません。GUIは妥当な変更ごとに即時保存します。操作前の値と現在値を比較し、APIと同じフィールドを変更した古い入力は競合として拒否します。途中入力と失敗値は現在の画面内に保持します。ファイル同期の未到着な変更までmergeする保証はありません。
 
 エラーコードはINVALID_ARGUMENT、NOT_FOUND、NOT_READY、WRITE_DISABLED、REVISION_CONFLICT、SAVE_FAILEDです。MCPはisErrorとtext/structuredContentにコードと説明を返し、秘密値や全設定を返しません。保存完了と全Appletの非同期reconcile完了は区別します。
 
@@ -64,7 +64,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
-取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未保存入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
+取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
 編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
 
@@ -99,7 +99,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で各100件まで。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
 
-operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正規化/実行順処理を共用し、一括検証後に1回だけ保存します。dryRun/無変更は保存せず、途中エラーも全体を保存しません。他の本体/Applet設定・ショートカットとrevisionを共用し、未通知のディスク更新・再起動・GUI未保存入力に対する競合保護を維持します。エラーはINVALID_ARGUMENT/NOT_FOUND/COMMAND_NOT_ASSIGNABLE/REVISION_CONFLICT/SAVE_FAILED、および実行/書込/編集の許可不足です。
+operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正規化/実行順処理を共用し、一括検証後に1回だけ保存します。dryRun/無変更は保存せず、途中エラーも全体を保存しません。他の本体/Applet設定・ショートカットとrevisionを共用し、未通知のディスク更新・再起動・GUIの未確定入力に対する競合保護を維持します。エラーはINVALID_ARGUMENT/NOT_FOUND/COMMAND_NOT_ASSIGNABLE/REVISION_CONFLICT/SAVE_FAILED、および実行/書込/編集の許可不足です。
 
 結果はdryRun/changed/settings/bindings/revision/warning/applies=gesturesChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。入力処理への反映は非同期であり、保存完了は物理ジェスチャーの成功や現在の一時停止解除を示しません。全API呼出しを既存automationログへ記録し、操作引数やexe名はログに残しません。
 
@@ -107,7 +107,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。
 
-読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未保存draftは含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
+読取りは保存済みのbindings（id/command/key/enabled/when）を実行順に返します。GUIの未確定入力は含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
 
@@ -144,7 +144,7 @@ scopeはglobal/app/pages/owner/appletsです。appletsだけは登録済みApple
 
 operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
 
-revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未保存入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。OSへのグローバル登録は非同期なので、保存成功だけで登録成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。登録エラーは限定した説明へ置き換えます。
+revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未確定入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。OSへのグローバル登録は非同期なので、保存成功だけで登録成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。登録エラーは限定した説明へ置き換えます。
 
 追加エラーはSHORTCUT_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
 
@@ -154,7 +154,7 @@ revisionは本体/各Applet設定と共通です。他の設定編集・再起�
 
 - enable/disable: enabledのみを既存SettingsStoreで保存し、他の設定を保持して状態を反映します。同じ値なら保存しません。有効化は設定済みの起動遅延に従います。
 - restart: 有効状態を保存し直さず、ファイル型は停止して再起動予約（起動遅延を尊重）、WebAppletはビューを作り直して表示します。無効なAppletはUNAVAILABLEで拒否します。再起動は実行中処理を中断し得ます。
-- 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未保存draftを混同しません。
+- 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未確定入力を混同しません。
 - 成功応答はcompletion=lifecycleApplied、changed（enabledの保存有無）、applet（id/enabled/state）、effectVerified=falseです。waitingは予約状態で、起動完了を意味しません。起動失敗はLIFECYCLE_FAILEDになり、保存済みenabledは巻き戻しません。失敗/通信切断後は状態とログを確認します。
 
 PC専用automation.jsonの`allowManageApplets`は既定falseです。「操作の許可」のMCP列の「Appletの有効・無効・再起動」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
@@ -290,7 +290,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、各配列500件、区切り線50件まで。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
 
-revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未保存draftは上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
+revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未確定入力は上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
 
 結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやリボン右クリックから戻れます。
 
@@ -333,7 +333,7 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 
 新規/変更先のコマンドはassignableCommandsから指定します。メニューではmenuAllowed=trueだけを使用し、固定「設定」「終了」の重複を防ぎます。クリック割当はmenuAllowedに制約されません。既存の未知/非公開コマンドは保持・移動・並べ替え・削除が可能で、同じ値の再指定は許可しますが、別の項目やクリック先への新規コピーは許可しません。groupのremoveは拒否し、中身を消したい場合も項目ごとに明示削除します。
 
-共有revision/dryRun/no-op/競合拒否/GUI未保存draft保持は他の編集コマンドと同じです。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値として更新します。旧形式は読取り時に既存getTrayMenuで投影し、変更保存時に移行します。リボン/キー/ジェスチャー/Applet設定などは保持します。
+共有revision/dryRun/no-op/競合拒否/GUIの未確定入力と同一フィールドの競合検査は他の編集コマンドと同じです。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値として更新します。旧形式は読取り時に既存getTrayMenuで投影し、変更保存時に移行します。リボン/キー/ジェスチャー/Applet設定などは保持します。
 
 結果はmenu/clicks/dryRun/changed/revision/warning/applies=trayChanged。completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後のトレイ反映は既存applySettingsが行い、保留中のクリックを取消します。編集自体はコマンド実行ではなく、実クリックの成功を保証しません。ダブル未設定ならシングルを即実行、ダブル設定時はWindowsの判定時間を待ち、ダブル成立時に先行シングルを取消す既存仕様を維持します。
 

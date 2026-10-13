@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
@@ -156,7 +157,7 @@ async function launch() {
       env,
     });
     browser = app.context();
-    host = await app.firstWindow();
+    host = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   } else {
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
@@ -223,14 +224,11 @@ async function settingsPage() {
   return p;
 }
 async function save(p) {
-  await p.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-  await p.getByText('すべて保存されています', { exact: true }).waitFor();
+  await settleSettings(p);
   await until(
     () =>
       p.evaluate(() =>
-        window.appdockPage
-          .connect()
-          .then((c) => !c.snapshot.content.editing.dirty && !c.snapshot.content.editing.pending),
+        window.appdockPage.connect().then((c) => !c.snapshot.content.editing.pending),
       ),
     'saved model',
   );

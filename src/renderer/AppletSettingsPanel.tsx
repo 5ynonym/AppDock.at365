@@ -26,7 +26,7 @@ export function AppletSettingsPanel({
   onWebAccounts(): void;
   webAccounts: WebProfile[];
 }) {
-  const { draft, edit } = editor;
+  const { value: settings, edit } = editor;
   const panel = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (panel.current) panel.current.scrollTop = 0;
@@ -49,7 +49,7 @@ export function AppletSettingsPanel({
           key={applet.id}
           applet={applet}
           allCommands={commands}
-          settings={draft}
+          settings={settings}
           applets={applets}
           onChange={edit}
         />

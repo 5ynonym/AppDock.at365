@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -181,7 +182,7 @@ const expectCalls = async (before, expected) => {
       args: process.argv[2] ? [`--test-profile=${profile}`] : [root, `--test-profile=${profile}`],
       timeout: 30000,
     });
-    dock = await app.firstWindow();
+    dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     await dock.waitForFunction(() => !!window.dock);
     await until(
       async () =>
@@ -361,7 +362,7 @@ const expectCalls = async (before, expected) => {
       await dock.locator('[data-shortcut-command="test.keys.c"] [data-binding-id]').count(),
       2,
     );
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(dock);
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.keybindings.filter(
@@ -379,7 +380,7 @@ const expectCalls = async (before, expected) => {
     );
     await keyRecorder.press('Control+Shift+F11');
     await applyEdit();
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(dock);
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.keybindings.find(
@@ -397,7 +398,7 @@ const expectCalls = async (before, expected) => {
     await openEdit();
     await editDialog.getByRole('switch').click();
     await applyEdit();
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(dock);
     await until(
       async () =>
         !(await dock.evaluate(() => window.dock.snapshot())).settings.value.keybindings.find(
@@ -416,7 +417,7 @@ const expectCalls = async (before, expected) => {
     );
     await editDialog.getByLabel('割り当てのいつ・どこで').selectOption('owner');
     await applyEdit();
-    await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(dock);
     await until(
       async () =>
         (await dock.evaluate(() => window.dock.snapshot())).settings.value.keybindings.find(
@@ -453,7 +454,7 @@ const expectCalls = async (before, expected) => {
       assert.equal(await editDialog.getByLabel('割り当てのいつ・どこで').inputValue(), scope);
       await keyRecorder.press(key);
       await editDialog.getByRole('button', { name: '追加', exact: true }).click();
-      await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+      await settleSettings(dock);
       await until(
         async () =>
           (await dock.evaluate(() => window.dock.snapshot())).settings.value.keybindings.some(

@@ -42,7 +42,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     env,
   });
   try {
-    const dock = await app.firstWindow();
+    const dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     await dock.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
     const snapshot = () => dock.evaluate(() => window.dock.snapshot());
     const initial = await snapshot();
@@ -80,7 +80,10 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       await dock.locator('.applet-shortcuts input, .applet-shortcuts select').count(),
       0,
     );
-    assert(await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled());
+    assert.equal(
+      await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+      0,
+    );
     const result = await snapshot();
     assert.deepEqual(
       result.settings.value.keybindings

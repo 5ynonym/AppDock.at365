@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -45,7 +46,7 @@ async function launch() {
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
   });
-  const page = await app.firstWindow();
+  const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   page.setDefaultTimeout(12000);
   await require('./shell-overlay-helper.cjs').homePage(page);
   await clickRibbon(page, 'Applet');
@@ -166,9 +167,10 @@ async function launch() {
     await settingsSeparator.press('ArrowRight');
     assert.equal(await width(), 320);
     await body.getByRole('button', { name: '一般', exact: true }).click();
-    await body.getByRole('switch', { name: 'デスクトップ通知', exact: true }).click();
-    assert.equal(await body.getByText('未保存の変更があります', { exact: true }).count(), 1);
-    assert.equal(await body.locator('.settings-categories .unsaved-mark').count(), 1);
+    await body.getByRole('switch', { name: '閉じるとトレイに常駐', exact: true }).click();
+    await settleSettings(page);
+    assert.equal(await body.getByText('未保存の変更があります', { exact: true }).count(), 0);
+    assert.equal(await body.locator('.settings-categories .unsaved-mark').count(), 0);
     for (const size of [
       { width: 1280, height: 840 },
       { width: 900, height: 620 },
@@ -186,10 +188,10 @@ async function launch() {
     await clickRibbon(page, '設定');
     assert.equal(
       await body
-        .getByRole('switch', { name: 'デスクトップ通知', exact: true })
+        .getByRole('switch', { name: '閉じるとトレイに常駐', exact: true })
         .getAttribute('aria-checked'),
-      'true',
-      'unsaved draft survives page switches',
+      'false',
+      'saved value survives page switches',
     );
     await clickRibbon(page, 'ログ');
     assert.equal(await page.locator('.page-heading p').count(), 0);
@@ -215,7 +217,7 @@ async function launch() {
             'drag / keyboard / bounds',
             '900px / 1280px / narrow layout',
             'restart persistence / invalid storage',
-            'settings appearance / shared drag and keyboard width / draft preservation',
+            'settings appearance / shared drag and keyboard width / immediate persistence',
             'home / Applet / logs subtitles removed',
           ],
         },

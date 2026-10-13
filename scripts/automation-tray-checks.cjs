@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path');
@@ -94,7 +95,7 @@ module.exports = async function ({
   await page.screenshot({ path: path.join(profile, 'mcp-tray-edited.png') });
   await row('mcp-tray-group').locator('.tray-select').click();
   await page.getByRole('textbox', { name: 'グループ名' }).fill('GUI renamed');
-  await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(page);
   await until(
     async () => (await read()).menu.find((i) => i.id === 'mcp-tray-group').title === 'GUI renamed',
     'tray GUI roundtrip',

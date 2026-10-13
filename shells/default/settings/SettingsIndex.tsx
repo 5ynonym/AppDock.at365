@@ -31,11 +31,6 @@ export function SettingsIndex({
       onClick={() => act({ kind: 'select', pageId: p.id })}
     >
       <span title={p.title}>{p.title}</span>
-      {p.dirty && (
-        <small className="unsaved-mark" aria-label="未保存">
-          ●
-        </small>
-      )}
     </button>
   );
   return (

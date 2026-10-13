@@ -25,7 +25,6 @@ export interface NotificationInput {
   history: 'persistent' | 'session' | 'none';
   historyText?: { title: string; body: string };
   busy?: boolean;
-  bannerVisible?: boolean;
   restartTimer?: boolean;
   windowsSilent?: boolean;
   windowsClickAction?: string;
@@ -218,12 +217,7 @@ export class NotificationService {
     this.expire();
     return structuredClone(
       [...this.records.values()]
-        .filter(
-          (r) =>
-            r.item.status === 'active' &&
-            r.item.targets.includes(target) &&
-            (target !== 'banner' || r.input.bannerVisible !== false),
-        )
+        .filter((r) => r.item.status === 'active' && r.item.targets.includes(target))
         .map((r) => r.item),
     );
   }

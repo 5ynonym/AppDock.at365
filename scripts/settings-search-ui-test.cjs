@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process'),
   net = require('node:net');
@@ -55,6 +56,7 @@ fs.cpSync(path.join(root, 'out/shells/default'), external, { recursive: true });
 const manifest = JSON.parse(fs.readFileSync(path.join(external, 'extension.json')));
 manifest.id = 'fixture.settings-shell';
 manifest.name = 'Settings shell fixture';
+manifest.minimumHostVersion = '0.33.0';
 manifest.shell = { apiVersion: 1, views: { 'page.settings': 'settings.html' } };
 fs.writeFileSync(path.join(external, 'extension.json'), JSON.stringify(manifest));
 const stalled = path.join(profile, 'extensions', 'fixture.stalled-settings');
@@ -164,7 +166,7 @@ async function until(fn, label) {
     await host.evaluate(() => window.dock.navigate('settings'));
     let shell = await settingsPage();
     let m = await modelOf(shell);
-    assert.equal(m.content.navigation[11].id, 'applet:fixture.settings');
+    assert.equal(m.content.navigation.find((p) => p.owner)?.id, 'applet:fixture.settings');
     assert(!m.content.navigation.some((p) => p.id.includes('web-manager')));
     for (const page of m.content.navigation.filter((p) => !p.owner)) {
       await op(shell, { kind: 'select', pageId: page.id });
@@ -270,7 +272,7 @@ async function until(fn, label) {
       await shell.getByLabel('Fixture text', { exact: true }).inputValue(),
       'Edited in detail',
     );
-    await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+    await settleSettings(shell);
     await until(
       () =>
         host.evaluate(() =>
@@ -297,16 +299,11 @@ async function until(fn, label) {
     await shell.getByLabel('設定JSON').fill('{broken');
     await search().fill('テーマ');
     await shell.getByRole('option', { name: /テーマ/ }).click();
-    await shell.getByRole('alert').filter({ hasText: /JSON/ }).first().waitFor();
-    assert.equal(await shell.getByLabel('設定JSON').inputValue(), '{broken');
-    assert.equal((await modelOf(shell)).content.page.id, 'applet:fixture.settings');
-    await shell.getByLabel('設定JSON').fill(json);
-    await shell.getByRole('option', { name: /テーマ/ }).click();
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
-    await shell.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-    await shell.getByText('すべて保存されています', { exact: true }).waitFor();
+    assert.equal((await modelOf(shell)).content.page.id, 'appearance');
+    await settleSettings(shell);
     checks.push(
-      'JSON scope ignores query and scrolling; invalid raw JSON blocks result movement and valid JSON returns to full form',
+      'JSON scope ignores query and scrolling; invalid raw JSON stays local and result movement opens persisted form',
     );
     await search().fill('テーマ');
     await search().press('ArrowDown');

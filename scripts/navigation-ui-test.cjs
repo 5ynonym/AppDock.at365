@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -94,7 +95,7 @@ const checks = [];
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     env,
   });
-  const page = await app.firstWindow();
+  const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
   page.setDefaultTimeout(12000);
   const body = require('./settings-shell-helper.cjs').deferred(() =>
@@ -116,9 +117,7 @@ const checks = [];
             ? shell
             : ['JSON', 'フォーム', '表示', '一般', 'ショートカット', '検証操作'].includes(name)
               ? body
-              : ['変更をすべて保存', '変更を破棄して再読み込み'].includes(name)
-                ? saveSurface
-                : page
+              : page
           ).getByRole('button', {
             name: name === 'Appletに戻る' ? 'Applet' : name,
             exact: true,
@@ -130,14 +129,13 @@ const checks = [];
     const click = locator.click.bind(locator);
     locator.click = async (...args) => {
       await click(...args);
-      if (!(await page.evaluate(() => window.dock.settingsEditing())).parseError)
-        await page.waitForFunction(
-          (name) =>
-            [...document.querySelectorAll('.detail-tabs [role="tab"]')].some(
-              (el) => el.textContent === name && el.getAttribute('aria-selected') === 'true',
-            ),
-          name,
-        );
+      await page.waitForFunction(
+        (name) =>
+          [...document.querySelectorAll('.detail-tabs [role="tab"]')].some(
+            (el) => el.textContent === name && el.getAttribute('aria-selected') === 'true',
+          ),
+        name,
+      );
     };
     return locator;
   };
@@ -161,11 +159,7 @@ const checks = [];
     });
   const settingsNav = () => body.locator('.settings-categories');
   const save = async () => {
-    await button('変更をすべて保存').click();
-    await saveSurface
-      .locator('.settings-toolbar:visible')
-      .getByText('すべて保存されています', { exact: true })
-      .waitFor();
+    await settleSettings(page);
   };
   const chooseApplet = async (name) => {
     const view = await page.evaluate(() =>
@@ -249,6 +243,9 @@ const checks = [];
           'button[aria-describedby="setting-action-help-test.applet-1.apply"]',
         )?.disabled,
     );
+    await body.locator('.settings-body').evaluate((e) => {
+      e.scrollTop = e.scrollHeight;
+    });
     await settingAction.click();
     await body
       .getByRole('status')
@@ -261,7 +258,7 @@ const checks = [];
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
         .settings.value0,
-      undefined,
+      '詳細からの編集',
     );
     await settingAction.click();
     await body.getByRole('alert').filter({ hasText: 'fixture action failure' }).first().waitFor();
@@ -270,11 +267,11 @@ const checks = [];
       '詳細からの編集',
     );
     checks.push(
-      'main setting actions in the shared inline panel / success and failure / unsaved draft preserved',
+      'main setting actions in the shared inline panel / success and failure / durable input preserved',
     );
     await body.getByLabel('検証数値', { exact: true }).fill('');
-    await button('変更をすべて保存').click();
-    await page.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
+    await settleSettings(page);
+    await body.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
     await body.getByLabel('検証数値', { exact: true }).fill('3');
     await detailTab('説明').click();
     await detailTab('設定').click();
@@ -289,7 +286,7 @@ const checks = [];
       '詳細からの編集',
     );
     checks.push(
-      'inline settings / description return / unified shortcut entry / shared draft / validation',
+      'inline settings / description return / unified shortcut entry / persisted settings / validation',
     );
 
     await chooseApplet('検証Applet 01');
@@ -313,10 +310,13 @@ const checks = [];
     await button('設定').click();
     await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
     await body.getByRole('region', { name: 'バージョン情報・更新', exact: true }).waitFor();
-    assert.equal(await saveSurface.locator('.settings-toolbar:visible').count(), 1);
+    assert.equal(
+      await saveSurface.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+      0,
+    );
     assert.equal(
       await body.getByRole('button', { name: 'Appletを一括更新', exact: true }).isDisabled(),
-      true,
+      false,
     );
     await chooseApplet('検証Applet 01');
     assert.equal(await body.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
@@ -324,7 +324,7 @@ const checks = [];
     const stored = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     assert.equal(stored.extensions['test.applet-1'].settings.value23, '末尾の値');
     assert.equal(stored.extensions['test.applet-2'].settings.value0, '別Appletの値');
-    checks.push('search / multiple applet drafts / return link / save all');
+    checks.push('search / immediate writes across applets / return link');
     await body.getByRole('switch', { name: '検証スイッチ' }).click();
     await body.getByLabel('検証選択', { exact: true }).selectOption('b');
     assert.equal(
@@ -332,12 +332,12 @@ const checks = [];
       'disconnected',
     );
     await body.getByLabel('検証数値', { exact: true }).fill('');
-    await button('変更をすべて保存').click();
-    await page.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
+    await settleSettings(page);
+    await body.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
         .settings.flag,
-      undefined,
+      false,
     );
     await body.getByLabel('検証数値', { exact: true }).fill('5');
     await save();
@@ -412,17 +412,12 @@ const checks = [];
     await button('設定').click();
     await button('JSON').click();
     await setJsonDraft('{broken');
+    await body.getByRole('alert').first().waitFor();
     await button('Applet').click();
     await detailTab('設定').click();
-    assert.equal(await page.locator('.detail-heading h2').count(), 1);
-    await page.locator('.error-banner').filter({ hasText: 'JSONの内容を修正' }).waitFor();
     await button('設定').click();
-    assert.equal(await body.getByLabel('設定JSON').inputValue(), '{broken');
-    await body.locator('.error-text').filter({ hasText: 'JSONの内容を修正' }).waitFor();
-    await button('変更を破棄して再読み込み').click();
     await button('フォーム').click();
-    await button('エラーを閉じる').click();
-    checks.push('direct navigation preserves invalid JSON');
+    checks.push('invalid JSON remains local and does not prevent navigation');
 
     await chooseApplet('検証Applet 01');
     await detailTab('設定').click();
@@ -451,7 +446,7 @@ const checks = [];
       await body.getByLabel('検証項目 0', { exact: true }).inputValue(),
       'JSONから共通編集',
     );
-    await button('変更を破棄して再読み込み').click();
+    await settleSettings(page);
     await button('設定').click();
     await button('ショートカット').click();
     await body
@@ -471,18 +466,15 @@ const checks = [];
         .allTextContents()
         .then((keys) => keys.includes('Ctrl+Alt+W')),
     );
-    await button('変更を破棄して再読み込み').click();
-    await page.getByText('すべて保存されています', { exact: true }).waitFor();
+    await settleSettings(page);
     assert(
       await page
         .locator('.applet-shortcuts kbd')
         .allTextContents()
-        .then((keys) => keys.includes('Ctrl+Alt+R')),
+        .then((keys) => keys.includes('Ctrl+Alt+W')),
     );
     await button('設定').click();
-    checks.push(
-      'valid JSON shared with inline form / shortcut draft shared / discard from either surface',
-    );
+    checks.push('valid JSON persists into inline form / shortcuts save when applied');
 
     await chooseApplet('検証Applet 01');
     await button('設定項目').click();
@@ -492,23 +484,21 @@ const checks = [];
     const external = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     external.profile.name = '外部変更';
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(external));
-    await page.getByText(/別の場所で設定が変わりました/).waitFor();
-    await button('変更をすべて保存').click();
-    await page.locator('.error-banner').waitFor();
+    await page.waitForFunction(
+      async () => (await window.dock.snapshot()).settings.value.profile.name === '外部変更',
+    );
+    await settleSettings(page);
     assert.equal(
       await body.getByLabel('検証項目 0', { exact: true }).inputValue(),
       '競合しても残す',
     );
-    assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).profile.name,
-      '外部変更',
-    );
-    await button('変更を破棄して再読み込み').click();
-    await button('エラーを閉じる').click();
     await chooseApplet('検証Applet 01');
     await detailTab('設定').click();
-    assert.equal(await body.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
-    checks.push('inline external update refuses overwrite and retains draft / shared discard');
+    assert.equal(
+      await body.getByLabel('検証項目 0', { exact: true }).inputValue(),
+      '競合しても残す',
+    );
+    checks.push('external updates reach inline saved settings without losing unrelated values');
 
     await button('Applet').click();
     await page.getByLabel('Appletを検索', { exact: true }).fill('Welcome');
@@ -583,10 +573,10 @@ const checks = [];
       await body.getByLabel('検証項目 0', { exact: true }).inputValue(),
       'ログ切替で保持する下書き',
     );
-    await button('変更を破棄して再読み込み').click();
+    await settleSettings(page);
     await detailTab('説明').click();
     checks.push(
-      'inline applet logs / fixed source / search and level / stable tabs / shared draft / independent global logs / applet selection retains tab',
+      'inline applet logs / fixed source / search and level / stable tabs / persisted settings / independent global logs / applet selection retains tab',
     );
 
     const searchButton = page.locator('.titlebar-search');
@@ -639,11 +629,7 @@ const checks = [];
         await page.locator('main').evaluate((el) => {
           el.scrollTop = el.scrollHeight;
         });
-        const bounds = await button('変更をすべて保存').boundingBox();
-        assert(
-          bounds && bounds.y >= 40 && bounds.y + bounds.height < size.height - 20,
-          'sticky save remains visible',
-        );
+        await settleSettings(page);
         assert.equal(
           await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth),
           true,
@@ -695,11 +681,7 @@ const checks = [];
         await page.locator('.detail-settings > .applet-settings-panel').evaluate((el) => {
           el.scrollTop = el.scrollHeight;
         });
-        const bounds = await button('変更をすべて保存').boundingBox();
-        assert(
-          bounds && bounds.y >= 40 && bounds.y + bounds.height < 600,
-          'inline save stays visible',
-        );
+        await settleSettings(page);
         assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
         await page.screenshot({
           path: path.join(profile, `${theme}-${width}-inline-settings.png`),
@@ -754,7 +736,7 @@ const checks = [];
       }
     }
     checks.push(
-      '24 applets / long forms / dark and light / 1280x840 and 900x620 / sticky save / no overflow',
+      '24 applets / long forms / dark and light / 1280x840 and 900x620 / immediate save / no overflow',
       'command search and status filter share a row at 1280 / 900 / 700px in both themes',
     );
     assert.deepEqual(errors, []);

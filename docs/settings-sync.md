@@ -27,7 +27,7 @@ EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材�
 
 `file-observer.ts`は親フォルダーのwatchと2秒のpollを併用する。イベント後100msから読み、同じbytesを180ms隔てて2回確認してから検証・反映する。途中JSON/一時的削除/ロック/通知欠落は直近正常値を維持して再照合する。同じ内容は再適用せず、受信ファイルを整形して書き戻さない。名簿とsettingsの到着順が違う場合は不足枠を同期待ちとして表示する。名簿未到着の起動時は空の共有accounts.jsonを生成しない。枠が0件ならユーザーの明示的な追加で名簿を作成できる。旧設定に残った参照は自動置換せず、WebApplet設定で新しい枠を選んで保存する。追加直前に届いた未反映名簿・破損名簿は上書きしない。既存枠を保持しているときの一時的欠落も同期待ちとする。
 
-SettingsStoreのchanged経由でホスト/キー/トレイ/WebApplet/実行中Appletへ適用する。useSettingsEditorのdirty draftは外部受信で消さず、revision違いの保存を拒否する。hardwareAcceleration等の起動専用項目、Windows起動タスクの明示保存契約は維持する。
+SettingsStoreのchanged経由でホスト/キー/トレイ/WebApplet/実行中Appletへ適用する。保存済み値を正本として画面を更新し、現在のUIだけが不完全入力を保持する。変更した項目についてbeforeと現在値を比較し、同じ項目の外部変更を拒否する。hardwareAcceleration等の起動専用項目、Windows起動タスクの保存トランザクションは維持する。
 
 WebProfileStoreのpendingDeletionはPC専用の別ファイル。共有名簿の外部削除は対象Viewを閉じるが、このPCのCookieの物理削除を予約しない。明示的なこのPCでの枠削除だけが当該PCの保存領域を回収する。回収で共有accounts.jsonを書き換えない。
 
@@ -51,6 +51,6 @@ atomicWriteは一時ファイルを書いた後、WindowsのEPERM/EACCES/EBUSY�
 
 notificationPreferences.overridesはsettings.jsonの任意フィールドです。ownerKind/ownerId/typeIdの組で種類ごとにenabled/targets/durationSecondsを上書きします。未導入Applet/削除された種類/未実装の既知表示先を同期で受信しても保持し、PCで実行できない場合は理由付き抑制となります。種類定義、起動世代、利用可否、active状態と履歴はこの共有設定へ保存しません。
 
-省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。共有編集draftや外部revisionの競合保護を共用し、通知設定だけの別保存・即時保存は導入しません。詳細は[通知契約](notifications.md)を参照してください。
+省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。設定の即時保存や外部revisionの競合保護を共用し、通知設定も共通の即時保存経路を使います。詳細は[通知契約](notifications.md)を参照してください。
 
 通知センターの既読/履歴削除とnotifications/update-receipt.jsonの受付済み記録はPC専用です。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。

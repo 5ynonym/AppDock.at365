@@ -195,12 +195,12 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
-  settingsEditing(): Promise<import('./settings-editing').SettingsEditingState>;
+  settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;
   flushSettings(): Promise<void>;
   onSettingsSidebarWidth(callback: (width: number) => void): () => void;
   editSettings(
     request: import('./settings-editing').SettingsEditRequest,
-  ): Promise<import('./settings-editing').SettingsEditingState>;
+  ): Promise<import('./settings-editing').SettingsInputState>;
   onSettingsEditingChanged(callback: () => void): () => void;
   shellPage(
     request: import('./shell-pages').ShellPageRequest,
@@ -224,11 +224,9 @@ export interface DockApi {
   restoreSettingsBackup(revision: number): Promise<SettingsSnapshot | null>;
   refreshLaunchState(): Promise<LaunchState>;
   restartAsAdministrator(): Promise<void>;
-  settingsUiContext(busy: boolean): Promise<void>;
   focusNotifications(): Promise<void>;
   onFlushSettingsInputs(callback: (id: string) => void): () => void;
   settingsInputsFlushed(id: string): Promise<void>;
-  confirmDiscardSettings(): Promise<boolean>;
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
   webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;

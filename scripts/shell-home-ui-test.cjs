@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { settingsPage: getSettingsPage } = require('./settings-shell-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
@@ -106,7 +107,8 @@ async function launch(extra = []) {
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
+            p.url().startsWith('appdock://host/index.html') &&
+            !p.url().endsWith('/notifications.html'),
         ),
     'host page',
   );
@@ -204,58 +206,51 @@ const invoke = (p, actionId) =>
         );
       },
     );
-    await check(
-      'shared draft order, notice, card navigation and pin execution preserve input',
-      async () => {
-        await navigate('settings');
-        const draft = await dock.evaluate(async () => {
-          const s = await window.dock.settingsEditing();
-          s.draft.appletOrder = ['fixture.home', 'fixture.stalled'];
-          await window.dock.editSettings({
-            sessionId: s.sessionId,
-            editRevision: s.editRevision,
-            operationId: crypto.randomUUID(),
-            action: { type: 'draft', value: s.draft },
-          });
-          return s.draft;
+    await check('persisted order, card navigation and pin execution preserve input', async () => {
+      await navigate('settings');
+      const draft = await dock.evaluate(async () => {
+        const s = await window.dock.settingsEditing();
+        const before = structuredClone(s.value);
+        s.value.appletOrder = ['fixture.home', 'fixture.stalled'];
+        await window.dock.editSettings({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: crypto.randomUUID(),
+          action: { type: 'values', before, value: s.value },
         });
-        await navigate('home');
-        let p = await home();
-        await until(
-          async () => (await model(p)).content.applets[0].id === 'fixture.home',
-          'draft order',
-        );
-        assert.deepEqual(
-          (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder,
-          settings.appletOrder,
-        );
-        const notice = await until(
-          () => browser.pages().find((p) => p.url().endsWith('/notifications.html')),
-          'notice',
-        );
-        await notice.getByRole('button', { name: 'すべて保存', exact: true }).waitFor();
-        await p.locator('.extension-card').filter({ hasText: 'Fixture Home' }).click();
-        await dock.locator('.detail').filter({ hasText: 'Fixture Home' }).waitFor();
-        await navigate('home');
-        p = await home();
-        await p.getByRole('button', { name: /Run slow/ }).click();
-        await until(async () => (await model(p)).content.busy, 'busy');
-        await until(
-          () => p.getByRole('button', { name: /Run slow/ }).isDisabled(),
-          'disabled busy button',
-        );
-        await until(async () => !(await model(p)).content.busy, 'complete');
-        await p.getByRole('status').waitFor();
-        await p.getByRole('button', { name: /Fail/ }).click();
-        await p.getByRole('alert').filter({ hasText: 'Home fixture error' }).waitFor();
-        await navigate('settings');
-        assert.deepEqual(
-          (await dock.evaluate(() => window.dock.settingsEditing())).draft.appletOrder,
-          draft.appletOrder,
-        );
-        await navigate('home');
-      },
-    );
+        return s.value;
+      });
+      await navigate('home');
+      let p = await home();
+      await until(
+        async () => (await model(p)).content.applets[0].id === 'fixture.home',
+        'draft order',
+      );
+      assert.deepEqual(
+        (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder,
+        ['fixture.home', 'fixture.stalled'],
+      );
+      await p.locator('.extension-card').filter({ hasText: 'Fixture Home' }).click();
+      await dock.locator('.detail').filter({ hasText: 'Fixture Home' }).waitFor();
+      await navigate('home');
+      p = await home();
+      await p.getByRole('button', { name: /Run slow/ }).click();
+      await until(async () => (await model(p)).content.busy, 'busy');
+      await until(
+        () => p.getByRole('button', { name: /Run slow/ }).isDisabled(),
+        'disabled busy button',
+      );
+      await until(async () => !(await model(p)).content.busy, 'complete');
+      await p.getByRole('status').waitFor();
+      await p.getByRole('button', { name: /Fail/ }).click();
+      await p.getByRole('alert').filter({ hasText: 'Home fixture error' }).waitFor();
+      await navigate('settings');
+      assert.deepEqual(
+        (await dock.evaluate(() => window.dock.settingsEditing())).value.appletOrder,
+        draft.appletOrder,
+      );
+      await navigate('home');
+    });
     await check(
       'navigation retains in-flight guard and reports detached command completion',
       async () => {
@@ -403,79 +398,73 @@ const invoke = (p, actionId) =>
       await navigate('home');
       await home('fixture.home');
     });
-    await check('theme, resize, zoom and timeout fallback retain draft projection', async () => {
-      await dock.evaluate(async () => {
-        const s = await window.dock.snapshot();
-        await window.dock.saveSettings(
-          { ...s.settings.value, host: { ...s.settings.value.host, theme: 'light' } },
-          s.settings.revision,
-        );
-      });
-      const p = await home('fixture.home');
-      await until(async () => (await model(p)).dark === false, 'light');
-      await p.waitForFunction(() => document.documentElement.dataset.theme === 'light');
-      assert.equal(
-        await p.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
-        'rgb(250, 251, 252)',
-      );
-      await p.screenshot({ path: path.join(profile, 'home-light.png') });
-      if (app) {
-        await app.evaluate(({ BrowserWindow }) => {
-          const w = BrowserWindow.getAllWindows()[0];
-          w.setSize(900, 650);
-          w.webContents.setZoomFactor(1.25);
+    await check(
+      'theme, resize, zoom and timeout fallback retain persisted projection',
+      async () => {
+        await dock.evaluate(async () => {
+          const s = await window.dock.snapshot();
+          await window.dock.saveSettings(
+            { ...s.settings.value, host: { ...s.settings.value.host, theme: 'light' } },
+            s.settings.revision,
+          );
         });
-        await until(async () => await p.evaluate(() => innerWidth < 800), 'resize');
-        const bounds = await p.evaluate(() => ({
-          scroll: document.documentElement.scrollWidth,
-          width: innerWidth,
-        }));
-        assert(bounds.scroll <= bounds.width + 1);
-        await p.screenshot({ path: path.join(profile, 'home-narrow.png') });
-        await app.evaluate(({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1),
+        const p = await home('fixture.home');
+        await until(async () => (await model(p)).dark === false, 'light');
+        await p.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+        assert.equal(
+          await p.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+          'rgb(250, 251, 252)',
         );
-      }
-      await select('fixture.stalled');
-      const fallback = await home();
-      assert.equal((await model(fallback)).content.applets[0].id, 'fixture.home');
-      await navigate('settings');
-      const setting = await getSettingsPage(dock);
-      await setting.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
-      await setting
-        .getByRole('alert')
-        .filter({ hasText: '別の場所で設定が変わりました' })
-        .waitFor();
-      assert.deepEqual(
-        (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder,
-        settings.appletOrder,
-      );
-      await setting.getByRole('button', { name: '変更を破棄して再読み込み', exact: true }).click();
-      await dock.evaluate(async () => {
-        const s = await window.dock.settingsEditing();
-        s.draft.appletOrder = ['fixture.home', 'fixture.stalled'];
-        await window.dock.editSettings({
-          sessionId: s.sessionId,
-          editRevision: s.editRevision,
-          operationId: crypto.randomUUID(),
-          action: { type: 'draft', value: s.draft },
+        await p.screenshot({ path: path.join(profile, 'home-light.png') });
+        if (app) {
+          await app.evaluate(({ BrowserWindow }) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            w.setSize(900, 650);
+            w.webContents.setZoomFactor(1.25);
+          });
+          await until(async () => await p.evaluate(() => innerWidth < 800), 'resize');
+          const bounds = await p.evaluate(() => ({
+            scroll: document.documentElement.scrollWidth,
+            width: innerWidth,
+          }));
+          assert(bounds.scroll <= bounds.width + 1);
+          await p.screenshot({ path: path.join(profile, 'home-narrow.png') });
+          await app.evaluate(({ BrowserWindow }) =>
+            BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1),
+          );
+        }
+        await select('fixture.stalled');
+        const fallback = await home();
+        assert.equal((await model(fallback)).content.applets[0].id, 'fixture.home');
+        await navigate('settings');
+        const setting = await getSettingsPage(dock);
+        await settleSettings(setting);
+        assert.deepEqual(
+          (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder,
+          ['fixture.home', 'fixture.stalled'],
+        );
+        await dock.evaluate(async () => {
+          const s = await window.dock.settingsEditing();
+          const before = structuredClone(s.value);
+          s.value.appletOrder = ['fixture.home', 'fixture.stalled'];
+          await window.dock.editSettings({
+            sessionId: s.sessionId,
+            editRevision: s.editRevision,
+            operationId: crypto.randomUUID(),
+            action: { type: 'values', before, value: s.value },
+          });
         });
-      });
-      await navigate('home');
-      const again = await home();
-      assert.equal((await model(again)).content.applets[0].id, 'fixture.home');
-      const n = await until(
-        () => browser.pages().find((p) => p.url().endsWith('/notifications.html')),
-        'notice',
-      );
-      await n.getByRole('button', { name: 'すべて保存', exact: true }).click();
-      await until(
-        async () =>
-          (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder[0] ===
-          'fixture.home',
-        'save shared draft',
-      );
-    });
+        await navigate('home');
+        const again = await home();
+        assert.equal((await model(again)).content.applets[0].id, 'fixture.home');
+        await until(
+          async () =>
+            (await dock.evaluate(() => window.dock.snapshot())).settings.value.appletOrder[0] ===
+            'fixture.home',
+          'saved order',
+        );
+      },
+    );
     await close();
     await launch(['--safe-shell']);
     await home();

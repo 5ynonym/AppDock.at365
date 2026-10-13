@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 module.exports = async ({ page, snapshot, save, profile, checks }) => {
@@ -19,16 +20,22 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
       s.settings.value.keybindings = rows;
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, rows);
-    await page.waitForFunction((rows) => {
-      const rendered = Array.from(document.querySelectorAll('.shortcuts-editor [data-binding-id]'));
-      return (
-        rendered.length === rows.length &&
-        rows.every((row) => {
-          const el = rendered.find((el) => el.dataset.bindingId === row.id);
-          return el && el.textContent.includes('無効') === !row.enabled;
-        })
-      );
-    }, rows);
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      const ready = await page.locator('.shortcuts-editor').evaluate((root, rows) => {
+        const rendered = Array.from(root.querySelectorAll('[data-binding-id]'));
+        return (
+          rendered.length === rows.length &&
+          rows.every((row) => {
+            const el = rendered.find((el) => el.dataset.bindingId === row.id);
+            return el && el.textContent.includes('無効') === !row.enabled;
+          })
+        );
+      }, rows);
+      if (ready) return;
+      await page.waitForTimeout(50);
+    }
+    throw Error('Shortcut model did not reflect external write');
   };
   const fromMenu = async (id) => {
     await page
@@ -58,7 +65,10 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
       .locator('[data-binding-id="a2"] .gesture-menu-trigger')
       .evaluate((el) => el === document.activeElement),
   );
-  assert(await page.getByRole('button', { name: '変更をすべて保存', exact: true }).isDisabled());
+  assert.equal(
+    await page.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
+    0,
+  );
   await openTop();
   await item('a2')
     .getByRole('button', { name: /を上へ/ })
@@ -73,11 +83,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await choose('Ctrl+F8');
   assert.deepEqual(await order(), ['a2', 'b1']);
   await apply();
-  assert.deepEqual(
-    (await snapshot()).settings.value.keybindings,
-    original,
-    'apply remains a draft',
-  );
+  await save();
   await save();
   assert.deepEqual(
     (await snapshot()).settings.value.keybindings.map((r) => r.id),

@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -32,7 +33,9 @@ async function launch() {
     args: [...(process.argv[2] ? [] : [root]), `--test-profile=${profile}`],
     timeout: 30000,
   });
-  const page = await application.firstWindow();
+  const page = require('./settings-aware-page.cjs').settingsAwarePage(
+    await application.firstWindow(),
+  );
   await require('./shell-overlay-helper.cjs').homePage(page);
   await application.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
@@ -113,12 +116,8 @@ async function waitPins(page, pins) {
     };
     await setShortcut('appdock.commands.search', 'Control+Alt+p');
     await setShortcut('appdock.welcome.refresh', 'Control+Alt+p');
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
-    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
+    await settleSettings(await settingsPage());
+    await settleSettings(await settingsPage());
     assert.equal(
       (await page.evaluate(() => window.dock.snapshot())).settings.value.shortcuts[
         'appdock.commands.search'
@@ -126,12 +125,8 @@ async function waitPins(page, pins) {
       true,
     );
     await setShortcut('appdock.welcome.refresh', 'Control+Alt+r');
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
-    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
+    await settleSettings(await settingsPage());
+    await settleSettings(await settingsPage());
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
@@ -164,11 +159,7 @@ async function waitPins(page, pins) {
     await page.getByRole('heading', { name: 'C# is docked.' }).waitFor();
     await page.keyboard.press('Control+,');
     await setShortcut('appdock.dotnet-demo.refresh', 'Control+Alt+d');
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
+    await settleSettings(await settingsPage());
     const before = (await page.evaluate(() => window.dock.snapshot())).extensions
       .find((e) => e.id === 'appdock.dotnet-demo')
       .panel.facts.find((f) => f.label === 'Refresh').value;
@@ -203,11 +194,7 @@ async function waitPins(page, pins) {
       .getByLabel('アバター画像を選択')
       .setInputFiles(path.join(root, 'assets/icon.png'));
     await (await settingsPage()).getByAltText('プロフィール画像').waitFor();
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
+    await settleSettings(await settingsPage());
     await shell.locator('.avatar img').waitFor();
     await shell.waitForFunction(() => {
       const img = document.querySelector('.avatar img');
@@ -223,23 +210,15 @@ async function waitPins(page, pins) {
     )
       .getByLabel('アバター画像を選択')
       .setInputFiles(path.join(profile, 'pins.png'));
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
-    await (await settingsPage()).getByText('すべて保存されています', { exact: true }).waitFor();
+    await settleSettings(await settingsPage());
+    await settleSettings(await settingsPage());
     assert.notEqual(hash(), firstHash);
     const finalHash = hash();
     const conflict = path.join(profile, 'conflict', 'icon.png');
     fs.mkdirSync(path.dirname(conflict), { recursive: true });
     fs.copyFileSync(path.join(profile, 'pins.png'), conflict);
     await (await settingsPage()).getByLabel('アバター画像を選択').setInputFiles(conflict);
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '変更をすべて保存', exact: true })
-      .click();
+    await settleSettings(await settingsPage());
     await (
       await settingsPage()
     )
@@ -250,7 +229,7 @@ async function waitPins(page, pins) {
     await (
       await settingsPage()
     )
-      .getByRole('button', { name: '変更を破棄して再読み込み', exact: true })
+      .getByRole('button', { name: '設定を再読み込み', exact: true })
       .click();
     assert.deepEqual(fs.readdirSync(path.join(profile, 'data/assets/profile')).sort(), [
       'icon.png',

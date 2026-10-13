@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Exercise the actual single EXE without main-process test hooks or real accounts.
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
@@ -126,7 +127,7 @@ async function open(id) {
       (await dock.getByLabel('WebAppletの名前', { exact: true }).inputValue()) === '単一EXEのWeb',
     'well-known defaults',
   );
-  await dock.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(dock);
   const s = await until(async () => {
     const s = await snapshot();
     return s.settings.value.webApplets.items.length ? s : null;

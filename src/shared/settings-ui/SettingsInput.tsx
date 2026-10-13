@@ -1,17 +1,30 @@
 import {
   forwardRef,
+  useEffect,
   useRef,
   useState,
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
 
-/** Keep composition local; only confirmed text enters the shared editing session. */
+/** Keep composition and incomplete text local; save confirmed input immediately. */
 export const SettingsInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function SettingsInput(props, ref) {
     const composing = useRef(false);
+    const focused = useRef(false);
     const [raw, setRaw] = useState('');
     const numeric = props.type === 'number';
+    useEffect(() => {
+      if (!composing.current && focused.current && props.value !== undefined) {
+        const same =
+          (numeric &&
+            raw.trim() !== '' &&
+            Number.isFinite(Number(raw)) &&
+            Number(raw) === Number(props.value)) ||
+          (!numeric && raw.trim() === String(props.value));
+        if (!same) setRaw(String(props.value));
+      }
+    }, [props.value]);
     return (
       <input
         {...props}
@@ -21,7 +34,19 @@ export const SettingsInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
         role={numeric ? 'spinbutton' : props.role}
         aria-valuemin={numeric && props.min !== undefined ? Number(props.min) : undefined}
         aria-valuemax={numeric && props.max !== undefined ? Number(props.max) : undefined}
-        value={composing.current ? raw : props.value}
+        value={
+          props.value !== undefined && (composing.current || focused.current) ? raw : props.value
+        }
+        onFocus={(e) => {
+          focused.current = true;
+          setRaw(e.currentTarget.value);
+          props.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          focused.current = false;
+          setRaw(e.currentTarget.value);
+          props.onBlur?.(e);
+        }}
         onCompositionStart={(event) => {
           composing.current = true;
           setRaw(event.currentTarget.value);
@@ -31,11 +56,12 @@ export const SettingsInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
           composing.current = false;
           setRaw(event.currentTarget.value);
           props.onCompositionEnd?.(event);
+          setRaw(event.currentTarget.value);
           props.onChange?.(event as any);
         }}
         onChange={(event) => {
-          if (composing.current) setRaw(event.currentTarget.value);
-          else props.onChange?.(event);
+          setRaw(event.currentTarget.value);
+          if (!composing.current) props.onChange?.(event);
         }}
         onKeyDown={(event) => {
           props.onKeyDown?.(event);
@@ -58,6 +84,7 @@ export const SettingsInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
               ),
             ),
           );
+          setRaw(event.currentTarget.value);
           props.onChange?.(event as any);
         }}
       />
@@ -69,12 +96,25 @@ export const SettingsTextarea = forwardRef<
   TextareaHTMLAttributes<HTMLTextAreaElement>
 >(function SettingsTextarea(props, ref) {
   const composing = useRef(false);
+  const focused = useRef(false);
   const [raw, setRaw] = useState('');
   return (
     <textarea
       {...props}
       ref={ref}
-      value={composing.current ? raw : props.value}
+      value={
+        props.value !== undefined && (composing.current || focused.current) ? raw : props.value
+      }
+      onFocus={(e) => {
+        focused.current = true;
+        setRaw(e.currentTarget.value);
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        focused.current = false;
+        setRaw(e.currentTarget.value);
+        props.onBlur?.(e);
+      }}
       onCompositionStart={(e) => {
         composing.current = true;
         setRaw(e.currentTarget.value);
@@ -87,13 +127,13 @@ export const SettingsTextarea = forwardRef<
         props.onChange?.(e as any);
       }}
       onChange={(e) => {
-        if (composing.current) setRaw(e.currentTarget.value);
-        else props.onChange?.(e);
+        setRaw(e.currentTarget.value);
+        if (!composing.current) props.onChange?.(e);
       }}
     />
   );
 });
-/** Incomplete numbers remain text, never NaN; validation runs in main at save. */
+/** Incomplete numbers remain text, never NaN; validation precedes each immediate write. */
 export function numberInput(text: string): number {
   return (
     /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text) &&

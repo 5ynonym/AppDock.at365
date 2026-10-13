@@ -20,10 +20,9 @@ import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettings } from './AppletSettings';
 export interface FormEditor {
-  draft: Settings;
+  value: Settings;
   edit(value: Settings): void;
   setAvatar(bytes: Uint8Array | null, name?: string): void;
-  setAvatarLoading(value: boolean): void;
 }
 export function SettingsForm({
   model,
@@ -38,9 +37,8 @@ export function SettingsForm({
 }) {
   const { page, auxiliary: aux, editing } = model.content;
   const category = page.id,
-    draft = editor.draft,
+    settings = editor.value,
     edit = editor.edit,
-    dirty = editing.dirty,
     busy = editing.pending;
   const extensions = aux.applets ?? [],
     commands = aux.commands ?? [],
@@ -51,7 +49,6 @@ export function SettingsForm({
   const avatarUrl = aux.avatarUrl ?? null,
     avatarPreview = undefined;
   const setAvatar = editor.setAvatar,
-    setAvatarLoading = editor.setAvatarLoading,
     setCategory = select;
   const run = async (work: () => Promise<unknown>) => {
     try {
@@ -64,7 +61,7 @@ export function SettingsForm({
     return (
       <AppletSettings
         applet={extensions.find((a) => a.id === page.owner)!}
-        draft={draft}
+        settings={settings}
         onChange={edit}
       />
     );
@@ -97,7 +94,6 @@ export function SettingsForm({
       <WebAccountSettings
         accounts={aux.accounts ?? []}
         savedItems={(aux.accountReferences?.saved as Settings['webApplets']['items']) ?? []}
-        draftItems={(aux.accountReferences?.draft as Settings['webApplets']['items']) ?? []}
       />
     );
   return (
@@ -106,14 +102,14 @@ export function SettingsForm({
         {' '}
         {category === 'gestures' && (
           <GesturesEditor
-            settings={draft}
+            settings={settings}
             onChange={edit}
             commands={commands}
             applets={extensions}
           />
         )}
         {category === 'ribbon' && (
-          <RibbonSettings draft={draft} extensions={extensions} onChange={edit} />
+          <RibbonSettings settings={settings} extensions={extensions} onChange={edit} />
         )}
         {category === 'about' && (
           <section className="about-page" aria-label="バージョン情報・更新">
@@ -123,13 +119,8 @@ export function SettingsForm({
                 AppDock.at365 <span>v{version}</span>
               </h2>
               <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
-              <VersionCheck details disabled={dirty} />
-              <UpdateSettings
-                draft={draft}
-                edit={edit}
-                appletCount={extensions.length}
-                dirty={dirty}
-              />
+              <VersionCheck details />
+              <UpdateSettings settings={settings} edit={edit} appletCount={extensions.length} />
               <details className="update-disclosure">
                 <summary>実行環境の詳細</summary>
                 <dl className="runtime-versions">
@@ -168,8 +159,8 @@ export function SettingsForm({
                       <strong>{e.displayName}</strong>
                       <span className="muted">v{e.version}</span>
                     </div>
-                    <VersionCheck id={e.id} details disabled={dirty} />
-                    <AppletUpdateSource extension={e} draft={draft} edit={edit} />
+                    <VersionCheck id={e.id} details disabled={busy} />
+                    <AppletUpdateSource extension={e} settings={settings} edit={edit} />
                   </article>
                 ))}
             </div>
@@ -179,7 +170,7 @@ export function SettingsForm({
           <ShortcutsEditor
             key={category}
             commands={commands}
-            settings={draft}
+            settings={settings}
             onChange={edit}
             applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
             statuses={globalHotKeys}
@@ -187,17 +178,12 @@ export function SettingsForm({
         )}
         {category === 'profile' && (
           <ProfileEditor
-            name={draft.profile.name}
+            name={settings.profile.name}
             avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
             busy={busy}
-            onLoading={setAvatarLoading}
-            onName={(name) => edit({ ...draft, profile: { ...draft.profile, name } })}
+            onName={(name) => edit({ ...settings, profile: { ...settings.profile, name } })}
             onAvatar={(bytes, preview, name) => {
               setAvatar(bytes, name);
-              edit({
-                ...draft,
-                profile: { ...draft.profile, avatar: bytes ? 'avatar.png' : null },
-              });
             }}
           />
         )}
@@ -207,17 +193,17 @@ export function SettingsForm({
             <SettingRow pageId={category} itemKey="shellProvider">
               <select
                 aria-label="Shell"
-                value={draft.host.shellProvider || defaultShellId}
+                value={settings.host.shellProvider || defaultShellId}
                 onChange={(e) =>
-                  edit({ ...draft, host: { ...draft.host, shellProvider: e.target.value } })
+                  edit({ ...settings, host: { ...settings.host, shellProvider: e.target.value } })
                 }
               >
                 <option value={defaultShellId}>Default Shell</option>
-                {draft.host.shellProvider &&
-                  draft.host.shellProvider !== defaultShellId &&
-                  !extensions.some((e) => e.shell && e.id === draft.host.shellProvider) && (
-                    <option value={draft.host.shellProvider} disabled>
-                      未導入のShell ({draft.host.shellProvider})
+                {settings.host.shellProvider &&
+                  settings.host.shellProvider !== defaultShellId &&
+                  !extensions.some((e) => e.shell && e.id === settings.host.shellProvider) && (
+                    <option value={settings.host.shellProvider} disabled>
+                      未導入のShell ({settings.host.shellProvider})
                     </option>
                   )}
                 {extensions
@@ -232,12 +218,12 @@ export function SettingsForm({
             <SettingRow pageId={category} itemKey="theme">
               <select
                 aria-label="テーマ"
-                value={draft.host.theme}
+                value={settings.host.theme}
                 onChange={(e) =>
                   edit({
-                    ...draft,
+                    ...settings,
                     host: {
-                      ...draft.host,
+                      ...settings.host,
                       theme: e.target.value as Settings['host']['theme'],
                     },
                   })
@@ -251,7 +237,12 @@ export function SettingsForm({
           </>
         )}
         {category === 'tray' && (
-          <TraySettings draft={draft} extensions={extensions} commands={commands} onChange={edit} />
+          <TraySettings
+            settings={settings}
+            extensions={extensions}
+            commands={commands}
+            onChange={edit}
+          />
         )}
         {category === 'general' && (
           <>
@@ -262,17 +253,19 @@ export function SettingsForm({
             <SettingRow pageId={category} itemKey="startAtLogon">
               <Toggle
                 label="スタートアップに登録"
-                checked={draft.host.startAtLogon}
+                checked={settings.host.startAtLogon}
                 disabled={!launch.supported}
-                onChange={(v) => edit({ ...draft, host: { ...draft.host, startAtLogon: v } })}
+                onChange={(v) => edit({ ...settings, host: { ...settings.host, startAtLogon: v } })}
               />
             </SettingRow>
             <SettingRow pageId={category} itemKey="runAsAdministrator">
               <Toggle
                 label="常に管理者として起動"
-                checked={draft.host.runAsAdministrator}
+                checked={settings.host.runAsAdministrator}
                 disabled={!launch.supported}
-                onChange={(v) => edit({ ...draft, host: { ...draft.host, runAsAdministrator: v } })}
+                onChange={(v) =>
+                  edit({ ...settings, host: { ...settings.host, runAsAdministrator: v } })
+                }
               />
             </SettingRow>
             <SettingRow
@@ -292,7 +285,7 @@ export function SettingsForm({
                   状態を確認
                 </button>
                 <button
-                  disabled={!launch.supported || launch.elevated || dirty || busy}
+                  disabled={!launch.supported || launch.elevated || busy}
                   onClick={() => void run(() => invoke('restartAsAdministrator'))}
                 >
                   管理者として再起動
@@ -302,15 +295,15 @@ export function SettingsForm({
             {launch.error && <p role="alert">{launch.error}</p>}
             {launch.supported && (
               <p className="muted">
-                起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。再起動する前に、編集中の設定を保存してください。
+                起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。設定は変更時に保存されます。
               </p>
             )}
             {(['closeToTray', 'hardwareAcceleration', 'startMinimized'] as const).map((key) => (
               <SettingRow key={key} pageId={category} itemKey={key}>
                 <Toggle
                   label={hostSettingItem(category, key).title}
-                  checked={draft.host[key]}
-                  onChange={(v) => edit({ ...draft, host: { ...draft.host, [key]: v } })}
+                  checked={settings.host[key]}
+                  onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
                 />
               </SettingRow>
             ))}

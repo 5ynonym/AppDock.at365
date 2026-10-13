@@ -1,3 +1,4 @@
+const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,7 +20,9 @@ async function launch() {
     env,
     timeout: 30000,
   });
-  const page = await application.firstWindow();
+  const page = require('./settings-aware-page.cjs').settingsAwarePage(
+    await application.firstWindow(),
+  );
   await require('./shell-overlay-helper.cjs').homePage(page);
   await application.evaluate(async ({ app }) => {
     await app.getGPUInfo('basic');
@@ -33,7 +36,7 @@ async function save(page, value) {
   const toggle = page.getByRole('switch', { name: 'ハードウェアアクセラレーション', exact: true });
   await toggle.click();
   assert.equal(await toggle.getAttribute('aria-checked'), String(value));
-  await page.getByRole('button', { name: '変更をすべて保存', exact: true }).click();
+  await settleSettings(page);
   await page.waitForFunction(
     (expected) =>
       window.dock.snapshot().then((s) => s.settings.value.host.hardwareAcceleration === expected),

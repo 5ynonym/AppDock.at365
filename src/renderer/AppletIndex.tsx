@@ -34,8 +34,8 @@ export function AppletIndex({
       to,
     );
     editor.edit({
-      ...editor.draft,
-      appletOrder: [...order, ...editor.draft.appletOrder.filter((id) => !order.includes(id))],
+      ...editor.value,
+      appletOrder: [...order, ...editor.value.appletOrder.filter((id) => !order.includes(id))],
     });
     setAnnouncement(
       `${applets.find((a) => a.id === id)?.displayName}を${order.indexOf(id) + 1}番目へ移動しました。`,
@@ -55,7 +55,6 @@ export function AppletIndex({
             checked={reordering}
             disabled={busy}
             onChange={(value) => {
-              if (value && !editor.switchToForm()) return;
               setReordering(value);
               setSearch('');
               setDragged(null);

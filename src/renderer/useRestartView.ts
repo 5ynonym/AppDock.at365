@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState } from 'react';
 
-// Only navigation is retained. Settings drafts and Applet data have their own owners.
+// Only navigation is retained. Settings and Applet data are persisted by their own stores.
 export function useRestartView<T extends string | boolean>(
   key: string,
   fallback: T,
