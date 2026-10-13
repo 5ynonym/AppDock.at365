@@ -1,37 +1,24 @@
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
-import { BrowserWindow, screen, powerMonitor, type Rectangle, type Tray } from 'electron';
+import { BrowserWindow, screen, type Rectangle, type Tray } from 'electron';
 import { NotificationSurfaceHost } from './notification-surface-host';
 import { NotificationSurfaceController } from './notification-surface-controller';
 import { NotificationService } from './notification-service';
-import { NativeNotificationState } from './native-notification-state';
+import type { NotificationAvailability } from './notification-availability';
 import { desktopNotificationBounds } from './notification-desktop-layout';
 /** One lazy independent presentation window; all content and deadlines remain in the service. */
 export class NotificationDesktopHost {
   private window?: BrowserWindow;
   private host?: NotificationSurfaceHost;
-  private state: NativeNotificationState;
+  private stopAvailability: () => void;
   private stop: () => void;
-  private timer?: ReturnType<typeof setInterval>;
-  private querying = false;
-  private accepts = false;
-  private locked = false;
   private disposed = false;
-  private warned = false;
   private queued = false;
   private refreshDisplay = () => this.refresh();
-  private lock = () => {
-    this.locked = true;
-    this.refresh();
-  };
-  private unlock = () => {
-    this.locked = false;
-    void this.query();
-  };
   constructor(
     private options: {
       service: NotificationService;
       parent: BrowserWindow;
-      nativeExecutable: string;
+      availability: NotificationAvailability;
       preload: string;
       dark(): boolean;
       tray(): Tray | undefined;
@@ -44,7 +31,7 @@ export class NotificationDesktopHost {
       failed(message: string): void;
     },
   ) {
-    this.state = new NativeNotificationState(options.nativeExecutable);
+    this.stopAvailability = options.availability.subscribe(() => this.refresh());
     this.stop = options.service.subscribe(() => {
       if (!this.queued) {
         this.queued = true;
@@ -57,10 +44,6 @@ export class NotificationDesktopHost {
     screen.on('display-added', this.refreshDisplay);
     screen.on('display-removed', this.refreshDisplay);
     screen.on('display-metrics-changed', this.refreshDisplay);
-    powerMonitor.on('lock-screen', this.lock);
-    powerMonitor.on('unlock-screen', this.unlock);
-    powerMonitor.on('suspend', this.lock);
-    powerMonitor.on('resume', this.unlock);
     options.parent.on('enter-full-screen', this.refreshDisplay);
     options.parent.on('leave-full-screen', this.refreshDisplay);
   }
@@ -80,48 +63,17 @@ export class NotificationDesktopHost {
     const bounds = desktopNotificationBounds(work, tray, 600);
     return { width: bounds.width, maxHeight: bounds.height };
   }
-  private async query() {
-    if (
-      this.disposed ||
-      this.querying ||
-      this.warned ||
-      !this.options.service.targetItems('desktop').length
-    )
-      return;
-    this.querying = true;
-    try {
-      this.accepts = await this.state.accepts();
-    } catch {
-      this.accepts = false;
-      if (!this.warned) {
-        this.warned = true;
-        this.options.failed(
-          'デスクトップ通知の表示可否を確認できません。通知センターから確認できます。',
-        );
-      }
-    } finally {
-      this.querying = false;
-      this.refresh();
-    }
-  }
   refresh() {
     if (this.disposed) return;
     if (!this.options.ready() || !this.options.service.targetItems('desktop').length) {
-      clearInterval(this.timer);
-      this.timer = undefined;
+      this.options.availability.use('desktop', false);
       this.host?.dispose();
       this.host = undefined;
       this.window?.destroy();
       this.window = undefined;
-      this.state.close();
-      this.accepts = false;
       return;
     }
-    if (!this.timer) {
-      this.timer = setInterval(() => void this.query(), 1000);
-      this.timer.unref();
-      void this.query();
-    }
+    this.options.availability.use('desktop', true);
     if (!this.window) {
       const window = new BrowserWindow({
         title: 'AppDock デスクトップ通知',
@@ -158,7 +110,7 @@ export class NotificationDesktopHost {
         failed: (message) => this.options.failed(message),
         openCenter: this.options.openCenter,
         focusHost: () => window.blur(),
-        visible: () => !this.locked && this.accepts && !this.options.parent.isFullScreen(),
+        visible: () => this.options.availability.status() === 'allowed',
         viewport: () => this.viewport(),
         arrange: (view, height, visible) => {
           if (!visible) {
@@ -179,25 +131,21 @@ export class NotificationDesktopHost {
   }
   retry() {
     this.options.registry.retry('notification.desktop');
-    this.warned = false;
+    this.options.availability.retry();
     this.host?.retry();
-    void this.query();
   }
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
     this.stop();
-    clearInterval(this.timer);
+    this.stopAvailability();
+    this.options.availability.use('desktop', false);
     this.host?.dispose();
     this.window?.destroy();
-    this.state.close();
+
     screen.removeListener('display-added', this.refreshDisplay);
     screen.removeListener('display-removed', this.refreshDisplay);
     screen.removeListener('display-metrics-changed', this.refreshDisplay);
-    powerMonitor.removeListener('lock-screen', this.lock);
-    powerMonitor.removeListener('unlock-screen', this.unlock);
-    powerMonitor.removeListener('suspend', this.lock);
-    powerMonitor.removeListener('resume', this.unlock);
     this.options.parent.removeListener('enter-full-screen', this.refreshDisplay);
     this.options.parent.removeListener('leave-full-screen', this.refreshDisplay);
   }

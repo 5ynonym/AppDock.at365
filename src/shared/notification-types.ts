@@ -29,8 +29,14 @@ export interface NotificationPreference extends NotificationOwner {
   enabled?: boolean;
   targets?: NotificationTarget[];
   durationSeconds?: number | null;
+  speak?: boolean;
+}
+export interface NotificationSpeechSettings {
+  voice?: string;
+  speed?: number;
 }
 export interface NotificationPreferences {
+  speech?: NotificationSpeechSettings;
   overrides: NotificationPreference[];
 }
 export interface NotificationPolicy {
@@ -161,7 +167,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
   if (value === undefined) return { overrides: [] };
   if (
     !object(value) ||
-    Object.keys(value).some((k) => k !== 'overrides') ||
+    Object.keys(value).some((k) => !['overrides', 'speech'].includes(k)) ||
     !Array.isArray(value.overrides) ||
     value.overrides.length > 1024
   )
@@ -171,12 +177,21 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
       !object(v) ||
       Object.keys(v).some(
         (k) =>
-          !['ownerKind', 'ownerId', 'typeId', 'enabled', 'targets', 'durationSeconds'].includes(k),
+          ![
+            'ownerKind',
+            'ownerId',
+            'typeId',
+            'enabled',
+            'targets',
+            'durationSeconds',
+            'speak',
+          ].includes(k),
       ) ||
       !['host', 'applet'].includes(v.ownerKind) ||
       !id(v.ownerId) ||
       !id(v.typeId) ||
       (v.enabled !== undefined && typeof v.enabled !== 'boolean') ||
+      (v.speak !== undefined && typeof v.speak !== 'boolean') ||
       (v.targets !== undefined && !targets(v.targets)) ||
       (v.durationSeconds !== undefined && !duration(v.durationSeconds))
     )
@@ -185,7 +200,21 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
   });
   if (new Set(rows.map(notificationTypeKey)).size !== rows.length)
     throw Error('通知設定が重複しています。');
-  return { overrides: rows };
+  const speech = value.speech;
+  if (
+    speech !== undefined &&
+    (!object(speech) ||
+      Object.keys(speech).some((k) => !['voice', 'speed'].includes(k)) ||
+      (speech.voice !== undefined &&
+        (typeof speech.voice !== 'string' || !speech.voice.trim() || speech.voice.length > 200)) ||
+      (speech.speed !== undefined &&
+        (typeof speech.speed !== 'number' ||
+          !Number.isFinite(speech.speed) ||
+          speech.speed < 0.25 ||
+          speech.speed > 4)))
+  )
+    throw Error('通知の読み上げ設定が不正です。');
+  return { overrides: rows, ...(speech === undefined ? {} : { speech: structuredClone(speech) }) };
 }
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
   return [
@@ -306,4 +335,27 @@ export function validateNotificationPreferenceChanges(
     )
       throw Error(type.title + ': 通知種類の制約に合わない設定です。');
   }
+}
+
+export function resolveNotificationSpeech(
+  settings: Settings,
+  defaults:
+    Pick<import('./tts').TtsSettings, 'defaultVoice' | 'defaultSpeed'> | undefined = settings.tts,
+) {
+  const override = settings.notificationPreferences?.speech;
+  return {
+    voice: override?.voice ?? defaults?.defaultVoice ?? '',
+    speed: override?.speed ?? defaults?.defaultSpeed ?? 1,
+  };
+}
+export function notificationSpeechEnabled(
+  type: NotificationTypeEntry,
+  settings: Settings,
+): boolean {
+  return (
+    resolveNotificationPolicy(type, settings).enabled &&
+    settings.notificationPreferences?.overrides.find(
+      (r) => notificationTypeKey(r) === notificationTypeKey(type),
+    )?.speak === true
+  );
 }

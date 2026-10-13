@@ -31,6 +31,7 @@ import {
   net,
   screen,
   safeStorage,
+  powerMonitor,
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -111,6 +112,10 @@ import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
+import { NotificationAvailability } from './core/notification-availability';
+import { NativeNotificationState } from './core/native-notification-state';
+import { NotificationSpeechService } from './core/notification-speech';
+import { resolveNotificationSpeech } from '../shared/notification-types';
 import { defaultTtsSettings } from '../shared/tts';
 import { AppletApiAccess, callAppletApi } from './core/applet-api-access';
 import { automationApplets, automationCommands } from './core/automation-commands';
@@ -193,6 +198,8 @@ let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationWindows: NotificationWindowsAdapter | undefined;
 let notificationService: NotificationService | undefined;
 let typedNotifications: TypedNotifications | undefined;
+let notificationSpeech: NotificationSpeechService | undefined;
+let notificationAvailability: NotificationAvailability | undefined;
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
@@ -334,7 +341,8 @@ const tts = new TtsService({
   key: (url) => ttsSecrets.get(url),
   canUse: (owner, speak) => {
     if (quitting) return false;
-    if (owner === 'host') return startupReady;
+    if (owner === 'host' || owner === 'notification-preview') return startupReady;
+    if (owner.startsWith('notification:')) return notificationSpeech?.allows(owner) ?? false;
     if (owner === 'mcp') return mcpAllowed('allowUseTts') && (!speak || mcpAllowed('allowExecute'));
     const item = [...(manager?.items.values() ?? [])].find(
       (e) => owner === ttsOwner(e.manifest.id),
@@ -351,11 +359,18 @@ const tts = new TtsService({
   audit: (owner, id, state, code) =>
     log.write(
       'info',
-      owner.startsWith('applet:') ? owner.split(':')[1] : owner === 'host' ? 'host' : 'automation',
+      owner.startsWith('applet:')
+        ? owner.split(':')[1]
+        : owner.startsWith('notification:')
+          ? 'notifications'
+          : ['host', 'notification-preview'].includes(owner)
+            ? 'host'
+            : 'automation',
       '[TTS] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
     ),
 });
 const previewJobs = new Set<string>();
+const notificationPreviewJobs = new Set<string>();
 const operationApi = new AppDockApi({
   handlers: {
     'tts.speak': async (params, id) => tts.speak(ttsOwner(id), params),
@@ -834,6 +849,22 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'notifications')
     return {
       notificationTypes: notificationCatalog(orderApplets(applets, state.value.appletOrder)),
+      notificationSpeech: {
+        defaults: {
+          defaultVoice: settings.value.tts?.defaultVoice ?? '',
+          defaultSpeed: settings.value.tts?.defaultSpeed ?? 1,
+        },
+        configured: !!settings.value.tts?.baseUrl && !!settings.value.tts?.model,
+        voiceListRevision: settings.revision,
+        jobs: [...notificationPreviewJobs].flatMap((id) => {
+          try {
+            return [tts.get('notification-preview', id)];
+          } catch {
+            notificationPreviewJobs.delete(id);
+            return [];
+          }
+        }),
+      },
     };
   if (id === 'ribbon') return { applets: applets.map(summary) };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
@@ -914,6 +945,7 @@ function settingsPageActions(
   if (page.id === 'tts') {
     actions.ttsSetKey = async ([value]) => {
       ttsSecrets.set(settings.value.tts?.baseUrl ?? '', value);
+      notificationSpeech?.reconcile(true);
       tts.reconcile(true);
       changed();
     };
@@ -924,7 +956,43 @@ function settingsPageActions(
       while (previewJobs.size > 512) previewJobs.delete(previewJobs.values().next().value!);
       return job;
     };
-    actions.ttsStop = async () => tts.stopAll();
+    actions.ttsStop = async () => {
+      notificationSpeech?.stopAll();
+      await tts.stopAll();
+    };
+  }
+  if (page.id === 'notifications') {
+    actions.notificationVoices = async () => tts.voices('host');
+    actions.notificationPreview = async ([requestId]) => {
+      if (
+        [...notificationPreviewJobs].some((id) => {
+          try {
+            return ['queued', 'generating', 'playing'].includes(
+              tts.get('notification-preview', id).state,
+            );
+          } catch {
+            return false;
+          }
+        })
+      )
+        throw Error('試聴はすでに実行中です。');
+      const job = tts.speak('notification-preview', {
+        text: '新しい通知が届きました。通知の読み上げを試聴しています。',
+        ...resolveNotificationSpeech(settings.value),
+        requestId,
+      });
+      notificationPreviewJobs.add(job.jobId as string);
+      while (notificationPreviewJobs.size > 512)
+        notificationPreviewJobs.delete(notificationPreviewJobs.values().next().value!);
+      return job;
+    };
+    actions.notificationPreviewStop = async () => {
+      for (const id of notificationPreviewJobs) {
+        try {
+          await tts.stop('notification-preview', id);
+        } catch {}
+      }
+    };
   }
   if (page.id === 'general') {
     actions.refreshLaunchState = async () => {
@@ -1565,6 +1633,7 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    notificationSpeech?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
     for (const e of manager.items.values())
@@ -1574,6 +1643,7 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
+    notificationSpeech?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
     applySettings();
@@ -1700,6 +1770,39 @@ async function initialize() {
       (message) => log.write('error', 'notifications', message),
     ),
   );
+  const notificationState = new NativeNotificationState(
+    path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
+  );
+  notificationAvailability = new NotificationAvailability({
+    query: () => notificationState.accepts(),
+    close: () => notificationState.close(),
+    failed: () =>
+      log.write(
+        'error',
+        'notifications',
+        '通知の表示・読み上げ可否を確認できません。通知センターから確認できます。',
+      ),
+  });
+  powerMonitor.on('lock-screen', () => notificationAvailability?.setBlocked('lock', true));
+  powerMonitor.on('unlock-screen', () => notificationAvailability?.setBlocked('lock', false));
+  powerMonitor.on('suspend', () => notificationAvailability?.setBlocked('suspend', true));
+  powerMonitor.on('resume', () => notificationAvailability?.setBlocked('suspend', false));
+  window.on('enter-full-screen', () => notificationAvailability?.setBlocked('fullscreen', true));
+  window.on('leave-full-screen', () => notificationAvailability?.setBlocked('fullscreen', false));
+  notificationSpeech = new NotificationSpeechService({
+    settings: () => settings.value,
+    applets: () => manager.snapshot(),
+    ready: () => startupReady && !quitting,
+    generation: (id) => {
+      const e = manager.items.get(id);
+      return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
+    },
+    service: notificationService,
+    tts,
+    availability: notificationAvailability,
+    failed: (id, code) =>
+      log.write('error', 'notifications', '[TTS] notificationId=' + id + ' code=' + code),
+  });
   typedNotifications = new TypedNotifications(notificationService, {
     settings: () => settings.value,
     applets: () => manager.snapshot(),
@@ -1708,6 +1811,9 @@ async function initialize() {
       return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
     },
     changed,
+    published: (event) => notificationSpeech?.publish(event),
+    publicationFailed: () =>
+      log.write('error', 'notifications', '通知の読み上げ受付に失敗しました。'),
     policyChanged: (id) => {
       const peer = manager.items.get(id)?.peer;
       if (peer && !peer.closed)
@@ -1747,7 +1853,7 @@ async function initialize() {
   notificationDesktop = new NotificationDesktopHost({
     service: notificationService,
     parent: window,
-    nativeExecutable: path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
+    availability: notificationAvailability,
     preload: path.join(__dirname, 'notification-surface-preload.js'),
     dark: () => nativeTheme.shouldUseDarkColors,
     tray: () => tray ?? undefined,
@@ -2068,6 +2174,7 @@ async function initialize() {
   await syncHotKeys();
   await gestures.start();
   startupReady = true;
+  notificationSpeech?.reconcile();
   automation = new AutomationService({
     localDirectory: dataDirectory,
     baseDirectory,
@@ -2326,6 +2433,8 @@ app.on('before-quit', (event) => {
   notificationBanner?.dispose();
   notificationDesktop?.dispose();
   notificationWindows?.dispose();
+  notificationSpeech?.dispose();
+  notificationAvailability?.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();

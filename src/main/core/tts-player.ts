@@ -5,6 +5,7 @@ export async function playTtsWave(
   duration: number,
   signal: AbortSignal,
   speed = 1,
+  beforePlay?: () => void,
 ): Promise<void> {
   if (signal.aborted) return;
   const player = new BrowserWindow({
@@ -55,6 +56,7 @@ export async function playTtsWave(
       interrupted,
     ]);
     if (signal.aborted) return;
+    beforePlay?.();
     await Promise.race([
       player.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       const audio = new Audio(${JSON.stringify('data:audio/wav;base64,' + bytes.toString('base64'))});

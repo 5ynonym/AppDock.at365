@@ -1,3 +1,7 @@
+import React, { useEffect, useState, useRef } from 'react';
+import type { SettingsPageAuxiliary } from '../../../src/shared/settings-page';
+import type { TtsVoice } from '../../../src/shared/tts';
+import { resolveNotificationSpeech } from '../../../src/shared/notification-types';
 import type { FormEditor } from './SettingsForm';
 import type {
   NotificationPreference,
@@ -20,11 +24,61 @@ const reasonTitles: Record<string, string> = {
 export function NotificationSettings({
   editor,
   types,
+  auxiliary,
+  invoke,
+  busy,
+  select,
 }: {
   editor: FormEditor;
   types: NotificationTypeEntry[];
+  auxiliary?: SettingsPageAuxiliary['notificationSpeech'];
+  invoke(name: string, args?: unknown[]): Promise<any>;
+  busy: boolean;
+  select(id: string): void;
 }) {
   const settings = editor.value;
+  const speech = settings.notificationPreferences?.speech ?? {};
+  const effective = resolveNotificationSpeech(settings, auxiliary?.defaults);
+  const voiceListRevision = useRef(auxiliary?.voiceListRevision);
+  voiceListRevision.current = auxiliary?.voiceListRevision;
+  const [voices, setVoices] = useState<TtsVoice[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [voiceOverride, setVoiceOverride] = useState(false);
+  useEffect(() => {
+    setVoices([]);
+  }, [auxiliary?.voiceListRevision]);
+  useEffect(() => {
+    if (speech.voice !== undefined) setVoiceOverride(false);
+  }, [speech.voice]);
+  const changeSpeech = (key: 'voice' | 'speed', value?: string | number) => {
+    const next = { ...speech };
+    if (value === undefined) delete next[key];
+    else (next as any)[key] = value;
+    editor.edit({
+      ...settings,
+      notificationPreferences: {
+        ...settings.notificationPreferences,
+        overrides: settings.notificationPreferences?.overrides ?? [],
+        speech: next,
+      },
+    });
+  };
+  const run = async (name: string, args?: unknown[]) => {
+    if (pending) return;
+    setPending(true);
+    setError('');
+    try {
+      return await invoke(name, args);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(false);
+    }
+  };
+  const previewActive = auxiliary?.jobs.some((j) =>
+    ['queued', 'generating', 'playing'].includes(j.state),
+  );
   const overrides = settings.notificationPreferences?.overrides ?? [];
   const change = (type: NotificationTypeEntry, patch?: Partial<NotificationPreference>) => {
     const key = notificationTypeKey(type),
@@ -38,7 +92,10 @@ export function NotificationSettings({
         ...current,
         ...patch,
       });
-    editor.edit({ ...settings, notificationPreferences: { overrides: next } });
+    editor.edit({
+      ...settings,
+      notificationPreferences: { ...settings.notificationPreferences, overrides: next },
+    });
   };
   const owners = [...new Set(types.map((t) => JSON.stringify([t.ownerKind, t.ownerId])))];
   const unknown = overrides.filter(
@@ -46,6 +103,134 @@ export function NotificationSettings({
   );
   return (
     <div className="notification-settings">
+      <section className="notification-speech-settings" aria-label="通知の読み上げ">
+        <h3>通知の読み上げ</h3>
+        <p className="muted">
+          タイトルと本文を読み上げます。内容は、設定したTTSサーバーへ送信されます。接続先とモデルは共通の読み上げ設定を使用します。
+        </p>
+        <div {...settingAnchor('notifications', 'speech.voice')}>
+          <div className="setting-row">
+            <div>
+              <strong>声</strong>
+              <p>共通の読み上げ設定を使う</p>
+            </div>
+            <Toggle
+              label="通知の声に共通設定を使う"
+              checked={speech.voice === undefined && !voiceOverride}
+              onChange={(inherit) => {
+                setVoiceOverride(!inherit);
+                if (inherit) changeSpeech('voice');
+                else if (effective.voice) changeSpeech('voice', effective.voice);
+              }}
+            />
+          </div>
+          {speech.voice !== undefined || voiceOverride ? (
+            <label>
+              通知用のボイスID
+              <SettingsInput
+                aria-label="通知用のボイスID"
+                value={speech.voice ?? ''}
+                onChange={(e) => changeSpeech('voice', e.target.value)}
+                list="notification-voices"
+              />
+            </label>
+          ) : (
+            <p className="muted">現在の声: {effective.voice || '未設定'}</p>
+          )}
+          <datalist id="notification-voices">
+            {voices.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </datalist>
+          <button
+            disabled={busy || pending}
+            onClick={() => {
+              const revision = auxiliary?.voiceListRevision;
+              void run('notificationVoices').then((v) => {
+                if (v && revision === voiceListRevision.current) setVoices(v.voices);
+              });
+            }}
+          >
+            ボイス一覧を更新
+          </button>
+        </div>
+        <div {...settingAnchor('notifications', 'speech.speed')}>
+          <div className="setting-row">
+            <div>
+              <strong>速度</strong>
+              <p>共通の読み上げ設定を使う</p>
+            </div>
+            <Toggle
+              label="通知の速度に共通設定を使う"
+              checked={speech.speed === undefined}
+              onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
+            />
+          </div>
+          {speech.speed !== undefined ? (
+            <label>
+              通知用の読み上げ速度
+              <SettingsInput
+                type="number"
+                min={0.25}
+                max={4}
+                step={0.05}
+                aria-label="通知用の読み上げ速度"
+                value={speech.speed}
+                onChange={(e) =>
+                  changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
+                }
+              />
+            </label>
+          ) : (
+            <p className="muted">現在の速度: {effective.speed}</p>
+          )}
+        </div>
+        {(!auxiliary?.configured || !effective.voice) && (
+          <p role="status">読み上げには、接続先・モデル・声の設定が必要です。</p>
+        )}
+        <div
+          className="notification-speech-actions"
+          {...settingAnchor('notifications', 'speech.preview')}
+        >
+          <button
+            disabled={
+              busy || pending || previewActive || !auxiliary?.configured || !effective.voice
+            }
+            onClick={() => void run('notificationPreview', [crypto.randomUUID()])}
+          >
+            通知の読み上げを試聴
+          </button>
+          <button
+            disabled={pending || !previewActive}
+            onClick={() => void run('notificationPreviewStop')}
+          >
+            試聴を停止
+          </button>
+          <button onClick={() => select('tts')}>読み上げ設定を開く</button>
+          {auxiliary?.jobs.slice(-3).map((j) => (
+            <p key={j.jobId} role="status">
+              {
+                {
+                  queued: '待機中',
+                  generating: '生成中',
+                  playing: '再生中',
+                  completed: '完了',
+                  failed: '失敗',
+                  canceled: '取消',
+                }[j.state]
+              }
+              {j.error ? '：' + j.error.message : ''}
+            </p>
+          ))}
+        </div>
+        {error && (
+          <p role="alert" className="error-text">
+            {error}
+          </p>
+        )}
+      </section>
       <div className="setting-row" {...settingAnchor('notifications', 'notifications')}>
         <div>
           <strong>Appletからの通知を許可</strong>
@@ -89,6 +274,14 @@ export function NotificationSettings({
                       checked={checked}
                       disabled={!type.canDisable}
                       onChange={(enabled) => change(type, { enabled })}
+                    />
+                  </div>
+                  <div className="setting-row">
+                    <span>通知を読み上げる</span>
+                    <Toggle
+                      label={type.title + 'を読み上げる'}
+                      checked={row?.speak === true}
+                      onChange={(speak) => change(type, { speak })}
                     />
                   </div>
                   {!type.canDisable && <p className="muted">{type.disabledControlReason}</p>}
@@ -194,6 +387,7 @@ export function NotificationSettings({
                   editor.edit({
                     ...settings,
                     notificationPreferences: {
+                      ...settings.notificationPreferences,
                       overrides: overrides.filter(
                         (r) => notificationTypeKey(r) !== notificationTypeKey(row),
                       ),

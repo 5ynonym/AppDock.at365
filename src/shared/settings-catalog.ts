@@ -92,7 +92,12 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['manualVoices', '手動ボイス一覧'],
     ['preview', '試聴と停止', 'テキストを入力して読み上げ'],
   ],
-  notifications: [['notifications', 'Appletからの通知を許可', '種類別設定・通知先・表示時間']],
+  notifications: [
+    ['notifications', 'Appletからの通知を許可', '種類別設定・通知先・表示時間・読み上げ'],
+    ['speech.voice', '通知の声', '共通の読み上げ設定を継承 または上書き'],
+    ['speech.speed', '通知の読み上げ速度', '共通の読み上げ設定を継承 または上書き'],
+    ['speech.preview', '通知の読み上げを試聴', '試聴と停止'],
+  ],
   ribbon: [['ribbon', 'リボン', '表示 配置 並べ替え 上部 下部 セパレーター']],
   tray: [
     ['trayClickCommand', 'トレイクリックのコマンド', 'シングルクリック'],

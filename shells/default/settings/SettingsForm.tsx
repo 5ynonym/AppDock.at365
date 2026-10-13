@@ -80,7 +80,16 @@ export function SettingsForm({
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
   if (category === 'notifications')
-    return <NotificationSettings editor={editor} types={aux.notificationTypes ?? []} />;
+    return (
+      <NotificationSettings
+        editor={editor}
+        types={aux.notificationTypes ?? []}
+        auxiliary={aux.notificationSpeech}
+        invoke={invoke}
+        busy={busy}
+        select={select}
+      />
+    );
   if (category === 'codex')
     return <CodexSettings onOpenPermissions={() => select('permissions')} />;
   if (category === 'permissions')

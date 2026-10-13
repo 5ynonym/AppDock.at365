@@ -1,5 +1,7 @@
 # 通知基盤とShell表示
 
+通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別ON/OFFと、通知全体の声・速度の上書きを定義する。
+
 通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 
 ## 本体のサービス

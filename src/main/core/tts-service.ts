@@ -91,6 +91,10 @@ export function waveDuration(b: Buffer): number {
     return fail('TTS_AUDIO_TOO_LARGE', 'デコード後の音声が大きすぎます。');
   return duration;
 }
+export interface TtsInternalOptions {
+  startBefore?: number;
+  canStart?(): boolean;
+}
 interface InternalJob {
   view: TtsJob;
   owner: string;
@@ -105,9 +109,18 @@ interface InternalJob {
   timer?: ReturnType<typeof setTimeout>;
   finished?: Promise<void>;
   ended?: number;
+  internal?: TtsInternalOptions;
+  startTimer?: ReturnType<typeof setTimeout>;
 }
 export class TtsService {
   private jobs = new Map<string, InternalJob>();
+  private listeners = new Set<(owner: string, job: TtsJob) => void>();
+  subscribe(callback: (owner: string, job: TtsJob) => void) {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
   private queue: InternalJob[] = [];
   private active?: InternalJob;
   private lists = new Map<
@@ -125,7 +138,13 @@ export class TtsService {
       settings(): TtsSettings;
       key(baseUrl: string): string | undefined;
       canUse(owner: string, speak: boolean): boolean;
-      play(bytes: Buffer, seconds: number, signal: AbortSignal, speed?: number): Promise<void>;
+      play(
+        bytes: Buffer,
+        seconds: number,
+        signal: AbortSignal,
+        speed?: number,
+        beforePlay?: () => void,
+      ): Promise<void>;
       changed?(): void;
       audit?(owner: string, jobId: string, state: string, code?: string): void;
       fetcher?: typeof fetch;
@@ -156,7 +175,11 @@ export class TtsService {
       )
         this.jobs.delete(ended[i].view.jobId);
   }
-  speak(owner: string, input: Record<string, unknown>): Record<string, unknown> {
+  speak(
+    owner: string,
+    input: Record<string, unknown>,
+    internal?: TtsInternalOptions,
+  ): Record<string, unknown> {
     this.authorize(owner, true);
     const { text, voice, speed, requestId } = input;
     if (
@@ -198,6 +221,7 @@ export class TtsService {
     const now = new Date().toISOString();
     const j: InternalJob = {
       owner,
+      internal,
       requestId: requestId as string,
       fingerprint,
       text: text as string,
@@ -210,6 +234,11 @@ export class TtsService {
     };
     this.jobs.set(j.view.jobId, j);
     this.queue.push(j);
+    if (internal?.startBefore !== undefined)
+      j.startTimer = setTimeout(
+        () => this.cancel(j),
+        Math.max(0, internal.startBefore - Date.now()),
+      );
     j.timer = setTimeout(() => {
       if (j.view.state === 'queued') {
         this.queue = this.queue.filter((v) => v !== j);
@@ -240,16 +269,19 @@ export class TtsService {
   private state(j: InternalJob, state: TtsJob['state']) {
     j.view.state = state;
     j.view.updatedAt = new Date().toISOString();
+    for (const listener of this.listeners) listener(j.owner, structuredClone(j.view));
     this.options.changed?.();
   }
   private finish(j: InternalJob, state: 'completed' | 'failed' | 'canceled', error?: TtsError) {
     if (j.ended !== undefined) return;
     clearTimeout(j.timer);
+    clearTimeout(j.startTimer);
     j.ended = Date.now();
     if (error) j.view.error = { code: error.code, message: error.message };
     j.text = j.voice = j.key = undefined;
     j.config = undefined;
     j.speed = undefined;
+    j.internal = undefined;
     this.state(j, state);
     this.options.audit?.(j.owner, j.view.jobId, state, error?.code);
     this.prune();
@@ -294,9 +326,20 @@ export class TtsService {
     });
     await j.finished;
   }
+  private checkStart(j: InternalJob) {
+    if (
+      j.ended !== undefined ||
+      (j.internal?.startBefore !== undefined && Date.now() >= j.internal.startBefore) ||
+      j.internal?.canStart?.() === false
+    ) {
+      this.cancel(j);
+      throw new TtsError('TTS_START_CANCELED', '読み上げの開始を取り消しました。');
+    }
+  }
   private async run(j: InternalJob) {
     try {
       this.authorize(j.owner, true);
+      this.checkStart(j);
       this.state(j, 'generating');
       const controller = j.abort;
       j.timer = setTimeout(() => controller.abort(), this.limits.generationMs);
@@ -325,9 +368,13 @@ export class TtsService {
       const seconds = waveDuration(bytes);
       const playbackSpeed = j.config!.speedMode === 'playback' ? j.speed : 1;
       this.authorize(j.owner, true);
+      this.checkStart(j);
+      clearTimeout(j.startTimer);
       this.state(j, 'playing');
       if (j.ended === undefined)
-        await this.options.play(bytes, seconds, controller.signal, playbackSpeed);
+        await this.options.play(bytes, seconds, controller.signal, playbackSpeed, () =>
+          this.checkStart(j),
+        );
       if (j.ended === undefined) this.finish(j, 'completed');
     } catch (error) {
       if (j.ended === undefined)

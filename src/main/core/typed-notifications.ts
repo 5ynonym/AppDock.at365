@@ -16,6 +16,15 @@ type Binding = {
   input: NotificationInput;
   lifetime: NotificationInput['lifetime'];
 };
+export interface NotificationPublication {
+  notificationId: string;
+  owner: NotificationOwner;
+  typeId: string;
+  generation?: string;
+  title: string;
+  body: string;
+  createdAt: number;
+}
 export class TypedNotifications {
   private bindings = new Map<string, Binding>();
   private fingerprint = '';
@@ -31,6 +40,8 @@ export class TypedNotifications {
       changed(): void;
       policyChanged(id: string): void;
       now?(): number;
+      published?(event: NotificationPublication): void;
+      publicationFailed?(): void;
     },
   ) {
     this.unsubscribe = service.subscribe(() => {
@@ -124,6 +135,21 @@ export class TypedNotifications {
     const notificationId = this.service.upsert(this.source(owner), input);
     this.service.identify(notificationId, owner, typeId);
     this.bindings.set(notificationId, { owner: { ...owner }, typeId, generation, input, lifetime });
+    if (!previous) {
+      try {
+        this.options.published?.({
+          notificationId,
+          owner: { ...owner },
+          typeId,
+          generation,
+          title: content.title,
+          body: content.body,
+          createdAt: (this.options.now ?? Date.now)(),
+        });
+      } catch {
+        this.options.publicationFailed?.();
+      }
+    }
     return { status: 'accepted', notificationId };
   }
   end(

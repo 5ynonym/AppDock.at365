@@ -39,6 +39,7 @@ type Record = {
 export class NotificationService {
   private records = new Map<string, Record>();
   private listeners = new Set<() => void>();
+  private endedListeners = new Set<(id: string, status: NotificationItem['status']) => void>();
   private requests = new Map<string, { fingerprint: string; result: Promise<void> }>();
   private timer?: ReturnType<typeof setTimeout>;
   private closed = false;
@@ -54,6 +55,12 @@ export class NotificationService {
     this.listeners.add(callback);
     return () => {
       this.listeners.delete(callback);
+    };
+  }
+  subscribeEnded(callback: (id: string, status: NotificationItem['status']) => void) {
+    this.endedListeners.add(callback);
+    return () => {
+      this.endedListeners.delete(callback);
     };
   }
   private changed() {
@@ -288,6 +295,7 @@ export class NotificationService {
   private finish(r: Record, status: NotificationItem['status']) {
     if (r.item.status !== 'active') return;
     r.item.status = status;
+    for (const callback of this.endedListeners) callback(r.item.id, status);
     r.item.endedAt = this.now();
     r.item.updatedAt = this.now();
     r.item.revision++;
@@ -409,5 +417,6 @@ export class NotificationService {
     clearTimeout(this.timer);
     this.history.flush();
     this.listeners.clear();
+    this.endedListeners.clear();
   }
 }
