@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { TypedNotifications } from './typed-notifications';
+import type { NotificationInput } from './notification-service';
+
+export interface ErrorEpisode {
+  update(error: ReportableError, actions?: NotificationInput['actions']): void;
+  resolve(): void;
+}
 
 /** Only explicitly sanitized, user-facing messages belong in this shared reporting path. */
 export interface ReportableError {
@@ -19,6 +25,66 @@ export class ErrorReporter {
       log(source: string, message: string): void;
     },
   ) {}
+
+  /** Updates one failure episode without resurrecting an expired, dismissed or disabled notice. */
+  episode(): ErrorEpisode {
+    const owner = { ownerKind: 'host', ownerId: 'errors' } as const;
+    let attempted = false,
+      resolved = false,
+      id: string | undefined,
+      fingerprint = '',
+      publication = '';
+    return {
+      update: (error, actions) => {
+        if (resolved) return;
+        const title = error.title.slice(0, 200);
+        const body = `${error.message}\nエラーコード: ${error.code}`.slice(0, 2000);
+        const next = JSON.stringify([title, body]);
+        if (next !== fingerprint) {
+          fingerprint = next;
+          try {
+            this.options.log(error.source, `[ERROR] eventId=${error.eventId} ${title}\n${body}`);
+          } catch {
+            /* Reporting must not change the operation result. */
+          }
+        }
+        try {
+          const notifications = this.options.notifications();
+          if (!notifications || (attempted && (!id || !notifications.isActive(owner, id)))) return;
+          const nextPublication = JSON.stringify([
+            next,
+            actions?.map(({ key, label, primary, disabled }) => [key, label, primary, disabled]),
+          ]);
+          if (publication === nextPublication) return;
+          publication = nextPublication;
+          attempted = true;
+          const result = notifications.publish(owner, 'operation-failed', {
+            title,
+            body,
+            level: 'error',
+            historyText: { title, body },
+            actions,
+            dedupeKey: createHash('sha256')
+              .update(JSON.stringify([error.source, error.eventId]))
+              .digest('hex'),
+          });
+          if (result.status === 'accepted') id = result.notificationId;
+        } catch {
+          /* A broken notification sink cannot recursively report itself. */
+        }
+      },
+      resolve: () => {
+        if (resolved) return;
+        resolved = true;
+        try {
+          const notifications = this.options.notifications();
+          if (id && notifications?.isActive(owner, id)) notifications.end(owner, id);
+        } catch {
+          /* The notification may already have ended. */
+        }
+      },
+    };
+  }
 
   report(error: ReportableError): void {
     const key = JSON.stringify([error.source, error.eventId]);

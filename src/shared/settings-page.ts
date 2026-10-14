@@ -41,6 +41,14 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  settingsHealth?: {
+    restartRequired: boolean;
+    reasons: string[];
+    errors: string[];
+    recovered: boolean;
+    canRestore: boolean;
+    busy: boolean;
+  };
   ai?: {
     connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
     jobs: import('./ai').AiJob[];

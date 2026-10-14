@@ -38,7 +38,12 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { SettingsStore } from './core/settings';
+import { SettingsStore, SettingsConflictError } from './core/settings';
+import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
+import {
+  SettingsHealthNotifications,
+  settingsRestartReason,
+} from './core/settings-health-notifications';
 import { SettingsCommands } from './core/settings-commands';
 import { SettingsInputSession } from './core/settings-input-session';
 import { SettingsPageSession } from './core/settings-page';
@@ -183,6 +188,16 @@ const launch = new WindowsLaunch(
   app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
   baseDirectory,
   testDirectory ? [`--test-profile=${baseDirectory}`] : [],
+  undefined,
+  undefined,
+  {
+    failed: () => settings.health.set('launch', 'launch-save-failed'),
+    succeeded: () => settings.health.clear('launch'),
+    changed: () => {
+      settingsHealthNotifications?.refresh();
+      changed();
+    },
+  },
 );
 let settingsLoadError: Error | undefined;
 if (locked) {
@@ -194,6 +209,7 @@ if (locked) {
     settingsLoadError = error instanceof Error ? error : new Error(String(error));
   }
 }
+const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
 let window: BrowserWindow | null = null;
 let shellRegistry: ShellProviderRegistry | undefined;
 const shellStateSent = new Map<string, string>();
@@ -203,6 +219,9 @@ let notificationDesktop: NotificationDesktopHost | undefined;
 let notificationWindows: NotificationWindowsAdapter | undefined;
 let notificationService: NotificationService | undefined;
 let typedNotifications: TypedNotifications | undefined;
+let settingsHealthNotifications: SettingsHealthNotifications | undefined;
+let settingsRecoveryBusy = false;
+const settingsOperationBusy = () => settingsRecoveryBusy || launch.isBusy;
 let notificationSpeech: NotificationSpeechService | undefined;
 let notificationAvailability: NotificationAvailability | undefined;
 const settingsInputFlushes = new Map<string, () => void>();
@@ -268,6 +287,7 @@ const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
   applets: () => (manager ? allApplets() : []),
   save: async (value, revision, avatar, name) => {
+    assertSettingsWritable();
     const next = prepareSettings(value);
     return launch.save(
       next.host,
@@ -631,6 +651,8 @@ function trayMenu() {
 }
 function quitHost(restart = false) {
   if (quitting) return;
+  if (restart && settingsOperationBusy())
+    throw Error('設定の保存・復元が完了してから再起動してください。');
   if (restart) {
     const portableExecutable = app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE;
     if (portableExecutable) {
@@ -851,14 +873,21 @@ function refreshWindowTheme() {
     window.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#101116' : '#fafbfc');
 }
 function applySettings() {
-  webApplets?.reconcile();
-  trayClicks?.cancel();
-  nativeTheme.themeSource = settings.value.host.theme;
-  refreshWindowTheme();
-  refreshPageDisplays();
-  trayMenu();
-  changed();
+  try {
+    webApplets?.reconcile();
+    trayClicks?.cancel();
+    nativeTheme.themeSource = settings.value.host.theme;
+    refreshWindowTheme();
+    refreshPageDisplays();
+    trayMenu();
+    changed();
+    settings.health.clear('apply-window', settings.revision);
+  } catch {
+    settings.health.set('apply-window', 'apply-failed', settings.revision);
+  }
 }
+let hotKeyApplyGeneration = 0;
+let appletApplyGeneration = 0;
 function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
   const available = [
@@ -870,7 +899,102 @@ function syncHotKeys(retry = false) {
       extension.commands.filter((command) => command.available).map((command) => command.id),
     ),
   ];
-  return hotKeys.sync(settings.value, available, shortcutRecording || !!overlayHost?.active, retry);
+  const revision = settings.revision;
+  const generation = ++hotKeyApplyGeneration;
+  const suspended = shortcutRecording || !!overlayHost?.active;
+  return hotKeys
+    .sync(settings.value, available, suspended, retry)
+    .then(() => {
+      if (
+        quitting ||
+        revision !== settings.revision ||
+        suspended ||
+        generation !== hotKeyApplyGeneration
+      )
+        return;
+      if (hotKeys?.statuses.some((s) => !s.registered))
+        settings.health.set('apply-hotkeys', 'apply-failed', generation);
+      else settings.health.clear('apply-hotkeys', generation);
+    })
+    .catch(() => {
+      if (generation === hotKeyApplyGeneration)
+        settings.health.set('apply-hotkeys', 'apply-failed', generation);
+    });
+}
+async function reconcileSettingsApplets() {
+  const generation = ++appletApplyGeneration;
+  try {
+    await manager.reconcile();
+    if (generation === appletApplyGeneration) settings.health.clear('apply-applets', generation);
+  } catch {
+    if (generation === appletApplyGeneration)
+      settings.health.set('apply-applets', 'apply-failed', generation);
+  }
+}
+function assertSettingsWritable() {
+  if (quitting || settingsRecoveryBusy)
+    throw Error('設定の復元・再起動中です。完了後に操作してください。');
+}
+const settingsRestartRequired = () =>
+  settings.value.host.hardwareAcceleration !== startupHardwareAcceleration;
+const settingsRecoveryUi: SettingsRecoveryUi = {
+  confirm: async (plan) =>
+    (
+      await dialog.showMessageBox({
+        type: 'warning',
+        message: '正常な設定で共有ファイルを復元しますか？',
+        detail: `復元元の更新日時: ${new Date(plan.modifiedAt).toLocaleString()}\n復元したsettings.jsonは同期先のPCにも届きます。現在の破損ファイルはこのPCへ退避します。`,
+        buttons: ['キャンセル', '復元'],
+        defaultId: 0,
+        cancelId: 0,
+      })
+    ).response === 1,
+  chooseJson: async () => {
+    const result = await dialog.showOpenDialog({
+      title: '正常な設定JSONを選択',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    return result.canceled ? undefined : result.filePaths[0];
+  },
+  openDirectory: async () => {
+    const error = await shell.openPath(path.dirname(settings.file));
+    if (error) throw Error('保存先を開けませんでした。');
+  },
+  chooseStartupAction: async (message) => {
+    const result = await dialog.showMessageBox({
+      type: 'error',
+      title: 'AppDock — 設定の復旧',
+      message: '設定を確認して再起動してください',
+      detail: `${message}\n\n${settings.file}`,
+      buttons: ['正常なJSONから復元', '保存先を開く', '再読み込み', '終了'],
+      defaultId: 2,
+      cancelId: 3,
+    });
+    return (['restore', 'open', 'reload', 'quit'] as const)[result.response] ?? 'quit';
+  },
+};
+async function restoreSettingsBackup() {
+  if (settingsOperationBusy() || quitting)
+    throw Error('設定を処理中です。完了後に操作してください。');
+  settingsRecoveryBusy = true;
+  settings.writesBlocked = true;
+  settingsHealthNotifications?.refresh();
+  changed();
+  try {
+    const plan = settings.prepareRecovery();
+    if (!(await settingsRecoveryUi.confirm(plan))) return null;
+    return settings.restoreRecovery(plan);
+  } catch (error) {
+    if (error instanceof SettingsConflictError) throw error;
+    settings.health.set('save', 'save-failed');
+    throw Error('設定を復元できませんでした。元のファイルは保持しています。');
+  } finally {
+    settings.writesBlocked = false;
+    settingsRecoveryBusy = false;
+    settingsHealthNotifications?.refresh();
+    changed();
+  }
 }
 function prepareSettings(value: Settings) {
   let next = parseSettings(value);
@@ -885,6 +1009,7 @@ function commitSettings(
   avatar?: Uint8Array | null,
   avatarName?: string,
 ) {
+  assertSettingsWritable();
   return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
@@ -933,7 +1058,18 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       applets: applets.filter((a) => a.shell).map(summary),
       shellRegions: shellRegistry?.snapshot(),
     };
-  if (id === 'general') return { launch: host.launch };
+  if (id === 'general')
+    return {
+      launch: host.launch,
+      settingsHealth: {
+        restartRequired: settingsRestartRequired(),
+        reasons: settingsRestartRequired() ? [settingsRestartReason] : [],
+        errors: settings.health.all().map((i) => i.message),
+        recovered: settings.recovered,
+        canRestore: settings.recovered && !!settings.backupCandidate(),
+        busy: settingsOperationBusy(),
+      },
+    };
   if (id === 'notifications')
     return {
       notificationTypes: notificationCatalog(orderApplets(applets, state.value.appletOrder)),
@@ -1122,12 +1258,24 @@ function settingsPageActions(
     };
   }
   if (page.id === 'general') {
+    actions.restart = async () => {
+      quitHost(true);
+    };
+    actions.restoreSettingsBackup = restoreSettingsBackup;
+    actions.openSettingsDirectory = settingsRecoveryUi.openDirectory;
     actions.refreshLaunchState = async () => {
       const result = await launch.refresh();
+      if (
+        !result.error &&
+        result.registered === settings.value.host.startAtLogon &&
+        (!result.registered || result.taskElevated === settings.value.host.runAsAdministrator)
+      )
+        settings.health.clear('launch');
       changed();
       return result;
     };
     actions.restartAsAdministrator = async () => {
+      if (settingsOperationBusy()) throw Error('設定の処理が完了してから再起動してください。');
       await launch.restartElevated([
         ...launch.args,
         '--restore-view',
@@ -1500,24 +1648,19 @@ function registerIpc() {
     return state;
   });
   handle('dock:restartAsAdministrator', async () => {
+    if (settingsOperationBusy()) throw Error('設定の処理が完了してから再起動してください。');
     await launch.restartElevated([...launch.args, '--restore-view', '--appdock-elevation-attempt']);
     quitHost();
   });
   handle('dock:restoreSettingsBackup', async (revision: number) => {
-    const answer = await dialog.showMessageBox(window!, {
-      type: 'warning',
-      message: 'このPCの正常な設定で共有ファイルを復元しますか？',
-      detail:
-        '復元したsettings.jsonは同期先のPCにも届きます。現在の破損ファイルはそのままでは使えません。',
-      buttons: ['キャンセル', 'バックアップで復元'],
-      defaultId: 0,
-      cancelId: 0,
-    });
-    return answer.response === 1 ? settings.restoreBackup(revision) : null;
+    if (revision !== settings.revision)
+      throw new SettingsConflictError('設定が変わりました。もう一度確認してください。');
+    return restoreSettingsBackup();
   });
   handle(
     'dock:saveSettings',
     async (value: Settings, revision: number, avatar?: Uint8Array | null, avatarName?: string) => {
+      assertSettingsWritable();
       const next = prepareSettings(value);
       return launch.save(
         next.host,
@@ -1574,11 +1717,8 @@ function registerIpc() {
 }
 async function initialize() {
   if (settingsLoadError) {
-    dialog.showErrorBox(
-      'AppDock — 設定を読み込めません',
-      `${settingsLoadError.message}\n\n${settings.file}\n元のファイルは保持しています。JSONを修正して起動し直してください。`,
-    );
-    app.quit();
+    const recovered = await recoverSettingsAtStartup(settings, settingsRecoveryUi);
+    quitHost(recovered);
     return;
   }
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
@@ -1719,7 +1859,11 @@ async function initialize() {
       (shortcut) => {
         void hotKeys?.pressed(shortcut);
       },
-      (error) => hotKeys?.failed(error),
+      (error) => {
+        hotKeys?.failed(error);
+        if (!quitting && hotKeys?.statuses.length)
+          settings.health.set('apply-hotkeys', 'apply-failed', ++hotKeyApplyGeneration);
+      },
     ),
     async (id) => {
       if (shortcutRecording || quitting || overlayHost?.active) return;
@@ -1776,22 +1920,27 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
-    ai.reconcile();
-    notificationSpeech?.reconcile();
-    tts.reconcile();
-    typedNotifications?.reconcile();
+    try {
+      ai.reconcile();
+      notificationSpeech?.reconcile();
+      tts.reconcile();
+      typedNotifications?.reconcile();
+      settings.health.clear('apply-services', settings.revision);
+    } catch {
+      settings.health.set('apply-services', 'apply-failed', settings.revision);
+    }
     applySettings();
     void syncHotKeys(true);
-    void manager.reconcile();
+    void reconcileSettingsApplets();
+    settingsHealthNotifications?.refresh();
   });
-  settings.on('statusChanged', changed);
-  settings.watch((e) =>
-    log.write(
-      'error',
-      'settings',
-      `設定ファイルを読み込めません。最後の有効な設定を継続します。${e.message}`,
-    ),
-  );
+  settings.on('statusChanged', () => {
+    settingsHealthNotifications?.refresh();
+    changed();
+  });
+  settings.watch(() => {
+    /* The health source reports stable failures through ErrorReporter. */
+  });
   applySettings();
   let lastAvatar = avatarSignature();
   avatarPoll = setInterval(() => {
@@ -2308,6 +2457,43 @@ async function initialize() {
   await syncHotKeys();
   await gestures.start();
   startupReady = true;
+  settingsHealthNotifications = new SettingsHealthNotifications({
+    notifications: typedNotifications!,
+    errors,
+    issues: () => settings.health.all(),
+    restartRequired: settingsRestartRequired,
+    failed: () =>
+      log.write(
+        'error',
+        'notifications',
+        '設定の通知を表示できませんでした。一般設定で状態を確認してください。',
+      ),
+    actions: (error) => [
+      {
+        key: 'restart',
+        label: '再起動',
+        primary: true,
+        disabled: settingsOperationBusy() || quitting,
+        run: async () => {
+          quitHost(true);
+        },
+      },
+      ...(error && settings.recovered && settings.backupCandidate()
+        ? [
+            {
+              key: 'restore',
+              label: 'バックアップで復元',
+              disabled: settingsOperationBusy() || quitting,
+              run: async () => {
+                await restoreSettingsBackup();
+              },
+            },
+          ]
+        : []),
+      { key: 'open', label: '保存先を開く', run: settingsRecoveryUi.openDirectory },
+    ],
+  });
+  settingsHealthNotifications.refresh();
   notificationSpeech?.reconcile();
   automation = new AutomationService({
     localDirectory: dataDirectory,
@@ -2572,6 +2758,7 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (shutdownStarted) return;
   shutdownStarted = true;
+  settingsHealthNotifications?.dispose();
   notificationBanner?.dispose();
   notificationDesktop?.dispose();
   notificationWindows?.dispose();

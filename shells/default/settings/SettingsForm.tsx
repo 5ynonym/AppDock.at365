@@ -268,71 +268,114 @@ export function SettingsForm({
         )}
 
         {category === 'general' && (
-          <SettingsSection
-            title="起動とウィンドウ"
-            description="Windowsへのサインイン時や、ウィンドウを閉じたときの動作を設定します。"
-          >
-            <SettingRow pageId={category} itemKey="permissions">
-              <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
-            </SettingRow>
-            <SettingRow pageId={category} itemKey="startAtLogon">
-              <Toggle
-                label="スタートアップに登録"
-                checked={settings.host.startAtLogon}
-                disabled={!launch.supported}
-                onChange={(v) => edit({ ...settings, host: { ...settings.host, startAtLogon: v } })}
-              />
-            </SettingRow>
-            <SettingRow pageId={category} itemKey="runAsAdministrator">
-              <Toggle
-                label="常に管理者として起動"
-                checked={settings.host.runAsAdministrator}
-                disabled={!launch.supported}
-                onChange={(v) =>
-                  edit({ ...settings, host: { ...settings.host, runAsAdministrator: v } })
-                }
-              />
-            </SettingRow>
-            <SettingRow
-              pageId={category}
-              itemKey="launch"
-              description={
-                launch.supported
-                  ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
-                  : '起動設定はWindowsの発行版AppDockで使用できます。'
-              }
+          <>
+            <SettingsSection
+              title="設定ファイル"
+              description="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
             >
-              <div className="button-row">
-                <button
-                  disabled={!launch.supported || busy}
-                  onClick={() => void run(() => invoke('refreshLaunchState'))}
-                >
-                  状態を確認
-                </button>
-                <button
-                  disabled={!launch.supported || launch.elevated || busy}
-                  onClick={() => void run(() => invoke('restartAsAdministrator'))}
-                >
-                  管理者として再起動
-                </button>
+              <div {...settingAnchor(category, 'settingsFile')}>
+                {!aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired && (
+                  <p>設定は正常です。</p>
+                )}
+                {aux.settingsHealth?.recovered && (
+                  <p>最後の正常な設定で動作しています。共有ファイルは変更していません。</p>
+                )}
+                {aux.settingsHealth?.reasons.map((reason) => (
+                  <p key={reason}>{reason}</p>
+                ))}
+                {[...new Set(aux.settingsHealth?.errors)].map((reason) => (
+                  <p role="alert" key={reason}>
+                    {reason}
+                  </p>
+                ))}
+                {!!aux.settingsHealth?.errors.length && <p>原因を確認して再起動してください。</p>}
+                <div className="button-row">
+                  <button
+                    disabled={busy || aux.settingsHealth?.busy}
+                    onClick={() => void run(() => invoke('restart'))}
+                  >
+                    再起動
+                  </button>
+                  <button
+                    disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
+                    onClick={() => void run(() => invoke('restoreSettingsBackup'))}
+                  >
+                    バックアップで復元
+                  </button>
+                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
+                    保存先を開く
+                  </button>
+                </div>
               </div>
-            </SettingRow>
-            {launch.error && <p role="alert">{launch.error}</p>}
-            {launch.supported && (
-              <p className="muted">
-                起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。設定は変更時に保存されます。
-              </p>
-            )}
-            {(['closeToTray', 'hardwareAcceleration', 'startMinimized'] as const).map((key) => (
-              <SettingRow key={key} pageId={category} itemKey={key}>
+            </SettingsSection>
+            <SettingsSection
+              title="起動とウィンドウ"
+              description="Windowsへのサインイン時や、ウィンドウを閉じたときの動作を設定します。"
+            >
+              <SettingRow pageId={category} itemKey="permissions">
+                <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="startAtLogon">
                 <Toggle
-                  label={hostSettingItem(category, key).title}
-                  checked={settings.host[key]}
-                  onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
+                  label="スタートアップに登録"
+                  checked={settings.host.startAtLogon}
+                  disabled={!launch.supported}
+                  onChange={(v) =>
+                    edit({ ...settings, host: { ...settings.host, startAtLogon: v } })
+                  }
                 />
               </SettingRow>
-            ))}
-          </SettingsSection>
+              <SettingRow pageId={category} itemKey="runAsAdministrator">
+                <Toggle
+                  label="常に管理者として起動"
+                  checked={settings.host.runAsAdministrator}
+                  disabled={!launch.supported}
+                  onChange={(v) =>
+                    edit({ ...settings, host: { ...settings.host, runAsAdministrator: v } })
+                  }
+                />
+              </SettingRow>
+              <SettingRow
+                pageId={category}
+                itemKey="launch"
+                description={
+                  launch.supported
+                    ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
+                    : '起動設定はWindowsの発行版AppDockで使用できます。'
+                }
+              >
+                <div className="button-row">
+                  <button
+                    disabled={!launch.supported || busy}
+                    onClick={() => void run(() => invoke('refreshLaunchState'))}
+                  >
+                    状態を確認
+                  </button>
+                  <button
+                    disabled={!launch.supported || launch.elevated || busy}
+                    onClick={() => void run(() => invoke('restartAsAdministrator'))}
+                  >
+                    管理者として再起動
+                  </button>
+                </div>
+              </SettingRow>
+              {launch.error && <p role="alert">{launch.error}</p>}
+              {launch.supported && (
+                <p className="muted">
+                  起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。設定は変更時に保存されます。
+                </p>
+              )}
+              {(['closeToTray', 'hardwareAcceleration', 'startMinimized'] as const).map((key) => (
+                <SettingRow key={key} pageId={category} itemKey={key}>
+                  <Toggle
+                    label={hostSettingItem(category, key).title}
+                    checked={settings.host[key]}
+                    onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
+                  />
+                </SettingRow>
+              ))}
+            </SettingsSection>
+          </>
         )}
       </div>
     </div>

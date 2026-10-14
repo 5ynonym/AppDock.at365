@@ -52,6 +52,10 @@ export function observeFile(
   timer = setTimeout(check, 100);
   return {
     check,
+    // A caller can validate a file directly before the observer sees the healthy interval.
+    resetError() {
+      lastError = '';
+    },
     close() {
       closed = true;
       clearTimeout(timer);

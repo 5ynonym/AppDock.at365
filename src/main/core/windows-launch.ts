@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { HostSettings, LaunchState } from '../../shared/contracts';
 
 const execute = promisify(execFile);
+export class WindowsOperationCancelled extends Error {}
 export const psString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 export const encodedScript = (value: string) => Buffer.from(value, 'utf16le').toString('base64');
 export const powershell = () =>
@@ -28,7 +29,7 @@ export async function runPowerShell(script: string, encode = true): Promise<stri
         'Bypass',
         encode ? '-EncodedCommand' : '-Command',
         (encode ? encodedScript : (value: string) => value)(
-          `$ProgressPreference='SilentlyContinue'\n[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)\ntry { ${script}\n} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }`,
+          `$ProgressPreference='SilentlyContinue'\n[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)\ntry { ${script}\n} catch { $failure=$_.Exception; while ($failure) { if ($failure.NativeErrorCode -eq 1223) { exit 1223 }; $failure=$failure.InnerException }; [Console]::Error.WriteLine($_.Exception.Message); exit 1 }`,
         ),
       ],
       {
@@ -40,6 +41,8 @@ export async function runPowerShell(script: string, encode = true): Promise<stri
     return result.stdout.trim();
   } catch (error) {
     const failure = error as { code?: string | number; stderr?: string };
+    if (failure.code === 1223)
+      throw new WindowsOperationCancelled('Windowsの操作をキャンセルしました。');
     throw Error(
       `Windowsの操作に失敗しました (${failure.code ?? 'timeout'})。${failure.stderr?.includes('CLIXML') ? '' : (failure.stderr?.trim().slice(0, 500) ?? '')}`,
     );
@@ -57,6 +60,9 @@ export interface LaunchTask {
 export class WindowsLaunch {
   state: LaunchState;
   private busy = false;
+  get isBusy() {
+    return this.busy;
+  }
   private readonly prefix: string;
   constructor(
     readonly executable: string,
@@ -64,6 +70,7 @@ export class WindowsLaunch {
     readonly args: string[] = [],
     supported = process.platform === 'win32' && !!executable,
     private readonly run = runPowerShell,
+    private readonly health?: { failed(): void; succeeded(): void; changed(): void },
   ) {
     const id = createHash('sha256')
       .update(`${executable.toLowerCase()}\n${directory.toLowerCase()}`)
@@ -147,11 +154,20 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
   ): Promise<T> {
     if (this.busy) throw Error('起動設定を変更中です。完了後に保存してください。');
     this.busy = true;
+    this.health?.changed();
+    const read = async () => {
+      try {
+        return await this.read();
+      } catch (error) {
+        if (!(error instanceof WindowsOperationCancelled)) this.health?.failed();
+        throw error;
+      }
+    };
     try {
       preflight();
       let checked: LaunchTask | undefined;
       if (this.state.supported && next.runAsAdministrator && !previous.runAsAdministrator) {
-        checked = await this.read();
+        checked = await read();
         if (!checked.administratorAccount && !checked.elevated)
           throw Error(
             'このWindowsユーザーは管理者ではありません。管理者ユーザーでAppDockを使用してください。',
@@ -167,7 +183,7 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
       if (!changed) return commit();
       if (!this.state.supported)
         throw Error('起動設定はWindowsの発行版AppDockで変更してください。');
-      const before = checked ?? (await this.read());
+      const before = checked ?? (await read());
       const elevate =
         !before.elevated && ((next.startAtLogon && next.runAsAdministrator) || before.taskElevated);
       if (elevate && !before.administratorAccount)
@@ -204,19 +220,25 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
       try {
         await this.mutate(sameUser + script, elevate);
       } catch (error) {
+        if (error instanceof WindowsOperationCancelled) throw error;
+        this.health?.failed();
         throw Error(
           `スタートアップの変更は完了しませんでした。UACをキャンセルした場合や権限がない場合、設定は保存されません。${String(error)}`,
         );
       }
       try {
-        const after = await this.read();
+        const after = await read();
         if (
           after.registered !== next.startAtLogon ||
           (next.startAtLogon && after.taskElevated !== next.runAsAdministrator)
-        )
+        ) {
+          this.health?.failed();
           throw Error('Windowsの登録結果が設定と一致しません。');
+        }
         preflight();
-        return commit();
+        const result = commit();
+        this.health?.succeeded();
+        return result;
       } catch (error) {
         try {
           await this.mutate(
@@ -229,6 +251,7 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
           );
           await this.read();
         } catch (rollback) {
+          this.health?.failed();
           throw Error(
             `${String(error)} / Windowsの起動設定を元に戻せませんでした: ${String(rollback)}`,
           );
@@ -237,6 +260,7 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
       }
     } finally {
       this.busy = false;
+      this.health?.changed();
     }
   }
   async restartElevated(args: string[], pid = process.pid) {

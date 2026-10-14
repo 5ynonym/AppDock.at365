@@ -152,6 +152,15 @@ export class TypedNotifications {
     }
     return { status: 'accepted', notificationId };
   }
+  isActive(owner: NotificationOwner, id: string) {
+    this.reconcile();
+    const binding = this.bindings.get(id);
+    return (
+      !!binding &&
+      binding.owner.ownerKind === owner.ownerKind &&
+      binding.owner.ownerId === owner.ownerId
+    );
+  }
   end(
     owner: NotificationOwner,
     id: string,

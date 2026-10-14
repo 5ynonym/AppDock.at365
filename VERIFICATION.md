@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-15: 設定通知・JSON復旧のコミット確認（0.41.0）
+
+- main `7f0a266`上の今回の実装・試験・文書を対象に、設計書を実装済みの構成へ更新した。SettingsHealth / SettingsHealthNotifications / ErrorReporter.episode、障害の処理世代、短時間の読込障害、実際の通知文言、復元操作の条件、再起動の排他と確認範囲をコードへ照合した。確認項目の表と実施結果を区別し、未実装の予定表現を取り除いた。
+- 実装時の443ファイルの入力hash、6件の成功ログ、最終GUI runner、publishのEXE/feedを照合した。製品入力は一致し、単体試験後のGUI runner変更は最終固定EXE試験で使用したhashと一致。型検査・ビルド・関連**130件**・固定EXEの**7群**を再利用した。今回の追加変更は設計書と検証記録だけのため、0.41.0の再版更新・再発行は行わない。
+- 標準回帰の不足分を補うため、`dev.bat run build:test-extensions`と、既存130件を含む14ファイル以外の`dev.bat exec node --test`を実行。残り**336件成功、fail/skip 0**、再利用分と合わせて**466件**の標準回帰が成功した。fixtureの.NETビルドは制限環境で非0となったためログを保持し、同じコマンドの通常権限での成功を確認した。試験ファイル一覧・コマンド・終了コードは証跡へ保存する。
+- 文書リンク・見出し参照・コードフェンス・競合マーカー・会話上の人物名の不在と`git diff --check`を確認。設定ファイル優先、即時保存、通知OFF/終了と障害解消の分離、復元前の退避・競合照合を保持する。ネイティブdialogの回答はfixture、起動復旧loopは単体試験。実同期サービス・実UAC昇格・物理dialog操作は今回も対象外。
+- 再利用判定と追加回帰は`.artifacts/commit-validation-settings-recovery-20261015/validation.json`、stage tree・作業ファイル・最終commitの一致は同フォルダーの`commit.json`へ記録する。今回の26ファイルだけをmainへコミットする。固定EXEと再利用証跡、今回の成功・失敗ログを保持し、push・Release・実利用先へのdeployは行わない。
+
+## 2026-10-15: 設定の再起動通知とJSON復旧（0.41.0）
+
+- main `7f0a266`から実装。保存直後の設定と起動時GPU要求値を比較する再起動通知、共通ErrorReporterの設定障害episode、理由・再起動・保存先・復元action、一般設定の常設復旧欄を追加した。通知OFF・終了と障害解消を分離し、既存の即時保存、外部設定優先、AIの単発エラー報告を維持する。起動時に正常なバックアップがない場合は通常初期化の前に復旧dialogを使う。
+- 復元元と保存先の確認後再照合、破損bytesの退避、最初のrename直前からの比較、正常な同期受信の優先を検査した。レビューで見つけた「直接読込だけが正常期間を見た後に同じ監視エラーが再発すると見逃す」問題はobserverのエラー記録解除と回帰試験で修正。初回作成と同期到着の競合も保護し、バックアップ保存先が読めない場合に既定値を作成しない。通知自身の失敗は設定操作へ伝播させず、古い非同期反映結果で新しい障害を解消しない。
+- `dev.bat run typecheck`、`dev.bat run build`成功。`dev.bat exec node --test`でsettings-recovery / settings-health-notifications / settings-sync / settings-editing / settings-page / settings-commands / error-reporter / notification-policy / notification-foundation / notification-speech / ai / ai-settings / windows-launch / global-hotkeysの**130件成功**。破損・欠落・候補変更・4MB超・退避不能・保存失敗・初回競合・一時エラー・期限切れ・OFF/再ON・dismiss・別AI通知との分離・PowerShellの1223取消を含む。
+- `settings-recovery-ui-test.cjs`のsource試験と固定EXE試験に成功。通知の生成とGPU値の取消による解消、短い破損の非通知、確認中の再起動不可と正常受信の優先、通知ボタンによる退避・復元、通知OFF時の一般画面からの復元、実際の再起動と同じprofile/設定画面の復元、破損状態からのバックアップ起動を確認した。最終EXEの画面画像で復旧欄の表示も確認。ネイティブ確認dialogの回答はfixture、ファイル選択・起動復旧loopは単体試験であり、OS dialogを人がクリックする試験や実同期サービス・実UAC昇格は未実施。
+- 発行前レビューで要件・競合保護・通知寿命・再起動経路・Shell限定モデル・保存境界を確認し、上記の修正を再検証した。新しい通知種類の設定追加によりマイナーを更新し**0.41.0**とした。`publish.bat`成功。EXEのProductVersionとupdate.jsonが一致し、144,197,883 bytes、SHA256 `7a9f2ac5725668c2d1328106f2aaa2471b6e06a6ac8db529f893cce6640e43ec`。固定EXE試験はこの配布物をコピーし同一hashを照合した。
+- 証跡: `.artifacts/settings-recovery-validation-20261015/validation.json`、ログとhash、`inputs-before.json`の443ファイルを記録。単体試験後の製品入力は不変。GUI runnerだけ既存のCDP/main inspector接続へ修正し、`ui-runner-final.json`のhashで固定EXE試験を実行した。source結果は`.artifacts/settings-recovery-ui-1791992687676/result.json`、最終固定EXE結果は`.artifacts/settings-recovery-ui-1791993300850/result.json`。Windows 10.0.26300 x64、Node 24.21.0 / pnpm 12.10.1 / Electron 44.6.0 / .NET SDK 10.0.402を使用。
+- 制限環境の一時フォルダーrenameのEPERM、Electron起動失敗、pnpmのSTATUS_STACK_OVERFLOWはログを保持し、同じ検証・発行を通常権限で実行して成功を確認した。新規fixtureのディレクトリ移動はWindowsの一時拒否に依存したため、障害注入を安定化した。固定単一EXEへのPlaywright直接接続のtimeoutは配布版用CDPへ変更して解消。成功済みの今回GUI成果物は方式別3件以内で保持し、失敗・調査資料も保持。試験プロセスの終了を確認した。未変更Appletの発行、全体回帰、Release、deployは対象外。変更は未コミット。
+
 ## 2026-10-15: 設定通知・JSON復旧の設計をmainへ統合
 
 - `design/settings-notifications`に残っていた文書3点を`48b6838`としてコミットし、main `10ff37b`（0.40.0）へ統合。[設計書](docs/settings-recovery-notifications-design.md)とDEVELOPMENTの入口、初期設計時の検証記録を取り込む。VERIFICATIONの競合は両方の記録を保持して解消した。

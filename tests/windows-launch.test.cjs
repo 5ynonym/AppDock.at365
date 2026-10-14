@@ -3,6 +3,72 @@ const assert = require('node:assert/strict');
 const { WindowsLaunch, psString, encodedScript } = require('../out/main/main/core/windows-launch');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const sid = 'S-1-5-21-123-456-789-1001';
+test(
+  'PowerShell preserves explicit Windows cancellation as a typed result',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const {
+      runPowerShell,
+      WindowsOperationCancelled,
+    } = require('../out/main/main/core/windows-launch');
+    await assert.rejects(
+      runPowerShell('throw [ComponentModel.Win32Exception]::new(1223)'),
+      WindowsOperationCancelled,
+    );
+  },
+);
+test('launch health excludes explicit UAC cancellation and preflight conflicts, reports operational failure', async () => {
+  const { WindowsOperationCancelled } = require('../out/main/main/core/windows-launch');
+  const host = createDefaultSettings().host;
+  for (const [failure, expected] of [
+    [new WindowsOperationCancelled('cancel'), 0],
+    [Error('registration failure'), 1],
+  ]) {
+    let failed = 0,
+      calls = 0;
+    const service = new WindowsLaunch(
+      'C:\\AppDock.exe',
+      'C:\\test',
+      [],
+      true,
+      async () => {
+        if (calls++ === 0) return JSON.stringify(task());
+        throw failure;
+      },
+      { failed: () => failed++, succeeded: () => {}, changed: () => {} },
+    );
+    await assert.rejects(
+      service.save(
+        { ...host, startAtLogon: true },
+        host,
+        () => {},
+        () => {},
+      ),
+    );
+    assert.equal(failed, expected);
+    assert.equal(service.isBusy, false);
+  }
+  let failed = 0;
+  const service = new WindowsLaunch(
+    'C:\\AppDock.exe',
+    'C:\\test',
+    [],
+    true,
+    async () => assert.fail(),
+    { failed: () => failed++, succeeded: () => {}, changed: () => {} },
+  );
+  await assert.rejects(
+    service.save(
+      host,
+      host,
+      () => {
+        throw Error('revision conflict');
+      },
+      () => {},
+    ),
+  );
+  assert.equal(failed, 0);
+});
 const task = (patch = {}) => ({
   administratorAccount: true,
   elevated: false,

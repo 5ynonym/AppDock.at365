@@ -557,23 +557,6 @@ function App() {
             旧保存領域にPC専用データが残っています。同期する前にAppDockを終了して旧データを整理してください。自動移行・削除は行いません。
           </div>
         )}
-        {snapshot?.settings.syncError && (
-          <div className="error-banner" role="alert">
-            {snapshot.settings.syncError}
-            {snapshot.settings.recovered && (
-              <button
-                disabled={busy || editor.pending}
-                onClick={() =>
-                  void action(async () => {
-                    await window.dock.restoreSettingsBackup(snapshot.settings.revision);
-                  })
-                }
-              >
-                バックアップで復元
-              </button>
-            )}
-          </div>
-        )}
         {error && (
           <div className="error-banner" role="alert">
             {error}

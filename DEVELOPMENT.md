@@ -9,7 +9,7 @@
 | 実装・コミット・Release | [共通手順](docs/development-workflow.md)、[Release](docs/RELEASING.md)、[全体パッケージ](docs/all-in-one.md) |
 | ホストとAppletの開発 | [ホスト開発](docs/host-development.md)、[Applet開発](docs/applet-development.md)、[Applet API](docs/extensions.md) |
 | 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
-| 設定の再起動通知・JSON復旧（設計案） | [ファイル受信・復旧と理由付き再起動通知](docs/settings-recovery-notifications-design.md) |
+| 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
 | TTSサーバー連携・読み上げAPI | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
 | AI共通API・プロンプト設定 | [AI文章生成とApplet/MCP共通API](docs/ai.md)、[Gmail連携を含む設計](docs/ai-services-design.md)（Gmailは未実装） |
@@ -235,6 +235,8 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 設定の正本は保存済みSettingsStoreです。mainのSettingsInputSessionは選択/モード/操作受付だけを持ちます。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 
 設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。
+
+設定の通知と破損復旧は`tests/settings-recovery.test.cjs`、`tests/settings-health-notifications.test.cjs`、`scripts/settings-recovery-ui-test.cjs [固定EXE]`で確認します。GUIは専用profileとPC専用rootを使い、復元確認だけをdialog fixtureで応答します。固定EXEでは既存のCDP/main inspector helperへ接続し、元EXEからの実際の再起動も確認します。OSのファイル選択dialogの実操作とは区別して記録してください。
 
 設定横断検索はmainのSettingsNavigationStateがqueryと移動要求を保持し、settings-catalogの静的メタデータだけを照合します。Default ShellのSettingsIndexと安定アンカーが本文全体への移動を担当します。検索値・選択・移動はsettings.jsonへ保存しません。追加回帰は`scripts/settings-search-ui-test.cjs [固定EXE]`で、全本体項目のアンカー、非表示ページの遅延描画、検索/移動/復旧/削除対象を確認します。
 

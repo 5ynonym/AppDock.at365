@@ -67,6 +67,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
   ],
   general: [
+    ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
     [
       'permissions',
       'Applet・MCPからの操作',

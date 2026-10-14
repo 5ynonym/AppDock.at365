@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
 import { observeFile } from './file-observer';
+import { SettingsHealth, settingsIssueMessages } from './settings-health';
 import type { Settings, SettingsSnapshot, ExtensionSettings } from '../../shared/contracts';
 import {
   createDefaultSettings as defaults,
@@ -10,7 +11,27 @@ import {
 } from '../../shared/settings-schema';
 const isObject = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
-function atomicWrite(file: string, text: string | Uint8Array) {
+export class SettingsConflictError extends Error {}
+class SettingsReadError extends Error {
+  constructor(readonly kind: 'read-invalid' | 'read-unavailable') {
+    super(settingsIssueMessages[kind]);
+  }
+}
+export interface SettingsRecoveryPlan {
+  readonly candidate: string;
+  readonly candidateHash: string;
+  readonly modifiedAt: number;
+  readonly previous: Buffer | undefined;
+  readonly revision: number;
+}
+const hashBytes = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+const sameBytes = (a: Buffer | undefined, b: Buffer | undefined) =>
+  a === undefined ? b === undefined : !!b?.equals(a);
+function atomicWrite(
+  file: string,
+  text: string | Uint8Array,
+  expected?: { previous: Buffer | undefined },
+) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const readPrevious = () => {
     try {
@@ -20,15 +41,15 @@ function atomicWrite(file: string, text: string | Uint8Array) {
       throw error;
     }
   };
-  const previous = readPrevious();
+  const previous = expected ? expected.previous : readPrevious();
   const tmp = `${file}.${randomUUID()}.tmp`;
   try {
     fs.writeFileSync(tmp, text, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
     for (let attempt = 0; ; attempt++) {
-      if (attempt > 0) {
+      {
         const current = readPrevious();
-        if (previous === undefined ? current !== undefined : !current?.equals(previous))
-          throw Error('保存先が別の場所で変更されました。再取得してください。');
+        if (!sameBytes(previous, current))
+          throw new SettingsConflictError('保存先が別の場所で変更されました。再取得してください。');
       }
       try {
         fs.renameSync(tmp, file);
@@ -58,8 +79,17 @@ class SettingsStore extends EventEmitter {
   private observer?: ReturnType<typeof observeFile>;
   private lastBackup = '';
   private lastBackupTime = 0;
-  syncError?: string;
+  readonly health = new SettingsHealth(() => this.emit('statusChanged', this.snapshot()));
+  get syncError() {
+    return (
+      this.health
+        .all()
+        .map((i) => i.message)
+        .join('\n') || undefined
+    );
+  }
   recovered = false;
+  writesBlocked = false;
   constructor(
     file: string,
     private backupDirectory?: string,
@@ -69,56 +99,100 @@ class SettingsStore extends EventEmitter {
     this.revision = 0;
     this.value = defaults();
   }
+  private readBytes(file: string): Buffer {
+    try {
+      const stat = fs.statSync(file);
+      if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
+        throw new SettingsReadError('read-unavailable');
+      const bytes = fs.readFileSync(file);
+      if (bytes.length > 4 * 1024 * 1024) throw new SettingsReadError('read-unavailable');
+      return bytes;
+    } catch {
+      throw new SettingsReadError('read-unavailable');
+    }
+  }
+  private parse(bytes: Buffer | string) {
+    try {
+      return validate(JSON.parse(bytes.toString().replace(/^\uFEFF/, '')));
+    } catch {
+      throw new SettingsReadError('read-invalid');
+    }
+  }
   private readDisk() {
-    const stat = fs.statSync(this.file);
-    if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
-      throw Error('設定ファイルは4MB以下の通常ファイルにしてください。');
-    return validate(JSON.parse(fs.readFileSync(this.file, 'utf8').replace(/^\uFEFF/, '')));
+    return this.parse(this.readBytes(this.file));
+  }
+  private readFailure(error: unknown, immediate = true) {
+    this.recovered = true;
+    this.health.set(
+      'read',
+      error instanceof SettingsReadError ? error.kind : 'read-unavailable',
+      0,
+      immediate,
+    );
+  }
+  private backupFiles() {
+    if (!this.backupDirectory) return [];
+    try {
+      return [
+        'last-good.json',
+        ...fs
+          .readdirSync(this.backupDirectory)
+          .filter((n) => /^settings-.*\.json$/.test(n))
+          .sort()
+          .reverse(),
+      ].map((n) => path.join(this.backupDirectory!, n));
+    } catch {
+      return [];
+    }
+  }
+  backupCandidate(): { file: string; modifiedAt: number } | undefined {
+    for (const file of this.backupFiles()) {
+      try {
+        this.parse(this.readBytes(file));
+        return { file, modifiedAt: fs.statSync(file).mtimeMs };
+      } catch {
+        /* Try the next local generation. */
+      }
+    }
+  }
+  private tryBackup(value: Settings) {
+    try {
+      this.backup(value);
+      this.health.clear('backup');
+    } catch {
+      this.health.set('backup', 'backup-failed');
+    }
   }
   load() {
     try {
       if (!fs.existsSync(this.file)) {
         if (
           this.backupDirectory &&
-          fs.existsSync(path.join(this.backupDirectory, 'last-good.json'))
+          fs.existsSync(this.backupDirectory) &&
+          fs
+            .readdirSync(this.backupDirectory)
+            .some(
+              (name) =>
+                name === 'last-good.json' || /^(settings-.*\.json|invalid-.*\.txt)$/.test(name),
+            )
         )
           throw Error('設定ファイルがありません。');
-        atomicWrite(this.file, JSON.stringify(this.value, null, 2) + '\n');
+        try {
+          atomicWrite(this.file, JSON.stringify(this.value, null, 2) + '\n', {
+            previous: undefined,
+          });
+        } catch (error) {
+          if (!(error instanceof SettingsConflictError)) throw error;
+        }
       }
       this.value = this.readDisk();
     } catch (error) {
-      if (!this.backupDirectory) throw error;
-      const files = fs.existsSync(this.backupDirectory)
-        ? fs
-            .readdirSync(this.backupDirectory)
-            .filter((n) => /^settings-.*\.json$/.test(n))
-            .sort()
-            .reverse()
-        : [];
-      let restored: Settings | undefined;
-      for (const name of ['last-good.json', ...files]) {
-        try {
-          restored = validate(
-            JSON.parse(fs.readFileSync(path.join(this.backupDirectory, name), 'utf8')),
-          );
-          break;
-        } catch {
-          /* Try another validated generation. */
-        }
-      }
-      if (!restored) throw error;
-      this.value = restored;
-      this.recovered = true;
-      this.syncError =
-        '設定を読み込めないため、このPCの正常なバックアップで動作しています。共有ファイルは変更していません。';
+      this.readFailure(error);
+      const candidate = this.backupCandidate();
+      if (!candidate) throw error;
+      this.value = this.parse(this.readBytes(candidate.file));
     }
-    if (!this.recovered) {
-      try {
-        this.backup(this.value);
-      } catch {
-        this.syncError = '設定は読み込めましたが、このPCへのバックアップを保存できませんでした。';
-      }
-    }
+    if (!this.recovered) this.tryBackup(this.value);
     this.revision++;
     return this.snapshot();
   }
@@ -135,27 +209,35 @@ class SettingsStore extends EventEmitter {
     if (!this.backupDirectory) return;
     const text = JSON.stringify(value, null, 2) + '\n';
     const hash = createHash('sha256').update(text).digest('hex');
-    if (hash === this.lastBackup) return;
+    if (hash === this.lastBackup) {
+      try {
+        if (hashBytes(this.readBytes(path.join(this.backupDirectory, 'last-good.json'))) === hash)
+          return;
+      } catch {
+        /* Retry a missing or unreadable backup. */
+      }
+    }
     this.lastBackupTime = Math.max(Date.now(), this.lastBackupTime + 1);
     atomicWrite(
       path.join(this.backupDirectory, `settings-${this.lastBackupTime}-${randomUUID()}.json`),
       text,
     );
     atomicWrite(path.join(this.backupDirectory, 'last-good.json'), text);
-    this.lastBackup = hash;
     const generations = fs
       .readdirSync(this.backupDirectory)
       .filter((n) => /^settings-.*\.json$/.test(n))
       .sort()
       .reverse();
     for (const old of generations.slice(20)) fs.unlinkSync(path.join(this.backupDirectory, old));
+    this.lastBackup = hash;
   }
   private accept(next: Settings) {
+    this.observer?.resetError();
     const changed = JSON.stringify(next) !== JSON.stringify(this.value);
     const unhealthy = this.syncError || this.recovered;
-    this.backup(next);
-    this.syncError = undefined;
     this.recovered = false;
+    this.health.clear('read');
+    this.tryBackup(next);
     if (changed) {
       this.value = next;
       this.revision++;
@@ -164,37 +246,49 @@ class SettingsStore extends EventEmitter {
   }
   assertRevision(revision: number) {
     // Also detect a manual edit before the file watcher has delivered it.
-    const disk = this.readDisk();
+    let disk: Settings;
+    try {
+      disk = this.readDisk();
+    } catch (error) {
+      this.readFailure(error);
+      throw error;
+    }
     if (JSON.stringify(disk) !== JSON.stringify(this.value)) {
       this.accept(disk);
     }
     if (revision !== this.revision)
-      throw new Error('設定が別の場所で変更されました。再読み込みしてから保存してください。');
+      throw new SettingsConflictError(
+        '設定が別の場所で変更されました。再読み込みしてから保存してください。',
+      );
   }
   save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
+    if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
     this.assertRevision(revision);
     const next = validate(value);
-    this.backup(this.value);
+    this.tryBackup(this.value);
+    const previous = this.readBytes(this.file);
+    if (JSON.stringify(this.parse(previous)) !== JSON.stringify(this.value)) {
+      this.accept(this.parse(previous));
+      throw new SettingsConflictError('設定が別の場所で変更されました。再読み込みしてください。');
+    }
     try {
       asset?.commit();
-      atomicWrite(this.file, JSON.stringify(next, null, 2) + '\n');
+      atomicWrite(this.file, JSON.stringify(next, null, 2) + '\n', { previous });
     } catch (error) {
+      if (!(error instanceof SettingsConflictError)) this.health.set('save', 'save-failed');
       try {
         asset?.rollback();
       } catch (rollbackError) {
-        throw new Error(
-          `${String(error)} / 関連データの復元に失敗しました: ${String(rollbackError)}`,
-        );
+        this.health.set('save', 'save-failed');
+        throw new Error('設定の関連データを復元できませんでした。保存先を確認してください。');
       }
       throw error;
     }
     this.value = next;
-    this.syncError = undefined;
-    try {
-      this.backup(next);
-    } catch {
-      this.syncError = '設定を保存しましたが、このPCへのバックアップを保存できませんでした。';
-    }
+    this.observer?.resetError();
+    this.health.clear('save');
+    this.health.clear('read');
+    this.tryBackup(next);
     this.recovered = false;
     this.revision++;
     this.emit('changed', this.snapshot());
@@ -210,11 +304,9 @@ class SettingsStore extends EventEmitter {
     this.observer?.close();
     this.observer = observeFile(
       this.file,
-      (text) => this.accept(validate(JSON.parse(text.replace(/^\uFEFF/, '')))),
+      (text) => this.accept(this.parse(text)),
       (error) => {
-        this.syncError = '設定ファイルを読み込めません。最後の正常な設定を継続しています。';
-        this.recovered = !!this.backupDirectory;
-        this.emit('statusChanged', this.snapshot());
+        this.readFailure(error, false);
         onError(error);
       },
     );
@@ -222,7 +314,20 @@ class SettingsStore extends EventEmitter {
   restoreBackup(revision: number) {
     if (!this.recovered || revision !== this.revision)
       throw Error('復元する設定を再確認してください。');
-    // A valid incoming sync update always wins over the fallback.
+    return this.restoreRecovery(this.prepareRecovery());
+  }
+  /** Read only: unlike load(), this never creates a missing shared file. */
+  reload() {
+    try {
+      this.accept(this.readDisk());
+      return this.snapshot();
+    } catch (error) {
+      this.readFailure(error);
+      throw error;
+    }
+  }
+  private recoveryTarget() {
+    // A valid incoming sync update always wins over recovery.
     let incoming: Settings | undefined;
     try {
       incoming = this.readDisk();
@@ -231,19 +336,60 @@ class SettingsStore extends EventEmitter {
     }
     if (incoming) {
       this.accept(incoming);
-      throw Error('正常な設定が届いたため、バックアップの復元を中止しました。');
+      throw new SettingsConflictError('正常な設定が届いたため、復元を中止しました。');
     }
-    if (this.backupDirectory && fs.existsSync(this.file)) {
-      if (fs.statSync(this.file).size > 4 * 1024 * 1024)
-        throw Error('破損ファイルが大きすぎます。手動で退避してから復元してください。');
-      atomicWrite(
-        path.join(this.backupDirectory, `invalid-${Date.now()}-${randomUUID()}.txt`),
-        fs.readFileSync(this.file),
-      );
+    try {
+      fs.lstatSync(this.file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw error;
     }
-    atomicWrite(this.file, JSON.stringify(this.value, null, 2) + '\n');
+    return this.readBytes(this.file);
+  }
+  prepareRecovery(file = this.backupCandidate()?.file): SettingsRecoveryPlan {
+    if (!file) throw Error('正常なバックアップがありません。');
+    const bytes = this.readBytes(file);
+    this.parse(bytes);
+    return {
+      candidate: file,
+      candidateHash: hashBytes(bytes),
+      modifiedAt: fs.statSync(file).mtimeMs,
+      previous: this.recoveryTarget(),
+      revision: this.revision,
+    };
+  }
+  restoreRecovery(plan: SettingsRecoveryPlan) {
+    const previous = this.recoveryTarget();
+    if (this.revision !== plan.revision || !sameBytes(previous, plan.previous))
+      throw new SettingsConflictError('復元中に設定が変わりました。もう一度確認してください。');
+    const bytes = this.readBytes(plan.candidate);
+    const next = this.parse(bytes);
+    if (hashBytes(bytes) !== plan.candidateHash)
+      throw new SettingsConflictError('復元元が変わりました。もう一度確認してください。');
+    try {
+      if (previous !== undefined) {
+        if (!this.backupDirectory) throw Error('退避先がありません。');
+        atomicWrite(
+          path.join(this.backupDirectory, `invalid-${Date.now()}-${randomUUID()}.txt`),
+          previous,
+        );
+      }
+    } catch {
+      this.health.set('backup', 'backup-failed');
+      throw Error('破損ファイルを退避できないため復元を中止しました。保存先を確認してください。');
+    }
+    try {
+      atomicWrite(this.file, JSON.stringify(next, null, 2) + '\n', { previous });
+    } catch (error) {
+      if (!(error instanceof SettingsConflictError)) this.health.set('save', 'save-failed');
+      throw error;
+    }
+    this.value = next;
+    this.observer?.resetError();
     this.recovered = false;
-    this.syncError = undefined;
+    this.health.clear('read');
+    this.health.clear('save');
+    this.tryBackup(next);
     this.revision++;
     this.emit('changed', this.snapshot());
     return this.snapshot();
