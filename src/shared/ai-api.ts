@@ -1,3 +1,5 @@
+import { aiOutputTokenLimits, aiTimeoutLimits } from './ai';
+
 const jobSchema = {
   type: 'object',
   properties: { jobId: { type: 'string', minLength: 1, maxLength: 100 } },
@@ -25,8 +27,18 @@ export const aiOperations = {
         model: { type: 'string', minLength: 1, maxLength: 200 },
         additionalPrompt: { type: 'string', maxLength: 2048 },
         input: { type: 'string', maxLength: 8192 },
-        timeoutMs: { type: 'integer', minimum: 1000, maximum: 30000 },
-        maxOutputTokens: { type: 'integer', minimum: 32, maximum: 2048 },
+        timeoutMs: {
+          type: 'integer',
+          minimum: aiTimeoutLimits.minimumSeconds * 1000,
+          maximum: aiTimeoutLimits.maximumSeconds * 1000,
+          description: '省略時は接続に設定した既定の待ち時間を使用します。',
+        },
+        maxOutputTokens: {
+          type: 'integer',
+          minimum: aiOutputTokenLimits.minimum,
+          maximum: aiOutputTokenLimits.maximum,
+          description: '省略時は接続に設定した既定の出力トークン上限を使用します。',
+        },
       },
       required: ['requestId'],
       additionalProperties: false,

@@ -1,6 +1,5 @@
-import { settingsControls } from './api';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useId, useRef, useState } from 'react';
+import { SettingsModal } from './SettingsModal';
 import type { UiCommand } from '../commands';
 export function BindingOrderDialog<R extends { id: string; command: string; enabled: boolean }>({
   bindings,
@@ -28,9 +27,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   onClose(): void;
 }) {
   const [original] = useState(() => structuredClone(bindings));
-  const [returnFocus] = useState(() =>
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
-  );
   const [ordered, setOrdered] = useState(original);
   const groups = groupRows(ordered);
   const [key, setKey] = useState(
@@ -43,7 +39,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   const [notice, setNotice] = useState('');
   const [over, setOver] = useState<string | null>(null);
   const dragged = useRef<string | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
   const selector = useRef<HTMLSelectElement>(null);
   const id = useId();
   const originalGroups = new Map(groupRows(original));
@@ -52,32 +47,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       group.map((row) => row.id).join('\n') !==
       (originalGroups.get(name) ?? []).map((row) => row.id).join('\n'),
   ).length;
-  useLayoutEffect(() => {
-    dialog.current?.showModal();
-    selector.current?.focus({ preventScroll: true });
-  }, []);
-  useEffect(() => {
-    let active = true;
-    const suspend = () => {
-      setReady(false);
-      void settingsControls
-        .setShortcutRecording(true)
-        .then(() => {
-          if (active) setReady(true);
-        })
-        .catch((reason) => {
-          if (active) setError(String(reason));
-        });
-    };
-    suspend();
-    window.addEventListener('focus', suspend);
-    return () => {
-      active = false;
-      window.removeEventListener('focus', suspend);
-      void settingsControls.setShortcutRecording(false).catch(() => {});
-      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
-    };
-  }, []);
+
   const move = (from: string, to: string) => {
     setOrdered((value) => moveRow(value, from, to));
     const source = rows.find((row) => row.id === from);
@@ -86,17 +56,14 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
     );
     setError('');
   };
-  return createPortal(
-    <dialog
-      ref={dialog}
-      className="applet-shortcut-dialog shortcut-order-dialog"
-      aria-labelledby={`${id}-title`}
-      data-shortcut-recorder="true"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => event.stopPropagation()}
+  return (
+    <SettingsModal
+      className="shortcut-order-dialog"
+      labelledBy={`${id}-title`}
+      onClose={onClose}
+      onReady={setReady}
+      onError={setError}
+      initialFocus="select"
     >
       <header>
         <div>
@@ -235,7 +202,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
         </p>
       )}
       <footer>
-        <small>{changed ? `${changed}種類の順序を変更` : '保存は「変更をすべて保存」から'}</small>
+        <small>{changed ? `${changed}種類の順序を変更` : '適用すると設定に反映されます'}</small>
         <div>
           <button onClick={onClose}>キャンセル</button>
           <button
@@ -254,7 +221,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
           </button>
         </div>
       </footer>
-    </dialog>,
-    document.body,
+    </SettingsModal>
   );
 }

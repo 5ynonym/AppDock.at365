@@ -225,6 +225,7 @@ async function close() {
       0,
     );
     await p.getByRole('switch', { name: 'Stopped noticeを通知', exact: true }).waitFor();
+    await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     assert.equal(
       await p.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
@@ -383,6 +384,7 @@ async function close() {
     p = await settingsPage();
     assert.equal(await p.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(), '');
     assert.equal(await p.getByLabel('Node noticeの表示時間', { exact: true }).inputValue(), '60');
+    await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     const historyFile = path.join(profile, 'data/notifications/history.json');
     await until(

@@ -3585,3 +3585,85 @@ summary {
   min-height: 140px;
   outline: none;
 }
+
+/* Common grouped settings dialogs keep actions visible while their content scrolls. */
+.settings-group-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(640px, calc(100vw - 32px));
+  overflow: hidden;
+  padding: 24px;
+}
+.settings-group-dialog > header,
+.settings-group-dialog > footer,
+.settings-group-dialog > .shortcut-dialog-error {
+  flex: none;
+}
+.settings-group-dialog > header {
+  margin-bottom: 18px;
+}
+.settings-group-dialog > header h2 {
+  margin-top: 0;
+}
+.settings-group-dialog > header p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.7;
+}
+.settings-dialog-body {
+  min-width: 0;
+  min-height: 0;
+  padding: 0 6px 2px 0;
+  border: 0;
+  margin: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.settings-group-dialog > footer {
+  margin-top: 18px;
+}
+.settings-dialog-body .settings-field {
+  grid-template-columns: minmax(100px, 0.55fr) minmax(0, 1.45fr);
+  gap: 20px;
+  padding: 14px 0;
+}
+.settings-dialog-body input,
+.settings-dialog-body select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.settings-dialog-body .settings-section {
+  margin-top: 20px;
+}
+.settings-dialog-body .settings-section > summary {
+  padding: 14px 16px;
+}
+.settings-dialog-body .settings-section > summary::after {
+  top: 12px;
+  right: 16px;
+}
+.settings-dialog-body .settings-section h2 {
+  font-size: 13px;
+}
+.settings-dialog-body .settings-section-content {
+  padding: 0 16px 16px;
+}
+.settings-dialog-body .settings-feedback:empty {
+  display: none;
+}
+.settings-dialog-body p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .settings-group-dialog[open] {
+    padding: 18px;
+  }
+  .settings-dialog-body .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}

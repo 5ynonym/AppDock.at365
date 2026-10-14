@@ -22,8 +22,9 @@ import {
   SettingsFeedback,
 } from '../../../src/shared/settings-ui/SettingsSections';
 const targetTitles = { banner: 'バナー', desktop: 'デスクトップ通知', windows: 'Windows通知' };
+const ownerGroup = (type: NotificationTypeEntry) =>
+  type.ownerKind === 'host' ? 'host' : JSON.stringify([type.ownerKind, type.ownerId]);
 const reasonTitles: Record<string, string> = {
-  'type-disabled': 'この種類の通知はオフです。',
   'applet-disabled': 'Applet共通設定で停止中です。',
   'type-definition-changed': '通知種類の仕様が変わりました。設定を確認してください。',
 };
@@ -90,20 +91,26 @@ export function NotificationSettings({
     const key = notificationTypeKey(type),
       current = overrides.find((r) => notificationTypeKey(r) === key);
     const next = overrides.filter((r) => notificationTypeKey(r) !== key);
-    if (patch)
-      next.push({
+    if (patch) {
+      const updated: NotificationPreference = {
         ownerKind: type.ownerKind,
         ownerId: type.ownerId,
         typeId: type.typeId,
         ...current,
         ...patch,
-      });
+      };
+      // Keep edits valid when an older saved preference lacks newly required controls.
+      if (!type.canDisable) updated.enabled = true;
+      if (updated.targets && type.requiredTargets.length)
+        updated.targets = [...new Set([...updated.targets, ...type.requiredTargets])];
+      next.push(updated);
+    }
     editor.edit({
       ...settings,
       notificationPreferences: { ...settings.notificationPreferences, overrides: next },
     });
   };
-  const owners = [...new Set(types.map((t) => JSON.stringify([t.ownerKind, t.ownerId])))];
+  const owners = [...new Set(types.map(ownerGroup))];
   const unknown = overrides.filter(
     (r) => !types.some((t) => notificationTypeKey(t) === notificationTypeKey(r)),
   );
@@ -111,7 +118,7 @@ export function NotificationSettings({
     <div className="settings-sections notification-settings">
       <SettingsSection
         title="通知の受け取り方"
-        description="種類ごとに通知先を組み合わせられます。通知先をすべて外すと、通知センターだけに残ります。"
+        description="種類ごとに通知先を組み合わせられます。必須の通知先がない種類は、通知センターだけに残すこともできます。"
       >
         <SettingsField
           title="Appletからの通知を許可"
@@ -128,7 +135,7 @@ export function NotificationSettings({
         </SettingsField>
       </SettingsSection>
       {owners.map((owner) => {
-        const rows = types.filter((t) => JSON.stringify([t.ownerKind, t.ownerId]) === owner);
+        const rows = types.filter((t) => ownerGroup(t) === owner);
         return (
           <SettingsSection
             key={owner}
@@ -161,7 +168,7 @@ export function NotificationSettings({
                     !['starting', 'running'].includes(type.ownerState) && (
                       <p className="muted">Appletは停止中です。通知設定を編集できます。</p>
                     )}
-                  {policy.reason && (
+                  {policy.reason && policy.reason !== 'type-disabled' && (
                     <p role="status">{reasonTitles[policy.reason] ?? policy.reason}</p>
                   )}
                   <fieldset className="notification-targets">

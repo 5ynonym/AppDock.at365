@@ -182,7 +182,9 @@ class SettingsStore extends EventEmitter {
       try {
         asset?.rollback();
       } catch (rollbackError) {
-        throw new Error(`${String(error)} / 画像の復元に失敗しました: ${String(rollbackError)}`);
+        throw new Error(
+          `${String(error)} / 関連データの復元に失敗しました: ${String(rollbackError)}`,
+        );
       }
       throw error;
     }

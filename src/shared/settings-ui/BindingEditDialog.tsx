@@ -1,6 +1,5 @@
-import { settingsControls } from './api';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useId, useState, type ReactNode } from 'react';
+import { SettingsModal } from './SettingsModal';
 export function BindingEditDialog({
   title,
   adding,
@@ -20,39 +19,7 @@ export function BindingEditDialog({
 }) {
   const [error, setError] = useState('');
   const [recordingReady, setRecordingReady] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [returnFocus] = useState(() =>
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
-  );
   const id = useId();
-  useLayoutEffect(() => {
-    dialog.current?.showModal();
-    dialog.current
-      ?.querySelector<HTMLElement>('[data-initial-focus], .shortcut-capture')
-      ?.focus({ preventScroll: true });
-  }, []);
-  useEffect(() => {
-    let active = true;
-    const suspend = () => {
-      setRecordingReady(false);
-      void settingsControls
-        .setShortcutRecording(true)
-        .then(() => {
-          if (active) setRecordingReady(true);
-        })
-        .catch((reason) => {
-          if (active) setError(String(reason));
-        });
-    };
-    suspend();
-    window.addEventListener('focus', suspend);
-    return () => {
-      active = false;
-      window.removeEventListener('focus', suspend);
-      void settingsControls.setShortcutRecording(false).catch(() => {});
-      if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
-    };
-  }, []);
 
   const apply = () => {
     if (!valid || !recordingReady) return;
@@ -62,27 +29,13 @@ export function BindingEditDialog({
       setError(String(reason));
     }
   };
-  return createPortal(
-    <dialog
-      ref={dialog}
-      className={`applet-shortcut-dialog ${className}`}
-      aria-labelledby={`${id}-title`}
-      data-shortcut-recorder="true"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.nativeEvent.isComposing) {
-          if (event.key === 'Escape') event.preventDefault();
-          return;
-        }
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          onClose();
-        }
-      }}
+  return (
+    <SettingsModal
+      className={className}
+      labelledBy={`${id}-title`}
+      onClose={onClose}
+      onReady={setRecordingReady}
+      onError={setError}
     >
       <header>
         <div>
@@ -100,7 +53,7 @@ export function BindingEditDialog({
         </p>
       )}
       <footer>
-        <small>適用後、画面上部から保存できます。</small>
+        <small>適用すると設定に反映されます。</small>
         <div>
           <button onClick={onClose}>キャンセル</button>
           <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>
@@ -108,7 +61,6 @@ export function BindingEditDialog({
           </button>
         </div>
       </footer>
-    </dialog>,
-    document.body,
+    </SettingsModal>
   );
 }

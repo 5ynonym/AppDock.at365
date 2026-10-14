@@ -1,5 +1,45 @@
 # 検証記録
 
+## 2026-10-14: 必須バナーと独立した通知ON/OFF・AI変更のコミット（0.40.0）
+
+- エラー通知を`requiredTargets:['banner'] / canDisable:true`に変更。有効な間はバナー必須で、センターのみへの変更を拒否する。通知全体のOFFは許可し、OFF中もログを残す。初期配送はバナー＋デスクトップ、10秒、読み上げOFF。表示期限・個別の閉じる操作・キャンセルの非通知は維持した。
+- 共通登録の`requiredTargets`と`canDisable`を独立化。本体のOFF不可定義に必須先を要求していた制約を外し、4組合せを検証。AppletのOFF不可自己宣言は禁止のまま、本体のOFF不可には初期ONと理由を要求する。設定UIで旧値を編集するときに必須先を補完し、既存のセンターのみ設定が読み上げ・時間・ON/OFFの保存を妨げないよう修正。読み込みのみでは書き換えない。不要な「この種類の通知はオフです」の表示を削除し、ほかの停止／定義変更理由は保持した。
+- [共通通知契約](docs/notifications.md#通知種類の制約)、エラー方針、移行設計、Applet API、READMEへ登録方法・制約を反映。既存エラー通知のバナーなし配送を廃止する非互換の挙動変更として0.39.0→0.40.0へ更新した。発行前に制約の独立性、UIと保存API・実効方針、旧設定、通知寿命と秘密値をレビューし、未解決の指摘なし。
+- 型検査・ビルド・関連13ファイルの回帰 **108/108、fail/skip 0** が終了0。[ソースAI/通知GUI](.artifacts/ai-ui-1791989629434/result.json)と[固定EXE AI/通知GUI](.artifacts/ai-ui-1791989822942/result.json)は各**16群**成功。バナーがチェック済み・変更不可、センターのみ不可、独立したOFF/ON、OFF説明の不在、旧設定の修正保存、任意のデスクトップ通知追加／解除を確認した。
+- 同一固定EXEの[一般通知設定GUI](.artifacts/notification-settings-1791989943982/result.json)も**8群**成功。Node/.NET実API、種類別OFFと親許可、期限／manual、保存失敗、権限・所有者、検索・既定復帰・再起動・履歴・両テーマを確認。初回は既存の「現在利用できない種類」が折りたたまれたままの試験手順で失敗し、開いてから検査するようテストのみ修正して再実行した。製品の再修正なし。
+- `publish.bat`終了0。package・単一EXE・Default Shell・feedは**0.40.0**。EXEは**144,185,474 bytes / SHA256 0588cafca8cb5e6ffc79a0fd9505631b5bc8216b512a0d9e9efc6f71072f519c**。main127ファイル・Shell26ファイルを照合し、各GUIコピーのhash一致。固定lockfile・toolchainは不変。実Ollamaは直前の8,192トークン成功の記録を保持し、今回の通知方針変更では再生成していない。実利用先へのdeployやGmail連携は行っていない。
+- コミット対象はmain `61dca84`以降の本チャットのAI接続UI・上限と期限・共通エラー通知・共通設計と今回の調整。先行の標準436件・最終キー修正・関連81件とショートカット／ジェスチャー／URL GUIのログhashと入力差分を照合し、無影響の成功結果を再利用。影響するAI／通知／設定は今回再検証した。別worktreeの設定復旧設計と兄弟Appletは含めない。[証跡](.artifacts/required-notifications-20261014/validation.json)に比較・ログ・環境・レビュー・発行物を、[コミット照合](.artifacts/required-notifications-20261014/commit.json)にstage treeと最終commitを保存する。
+- 現在の固定配布物・成功fixtureと先行のコミット照合資料、初回失敗の調査資料を保持する。試験プロセスの終了を確認し、今回の削除対象なし。通常publishとローカルコミットまでとし、push・Release・実利用先への配置は行わない。
+
+## 2026-10-14: AIの既定上限・待ち時間と共通エラー通知（0.39.0）
+
+- main `61dca84`上のAI設定UIに続けて実装。接続の詳細へ出力トークン上限（初期8,192、32〜131,072）と待ち時間（初期60秒、1〜600秒）を追加し、OKで一括保存。未指定の旧設定は初期値へ補完し、APIの明示値は接続の既定値より優先する。上限なしは設けず、本文4,096コードポイント・応答1MiB等の既存制限は維持。設定追加のため0.38.0→0.39.0へマイナー更新した。
+- `finish_reason:length`を`AI_OUTPUT_LIMIT`に分け、上限または推論設定の調整を案内。受付済みAIジョブの最終失敗を、試験画面・Applet・MCP共通でErrorReporterへ接続した。「通知 → AppDock → エラー通知」は初期ON／デスクトップ10秒／読み上げOFF。通知OFFでもerrorログは残り、同一要求の再送・照会で重複せず、取消は通知しない。秘密値・入力・生成本文・思考を通知やログへ出さない。一般Appletへ任意の本体エラー発行APIを公開したものではなく、TTS等の既存機能一括移行は未実施。
+- [共通のエラー通知とログ](docs/error-reporting.md)と[一覧形式の設定編集UI](docs/settings-list-editing.md)を正本としてAGENTS・DEVELOPMENT・関連設計から参照する。新規／改修機能の最終失敗、画面内入力検証、取消、重複防止、安全な説明、通知障害の再帰防止と現在の接続範囲を文書化した。AI設計の実装状況も更新した。
+- 発行前レビューで設定の範囲・旧値補完・API優先・冪等性・期限・取消・通知設定・ログ・秘密値・文書を照合。期限超過後に応答が先に完了すると取消扱いになる競合を発見し、`AI_TIMEOUT`へ修正して専用回帰を追加した。型検査・ビルド、関連8ファイルの回帰 **81/81、fail/skip 0** が成功。初回のテスト補助関数・画面ラベルの誤りを修正して再実行し、未解決の製品指摘なし。無関係な全標準回帰・Applet固有の回帰は再実行していない。
+- [ソースGUI](.artifacts/ai-ui-1791988617056/result.json)と[固定配布EXE GUI](.artifacts/ai-ui-1791988880674/result.json)は各**15群、終了0**。一つのAppDock通知欄、読み上げ初期OFF、入力中のディスク不変／取消、上下限エラー、OK保存、既定10万トークン送信、上限不足の結果・通知・ログ、MCPの最大値指定と重複防止、実Node/.NET SDK/RPC、所有者・権限取消、既存の登録／削除／並べ替え／競合を確認。明暗・1280/760幅の画像で詳細入力と固定フッターを確認した。配布EXEと隔離コピーのSHA256も試験内で一致。
+- LAN内Ollamaの`gemma4:26b-mxfp8`へ同じテスト入力を、新しいAiServiceの初期値**8,192トークン・60秒、推論省略**で送信して成功。**13,493ms、本文575文字、completion_tokens:1,139、total_tokens:1,169**。共通／追加プロンプトなしの隔離設定で実行し、実利用設定・実メールは変更していない。[実測](.artifacts/ai-limits-20261014/ollama.json)。LM Studio・llama.cpp・クラウドへの実接続、Gmail連携、物理的なWindows通知の閲覧は今回未確認。
+- `publish.bat`終了0。制限環境でのpnpmスタックオーバーフローはログを保持し、同一コマンドを通常Windows環境で再実行して成功。固定依存の検査は維持した。EXE／asar内package／Default Shell／update.jsonは**0.39.0**。EXEは**144,187,832 bytes / SHA256 12e89b2ee949e3187e8c6cb4840172f60eadb4ecd56fcce4a2255d727b3cc36b**。同梱main127ファイル・Shell26ファイルをビルド出力と照合。照合用スクリプトのWindowsパス区切りとEXE版表記を訂正して再確認した。
+- [検証証跡](.artifacts/ai-limits-20261014/validation.json)へ入力hash、実行ログ、レビュー、発行物と環境を保存。後続の製品変更なし。既存の本文中リンク2件は対象不在のままHEADと同一と確認し、新規のリンク切れとは分けて記録する。現在と先行の成功fixture・固定EXE・将来のコミット照合資料・失敗調査資料は保持し、今回の削除対象なし。未変更Appletの発行、全体ZIP、commit、push、Release、実利用先deployは行っていない。
+
+## 2026-10-14: 一覧編集の共通指針と生成失敗の切り分け（調査時点0.38.0）
+
+- [一覧形式の設定編集UI](docs/settings-list-editing.md)を追加し、AGENTS・DEVELOPMENT・設定基盤から参照する。現行のAI接続、SettingsModal／SettingsDialog、入力部品、順序操作、保存Controllerを照合し、登録単位のOK保存、削除確認、並べ替え、フォーカス、競合と共通部品の範囲を文書化した。単純な設定の即時保存とショートカット／ジェスチャーの固有契約を維持する。
+- LAN内Ollama **0.40.3 / gemma4:26b-mxfp8**へ、利用者が提示したテスト文「テスト用の入力です。\nテキストを生成して返答してください。」を送信。共通・追加プロンプトなし、`max_tokens:256`、推論省略で **2302ms / finish_reason:length / completion_tokens:256 / 本文0文字 / reasoning852文字**となり、報告された失敗条件を再現した。推論だけ`none`へ変更すると **891ms / stop / completion_tokens:64 / 本文133文字 / reasoning0文字**で成功。利用者もAppDock画面でnoneに変更して返答が来たことを確認した。[実測とソースhash](.artifacts/ai-reasoning-diagnosis-20261014/result.json)。生の思考本文・実メール・認証情報は記録していない。
+- 調査時点のソースで試験画面が出力上限を省略し、AiServiceが既定256を送信すること、終了理由stop以外や空本文をAiOpenAiChatが拒否することを確認。当時のAPIは32〜2048の指定に対応するが試験画面に指定欄はない。短い回答を明示した別入力では推論省略でも成功しており、すべての入力が失敗するわけではない。実利用設定は利用者が変更し、この切り分けではアプリコード・版・発行物を変更していない。後続の上限・待ち時間とエラー通知の実装は0.39.0の記録を参照。現行仕様は[AI文書](docs/ai.md)に反映する。
+
+## 2026-10-14: AI接続一覧と一括保存ダイアログ（0.38.0）
+
+- main `61dca84`上で実装。AI接続をショートカット／ジェスチャーと同じ表スタイルへ変更し、＋の追加、歯車の編集、確認付き削除、ドラッグ・上下・Alt＋↑↓による並べ替えを実装。追加／編集は同じダイアログとし、詳細設定は折りたたむ。設計と現行仕様を[AI設計](docs/ai-services-design.md)、[共通API](docs/ai.md)、[設定基盤](docs/settings-foundation.md)へ反映した。
+- 共通SettingsModalへ既存の編集／順序ダイアログの表示寿命・フォーカス復帰・入力停止を集約。SettingsDialogで非同期OK・多重受付抑止を提供する。接続の入力とモデル取得は保存せず、OKでSettingsStoreへまとめて反映する。APIキーはPC専用暗号化のまま関連データトランザクションに接続し、書き込み失敗時のrollback、接続／キーの競合、削除時のキー回収、順序変更時の他項目保持を確認した。
+- URL／APIキーのEnterとモデル横の取得ボタンは未保存値を使う。IME変換のEnterを無視し、URLのblurでは補正だけを行う。古い応答の破棄、要求ID別の取消、URL変更時の保存キー不使用、一覧非対応からの再試行を確認。接続ごとの「このPCで使用」とai-access.jsonの読み書きを廃止し、Applet/MCPの独立useAi許可は維持した。設定／保存仕様の削除を含むため0.37.1→0.38.0へマイナー更新。
+- 発行前レビューでは要件、既存ダイアログ、保存境界、秘密値、公開API、寿命、既定接続の扱いを照合。初期GUI試験で見つかったblur時のレイアウト変動によるクリック欠落、同じURLへ正規化した場合の表示を修正した。追加確認では復号できないキーの改訂値を維持して再設定できるように修正し、関連試験を追加して同じ版を再発行した。最終の未解決指摘なし。[レビュー記録](.artifacts/ai-dialog-20261014/review.json)。
+- 型検査・ビルド・整形／差分検査が終了0。標準回帰は **436/436、fail/skip 0**。最終のキー修正後は影響するAI／設定保存回帰を **27/27** で再実行し、型検査も終了0。標準回帰からの差分はai-secrets.tsと追加した試験だけ。無関係な成功試験を再実行せず、入力hashと判断を[証跡](.artifacts/ai-dialog-20261014/validation.json)へ保存した。
+- [ソースAI統合12群](.artifacts/ai-ui-1791985117962/result.json)、[ショートカット](.artifacts/shortcuts-ui-1791985138925/result.json)、[ジェスチャー](.artifacts/gestures-ui-1791985190348/result.json)、[URL入力6群](.artifacts/settings-url-1791985218712/result.json)が成功。AI統合はNode/.NETの実SDK/RPC、MCPの独立許可・所有者・取消・重複を含む。.NET AiProbe fixtureはRelease build警告／エラー0。明暗・1280/760幅の表とダイアログ、詳細展開時のスクロールとOKの表示を画像で確認。実LLM・有料API・実メールはこのUI作業では使用していない。
+- `publish.bat`終了0。本体EXE・asar内package・Default Shell・update.jsonは **0.38.0**、**144,177,567 bytes**、SHA256 **034a4de3168dd6047fdb6beffc6fb7cd5383d25ea7ab7802614ea636337f0ef7**。[配布物照合](.artifacts/ai-dialog-20261014/published.json)で最終AIモジュールの収録hashも一致。[固定EXEの隔離GUI12群](.artifacts/ai-ui-1791985743872/result.json)が終了0、コピーhash一致・試験プロセス終了を確認した。
+- Node24.21.0／pnpm12.10.1／Electron44.6.0／.NET SDK10.0.402、Windows x64。版変更後のoffline installは制限環境の別キャッシュで失敗し、同じ固定lockfile・検査を通常キャッシュで再実行して成功。依存版・lockfile・待機設定は未変更。Gmailは変更せず、commit／push／Release／実利用先deployも未実施。
+- 整理は[記録](.artifacts/ai-dialog-20261014/cleanup.json)の旧成功フォルダー2件のみ。種類・方式別の直近3回と参照資料、今回の失敗調査・固定配布物、状態不明のものを保持した。候補の終了・成功・参照なし・絶対パスと再解析ポイント不在を確認。XX.TEMPの作成なし。
+
 ## 2026-10-14: URL入力の確定タイミング統一（0.37.1）
 
 - 指示に従いmain `dc9ab2e`上で修正。AI/TTSベースURL、WebApplet URL、Web追加許可先、本体/各Applet更新元を共通のURL入力部品へ統一。入力中のコロン・スラッシュ・不完全なURLを保持し、Enterまたはblurで補正・検証・即時保存する。IME変換EnterとEnter後のblurによる二重受付を抑止し、Web初期設定取得もURL確定後へ移した。URLリストはShift+Enterで改行し、追加許可先の厳密なorigin検証は維持。

@@ -101,14 +101,7 @@ export function SettingsForm({
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
   if (category === 'ai')
-    return (
-      <AiSettingsForm
-        editor={editor}
-        auxiliary={aux.ai}
-        invoke={invoke}
-        busy={busy || !!editing.error}
-      />
-    );
+    return <AiSettingsForm editor={editor} auxiliary={aux.ai} invoke={invoke} busy={busy} />;
   if (category === 'notifications')
     return (
       <NotificationSettings

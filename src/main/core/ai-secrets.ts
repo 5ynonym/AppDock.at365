@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { atomicWrite } from './settings';
-import { aiApprovalValue, aiObject, aiId, type AiConnectionSettings } from '../../shared/ai';
+import { aiObject, aiId, type AiConnectionSettings } from '../../shared/ai';
 const hash = (v: string) => createHash('sha256').update(v).digest('hex');
 export class AiSecrets {
   constructor(
     private keysFile: string,
-    private accessFile: string,
     private encryption: { encrypt(value: string): string; decrypt(value: string): string },
   ) {}
   private read(file: string): Record<string, { fingerprint: string; key?: string }> {
@@ -50,47 +49,44 @@ export class AiSecrets {
       throw Error('AIのAPIキーを復号できません。再設定してください。');
     }
   }
-  setKey(c: AiConnectionSettings, value: unknown) {
+  revision(id: string) {
+    return hash(JSON.stringify(this.read(this.keysFile)[id] ?? null));
+  }
+  prepareKey(c: AiConnectionSettings, value: unknown) {
     if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f\x7f]/.test(value))
       throw Error('APIキーは改行を含まない8192文字以下の文字列です。');
     const entries = this.read(this.keysFile);
+    const previous = fs.existsSync(this.keysFile) ? fs.readFileSync(this.keysFile) : undefined;
     if (value) {
       if (!c.baseUrl) throw Error('APIキーの保存前に接続先を設定してください。');
       entries[c.id] = { fingerprint: hash(c.baseUrl), key: this.encryption.encrypt(value) };
     } else delete entries[c.id];
     if (Object.keys(entries).length > 128) throw Error('AIのAPIキー保存件数が上限に達しました。');
-    atomicWrite(this.keysFile, JSON.stringify({ version: 1, entries }) + '\n');
+    return {
+      commit: () => atomicWrite(this.keysFile, JSON.stringify({ version: 1, entries }) + '\n'),
+      rollback: () => {
+        if (previous) atomicWrite(this.keysFile, previous);
+        else fs.rmSync(this.keysFile, { force: true });
+      },
+    };
   }
-  allowed(c: AiConnectionSettings): boolean {
-    try {
-      return this.read(this.accessFile)[c.id]?.fingerprint === hash(aiApprovalValue(c));
-    } catch {
-      return false;
-    }
-  }
-  setAllowed(c: AiConnectionSettings, allowed: unknown) {
-    if (typeof allowed !== 'boolean') throw Error('AIの利用許可はON/OFFで指定してください。');
-    if (allowed && !c.baseUrl) throw Error('利用許可の前に接続先を設定してください。');
-    const entries = this.read(this.accessFile);
-    if (allowed) entries[c.id] = { fingerprint: hash(aiApprovalValue(c)) };
-    else delete entries[c.id];
-    if (Object.keys(entries).length > 128)
-      throw Error('AIの利用許可の保存件数が上限に達しました。');
-    atomicWrite(this.accessFile, JSON.stringify({ version: 1, entries }) + '\n');
+  setKey(c: AiConnectionSettings, value: unknown) {
+    this.prepareKey(c, value).commit();
   }
   status(c: AiConnectionSettings) {
+    let keyRevision = '';
     try {
-      const access = this.read(this.accessFile);
+      keyRevision = this.revision(c.id);
       return {
         id: c.id,
         apiKeyConfigured: !!this.key(c),
-        allowed: access[c.id]?.fingerprint === hash(aiApprovalValue(c)),
+        keyRevision,
       };
     } catch (e) {
       return {
         id: c.id,
         apiKeyConfigured: false,
-        allowed: false,
+        keyRevision,
         error: e instanceof Error ? e.message : 'AIのPC専用設定を確認してください。',
       };
     }

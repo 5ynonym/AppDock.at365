@@ -5,6 +5,8 @@ export interface AiConnectionSettings {
   preset: 'ollama' | 'lm-studio' | 'llama-cpp' | 'openai' | 'custom';
   baseUrl: string;
   defaultModel?: string;
+  defaultMaxOutputTokens: number;
+  defaultTimeoutSeconds: number;
   authentication: 'none' | 'bearer';
   compatibility: {
     tokenLimitField: 'max_tokens' | 'max_completion_tokens';
@@ -43,6 +45,17 @@ export interface AiModel {
   id: string;
   name: string;
 }
+export const aiOutputTokenLimits = { minimum: 32, maximum: 131072, default: 8192 } as const;
+export const aiTimeoutLimits = {
+  minimumSeconds: 1,
+  maximumSeconds: 600,
+  defaultSeconds: 60,
+} as const;
+export const aiTokenLimit = (value: unknown): value is number =>
+  typeof value === 'number' &&
+  Number.isInteger(value) &&
+  value >= aiOutputTokenLimits.minimum &&
+  value <= aiOutputTokenLimits.maximum;
 export const defaultAiSettings = (): AiSettings => ({ commonPrompt: '', connections: [] });
 export const aiObject = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -87,6 +100,8 @@ export function newAiConnection(
     preset,
     baseUrl: preset === 'openai' ? 'https://api.openai.com/v1' : '',
     defaultModel: '',
+    defaultMaxOutputTokens: aiOutputTokenLimits.default,
+    defaultTimeoutSeconds: aiTimeoutLimits.defaultSeconds,
     authentication: preset === 'openai' ? 'bearer' : 'none',
     compatibility: {
       tokenLimitField: preset === 'openai' ? 'max_completion_tokens' : 'max_tokens',
@@ -115,6 +130,8 @@ export function parseAiSettings(value: unknown): AiSettings {
       'preset',
       'baseUrl',
       'defaultModel',
+      'defaultMaxOutputTokens',
+      'defaultTimeoutSeconds',
       'authentication',
       'compatibility',
     ]);
@@ -132,6 +149,23 @@ export function parseAiSettings(value: unknown): AiSettings {
     )
       throw Error('AI接続のID・名前・モデル・認証方式を確認してください。');
     ids.add(item.id);
+    const defaultMaxOutputTokens =
+      item.defaultMaxOutputTokens === undefined
+        ? aiOutputTokenLimits.default
+        : item.defaultMaxOutputTokens;
+    const defaultTimeoutSeconds =
+      item.defaultTimeoutSeconds === undefined
+        ? aiTimeoutLimits.defaultSeconds
+        : item.defaultTimeoutSeconds;
+    if (!aiTokenLimit(defaultMaxOutputTokens))
+      throw Error('既定の出力トークン上限は32〜131,072の整数で指定してください。');
+    if (
+      typeof defaultTimeoutSeconds !== 'number' ||
+      !Number.isInteger(defaultTimeoutSeconds) ||
+      defaultTimeoutSeconds < aiTimeoutLimits.minimumSeconds ||
+      defaultTimeoutSeconds > aiTimeoutLimits.maximumSeconds
+    )
+      throw Error('既定の待ち時間は1〜600秒の整数で指定してください。');
     const c = item.compatibility;
     keys(c, ['tokenLimitField', 'temperature', 'reasoningEffort', 'store']);
     if (
@@ -149,7 +183,13 @@ export function parseAiSettings(value: unknown): AiSettings {
     const baseUrl = aiBaseUrl(item.baseUrl);
     if (item.preset === 'openai' && baseUrl && !baseUrl.startsWith('https://'))
       throw Error('OpenAIの接続にはHTTPSを使用してください。');
-    return { ...item, baseUrl, compatibility: { ...c } } as unknown as AiConnectionSettings;
+    return {
+      ...item,
+      baseUrl,
+      defaultMaxOutputTokens,
+      defaultTimeoutSeconds,
+      compatibility: { ...c },
+    } as unknown as AiConnectionSettings;
   });
   return {
     commonPrompt: (value.commonPrompt ?? '') as string,
@@ -158,19 +198,6 @@ export function parseAiSettings(value: unknown): AiSettings {
       : { defaultConnectionId: value.defaultConnectionId as string }),
     connections,
   };
-}
-/** Only transmission settings invalidate a PC approval; models are selected per request. */
-export function aiApprovalValue(c: AiConnectionSettings): string {
-  return JSON.stringify([
-    c.id,
-    c.baseUrl,
-    c.protocol,
-    c.authentication,
-    c.compatibility.tokenLimitField,
-    c.compatibility.temperature ?? null,
-    c.compatibility.reasoningEffort ?? null,
-    c.compatibility.store,
-  ]);
 }
 export function aiMessages(commonPrompt: string, additionalPrompt: string, input: string) {
   const instruction =

@@ -46,7 +46,7 @@ Applet本文は`src/shared/settings-ui/AppletSettingsForm.tsx`を共通テンプ
 
 `scripts/applet-settings-ui-test.cjs [固定EXE]`は兄弟Appletの宣言と配布物を隔離配置し、停止したまま全項目の描画・保存・検索・両入口の一致・明暗/狭幅を確認する。コマンドの実行中表示は専用Node fixtureを使い、実壁紙やロック・キー送信は実行しない。最低ホスト版と宣言形式は[Applet API](extensions.md#共通の設定ページ)を正本とする。
 
-URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・スラッシュ・不完全なURLを入力欄内に保持する。補正・検証・保存はEnterまたはフォーカスが外れた時だけ行い、Enter後のblurで同じ入力を二重送信しない。IME変換確定のEnterは設定確定として扱わない。AI/TTSのベースURL、WebAppletのURL、本体/各Appletの更新元に同じ動作を適用する。WebAppletの追加許可先は`SettingsUrlTextarea`を使い、Enterで確定、Shift+Enterで改行する。Web側の初期設定取得もURL確定後に行う。モデル一覧・更新等の通信は既存の明示操作を維持する。
+URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・スラッシュ・不完全なURLを入力欄内に保持する。補正・検証・保存はEnterまたはフォーカスが外れた時だけ行い、Enter後のblurで同じ入力を二重送信しない。IME変換確定のEnterは設定確定として扱わない。AI/TTSのベースURL、WebAppletのURL、本体/各Appletの更新元に同じ動作を適用する。WebAppletの追加許可先は`SettingsUrlTextarea`を使い、Enterで確定、Shift+Enterで改行する。Web側の初期設定取得もURL確定後に行う。AI接続ダイアログではURLの確定はローカル入力だけを更新し、Enterでは未保存値でモデル一覧を取得する。blurでは通信・保存をしない。その他のモデル一覧・更新等の通信は既存の明示操作を維持する。
 
 `scripts/settings-url-ui-test.cjs [固定EXE]`はURLの連続入力、確定前の保存/通信抑止、Enter/blurの補正と即時保存、IME、不正URLの保持/修正、各URL欄の共通動作を隔離fixtureで確認する。
 
@@ -55,3 +55,13 @@ URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・ス�
 tests/settings-editing.test.cjs・settings-page.test.cjsは即時保存、失敗/競合、再送、範囲を確認する。scripts/settings-shell-ui-test.cjs [固定EXE]は連続入力/IME、画像、不正入力、保存失敗fixture、外部競合、公開範囲、追加/旧Shell/故障復旧と再起動を確認する。settings-search/navigation/shortcuts/gestures/ribbon/tray/notification-settings/syncと実Windows起動タスクの関連回帰はVERIFICATIONを参照する。
 
 settings-notice-ui-test.cjsと発行元は廃止した。汎用notification-banner-ui-test.cjsは通知基盤の回帰として維持する。通知基盤の段階1〜5と即時保存移行は今回で完了。新通知種類、履歴の機能拡張、一般の複数Window/MCP通知発行は別途の依頼範囲とする。
+
+## 関連する設定をまとめて確定するダイアログ
+
+新しい一覧編集は[一覧形式の設定編集UI](settings-list-editing.md)を共通指針とする。AI接続を基準に、適用する場面、操作配置、追加／編集、削除確認、並べ替えと確認項目をまとめている。
+
+AI接続のように複数の項目が密接に関係する設定は、画面内のダイアログに一時入力を持たせ、OKで一つの操作として保存する。これは全体のdirty・保存／破棄を復活させるものではない。共通プロンプト等の通常項目は即時保存を維持する。キャンセル・Escape・画面破棄で入力を破棄し、保存失敗では入力と安全なエラーをそのダイアログに保持する。
+
+共有部品SettingsModalは、設定ページ内のnative dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面のショートカット入力停止／復帰を担う。SettingsDialogはその上で非同期OK・二重実行防止・保存中の閉鎖抑止を提供する。ショートカットとジェスチャーの編集／順序ダイアログもSettingsModalを使う。これは既存設定Surface内のモーダルであり、別WebContentsを横断するShell OverlayHostとは用途を分ける。本体はSettingsPageの操作契約で検証と保存を所有し、Shellは一時入力と描画を所有する。
+
+AIのモデル取得は設定ページ専用の操作として未保存の接続・一時キーを受け付ける。Applet/MCPの生成APIへURLやキーの上書きを公開しない。保存は元の接続・キー改訂を確認して最新の他項目へ合成し、SettingsStoreのrevisionと原子的書き込み、関連データのcommit/rollbackを使う。並べ替えは元ID列を検査し、保存後の順序だけを置換する。

@@ -90,6 +90,11 @@ export class AiOpenAiChat {
     if (!aiObject(v) || !Array.isArray(v.choices) || !aiObject(v.choices[0]))
       return aiFail('AI_INVALID_RESPONSE', '生成結果が不正です。');
     const choice = v.choices[0];
+    if (choice.finish_reason === 'length')
+      return aiFail(
+        'AI_OUTPUT_LIMIT',
+        '出力トークンの上限に達したため、文章を最後まで生成できませんでした。トークン上限を増やすか、推論の強さを調整してください。',
+      );
     if (
       choice.finish_reason !== 'stop' ||
       !aiObject(choice.message) ||

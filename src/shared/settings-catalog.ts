@@ -54,10 +54,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
     [
       'connections',
       'AI接続設定',
-      'Ollama LM Studio llama.cpp OpenAI サーバー URL モデル 認証 互換性',
+      'Ollama LM Studio llama.cpp OpenAI サーバー URL モデル 認証 APIキー 互換性 トークン 上限 待ち時間 タイムアウト',
     ],
-    ['apiKey', 'AIのAPIキー', 'このPCだけに暗号化保存'],
-    ['access', 'このPCで使用', 'Applet MCPからの送信先を確認して許可'],
     ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
   ],
   appearance: [

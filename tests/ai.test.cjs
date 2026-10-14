@@ -44,14 +44,12 @@ function setup(t, extra = {}) {
       },
     ],
   };
-  let allowed = true,
-    approved = true;
+  let allowed = true;
   const calls = [];
   const s = new AiService({
     settings: () => config,
     key: () => undefined,
     canUse: () => allowed,
-    approved: () => approved,
     fetcher: async (url, init) => {
       calls.push({ url, init });
       return response();
@@ -75,10 +73,6 @@ function setup(t, extra = {}) {
       allowed = false;
       s.reconcile();
     },
-    unapprove: () => {
-      approved = false;
-      s.reconcile();
-    },
     settings: () => config,
   };
 }
@@ -89,6 +83,18 @@ test('AI settings accept old files and validate URL, keys, ids and compatibility
   delete settings.ai;
   assert.deepEqual(parseSettings(settings).ai, parseAiSettings());
   const c = { ...newAiConnection('local'), baseUrl: 'http://server:11434/proxy/v1/' };
+  const legacy = { ...c };
+  delete legacy.defaultMaxOutputTokens;
+  delete legacy.defaultTimeoutSeconds;
+  const normalized = parseAiSettings({ connections: [legacy] }).connections[0];
+  assert.equal(normalized.defaultMaxOutputTokens, 8192);
+  assert.equal(normalized.defaultTimeoutSeconds, 60);
+  assert.equal(
+    parseAiSettings({
+      connections: [{ ...c, defaultMaxOutputTokens: 131072, defaultTimeoutSeconds: 600 }],
+    }).connections[0].defaultMaxOutputTokens,
+    131072,
+  );
   assert.equal(
     parseAiSettings({ connections: [c] }).connections[0].baseUrl,
     'http://server:11434/proxy/v1',
@@ -101,6 +107,12 @@ test('AI settings accept old files and validate URL, keys, ids and compatibility
     { baseUrl: 'http://host/v1/chat/completions' },
     { apiKey: 'secret' },
     { id: '__proto__' },
+    ...[0, 31, 131073, 8192.5, null, '8192', Infinity].map((defaultMaxOutputTokens) => ({
+      defaultMaxOutputTokens,
+    })),
+    ...[0, 601, 1.5, null, '60', Infinity].map((defaultTimeoutSeconds) => ({
+      defaultTimeoutSeconds,
+    })),
     { compatibility: { ...c.compatibility, temperature: NaN } },
     { compatibility: { ...c.compatibility, reasoningEffort: 'x\n' } },
   ])
@@ -124,7 +136,7 @@ test('model overrides and prompt composition preserve shared values and isolate 
   await until(() => f.s.get('owner', a.jobId).state === 'completed');
   const body = JSON.parse(f.calls[0].init.body);
   assert.equal(body.model, 'override');
-  assert.equal(body.max_tokens, 256);
+  assert.equal(body.max_tokens, 8192);
   assert.equal(body.messages[1].content, '分離対象の架空データ');
   assert(!body.messages[0].content.includes('分離対象の架空データ'));
   assert(
@@ -184,7 +196,7 @@ test('empty input, explicit token dialect and authentication are supported witho
   const a = f.s.generate('owner', { requestId: 'a', additionalPrompt: '文章を作る' });
   await until(() => f.s.get('owner', a.jobId).state === 'completed');
   const body = JSON.parse(f.calls[0].init.body);
-  assert.equal(body.max_completion_tokens, 256);
+  assert.equal(body.max_completion_tokens, 8192);
   assert.equal(body.max_tokens, undefined);
   assert.equal(body.store, false);
   assert.equal(body.temperature, undefined);
@@ -206,6 +218,11 @@ test('invalid arguments, missing authorization and bearer keys fail before sendi
     { model: 'm\n' },
     { timeoutMs: 1 },
     { maxOutputTokens: 31 },
+    { maxOutputTokens: 131073 },
+    { maxOutputTokens: 32.5 },
+    { maxOutputTokens: null },
+    { timeoutMs: 600001 },
+    { timeoutMs: null },
     { input: 'x'.repeat(8193) },
     { additionalPrompt: 'x'.repeat(2049) },
     { apiKey: 'secret' },
@@ -218,17 +235,114 @@ test('invalid arguments, missing authorization and bearer keys fail before sendi
     () => f.s.generate('owner', request('a')),
     (e) => e.code === 'AI_AUTH_FAILED',
   );
-  f.unapprove();
-  assert.throws(
-    () => f.s.generate('owner', request('a')),
-    (e) => e.code === 'AI_CONNECTION_NOT_ALLOWED',
-  );
   f.deny();
   assert.throws(
     () => f.s.generate('owner', request('a')),
     (e) => e.code === 'API_DISABLED',
   );
 });
+test('connection output defaults, explicit overrides and retry identities remain independent', async (t) => {
+  const f = setup(t);
+  f.connection({ defaultMaxOutputTokens: 100000 });
+  const original = f.s.generate('owner', request('default'));
+  await until(() => f.s.get('owner', original.jobId).state === 'completed');
+  assert.equal(JSON.parse(f.calls.at(-1).init.body).max_tokens, 100000);
+  f.connection({ defaultMaxOutputTokens: 32 });
+  assert.equal(f.s.generate('owner', request('default')).jobId, original.jobId);
+  assert.equal(f.calls.length, 1);
+  for (const limit of [32, 131072]) {
+    const job = f.s.generate('owner', request('explicit-' + limit, { maxOutputTokens: limit }));
+    await until(() => f.s.get('owner', job.jobId).state === 'completed');
+    assert.equal(JSON.parse(f.calls.at(-1).init.body).max_tokens, limit);
+  }
+  assert.equal(f.settings().connections[0].defaultMaxOutputTokens, 32);
+  assert.throws(
+    () => f.s.generate('owner', request('default', { maxOutputTokens: 100000 })),
+    (e) => e.code === 'AI_REQUEST_CONFLICT',
+  );
+});
+
+test('connection deadlines include queue time and API deadlines override them', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 100000 });
+  const failures = [];
+  const f = setup(t, {
+    fetcher: async (_url, init) =>
+      new Promise((_resolve, reject) =>
+        init.signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }),
+      ),
+    failed: (_owner, id, error) => failures.push({ id, ...error }),
+  });
+  f.connection({ defaultTimeoutSeconds: 2 });
+  const first = f.s.generate('owner', request('default'));
+  await Promise.resolve();
+  t.mock.timers.tick(1999);
+  assert.equal(f.s.get('owner', first.jobId).state, 'running');
+  t.mock.timers.tick(1);
+  assert.equal(f.s.get('owner', first.jobId).error.code, 'AI_TIMEOUT');
+  assert.equal(failures.length, 1);
+  const queued = f.s.generate('owner', request('override', { timeoutMs: 1000 }));
+  t.mock.timers.tick(999);
+  assert.equal(f.s.get('owner', queued.jobId).state, 'queued');
+  t.mock.timers.tick(1);
+  assert.equal(f.s.get('owner', queued.jobId).error.code, 'AI_TIMEOUT');
+  assert.equal(failures.length, 2);
+  const long = f.s.generate('owner', request('long', { timeoutMs: 600000 }));
+  t.mock.timers.tick(599999);
+  assert.notEqual(f.s.get('owner', long.jobId).state, 'failed');
+  f.s.cancel('owner', long.jobId);
+  assert.equal(failures.length, 2);
+});
+
+test('a response arriving after its deadline is a timeout even before the timer callback', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const failures = [];
+  const f = setup(t, {
+    fetcher: async () => {
+      t.mock.timers.tick(2001);
+      return response();
+    },
+    failed: (_owner, _id, error) => failures.push(error.code),
+  });
+  f.connection({ defaultTimeoutSeconds: 2 });
+  const job = f.s.generate('owner', request('deadline'));
+  await until(() => f.s.get('owner', job.jobId).state === 'failed');
+  assert.equal(f.s.get('owner', job.jobId).error.code, 'AI_TIMEOUT');
+  assert.deepEqual(failures, ['AI_TIMEOUT']);
+});
+
+test('token exhaustion reports one safe failure for host and API jobs without partial text', async (t) => {
+  const failures = [];
+  const f = setup(t, {
+    fetcher: async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              finish_reason: 'length',
+              message: { content: 'partial-secret', reasoning: 'private-reasoning' },
+            },
+          ],
+        }),
+        { headers: { 'Content-Type': 'application/json' } },
+      ),
+    failed: (owner, id, error) => {
+      failures.push({ owner, id, ...error });
+      throw Error('reporter unavailable');
+    },
+  });
+  for (const owner of ['host', 'applet:fixture:run', 'mcp:run']) {
+    const job = f.s.generate(owner, request(owner));
+    await until(() => f.s.get(owner, job.jobId).state === 'failed');
+    assert.equal(f.s.get(owner, job.jobId).error.code, 'AI_OUTPUT_LIMIT');
+    assert.match(f.s.get(owner, job.jobId).error.message, /出力トークンの上限/);
+    assert.equal(f.s.get(owner, job.jobId).text, undefined);
+    assert.equal(f.s.generate(owner, request(owner)).jobId, job.jobId);
+  }
+  assert.equal(failures.length, 3);
+  assert(!JSON.stringify(failures).includes('secret'));
+  assert(!JSON.stringify(failures).includes('private-reasoning'));
+});
+
 test('queues serialize each connection, bound owners and allow two different connections', async (t) => {
   const runs = [],
     releases = [];
@@ -299,7 +413,7 @@ test('canceled transport retains its connection slot until it settles', async (t
   releases.shift()();
   await until(() => f.s.get('owner', b.jobId).state === 'completed');
 });
-test('prompt/key/approval changes cancel work and revoke result access without new generation', async (t) => {
+test('prompt/key/permission changes cancel work and revoke result access without new generation', async (t) => {
   const f = setup(t);
   const a = f.s.generate('owner', request('a'));
   await until(() => f.s.get('owner', a.jobId).state === 'completed');
@@ -355,7 +469,7 @@ test('result expiry is timer-driven, and connection revocation releases complete
   assert.equal(f.s.get('owner', a.jobId).resultExpired, true);
   const b = f.s.generate('owner', request('b'));
   await until(() => f.s.get('owner', b.jobId).state === 'completed');
-  f.unapprove();
+  f.set({ connections: [] });
   assert.equal(f.s.get('owner', b.jobId).text, undefined);
   assert.equal(f.s.get('owner', b.jobId).resultExpired, true);
 });
@@ -447,26 +561,21 @@ test('models coalesce by owner, reject unsupported lists and cancel on settings 
     (e) => e.code === 'AI_MODELS_UNSUPPORTED',
   );
 });
-test('keys are endpoint-bound encrypted and approval survives model selection but not URL changes', () => {
+test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   const dir = temp(),
-    store = new AiSecrets(path.join(dir, 'keys.json'), path.join(dir, 'access.json'), {
+    store = new AiSecrets(path.join(dir, 'keys.json'), {
       encrypt: (v) => Buffer.from(v).toString('base64'),
       decrypt: (v) => Buffer.from(v, 'base64').toString(),
     });
   const c = { ...newAiConnection('local'), baseUrl: 'http://server/v1' };
   store.setKey(c, 'fake-secret');
-  store.setAllowed(c, true);
   assert.equal(store.key(c), 'fake-secret');
   assert(!fs.readFileSync(path.join(dir, 'keys.json'), 'utf8').includes('fake-secret'));
-  assert(store.allowed({ ...c, defaultModel: 'different', name: 'renamed' }));
   assert.equal(store.key({ ...c, baseUrl: 'http://other/v1' }), undefined);
-  assert(!store.allowed({ ...c, baseUrl: 'http://other/v1' }));
-  assert(!store.allowed({ ...c, compatibility: { ...c.compatibility, temperature: 1 } }));
   assert.throws(() => store.setKey(c, 'secret\nheader'));
   store.setKey(c, '');
   assert.equal(store.key(c), undefined);
-  fs.writeFileSync(path.join(dir, 'access.json'), '{broken');
-  assert(!store.allowed(c));
+  fs.writeFileSync(path.join(dir, 'keys.json'), '{broken');
   assert(store.status(c).error);
 });
 test('Applet AI defaults OFF and existing grants do not gain AI permission', () => {
@@ -515,6 +624,15 @@ test('shared dispatcher enforces independent Applet/MCP grants and the same AI s
   mcp = true;
   await api.call('ai.text.generate', request('a'));
   assert.deepEqual(calls, ['applet', undefined]);
+  await api.call(
+    'ai.text.generate',
+    request('large', { maxOutputTokens: 131072, timeoutMs: 600000 }),
+  );
+  for (const patch of [{ maxOutputTokens: 131073 }, { timeoutMs: 600001 }])
+    assert.throws(
+      () => api.call('ai.text.generate', request('invalid-limit', patch)),
+      (e) => e.code === 'INVALID_ARGUMENT',
+    );
   assert.throws(
     () => api.call('ai.text.generate', { ...request('a'), apiKey: 'secret' }),
     (e) => e.code === 'INVALID_ARGUMENT',

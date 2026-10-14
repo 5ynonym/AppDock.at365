@@ -20,7 +20,9 @@
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・共通UIテンプレート | [設定基盤とDefault Shell](docs/settings-foundation.md)、[ページ・カード・項目行の共通部品](docs/settings-foundation.md#共通の画面構成) |
+| 一覧形式の設定編集 | [AI接続を基準とする一覧・追加／編集・削除・並べ替え](docs/settings-list-editing.md) |
 | 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[通知種類設定と段階的な拡張の設計](docs/notification-foundation.md) |
+| 共通のエラー報告 | [エラー通知とログの方針・共通入口・接続範囲](docs/error-reporting.md) |
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |
 

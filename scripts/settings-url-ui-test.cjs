@@ -154,41 +154,22 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       );
     }
     await select('AI');
-    await confirmed('AIのAPIのURL', (s) => s.ai.connections[0].baseUrl, {
-      raw: base + '/v1///',
-      saved: base + '/v1',
-    });
+    await page.getByRole('button', { name: '新しい接続の設定', exact: true }).click();
     const ai = page.getByLabel('AIのAPIのURL', { exact: true });
-    await ai.fill('http://');
-    assert.equal((await snapshot()).settings.value.ai.connections[0].baseUrl, base + '/v1');
+    await ai.fill(base + '/v1///');
+    assert.equal(await ai.inputValue(), base + '/v1///');
+    const aiRevision = (await snapshot()).settings.revision;
     await ai.press('Enter');
-    await settleSettings(page);
-    assert.equal(await ai.inputValue(), 'http://');
-    assert.equal((await snapshot()).settings.value.ai.connections[0].baseUrl, base + '/v1');
-    await ai.fill(base + '/v1/');
-    await ai.blur();
-    await settleSettings(page);
+    await until(() => ai.inputValue().then((v) => v === base + '/v1'), 'AI normalized');
+    assert.equal((await snapshot()).settings.revision, aiRevision);
+    await page
+      .getByRole('dialog')
+      .getByText(/1件のモデルを取得しました/)
+      .waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push(
-      'AI keeps colon/slash/incomplete input; Enter normalizes, invalid confirmed URL remains editable, blur repairs it',
+      'AI dialog URL confirms locally, fetches models on Enter, and cancels without saving',
     );
-    await ai.focus();
-    await ai.dispatchEvent('compositionstart');
-    await ai.fill(base + '/v1/');
-    await ai.dispatchEvent('keydown', {
-      key: 'Enter',
-      code: 'Enter',
-      isComposing: true,
-      keyCode: 229,
-    });
-    await pause(100);
-    assert.equal(await ai.inputValue(), base + '/v1/');
-    await ai.dispatchEvent('compositionend', { data: '/' });
-    await pause(100);
-    assert.equal(await ai.inputValue(), base + '/v1/');
-    await ai.press('Enter');
-    await settleSettings(page);
-    await until(() => ai.inputValue().then((v) => v === base + '/v1'), 'IME then confirmed');
-    checks.push('IME conversion Enter does not confirm URL; subsequent Enter does');
     await select('読み上げ');
     await confirmed(
       'APIのURL',

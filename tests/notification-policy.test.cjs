@@ -197,6 +197,73 @@ test('mandatory condition is enforced for UI saves and externally received overr
   assert.deepEqual(resolved.lifetime, { type: 'condition' });
   assert.equal(resolved.dismissible, false);
 });
+test('required banner and disabling are independent registration policies', () => {
+  for (const canDisable of [true, false]) {
+    for (const requiredTargets of [[], ['banner']]) {
+      const [declared] = p.parseNotificationTypes(
+        [
+          definition({
+            canDisable,
+            requiredTargets,
+            disabledControlReason: 'Required notification',
+          }),
+        ],
+        true,
+      );
+      const type = {
+        ...declared,
+        ownerKind: 'host',
+        ownerId: 'fixture',
+        ownerTitle: 'Host',
+        ownerState: 'running',
+      };
+      const settings = createDefaultSettings();
+      settings.notificationPreferences = {
+        overrides: [
+          {
+            ownerKind: 'host',
+            ownerId: 'fixture',
+            typeId: declared.typeId,
+            enabled: false,
+            targets: [],
+          },
+        ],
+      };
+      const policy = p.resolveNotificationPolicy(type, settings);
+      assert.equal(policy.enabled, !canDisable);
+      assert.deepEqual(policy.selectedTargets, requiredTargets);
+    }
+  }
+  assert.equal(p.parseNotificationTypes([definition({ requiredTargets: ['banner'] })]).length, 1);
+});
+
+test('error banner is required even for older center-only preferences; explicit removal is rejected', () => {
+  const type = p.notificationCatalog([]).find((t) => t.ownerId === 'errors');
+  const original = createDefaultSettings();
+  for (const targets of [[], ['desktop'], ['windows']]) {
+    const next = structuredClone(original);
+    next.notificationPreferences = {
+      overrides: [{ ownerKind: 'host', ownerId: 'errors', typeId: type.typeId, targets }],
+    };
+    assert.throws(() => p.validateNotificationPreferenceChanges(next, original, [type]));
+    assert(p.resolveNotificationPolicy(type, next).targets.includes('banner'));
+  }
+  const disabled = structuredClone(original);
+  disabled.notificationPreferences = {
+    overrides: [
+      {
+        ownerKind: 'host',
+        ownerId: 'errors',
+        typeId: type.typeId,
+        enabled: false,
+        targets: ['banner'],
+      },
+    ],
+  };
+  assert.doesNotThrow(() => p.validateNotificationPreferenceChanges(disabled, original, [type]));
+  assert.equal(p.resolveNotificationPolicy(type, disabled).enabled, false);
+});
+
 test('all declared targets are available without silently adding a banner', () => {
   const settings = createDefaultSettings(),
     type = { ...definition(), ...owner, ownerTitle: 'Fixture', ownerState: 'running' };

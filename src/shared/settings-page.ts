@@ -42,7 +42,7 @@ export interface SettingsPageModel {
 }
 export interface SettingsPageAuxiliary {
   ai?: {
-    connections: { id: string; apiKeyConfigured: boolean; allowed: boolean; error?: string }[];
+    connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];
     jobs: import('./ai').AiJob[];
   };
   tts?: { apiKeyConfigured: boolean; error?: string; jobs: import('./tts').TtsJob[] };

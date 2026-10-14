@@ -150,11 +150,7 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       !['persistent', 'session', 'none'].includes(v.history) ||
       (v.defaultDurationSeconds !== undefined &&
         (v.lifetimePolicy !== 'userDuration' || !duration(v.defaultDurationSeconds))) ||
-      (!v.canDisable &&
-        (!host ||
-          !v.defaultEnabled ||
-          !v.requiredTargets.length ||
-          !v.disabledControlReason.trim()))
+      (!v.canDisable && (!host || !v.defaultEnabled || !v.disabledControlReason.trim()))
     )
       throw Error('通知種類の定義が不正です。');
     return structuredClone(v) as NotificationTypeDefinition;
@@ -218,6 +214,27 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
 }
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
   return [
+    {
+      ownerKind: 'host',
+      ownerTitle: 'AppDock',
+      ownerState: 'running',
+      ownerId: 'errors',
+      typeId: 'operation-failed',
+      title: 'エラー通知',
+      description:
+        '共通のエラー報告へ接続した処理の失敗を通知します。有効な間はバナーが必須です。現在はAI文章生成に対応し、通知をオフにしてもログは残ります。',
+      levels: ['error'],
+      defaultLevel: 'error',
+      defaultEnabled: true,
+      canDisable: true,
+      disabledControlReason: '',
+      allowedTargets: ['banner', 'desktop', 'windows'],
+      defaultTargets: ['banner', 'desktop'],
+      requiredTargets: ['banner'],
+      lifetimePolicy: 'userDuration',
+      defaultDurationSeconds: 10,
+      history: 'persistent',
+    },
     {
       ownerKind: 'host',
       ownerTitle: 'AppDock',

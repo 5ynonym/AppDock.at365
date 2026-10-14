@@ -4,6 +4,8 @@ import {
   aiString,
   aiMessages,
   parseAiSettings,
+  aiTokenLimit,
+  aiTimeoutLimits,
   type AiConnectionSettings,
   type AiSettings,
   type AiJob,
@@ -58,10 +60,10 @@ export class AiService {
     private options: {
       settings(): AiSettings;
       key(c: AiConnectionSettings): string | undefined;
-      approved(c: AiConnectionSettings): boolean;
       canUse(owner: string, kind: Kind): boolean;
       changed?(): void;
       audit?(owner: string, id: string, state: string, code?: string): void;
+      failed?(owner: string, id: string, error: { code: string; message: string }): void;
       fetcher?: typeof fetch;
       limits?: Partial<typeof aiLimits>;
     },
@@ -82,8 +84,6 @@ export class AiService {
       aiFail('INVALID_ARGUMENT', '接続IDを確認してください。');
     const c = settings.connections.find((c) => c.id === selected);
     if (!c || !c.baseUrl) return aiFail('AI_NOT_CONFIGURED', 'AIの接続先を設定してください。');
-    if (!this.options.approved(c))
-      aiFail('AI_CONNECTION_NOT_ALLOWED', 'このPCでの接続先の利用を許可してください。');
     let key: string | undefined;
     try {
       key = c.authentication === 'bearer' ? this.options.key(c) : undefined;
@@ -144,12 +144,9 @@ export class AiService {
       !aiString(value.input ?? '', 8192) ||
       (value.timeoutMs !== undefined &&
         (!Number.isInteger(value.timeoutMs) ||
-          Number(value.timeoutMs) < 1000 ||
-          Number(value.timeoutMs) > 30000)) ||
-      (value.maxOutputTokens !== undefined &&
-        (!Number.isInteger(value.maxOutputTokens) ||
-          Number(value.maxOutputTokens) < 32 ||
-          Number(value.maxOutputTokens) > 2048))
+          Number(value.timeoutMs) < aiTimeoutLimits.minimumSeconds * 1000 ||
+          Number(value.timeoutMs) > aiTimeoutLimits.maximumSeconds * 1000)) ||
+      (value.maxOutputTokens !== undefined && !aiTokenLimit(value.maxOutputTokens))
     )
       return aiFail(
         'INVALID_ARGUMENT',
@@ -168,8 +165,8 @@ export class AiService {
           input.model ?? null,
           input.additionalPrompt,
           input.input,
-          input.timeoutMs ?? 10000,
-          input.maxOutputTokens ?? 256,
+          input.timeoutMs ?? null,
+          input.maxOutputTokens ?? null,
         ]),
       )
       .digest('hex');
@@ -201,7 +198,7 @@ export class AiService {
       model,
       messages: aiMessages(settings.commonPrompt, input.additionalPrompt, input.input),
       stream: false,
-      [c.compatibility.tokenLimitField]: input.maxOutputTokens ?? 256,
+      [c.compatibility.tokenLimitField]: input.maxOutputTokens ?? c.defaultMaxOutputTokens,
       ...(c.compatibility.temperature === undefined
         ? {}
         : { temperature: c.compatibility.temperature }),
@@ -233,7 +230,7 @@ export class AiService {
       body,
       key,
       abort: new AbortController(),
-      deadline: now + (input.timeoutMs ?? 10000),
+      deadline: now + (input.timeoutMs ?? c.defaultTimeoutSeconds * 1000),
       configSignature: JSON.stringify([settings.commonPrompt, c]),
       view: {
         jobId: randomUUID(),
@@ -245,7 +242,14 @@ export class AiService {
       },
     };
     j.timer = setTimeout(() => {
-      this.finish(j, 'failed', new AiError('AI_TIMEOUT', 'AIの待ち時間を超えました。'));
+      this.finish(
+        j,
+        'failed',
+        new AiError(
+          'AI_TIMEOUT',
+          'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
+        ),
+      );
       j.abort.abort();
     }, j.deadline - now);
     this.records.set(j.view.jobId, j);
@@ -285,6 +289,13 @@ export class AiService {
     j.c = undefined;
     this.queue = this.queue.filter((v) => v !== j);
     this.options.audit?.(j.owner, j.view.jobId, state, error?.code);
+    if (state === 'failed' && j.view.error) {
+      try {
+        this.options.failed?.(j.owner, j.view.jobId, { ...j.view.error });
+      } catch {
+        // Reporting failures must not alter the terminal job or strand its queue.
+      }
+    }
     if (j.view.text !== undefined)
       j.resultTimer = setTimeout(() => {
         delete j.view.text;
@@ -300,8 +311,7 @@ export class AiService {
     queueMicrotask(() => this.pump());
   }
   private valid(j: Record) {
-    if (!j.c || !this.options.canUse(j.owner, 'generate') || !this.options.approved(j.c))
-      return false;
+    if (!j.c || !this.options.canUse(j.owner, 'generate')) return false;
     const current = this.options.settings();
     const c = current.connections.find((v) => v.id === j.c!.id);
     return !!c && JSON.stringify([current.commonPrompt, c]) === j.configSignature;
@@ -320,7 +330,14 @@ export class AiService {
         continue;
       }
       if (Date.now() >= j.deadline) {
-        this.finish(j, 'failed', new AiError('AI_TIMEOUT', 'AIの待ち時間を超えました。'));
+        this.finish(
+          j,
+          'failed',
+          new AiError(
+            'AI_TIMEOUT',
+            'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
+          ),
+        );
         continue;
       }
       this.active.add(j);
@@ -335,8 +352,19 @@ export class AiService {
         .generate(c, key, body, j.abort.signal)
         .then((result) => {
           if (j.ended !== undefined) return;
-          if (!this.valid(j) || Date.now() >= j.deadline) {
+          if (!this.valid(j)) {
             this.finish(j, 'canceled');
+            return;
+          }
+          if (Date.now() >= j.deadline) {
+            this.finish(
+              j,
+              'failed',
+              new AiError(
+                'AI_TIMEOUT',
+                'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
+              ),
+            );
             return;
           }
           Object.assign(j.view, result);
@@ -374,7 +402,6 @@ export class AiService {
         this.authorize(owner, 'models');
         if (
           abort.signal.aborted ||
-          !this.options.approved(c) ||
           JSON.stringify(this.options.settings().connections.find((v) => v.id === c.id)) !==
             JSON.stringify(c)
         )
@@ -402,11 +429,7 @@ export class AiService {
         j.abort.abort();
       }
       const currentConnection = current.connections.find((c) => c.id === j.connectionId);
-      if (
-        !this.options.canUse(j.owner, 'generate') ||
-        !currentConnection ||
-        !this.options.approved(currentConnection)
-      ) {
+      if (!this.options.canUse(j.owner, 'generate') || !currentConnection) {
         delete j.view.text;
         delete j.view.usage;
         if (j.view.state === 'completed') j.view.resultExpired = true;
@@ -417,8 +440,7 @@ export class AiService {
         changed ||
         keyChanged === true ||
         keyChanged === list.c.id ||
-        !this.options.canUse(list.owner, 'models') ||
-        !this.options.approved(list.c)
+        !this.options.canUse(list.owner, 'models')
       )
         list.abort.abort();
     for (const id of this.rates.keys())

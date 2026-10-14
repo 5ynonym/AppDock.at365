@@ -112,7 +112,9 @@ import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { AiService } from './core/ai-service';
 import { AiSecrets } from './core/ai-secrets';
-import { defaultAiSettings, aiApprovalValue, type AiConnectionSettings } from '../shared/ai';
+import { AiSettingsController } from './core/ai-settings';
+import { ErrorReporter } from './core/error-reporter';
+import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
 import { NotificationAvailability } from './core/notification-availability';
@@ -372,25 +374,28 @@ const tts = new TtsService({
       '[TTS] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
     ),
 });
-const aiSecrets = new AiSecrets(
-  path.join(dataDirectory, 'ai-keys.json'),
-  path.join(dataDirectory, 'ai-access.json'),
-  {
-    encrypt: (value) => {
-      if (!safeStorage.isEncryptionAvailable())
-        throw Error('Windowsの認証情報保護を利用できません。');
-      return safeStorage.encryptString(value).toString('base64');
-    },
-    decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+const aiSecrets = new AiSecrets(path.join(dataDirectory, 'ai-keys.json'), {
+  encrypt: (value) => {
+    if (!safeStorage.isEncryptionAvailable())
+      throw Error('Windowsの認証情報保護を利用できません。');
+    return safeStorage.encryptString(value).toString('base64');
   },
-);
+  decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+});
+const aiSettings = new AiSettingsController(settings, aiSecrets, (id) => {
+  ai.reconcile(id ?? false);
+  changed();
+});
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>
   id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration;
+const errors = new ErrorReporter({
+  notifications: () => (quitting ? undefined : typedNotifications),
+  log: (source, message) => log.write('error', source, message),
+});
 const ai = new AiService({
   settings: () => settings.value.ai ?? defaultAiSettings(),
   key: (c) => aiSecrets.key(c),
-  approved: (c) => aiSecrets.allowed(c),
   canUse: (owner, kind) => {
     if (quitting) return false;
     if (owner === 'host') return startupReady;
@@ -419,12 +424,29 @@ const ai = new AiService({
   },
   fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
   changed: () => changed(),
-  audit: (owner, id, state, code) =>
-    log.write(
-      'info',
-      owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
-      '[AI] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
-    ),
+  audit: (owner, id, state, code) => {
+    if (state !== 'failed')
+      log.write(
+        'info',
+        owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
+        '[AI] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
+      );
+  },
+  failed: (owner, id, error) =>
+    errors.report({
+      eventId: id,
+      source: owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
+      title: 'AI文章生成に失敗しました',
+      code: error.code,
+      message:
+        error.message +
+        '\n実行元: ' +
+        (owner === 'host'
+          ? '試験画面'
+          : owner.startsWith('applet:')
+            ? 'Applet (' + owner.split(':')[1] + ')'
+            : 'MCP'),
+    }),
 });
 const aiPreviewJobs = new Set<string>();
 const previewJobs = new Set<string>();
@@ -995,6 +1017,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
 let settingsRecording = false;
 let settingsPalette: string | undefined;
 function releaseSettingsView() {
+  aiSettings.cancelModels();
   if (settingsRecording) {
     settingsRecording = false;
     shortcutRecording = false;
@@ -1023,28 +1046,15 @@ function settingsPageActions(
       await retryShell(region);
     };
   if (page.id === 'ai') {
-    const connection = (id: unknown): AiConnectionSettings => {
-      const c = settings.value.ai?.connections.find((c) => c.id === id);
-      if (!c) throw Error('AI接続が見つかりません。');
-      return c;
-    };
-    actions.aiSetKey = async ([id, endpoint, value]) => {
-      const c = connection(id);
-      if (endpoint !== c.baseUrl)
-        throw Error('AIの接続先が変わりました。内容を確認してもう一度操作してください。');
-      aiSecrets.setKey(c, value);
-      ai.reconcile(id as string);
-      changed();
-    };
-    actions.aiSetAllowed = async ([id, expected, allowed]) => {
-      const c = connection(id);
-      if (expected !== aiApprovalValue(c))
-        throw Error('AIの接続設定が変わりました。内容を確認してもう一度操作してください。');
-      aiSecrets.setAllowed(c, allowed);
-      ai.reconcile(id as string);
-      changed();
-    };
-    actions.aiModels = async ([id]) => ai.models('host', id);
+    actions.aiSaveConnection = async ([draft, original, key, keyRevision]) =>
+      aiSettings.save(draft, original, key, keyRevision);
+    actions.aiDeleteConnection = async ([original, keyRevision]) =>
+      aiSettings.remove(original, keyRevision);
+    actions.aiOrderConnections = async ([original, ordered]) =>
+      aiSettings.reorder(original, ordered);
+    actions.aiDraftModels = async ([draft, key, requestId]) =>
+      aiSettings.models(draft, key, requestId);
+    actions.aiCancelModels = async ([requestId]) => aiSettings.cancelModels(requestId);
     actions.aiPreview = async ([input]) => {
       const job = ai.generate('host', input);
       aiPreviewJobs.add(job.jobId);
@@ -1126,14 +1136,14 @@ function settingsPageActions(
       quitHost();
     };
   }
-  if (['shortcuts', 'gestures'].includes(page.id)) {
+  if (['shortcuts', 'gestures', 'ai'].includes(page.id)) {
     actions.setShortcutRecording = async ([value]) => {
       if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
       settingsRecording = value;
       shortcutRecording = value && !!window?.isFocused();
       await syncHotKeys();
     };
-    actions.retryGlobalHotKeys = async () => syncHotKeys(true);
+    if (page.id !== 'ai') actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
   if (['shortcuts', 'gestures', 'tray'].includes(page.id)) {
     actions.openCommandPalette = async ([request]) => {

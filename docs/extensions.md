@@ -271,7 +271,7 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 }
 ```
 
-定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。AppletはcanDisable:falseを宣言できません。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
+定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。AppletはcanDisable:falseを宣言できません。requiredTargets:['banner']は宣言でき、通知が有効な間だけバナーを必須にします。種類全体のOFFとApplet共通許可は尊重します。[通知先の必須指定とOFF可否](notifications.md#通知種類の制約)は独立した方針です。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
 
 | 操作 | Node context.notifications | .NET context.Notifications |
 | --- | --- | --- |

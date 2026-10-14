@@ -8,7 +8,7 @@
 
 NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、表示されない時間も進む。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
 
-targetsはbanner/desktop/windowsの複数指定、または空配列。空配列は通知センターだけに表示する指定。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
+targetsはbanner/desktop/windowsの複数指定、または空配列。必須先がない種類では、空配列は通知センターだけに表示する指定になる。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
 
 同じ所有者・dedupeKeyのactive通知を更新し、終了後の再発は新IDになる。所有者は本体側が決定する。操作のホスト発行IDは現在の通知revisionと照合し、要求IDを最大512件記憶する。同じ要求の再送は同じ結果、異なる内容でのID再利用はエラーになる。通知単位のロックで別表示先からの二重押下を拒否し、失敗後は明示的に再試行できる。終了・撤回時に操作関数を回収する。
 
@@ -16,13 +16,30 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。空配列
 
 ## 通知種類と設定
 
+本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知10秒、読み上げOFF。有効な間はバナーを必須とし、通知全体はOFFにできる。OFFでもログを残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
+
 notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
 
-「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
+「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。OFF状態はスイッチで表し、「この種類の通知はオフです」という重複説明は表示しない。Applet共通設定による停止や定義変更の説明は残す。
 
 検証して即時保存したオフは既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。画面の通知先はbanner/desktop/windowsと読み上げを選択できる。視覚的な表示先は従来のtargets、読み上げはspeakに保存する。「通知センターのみ」はtargets:[]かつspeak:falseで、選択時に両方を一度に反映する。targets:[]かつspeak:trueは読み上げとセンターの履歴だけを利用する。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
+
+### 通知種類の制約
+
+登録側は表示先と無効化可否を独立して指定する。必須の表示先は`allowedTargets`と`defaultTargets`にも含める。
+
+| 登録定義 | 動作 |
+| --- | --- |
+| `requiredTargets:['banner']` | 通知が有効な間はバナーを必ず含める。バナーの解除とセンターのみへの変更を拒否する |
+| `requiredTargets:[]` | 許可された表示先をすべて外してセンターのみへ変更できる |
+| `canDisable:true` | 通知全体のON/OFFを許可する。OFF中は必須先も含めて配送しない |
+| `canDisable:false` | 本体通知だけが指定可能。`defaultEnabled:true`と空でない`disabledControlReason`が必要。必須先の有無とは独立し、通知全体のOFFを拒否する |
+
+エラー通知は`requiredTargets:['banner']`と`canDisable:true`の組合せ。OFF不可の本体通知が必要なら`canDisable:false`を別途選ぶ。Appletにも必須先を宣言できるが、種類全体のOFFとApplet共通の許可は尊重する。通知の寿命や閉じる操作は`lifetimePolicy`の別の契約で、バナー必須だけでは常時表示を意味しない。
+
+設定UIは必須先をチェック済みで編集不可にし、理由を表示する。設定更新APIからの必須先解除も検証で拒否する。旧設定・外部受信に必須先がなくても実効方針に補い、読み込みだけでは保存しない。UIでその種類を編集するときは必須先を補完し、OFF不可の種類に旧`enabled:false`があれば`true`へ整えて保存する。これにより読み上げや表示時間の変更が古い制約違反値に妨げられない。
 
 ## 履歴
 
