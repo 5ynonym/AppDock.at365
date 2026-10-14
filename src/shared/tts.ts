@@ -14,7 +14,8 @@ export interface TtsSettings {
 }
 export interface TtsJob {
   jobId: string;
-  state: 'queued' | 'generating' | 'playing' | 'completed' | 'failed' | 'canceled';
+  state:
+    'queued' | 'generating' | 'waitingPlayback' | 'playing' | 'completed' | 'failed' | 'canceled';
   createdAt: string;
   updatedAt: string;
   error?: { code: string; message: string };

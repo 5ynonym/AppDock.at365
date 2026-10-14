@@ -21,7 +21,7 @@ OpenAI互換のTTSサーバーへテキストを送り、生成した音声をAp
 
 [共通操作API](appdock-api.md)の単一AppDockApiと操作カタログへTTS操作を追加する。AppletのJSON-lines RPCとMCPのHTTPアダプターは既存経路を使う。別のTTS用HTTPサーバーやAppletは作らない。
 
-既存の[音声再生](../src/main/core/sounds.ts)は短い通知音向けで、WAVの16MiB制限・30秒の再生期限を持つ。audio.playの契約を保ち、TTSには生成・状態・停止を管理する専用サービスと再生経路を設ける。
+短い通知音のWAV 16MiB制限・30秒の再生期限を維持し、TTSには生成・状態・停止を管理する専用サービスを設ける。実際の再生は0.42.0から通知音・試聴と同じ[共通音声再生API](audio-playback.md)へ委譲する。audio.playの空文字・省略は無音となり、ビープは廃止する。
 
 [Node RPC](../src/main/core/rpc.ts)と[.NET RPC](../dotnet/AppDock.Runtime/JsonRpcConnection.cs)には標準15秒の待ち時間がある。生成・再生の終了までAPIを待たせず、受付後すぐにジョブIDを返す。音声バイナリをApplet RPCやMCPの応答へ載せない。
 
@@ -184,9 +184,9 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 ## 状態・再生・取消
 
-状態はqueued → generating → playing → completed。受信・検証・プレイヤー準備はgeneratingに含める。終端状態はcompleted/failed/canceledで、終端から別状態へ遷移しない。
+状態はqueued → generating → waitingPlayback → playing → completed。受信・検証はgenerating、共通キューの待機・プレイヤー準備はwaitingPlaybackに含める。終端状態はcompleted/failed/canceledで、終端から別状態へ遷移しない。
 
-初期実装では生成から再生までを1件ずつ順番に実行する。先行生成や並列生成は行わず、TTS同士の重なりを防ぐ。既存通知音とは別キューで、通知音との重なりは許容する。
+TTSジョブは生成から再生までを1件ずつ順番に実行し、先行生成や並列生成は行わない。音声を受信するとwaitingPlaybackとなり、通知音・試聴と共通のFIFOへ入る。生成中は再生枠を予約せず、準備できた音から再生する。playingへの遷移と開始期限の解除は実際の再生開始直前に行う。
 
 | 制限 | 初期値 |
 | --- | --- |
@@ -206,7 +206,7 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 設定変更時は旧設定の待機・生成ジョブを取消し、受信済み音声の再生中ジョブは完了を許可する。キー変更・削除も同様。新規受付は一貫した設定・秘密参照を確定し、処理途中で別の設定を混ぜない。許可取消・終了時は再生中も停止する。
 
-プレイヤーはsandbox/contextIsolationを有効にし、Node・外部ページ・外部ネットワークへアクセスさせない。再生失敗・異常終了時も必ず回収し、次ジョブへ進める。通知音コードの再利用は最小限の共通部分に留め、既存audio.playの期限・登録素材の保存契約を変更しない。
+プレイヤーはsandbox/contextIsolationを有効にし、Node・外部ページ・外部ネットワークへアクセスさせない。再生失敗・異常終了時も必ず回収し、次ジョブへ進める。共通プレイヤーを回収してから次の音へ進める。通知音とTTSの各上限・登録素材の保存契約は呼出元で維持する。
 
 ## エラー契約
 

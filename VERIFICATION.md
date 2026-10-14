@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-15: 共通音声・Gmail通知移行のコミット確認
+
+- 今回の共通キュー・実プレイヤー・TTS取消/開始期限、種類指定通知のsilentと既存.NETコンストラクター互換、Gmailの通知寿命と安全な履歴、設計/操作変更を再レビューし、未解決の対象内指摘なし。両repoのmainで今回の変更だけをコミット対象とする。
+- 実装時の10件の成功記録、完全ログ、入力hash、固定EXE/ZIP/feedを再照合。製品入力は一致し、初期記録との差はGUIランナー2ファイルのみ。最終GUIは変更後のランナーで成功している。型検査/ビルド/発行、本体関連65件、Gmail標準22件、固定EXEの音声・Gmail・通知読み上げ・Node/.NET通知設定の4試験を再利用した。
+- 標準回帰の未実行63ファイルを追加実行して**406/406成功**。既確認9ファイル65件と合わせて本体標準**471/471成功**、fail/skip 0。標準前提のNode/.NET fixtureビルドも成功。制限環境の.NET診断なし失敗、ファイル置換EPERM/ローカル接続EACCESは失敗ログを保持し、同一処理の通常Windows権限実行で切り分けた。
+- [コミット証跡](.artifacts/commit-validation-audio-20261015/validation.json)に再利用元・差分判定・今回のコマンド/入力/ログhash・環境・生成fixture・stage treeとcommit/treeの一致を保存する。最終試験後は検証文書だけを追記。製品修正・追加の版更新・再発行はなく、AppDock0.42.0/Gmail0.11.0の配布物を維持する。
+- 旧Gmail全機能GUIの更新画面DOM参照は対象外の既知制約として残り、今回の音声/通知専用GUI成功と区別する。実Google受信・聴感は未確認。ローカルコミットまでで、push・Release・実利用先deployは行わない。
+
+## 2026-10-15: 共通音声再生・ビープ廃止・Gmail種類指定通知（0.42.0）
+
+- main `460bfa9`上で実装。設計は[共通音声再生API](docs/audio-playback.md)、発行前レビューは`.artifacts/audio-unification-20261015/review.md`。TTS、通知音、試聴が単一FIFOへ接続し、waitingPlayback中も開始期限・取消を維持することを確認。Node通知のsilent検証と.NETの既存コンストラクター互換を確認し、発行阻害指摘なし。
+- 型検査・ビルド、関連**65件すべて成功**。混在FIFO、待機/再生取消、回収順序、満杯/待機期限、生成中の通知音、通知開始期限、TTS設定/権限、通知方針、Windows配送、登録WAVを対象とした。.NET通知fixtureのRelease buildは警告/エラー0。
+- 固定発行EXEで4つのGUI/実プロセス試験が成功。共通音声: `.artifacts/audio-playback-ui-1791995776301/result.json`（同時プレイヤー最大1、3経路完走、未選択無音、待機/再生中取消）。通知読み上げ: `.artifacts/notification-speech-ui-1791995987648/result.json`（9群）。Node/.NET通知設定: `.artifacts/notification-settings-1791996002499/result.json`（8群、操作/停止/保存/再起動）。Gmail: `../Applet.Gmail.at365/.artifacts/ui-features-1791995939705/result.json`（実Nodeからnew-mailの発行/抑制/終了、安全な履歴、無音/試聴）。オフラインfixtureを使用し、実Google受信・物理スピーカーの聴感は未確認。
+- ビープ契約の廃止とTTS状態追加のため0.42.0へマイナー更新。`publish.bat`終了0、EXE/feedの版・サイズ・SHA256を照合。EXEは`dccacea51258c0e424657405f76de000209871469ad1d99e8b64a3f55b08db9c`。Gmail0.11.0の最低ホスト版とZIP内部manifestも整合。
+- 証跡は`.artifacts/audio-unification-20261015/validation.json`と各`*-validation.json`/`*-verified.log`。コマンド、終了コード、日時、入力ファイルhash、ログhash、成果物hashを保存。発行中/検証後の入力差分は試験ランナー2ファイルの起動待ち・portable接続・診断のみで製品入力は一致。最終配布版試験は現在のランナーhashで成功しており、製品の再発行は不要と判断した。
+- 制限環境のpnpm stack overflow、WAV置換EPERM、診断のない.NET非0は同一処理の通常権限実行で成功。共通音声の初期固定EXE試験は内部API注入が起動完了前で終了待ちに失敗し、startupReady待機を追加して成功。Gmail既存全機能UI試験は旧ホスト更新画面DOM参照で停止したため、今回の音声/通知専用モードを追加してsource/portableを検証。旧更新画面を含む全機能GUIと本体全標準回帰は今回の成功範囲に含めない。
+- 後片付け: 今回の隔離EXEプロセス残存0を確認。一時編集スクリプト2件を削除。今回の各実行方式の成功分は3件以内のため保持、失敗診断と過去の別作業の再利用/所有状態未照合のフォルダーも保持した。commit・push・Release・実利用先deployは未実施。
+
 ## 2026-10-15: 設定通知・JSON復旧のコミット確認（0.41.0）
 
 - main `7f0a266`上の今回の実装・試験・文書を対象に、設計書を実装済みの構成へ更新した。SettingsHealth / SettingsHealthNotifications / ErrorReporter.episode、障害の処理世代、短時間の読込障害、実際の通知文言、復元操作の条件、再起動の排他と確認範囲をコードへ照合した。確認項目の表と実施結果を区別し、未実装の予定表現を取り除いた。

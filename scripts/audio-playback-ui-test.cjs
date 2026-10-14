@@ -1,0 +1,180 @@
+const fs = require('node:fs'),
+  path = require('node:path'),
+  assert = require('node:assert/strict');
+const { spawn } = require('node:child_process'),
+  { createHash } = require('node:crypto');
+const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
+const root = path.resolve(__dirname, '..');
+const profile = path.join(root, '.artifacts', 'audio-playback-ui-' + Date.now());
+const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+fs.mkdirSync(profile, { recursive: true });
+const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.host.hardwareAcceleration = false;
+settings.keybindings = [];
+settings.gestures.enabled = false;
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+const wave = Buffer.alloc(44 + 8000);
+wave.write('RIFF');
+wave.writeUInt32LE(wave.length - 8, 4);
+wave.write('WAVEfmt ', 8);
+wave.writeUInt32LE(16, 16);
+wave.writeUInt16LE(1, 20);
+wave.writeUInt16LE(1, 22);
+wave.writeUInt32LE(8000, 24);
+wave.writeUInt32LE(16000, 28);
+wave.writeUInt16LE(2, 32);
+wave.writeUInt16LE(16, 34);
+wave.write('data', 36);
+wave.writeUInt32LE(8000, 40);
+const wav = path.join(profile, 'fixture.wav');
+fs.writeFileSync(wav, wave);
+const until = async (fn, label) => {
+  const end = Date.now() + 30000;
+  while (Date.now() < end) {
+    try {
+      const result = await fn();
+      if (result) return result;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  throw Error(label);
+};
+let child,
+  port,
+  output = '',
+  success = false,
+  checks = [];
+(async () => {
+  try {
+    port = await freePort();
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    if (process.argv[2]) {
+      fs.copyFileSync(path.resolve(process.argv[2]), exe);
+      assert.equal(hash(exe), hash(process.argv[2]));
+    }
+    child = spawn(
+      exe,
+      [
+        ...(process.argv[2] ? [] : [root]),
+        '--test-profile=' + profile,
+        '--test-local-state=' + path.join(profile, 'local'),
+        '--inspect=' + port,
+      ],
+      { cwd: root, env, windowsHide: true, stdio: 'pipe' },
+    );
+    child.stdout.on('data', (d) => (output += d));
+    child.stderr.on('data', (d) => (output += d));
+    await until(() => inspect(port, `${electronExpression}.app.isReady()`), 'host ready');
+    await until(() => inspect(port, `(async()=>{
+      const e=${electronExpression};
+      const w=e.webContents.getAllWebContents().find(w=>w.getURL().startsWith('appdock://host/'));
+      return w ? w.executeJavaScript('window.dock.snapshot().then(s=>s.startupReady)') : false;
+    })()`), 'host startup complete');
+    await inspect(
+      port,
+      `(()=>{
+      const e=${electronExpression};
+      const req=process.getBuiltinModule('module').createRequire(e.app.getAppPath()+'/package.json');
+      globalThis.audioFixture={req, events:[], active:0, peak:0, errors:[], windows:0};
+      const f=globalThis.audioFixture, q=req('./out/main/main/core/audio-service').audioPlayback;
+      const original=q.player;
+      q.player=async r=>{
+        f.active++; f.peak=Math.max(f.peak,f.active); f.events.push('start');
+        try {await original(r);} finally {f.events.push('end');f.active--;}
+      };
+      e.app.on('browser-window-created',(_event,w)=>{
+        w.webContents.on('page-title-updated',(_event,title)=>{if(title==='AppDock Audio')f.windows++;});
+      });
+      return true;
+    })()`,
+    );
+    await inspect(
+      port,
+      `(()=>{
+      const f=globalThis.audioFixture, bytes=f.req('node:fs').readFileSync(${JSON.stringify(wav)});
+      const sound=f.req('./out/main/main/core/sounds').queueSound;
+      const tts=f.req('./out/main/main/core/tts-player').playTtsWave;
+      sound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('notification'));
+      tts(bytes,0.5,new AbortController().signal,1.5).catch(()=>f.errors.push('tts'));
+      sound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('preview'));
+      sound('',()=>true,()=>f.errors.push('empty'));
+      return true;
+    })()`,
+    );
+    const result = await until(async () => {
+      const f = await inspect(
+        port,
+        '({events:audioFixture.events,peak:audioFixture.peak,errors:audioFixture.errors,windows:audioFixture.windows})',
+      );
+      fs.writeFileSync(path.join(profile, 'playback-state.json'), JSON.stringify(f, null, 2));
+      if (f.events.length < 6) {
+        const states = await inspect(port, `(async()=>{
+          const e=${electronExpression};
+          return Promise.all(e.webContents.getAllWebContents().filter(w=>w.getTitle()==='AppDock Audio').map(async w=>({id:w.id,loading:w.isLoading(),state:await w.executeJavaScript('(()=>{const a=document.querySelector("audio");return a?{paused:a.paused,ended:a.ended,time:a.currentTime,duration:a.duration,ready:a.readyState,error:a.error?.code}:null})()')})));
+        })()`);
+        fs.writeFileSync(path.join(profile,'player-state.json'),JSON.stringify(states,null,2));
+      }
+      return f.events.length >= 6 && f;
+    }, 'three real playbacks');
+    assert.deepEqual(result.events, ['start', 'end', 'start', 'end', 'start', 'end']);
+    assert.equal(result.peak, 1);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.windows, 3);
+    checks.push(
+      'TTS, notification and preview use one real Electron player at a time; empty WAV creates none',
+    );
+    await inspect(
+      port,
+      `(()=>{
+      const f=audioFixture, q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      const bytes=f.req('node:fs').readFileSync(${JSON.stringify(wav)});
+      const active=new AbortController(), waiting=new AbortController();
+      f.stopped=false;
+      const one=q.play({bytes,signal:active.signal,playbackTimeoutMs:30000});
+      const two=q.play({bytes,signal:waiting.signal,playbackTimeoutMs:30000});
+      waiting.abort(); setTimeout(()=>active.abort(),100);
+      Promise.all([one,two]).then(()=>f.stopped=true).catch(()=>f.errors.push('cancel'));
+      return true;
+    })()`,
+    );
+    await until(() => inspect(port, 'audioFixture.stopped'), 'cancellation');
+    const canceled = await inspect(
+      port,
+      '({events:audioFixture.events,peak:audioFixture.peak,errors:audioFixture.errors})',
+    );
+    assert.equal(canceled.events.length, 8);
+    assert.equal(canceled.peak, 1);
+    assert.deepEqual(canceled.errors, []);
+    checks.push(
+      'queued cancellation creates no player; active cancellation destroys player before release',
+    );
+    success = true;
+  } catch (error) {
+    fs.writeFileSync(path.join(profile, 'error.txt'), error.stack);
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
+    if (child) {
+      await inspect(port, `${electronExpression}.app.quit()`).catch(() => {});
+      try {
+        await until(() => child.exitCode !== null, 'shutdown');
+      } catch {
+        child.kill();
+        success = false;
+        process.exitCode = 1;
+      }
+    }
+    fs.writeFileSync(path.join(profile, 'process.log'), output);
+    const result = {
+      success,
+      profile,
+      checks,
+      version: require('../package.json').version,
+      portable: process.argv[2] ? { sha256: hash(process.argv[2]) } : null,
+    };
+    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result));
+  }
+})();

@@ -84,7 +84,7 @@ export function NotificationSettings({
     }
   };
   const previewActive = auxiliary?.jobs.some((j) =>
-    ['queued', 'generating', 'playing'].includes(j.state),
+    ['queued', 'generating', 'waitingPlayback', 'playing'].includes(j.state),
   );
   const overrides = settings.notificationPreferences?.overrides ?? [];
   const change = (type: NotificationTypeEntry, patch?: Partial<NotificationPreference>) => {
@@ -380,6 +380,7 @@ export function NotificationSettings({
               {
                 queued: '待機中',
                 generating: '生成中',
+                waitingPlayback: '再生待ち',
                 playing: '再生中',
                 completed: '完了',
                 failed: '失敗',

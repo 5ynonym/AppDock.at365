@@ -331,9 +331,11 @@ export function createHostApi(
                 'historyText',
                 'actions',
                 'restartTimer',
+                'silent',
               ].includes(k),
           ) ||
           (p.restartTimer !== undefined && typeof p.restartTimer !== 'boolean') ||
+          (p.silent !== undefined && typeof p.silent !== 'boolean') ||
           (p.dedupeKey != null && typeof p.dedupeKey !== 'string') ||
           (p.level != null && !type.levels.includes(p.level)) ||
           (p.historyText != null &&
@@ -390,6 +392,7 @@ export function createHostApi(
             historyText: p.historyText ?? undefined,
             actions,
             restartTimer: p.restartTimer,
+            windowsSilent: p.silent === true,
           },
           generation,
         );

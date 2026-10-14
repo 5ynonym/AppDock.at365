@@ -54,7 +54,10 @@ public interface INotificationService {
 public sealed record NotificationHistoryText(string Title, string Body);
 public sealed record NotificationAction(string Key, string Label, string Command, bool Primary = false, bool Disabled = false);
 public sealed record NotificationRequest(string TypeId, string Title, string Body, string? Level = null, string? DedupeKey = null,
-    NotificationHistoryText? HistoryText = null, IReadOnlyList<NotificationAction>? Actions = null, bool RestartTimer = false);
+    NotificationHistoryText? HistoryText = null, IReadOnlyList<NotificationAction>? Actions = null, bool RestartTimer = false)
+{
+    public bool Silent { get; init; }
+}
 public sealed record NotificationPublishResult(string Status, string? NotificationId, string? Reason);
 public sealed record NotificationLifetime(string Type, int? Milliseconds);
 public sealed record NotificationPolicy(bool Enabled, IReadOnlyList<string> SelectedTargets, IReadOnlyList<string> Targets,

@@ -63,6 +63,7 @@ export interface TypedNotificationInput {
     command: string;
   }[];
   restartTimer?: boolean;
+  silent?: boolean;
 }
 export type NotificationPublishResult =
   { status: 'accepted'; notificationId: string } | { status: 'suppressed'; reason: string };

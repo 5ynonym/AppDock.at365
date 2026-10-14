@@ -122,6 +122,7 @@ import { ErrorReporter } from './core/error-reporter';
 import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
+import { audioPlayback } from './core/audio-service';
 import { NotificationAvailability } from './core/notification-availability';
 import { NativeNotificationState } from './core/native-notification-state';
 import { NotificationSpeechService } from './core/notification-speech';
@@ -1230,7 +1231,7 @@ function settingsPageActions(
       if (
         [...notificationPreviewJobs].some((id) => {
           try {
-            return ['queued', 'generating', 'playing'].includes(
+            return ['queued', 'generating', 'waitingPlayback', 'playing'].includes(
               tts.get('notification-preview', id).state,
             );
           } catch {
@@ -2772,6 +2773,7 @@ app.on('before-quit', (event) => {
   void (async () => {
     for (const stop of [
       () => tts.close(),
+      () => audioPlayback.close(),
       () => ai.close(),
       () => automation?.close(),
       () => gestures?.close(),

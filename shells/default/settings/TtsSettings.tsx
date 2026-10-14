@@ -85,7 +85,9 @@ export function TtsSettingsForm({
           : '一覧は空でした。IDを直接入力できます。',
       );
     });
-  const active = auxiliary?.jobs.some((j) => ['queued', 'generating', 'playing'].includes(j.state));
+  const active = auxiliary?.jobs.some((j) =>
+    ['queued', 'generating', 'waitingPlayback', 'playing'].includes(j.state),
+  );
   return (
     <div className="settings-sections tts-settings" aria-label="読み上げ">
       <SettingsSection
@@ -314,6 +316,7 @@ export function TtsSettingsForm({
                 {
                   queued: '待機中',
                   generating: '生成中',
+                  waitingPlayback: '再生待ち',
                   playing: '再生中',
                   completed: '完了',
                   failed: '失敗',

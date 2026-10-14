@@ -219,7 +219,7 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 | Node API | capability | 動作 |
 | --- | --- | --- |
 | `ui.pickFile('json' \| 'wav')` | `file-dialog` | ホストのファイル選択。絶対パスまたはキャンセル時null。RPC待機は5分 |
-| `audio.play(file?)` | `audio` | ローカルWAVを順番に再生。空文字/省略はWindows標準音。キュー受付時に戻る |
+| `audio.play(file?)` | `audio` | ローカルWAVを共通キューで再生。0.42.0以降は空文字/省略が無音。キュー受付時に戻る |
 | `tray.attention(boolean)` | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示 |
 | `notifications.show(title, body, { silent?, command? })` | `notifications` | 音の抑制とクリック時の自Appletコマンドを任意指定 |
 
@@ -295,7 +295,7 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 
 .NETはNotificationRequest/NotificationHistoryText/NotificationAction/NotificationPublishResult/NotificationPolicyをSDKで提供します。新SDK/Runtimeを使ってビルドし、最低ホスト版を宣言してください。SDKの共有AssemblyVersion 0.10.0と旧ShowAsyncの署名を維持します。古いサービス実装の新メソッドはNotSupportedExceptionとなります。
 
-発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimerだけです。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトル200文字、本文2,000文字、dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
+発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimer/silentです。silentは0.42.0以降の任意booleanで、trueならWindows通知の音だけを抑制します。共通通知の読み上げ設定は変更しません。.NETはNotificationRequestのSilent initプロパティを使います。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトル200文字、本文2,000文字、dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
 
 結果はacceptedとnotificationId、またはsuppressedとreasonです。acceptedは登録完了で、表示成功/既読を保証しません。抑制理由はtype-disabled/applet-disabled/type-definition-changed/no-available-targets。不正入力・未知種類・上限/頻度超過はエラーです。endのstatusはresolved/withdrawnのみ、他Appletや古い世代の通知は終了できません。
 

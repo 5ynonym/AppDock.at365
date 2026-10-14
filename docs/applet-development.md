@@ -228,3 +228,7 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 種類別通知は[種類指定通知API](extensions.md#種類指定通知api)を使います。notificationTypesをmanifestへ静的宣言し、notifications capabilityとminimumHostVersion:0.30.0を指定してください。停止中も設定一覧へ表示されるため、通知発生後に種類を動的登録しません。IDは名称変更でも維持し、本文から作りません。
 
 Node/.NETの両APIで、保存済みユーザー方針をホストが解決します。Applet側でtargets/lifetimeを上書きしません。persistentには安全な履歴要約を渡し、操作は自Appletの登録済みコマンドに限定します。実機検証はオン/オフ、空欄manual、保存前の未反映、停止後の操作失効、再起動を含めます。新APIの回帰fixtureはtests/fixtures/dotnet/AppDock.Notifications、scripts/notification-settings-ui-test.cjsに置き、製品へ同梱しません。
+
+## 音声再生の共通化
+
+音声を鳴らす機能は[共通音声再生API](audio-playback.md)を基本とします。Node Appletの通知音はcontext.audio.play(file)、読み上げは既存TTS APIへ渡します。音を独自再生せず、試聴も同じ入口を使ってください。0.42.0から空文字/省略は無音で、Windows標準ビープは廃止しました。独自通知音を併用する種類指定通知はsilent:trueとminimumHostVersion:0.42.0を指定します。

@@ -40,6 +40,8 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 
 ## 共通APIと設定保存
 
+- 音声再生を追加・変更するときは[共通音声再生API](docs/audio-playback.md)を使う。読み上げ・通知音・試聴は本体の単一audioPlaybackへ集約し、Node Appletはhost.audio.playを入口とする。独自プレイヤー・別キュー・ビープへの代替を追加しない。音声生成、再生待ち、開始・取消・終了を区別する。
+
 - [共通操作API](docs/appdock-api.md)と[外部操作](docs/automation.md)を正本とする。単一AppDockApiと操作カタログを共有し、callers・permissions・schemaで公開先/許可/入力を管理する。MCPとAppletのPC専用許可を分ける。
 - 外部コマンド公開はApplet自身のmanifest宣言に従う。本体へApplet固有の許可一覧を置かず、IDの接頭辞・別名・runtime登録から公開権限を推測しない。停止中の自動有効化を避け、設定変更とコマンド実行を分離する。
 - 自己設定APIのcapability・非公開キー・activate中の契約を保持し、SettingsCommandsへ接続する。外部更新のexpectedRevision・dryRun・原子的保存・公開項目制限を維持する。再入のBUSY/SELF_CALLとNode/.NETの対応を確認する。

@@ -69,7 +69,7 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 `openItem(id,key): Promise<boolean>`は任意のitemOpenerを宣言したAppletのみが使えます。アカウントを選択し、読込済みのobserveOriginページへ、JSON文字列化した1〜200文字のkeyをisolated world 1001で渡します。UIから任意のソース/URLを受け取りません。itemOpenerは関数式として対象の可視行を探し、ユーザーが求めた項目だけを開いてtrueを返します。対象を確認できない場合はfalse。未宣言・認証ページ・読み込み中もfalseです。サービス固有のセレクターとフォルダー復帰/代替案内はAppletへ置きます。項目を開く操作でサイトの既読状態等が変わり得るため、背景監視からは実行しません。
 
-アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（標準ビープ）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず既存queueSoundで試聴します。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
+アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（無音）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず共通再生キューで試聴します（WAV未選択は無音）。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
 
 選択したWAVはRIFF/WAVE・16MB以下を検証し、EXE隣の`data/assets/applets/<Applet ID>/sounds`へ元のファイル名で登録します。同名・同一内容は再利用し、同名で内容が異なる場合は拒否します。元ファイルを変更せず、登録素材を停止時の未参照キャッシュとして削除しません。startでは旧絶対パスを登録ファイル名へ移行し、失敗した枠は元設定を保持してsoundErrorと実効的なOFF/空パスを返します。再選択で復旧できます。詳細は[登録素材](settings-sync.md#ファイル名を使う登録素材)を参照してください。
 

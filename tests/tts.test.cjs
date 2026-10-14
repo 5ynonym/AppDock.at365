@@ -53,6 +53,10 @@ function setup(t, extra = {}) {
       return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
     },
     ...extra,
+    play: async (b, d, signal, speed, beforePlay) => {
+      beforePlay?.();
+      await extra.play?.(b, d, signal, speed, beforePlay);
+    },
   });
   t.after(() => s.close());
   return {

@@ -377,12 +377,14 @@ export class TtsService {
       const playbackSpeed = j.config!.speedMode === 'playback' ? j.speed : 1;
       this.authorize(j.owner, true);
       this.checkStart(j);
-      clearTimeout(j.startTimer);
-      this.state(j, 'playing');
+      this.state(j, 'waitingPlayback');
       if (j.ended === undefined)
-        await this.options.play(bytes, seconds, controller.signal, playbackSpeed, () =>
-          this.checkStart(j),
-        );
+        await this.options.play(bytes, seconds, controller.signal, playbackSpeed, () => {
+          this.authorize(j.owner, true);
+          this.checkStart(j);
+          clearTimeout(j.startTimer);
+          this.state(j, 'playing');
+        });
       if (j.ended === undefined) this.finish(j, 'completed');
     } catch (error) {
       if (j.ended === undefined)

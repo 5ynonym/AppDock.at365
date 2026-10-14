@@ -111,3 +111,7 @@ Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protoco
 旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
 
 Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveや既読にしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
+
+## 通知音との併用
+
+種類指定通知のsilent:true（最低ホスト0.42.0）はWindows自身の音を抑制します。Appletの通知音は[共通音声再生API](audio-playback.md)へ渡し、通知の読み上げ・試聴と重ならないようにします。Gmailはnew-mail種類へ移行し、安全な汎用要約を履歴へ保存します。

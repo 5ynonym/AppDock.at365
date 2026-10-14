@@ -47,6 +47,11 @@ test('stopped and crashed extensions cannot leave attention active', async () =>
   assert.equal(e.attention, false);
 });
 test('sound rejects non-WAV paths and drops work for inactive extensions', async () => {
+  queueSound(
+    '',
+    () => true,
+    () => assert.fail('empty sound must be silent'),
+  );
   assert.throws(() =>
     queueSound(
       'relative.wav',
@@ -67,6 +72,44 @@ test('sound rejects non-WAV paths and drops work for inactive extensions', async
     () => assert.fail('inactive work should be dropped'),
   );
   await new Promise((resolve) => setImmediate(resolve));
+});
+
+test('typed notifications validate silent and preserve it for Windows without changing speech policy', async () => {
+  let captured;
+  const e = {
+    state: 'running',
+    runtimeSession: 'run',
+    commands: [],
+    manifest: {
+      id: 'fixture',
+      capabilities: ['notifications'],
+      notificationTypes: [{ typeId: 'new-mail', levels: ['info'], defaultLevel: 'info' }],
+    },
+  };
+  const typed = {
+    publish: (_owner, _type, input) => {
+      captured = input;
+      return { status: 'accepted', notificationId: 'one' };
+    },
+  };
+  const api = createHostApi(
+    {},
+    '',
+    () => {},
+    () => {},
+    () => {},
+    async () => {},
+    undefined,
+    undefined,
+    {},
+    () => typed,
+  );
+  const input = { typeId: 'new-mail', title: 'T', body: 'B', silent: true };
+  assert.equal((await api(e, 'host.notifications.publish', input)).status, 'accepted');
+  assert.equal(captured.windowsSilent, true);
+  await assert.rejects(api(e, 'host.notifications.publish', { ...input, silent: 'true' }), /引数/);
+  await api(e, 'host.notifications.publish', { typeId: 'new-mail', title: 'T', body: 'B' });
+  assert.equal(captured.windowsSilent, false);
 });
 
 test('legacy API uses declared generated kind while retaining null, silence, global-off and owned command guards', async () => {
