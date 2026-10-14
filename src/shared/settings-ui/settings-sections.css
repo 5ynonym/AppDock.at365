@@ -3,6 +3,12 @@
   gap: 20px;
   min-width: 0;
 }
+.web-applet-form.settings-sections {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  gap: 20px;
+}
 .settings-section {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -65,6 +71,59 @@
 .settings-field:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+.settings-field.settings-field-wide {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.settings-field-wide > .settings-field-label {
+  padding-top: 0;
+}
+.applet-settings .object-list-item {
+  border-radius: 12px;
+  background: var(--settings-group-background);
+}
+.applet-settings .object-list-item > .actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.applet-settings .source-folder {
+  flex-wrap: wrap;
+}
+.applet-settings .source-folder input {
+  flex-basis: 180px;
+}
+.applet-settings .object-list-item .settings-field-control > input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  justify-self: start;
+}
+.applet-settings .send-key-entry {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) minmax(140px, 1.2fr) minmax(120px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--settings-group-background);
+}
+.applet-settings .send-key-entry label {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.applet-settings .send-key-entry input {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+.applet-settings .send-key-count {
+  margin: 0;
+  color: var(--muted);
 }
 .settings-field-label {
   padding-top: 8px;
@@ -167,7 +226,7 @@
 }
 .settings-feedback p {
   padding: 10px 12px;
-  background: var(--raised);
+  background: var(--settings-group-background);
   border-radius: 8px;
 }
 .settings-status-grid {
@@ -179,7 +238,7 @@
 .settings-status-grid > div {
   padding: 14px;
   border-radius: 10px;
-  background: var(--raised);
+  background: var(--settings-group-background);
   min-width: 0;
 }
 .settings-status-grid dt {
@@ -201,6 +260,10 @@
   background: var(--accent-soft);
 }
 @container settings-page (max-width: 660px) {
+  .applet-settings .send-key-entry {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
   .settings-field {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;

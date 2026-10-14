@@ -7,6 +7,7 @@
   --side: #14151b;
   --panel: #191b23;
   --raised: #20232d;
+  --settings-group-background: color-mix(in srgb, var(--raised) 20%, var(--panel));
   --border: #282b35;
   --text: #eff0f5;
   --muted: #8e93a6;
@@ -150,7 +151,7 @@
   padding: 16px;
   margin-top: 12px;
   border-radius: 12px;
-  background: var(--raised);
+  background: var(--settings-group-background);
 }
 .tray-item-editor label {
   display: grid;
@@ -2908,7 +2909,7 @@ summary {
   padding: 14px 18px;
   color: var(--muted);
   font-size: 12px;
-  background: var(--raised);
+  background: var(--settings-group-background);
 }
 .command-shortcuts .applet-shortcut-overview td {
   padding: 16px 18px;
@@ -3305,7 +3306,7 @@ summary {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--raised);
+  background: var(--settings-group-background);
 }
 .shortcut-order-row.drop-target {
   outline: 2px solid var(--accent);
@@ -3491,7 +3492,7 @@ summary {
 .permission-table thead th {
   color: var(--muted);
   font-weight: 500;
-  padding: 12px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--border);
 }
 .permission-table thead th:first-child {
@@ -3501,7 +3502,7 @@ summary {
 .permission-table tbody th {
   text-align: left;
   font-weight: 400;
-  padding: 22px 12px 22px 0;
+  padding: 22px 18px;
   border-bottom: 1px solid var(--border);
 }
 .permission-table tbody th p {
@@ -3550,7 +3551,7 @@ summary {
   .permission-table tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    padding: 18px 0;
+    padding: 18px;
     border-bottom: 1px solid var(--border);
   }
   .permission-table tbody th {

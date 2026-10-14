@@ -22,6 +22,29 @@ Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作API
 
 ## マニフェスト
 
+### 共通の設定ページ
+
+設定フォームはホストの共通テンプレートで描画します。AppletはHTML/CSSを複製せず、`settings`と任意の`settingSections`を宣言します。設定一覧とApplet詳細の設定タブは同じ本文・編集状態を使います。ページ表示方法と起動待ちはホストが末尾の共通カードへ追加します。
+
+`settingSections`にはAppDock **0.36.8以上**が必要です。最大32件で、`id`（英小文字から始まる英数字・ハイフン、64文字以内）、`title`（160文字以内）、任意の`description`（500文字以内）、`settings`（自身の設定キー）、`actions`（自身のsettingActionsのコマンドID）、`collapsible`（既定false）を指定します。各セクションには設定か操作を1件以上含めます。ID重複・存在しない参照・複数セクションへの重複配置は起動時に拒否します。
+
+```json
+"minimumHostVersion": "0.36.8",
+"settingSections": [
+  {
+    "id": "monitoring",
+    "title": "監視",
+    "description": "自動確認の間隔を設定します。",
+    "settings": ["intervalSeconds"],
+    "actions": ["at365.my-tool.check"]
+  }
+]
+```
+
+セクションとその中の参照は宣言順に表示し、設定の後に操作ボタンを置きます。未配置の設定は「その他の設定」、未配置の操作は「操作」に残ります。セクション省略時も「設定」「操作」の共通カードになるため、後から追加した設定が非表示になりません。主要項目は初期表示し、調査・詳細調整などだけを`collapsible: true`にします。横断検索はセクションの見出し・説明にも対応し、検索した項目の折りたたみを開きます。
+
+この宣言は表示用メタデータです。設定キー・既定値・型・保存領域を変更せず、設定JSONへセクション情報を書き込みません。動的な選択肢・旧値の表示・即時保存・外部変更の競合処理も共通経路を使います。`object-list`と`shortcut-list`は横幅を使ったフォームになります。
+
 ### 設定ページの操作ボタン
 
 `settingActions` は最大16件の `{ title, command, description?, successMessage? }` を宣言します。

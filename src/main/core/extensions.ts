@@ -15,6 +15,7 @@ import {
   validateSettingCommandIds,
 } from '../../shared/settings-commands';
 import { parseSettingActions } from '../../shared/setting-actions';
+import { parseSettingSections } from '../../shared/setting-sections';
 import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
 import { parseGestures, defaultGestures } from '../../shared/gestures';
@@ -194,13 +195,25 @@ function readManifest(
     defaultGestureBindings.some((r) => !bindingCommands.some((c) => c.id === r.command))
   )
     throw Error('既定ジェスチャーには自身の宣言コマンドだけを指定してください。');
+  const settingActions = parseSettingActions(m.settingActions, bindingCommands);
+  const settingSections = parseSettingSections(
+    m.settingSections,
+    settingDefinitions ?? [],
+    settingActions ?? [],
+  );
+  if (
+    settingSections &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.36.8') < 0)
+  )
+    throw Error('設定セクションにはminimumHostVersion:0.36.8以上が必要です。');
   return {
     ...m,
     settings: settingDefinitions,
     commands,
     defaultKeybindings,
     defaultGestureBindings,
-    settingActions: parseSettingActions(m.settingActions, bindingCommands),
+    settingActions,
+    settingSections,
     folder,
     sourceKind,
     entryPath: contained(folder, m.entry),

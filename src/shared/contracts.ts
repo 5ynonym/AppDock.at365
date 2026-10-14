@@ -103,6 +103,15 @@ export interface SettingAction {
   description?: string;
   successMessage?: string;
 }
+/** Presentation only: references existing settings and actions without changing saved values. */
+export interface SettingSection {
+  id: string;
+  title: string;
+  description?: string;
+  settings?: string[];
+  actions?: string[];
+  collapsible?: boolean;
+}
 export interface Panel {
   title: string;
   description?: string;
@@ -143,6 +152,7 @@ export interface ExtensionManifest {
   capabilities?: string[];
   settings?: SettingDefinition[];
   settingActions?: SettingAction[];
+  settingSections?: SettingSection[];
   commands?: DeclaredCommand[];
   defaultKeybindings?: import('./keybindings').KeybindingDefault[];
   webAccounts?: import('./web-accounts').WebAccountDefinition;

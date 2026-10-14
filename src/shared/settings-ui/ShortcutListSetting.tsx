@@ -1,4 +1,4 @@
-import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
+import { SettingsInput } from './SettingsInput';
 import { validSendKeys } from '../setting-definitions';
 
 type Entry = { id: string; title: string; keys: string };
@@ -22,27 +22,38 @@ export function ShortcutListSetting({
     onChange(entries.map((entry, i) => (i === index ? { ...entry, [field]: text } : entry)));
   return (
     <div className="send-key-list" role="group" aria-label={title}>
+      <p className="send-key-count">{entries.length} / 32 件のコマンド</p>
+      {!entries.length && <p>「コマンドを追加」から、名前と送信するキーを登録できます。</p>}
       {entries.map((entry, index) => (
         <div className="send-key-entry" key={index}>
-          <SettingsInput
-            aria-label={`${title} ${index + 1} ID`}
-            placeholder="ID（例: new-tab）"
-            value={entry.id}
-            onChange={(event) => update(index, 'id', event.target.value)}
-          />
-          <SettingsInput
-            aria-label={`${title} ${index + 1} 名前`}
-            placeholder="名前（例: 新しいタブ）"
-            value={entry.title}
-            onChange={(event) => update(index, 'title', event.target.value)}
-          />
-          <SettingsInput
-            aria-label={`${title} ${index + 1} キー`}
-            placeholder="Ctrl+T"
-            value={entry.keys}
-            aria-invalid={!validSendKeys(entry.keys)}
-            onChange={(event) => update(index, 'keys', event.target.value)}
-          />
+          <label>
+            ID
+            <SettingsInput
+              aria-label={`${title} ${index + 1} ID`}
+              placeholder="ID（例: new-tab）"
+              value={entry.id}
+              onChange={(event) => update(index, 'id', event.target.value)}
+            />
+          </label>
+          <label>
+            名前
+            <SettingsInput
+              aria-label={`${title} ${index + 1} 名前`}
+              placeholder="名前（例: 新しいタブ）"
+              value={entry.title}
+              onChange={(event) => update(index, 'title', event.target.value)}
+            />
+          </label>
+          <label>
+            送信するキー
+            <SettingsInput
+              aria-label={`${title} ${index + 1} キー`}
+              placeholder="Ctrl+T"
+              value={entry.keys}
+              aria-invalid={!validSendKeys(entry.keys)}
+              onChange={(event) => update(index, 'keys', event.target.value)}
+            />
+          </label>
           <button
             type="button"
             aria-label={`${title} ${index + 1} 削除`}

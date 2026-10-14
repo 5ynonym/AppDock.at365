@@ -833,6 +833,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           ...summary(a),
           settings: a.settings,
           settingActions: a.settingActions,
+          settingSections: a.settingSections,
           settingOptions: a.settingOptions,
           startupDelaySeconds: a.startupDelaySeconds,
         },

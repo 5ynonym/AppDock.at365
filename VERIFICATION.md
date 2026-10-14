@@ -1,5 +1,29 @@
 # 検証記録
 
+## 2026-10-14: 設定テンプレートの仕上げとコミット前検証（0.36.8）
+
+- 操作の許可の見出し/項目を左右18pxへ統一し、狭い画面でも行の内側に同じ余白を確保。配布EXEの明暗テーマ・1280/760幅でショートカット一覧と左位置が一致することを測定した。
+- ネストしたグループ、状態表示、Appletのオブジェクト/キー一覧、一覧見出しに共通の薄い背景変数を適用。raisedを20%、panelを80%で混ぜ、ボタン・選択状態の色は維持。新規画面向けの共通ガイドにも記載。
+- 前回の共通フォーム・manifest宣言・保存修正と今回のCSSをコミット対象としてレビュー。保存/API境界、未配置項目、検索アンカー、折りたたみ、両入口、テーマ/狭幅、ボタンへの非干渉を確認し、未解決指摘なし。5Appletのmanifestは表示セクション・版・最低本体版以外が旧HEADと同一。
+- 型検査、標準回帰 **410/410、fail/skip 0** が成功。Gmail 21/21、Watch 8/8、WallpaperSlideshow 8群、WindowsTools 11/11、WebBrowserTools 2/2の標準回帰もすべて成功。制限環境の初回.NET fixtureビルド失敗はログを保持し、同一コマンドを通常環境で実行して成功。Node24.21.0/pnpm12.10.1/.NET SDK10.0.402。依存lockfile/toolchain/公開待機設定を変更していない。
+- 再発行した固定EXEで共通設定の使いやすさ（許可とショートカットを含む10ページの追加表示計測）、Applet設定、設定検索、設定Shellの4スクリプトが終了0。ソースのnavigationとWebApplet回帰も終了0。明暗・1280/760、全6AppletとWebApplet、即時保存/部分JSON/非公開値保持、検索と折りたたみ、設定Shell切替を確認。画像で余白・背景を確認した。
+- 同じ未公開変更への仕上げなので0.36.8を維持してpublish.batを再実行し終了0。EXEは **144,170,983 bytes / SHA256 eda1b3d4bb025f1f9ad94def40102ab1b372637b99e708895246414ae90d9010**。FileVersion・asar内package・同梱Default Shell・feed一致。各固定EXE試験はコピーhashを照合。5Appletは版・製品内容を追加変更せず、既存の個別ZIPと全発行ファイルのhashが前回照合記録と一致。
+- [コミット検証証跡](.artifacts/commit-validation-applet-settings-20261014/validation.json)に、全6repoの検証tree、終了コード/ログhash、環境、配布物、文書のみの追記差分、最終tree/commitを記録する。試験後の製品変更なし。今回の固定配布物・既存コミットの再利用資料・失敗調査資料を保持し、XX.TEMP追加なし。
+- Applet固有のOS操作・実Googleログイン・実サービスでの動作は今回の表示メタデータ変更の対象外。通常publishとコミットまでとし、push・Release・実利用先deployは行わない。
+
+
+## 2026-10-14: Applet設定の共通テンプレートと用途別カード（0.36.8）
+
+- 先行の本体設定整理・通知起動修正は **f48add7aa5744a5ae9faf5af2de26d477dcf6fcf** へコミット済み。その後の依頼として本項を実装し、今回の続きは未コミットで動作確認へ渡す。
+- AppletSettingsFormをshared/settings-uiへ集約し、SettingsSection/SettingsFieldで設定一覧と詳細タブを同じ構成へ統一。manifestの任意`settingSections`を追加し、参照の存在・重複・サイズと最低ホスト版を検査する。宣言しない旧Appletや追加項目も既定カードへ表示し、検索アンカーと部分JSONの保存キーを維持。WebAppletもサイト・表示/ページ遷移・ログイン枠・管理の共通カードへ整理した。
+- Gmail、Watch、WallpaperSlideshow、WindowsTools、WebBrowserToolsの宣言を用途別に再配置。既存のsettings/settingActions/commandsは旧HEADとJSON比較で同一。WindowMoverは本体の共通表示だけで対応し、未変更repoの版更新・発行はしていない。大きい一覧は全幅、キー送信は明示ラベル付き、壁紙の履歴とWindows操作は折りたたみにした。
+- 実GUIで、表示方法の未保存時に別項目を編集すると空のpagesオブジェクトが生成され保存できない既存不具合を発見。writePathで未設定値の削除時に親を生成せず、表示方法を既定へ戻す際は空の親だけを除くよう修正。他ページ・非公開値の保持を回帰で確認。設定項目/保存ファイルの増減・破壊的変更がない表示メタデータと修正なので、各モジュールをパッチ更新。
+- 発行前レビューで宣言検証、未配置項目、両入口、検索/折りたたみ、操作中制御、即時保存、旧値/非公開値、JSON境界、最低ホスト版を確認。保存修正を再レビュー・検証し、未解決の製品指摘なし。型検査・書式・差分検査成功。最終標準回帰は **410/410、fail/skip 0、終了0**。
+- [ソースGUI](.artifacts/applet-settings-1791960158477/result.json)と[発行物GUI](.artifacts/applet-settings-1791960532161/result.json)は各4群成功。実6Appletの全項目・起動待ち、boolean/number/select・未接続選択保持、モニター/キー一覧、検索から折りたたみ展開、操作のbusy/結果、フォーム/JSON、両入口の保存、非公開値保持、6Applet+WebAppletの明暗テーマ/1280・760幅を確認。実設定Surfaceの画像を確認した。ネイティブAppletは停止したまま、操作ボタンは専用Node fixtureで検証し、壁紙変更・消灯・ロック・キー送信・実Googleログインは行っていない。
+- 発行物の既存設定検索GUI7群とソース画面遷移GUIも終了0。途中のfixtureのID/アカウント枠不足、ウィンドウ表示、範囲外入力、描画待ち不足を修正して再実行。先行失敗を成功扱いしていない。既存navigation試験は新テンプレートのアンカーと空表示へ追従した。
+- 本体と変更5Appletの`publish.bat`はすべて終了0。本体 **0.36.8 / 144,177,217 bytes / SHA256 74d17bc3cbee9a2b83a5ff7884111e87955fe018216e33b1dd576992c518f949**。EXE・asar内package・Default Shell・feedの版一致。Gmail **0.10.1**、Watch **0.1.4**、WallpaperSlideshow **0.4.7**、WindowsTools **0.1.4**、WebBrowserTools **0.3.3**。各minimumHostVersionは0.36.8で、ZIP全ファイルと発行フォルダー、manifest/feed、サイズ/SHA256、native製品版を照合。依存lockfile/workspace/toolchainは不変。
+- [完全ログ・発行物照合・GUI結果](.artifacts/applet-settings-redesign-20261014/)を保存。各Appletにも自身の`.artifacts/settings-template-20261014/`へ発行・照合記録を保存。未変更機能のApplet固有全回帰・OS操作・長期常駐は未実行。成功した新テンプレート試験は方式ごとに3件以内を保持、コミット参照/失敗調査/固定配布物を保護し、作業用編集スクリプトだけを整理。全体ZIP・push・Release・実利用先deployは行わない。
+
 ## 2026-10-14: 設定UI整理のコミット前回帰と管理者起動時の通知経路（0.36.7）
 
 - 「最新版です。」の結果本文を削除。現在版、最終確認日時、新バージョンのバッジ、未確認/失敗などの必要な結果は維持。

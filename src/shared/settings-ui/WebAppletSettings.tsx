@@ -1,3 +1,4 @@
+import { SettingsSection, SettingsField } from './SettingsSections';
 import { webSettingLabels, appletSettingsPageId } from '../settings-catalog';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
@@ -137,7 +138,10 @@ export function WebAppletSettings({
     }
   }
   return (
-    <section className="web-applet-settings" aria-label="WebApplet設定">
+    <section
+      className={`web-applet-settings ${itemId ? 'settings-sections' : ''}`}
+      aria-label="WebApplet設定"
+    >
       {!itemId && (
         <>
           {tab === 'settings' && (
@@ -336,176 +340,201 @@ export function WebAppletSettings({
         </>
       )}
       {tab === 'settings' && item && (
-        <div className="web-applet-form" key={item.id}>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'name')}>
-            {webSettingLabels.name}
-            <SettingsInput
-              aria-label="WebAppletの名前"
-              value={item.name}
-              maxLength={80}
-              onChange={(e) => change({ name: e.target.value })}
-            />
-          </label>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'url')}>
-            {webSettingLabels.url}
-            <SettingsInput
-              aria-label="WebAppletのURL"
-              value={item.url}
-              maxLength={4096}
-              onChange={(e) => change({ url: e.target.value })}
-              onBlur={() => {
-                if (item.name === '新しいWebApplet' && item.url !== 'https://example.com/')
-                  void defaults();
-              }}
-            />
-          </label>
-          <div
-            className="actions"
-            {...settingAnchor(appletSettingsPageId(item.id), 'action:defaults')}
-          >
-            <button className="secondary" disabled={busy} onClick={() => void defaults()}>
-              {webSettingLabels['action:defaults']}
-            </button>
-            {item.icon && (
-              <>
-                <img className="web-applet-icon" src={item.icon} alt="WebAppletのアイコン" />
-                <button className="text-button" onClick={() => change({ icon: '' })}>
-                  アイコンを戻す
-                </button>
-              </>
-            )}
-          </div>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'icon')}>
-            {webSettingLabels.icon}
-            <SettingsInput
-              aria-label="WebAppletのアイコン画像"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (
-                  file.size > 4 * 1024 * 1024 ||
-                  !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
-                ) {
-                  setMessage('4MB以下のPNG / JPEG / WebPを選んでください。');
-                  return;
-                }
-                const id = item.id,
-                  token = ++request.current;
-                try {
-                  const image = await createImageBitmap(file);
-                  const canvas = document.createElement('canvas');
-                  canvas.width = 32;
-                  canvas.height = 32;
-                  canvas.getContext('2d')!.drawImage(image, 0, 0, 32, 32);
-                  image.close();
-                  if (token === request.current) {
-                    const current = liveEditor.current.value;
-                    edit({
-                      ...current,
-                      webApplets: {
-                        ...current.webApplets,
-                        items: current.webApplets.items.map((a) =>
-                          a.id === id ? { ...a, icon: canvas.toDataURL('image/png') } : a,
-                        ),
-                      },
-                    });
-                  }
-                } catch {
-                  setMessage('画像を読み込めませんでした。');
-                }
-              }}
-            />
-          </label>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'display')}>
-            {webSettingLabels.display}
-            <select
-              aria-label="WebAppletの表示方法"
-              value={item.display}
-              onChange={(e) => change({ display: e.target.value as WebApplet['display'] })}
+        <div className="web-applet-form settings-sections" key={item.id}>
+          <SettingsSection title="サイト" description="名前・開始ページ・アイコンを設定します。">
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'name')}
+              title={webSettingLabels.name}
             >
-              <option value="page">本体のページ</option>
-              <option value="window">別ウィンドウ</option>
-            </select>
-          </label>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'navigation')}>
-            {webSettingLabels.navigation}
-            <select
-              aria-label="WebAppletのページ遷移"
-              value={item.navigation}
-              onChange={(e) => change({ navigation: e.target.value as WebNavigation })}
+              <SettingsInput
+                aria-label="WebAppletの名前"
+                value={item.name}
+                maxLength={80}
+                onChange={(e) => change({ name: e.target.value })}
+              />
+            </SettingsField>
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'url')}
+              title={webSettingLabels.url}
             >
-              <option value="none">開始ページに固定</option>
-              <option value="same-origin">同じorigin内だけ</option>
-              <option value="any">HTTP(S)のページを許可</option>
-            </select>
-          </label>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'allowedOrigins')}>
-            {webSettingLabels.allowedOrigins}
-            <SettingsTextarea
-              aria-label="WebAppletの追加許可先"
-              value={item.allowedOrigins.join('\n')}
-              onChange={(e) =>
-                change({ allowedOrigins: e.target.value.split('\n').filter(Boolean) })
-              }
-              placeholder="https://accounts.example.com"
-            />
-          </label>
-          <label {...settingAnchor(appletSettingsPageId(item.id), 'accountId')}>
-            {webSettingLabels.accountId}
-            <select
-              aria-label="WebAppletのアカウント"
-              value={item.accountId}
-              onChange={(e) => change({ accountId: e.target.value })}
+              <SettingsInput
+                aria-label="WebAppletのURL"
+                value={item.url}
+                maxLength={4096}
+                onChange={(e) => change({ url: e.target.value })}
+                onBlur={() => {
+                  if (item.name === '新しいWebApplet' && item.url !== 'https://example.com/')
+                    void defaults();
+                }}
+              />
+            </SettingsField>
+            <div
+              className="actions"
+              {...settingAnchor(appletSettingsPageId(item.id), 'action:defaults')}
             >
-              {!accounts.some((a) => a.id === item.accountId) && (
-                <option value={item.accountId} disabled>
-                  アカウント枠を選び直してください
-                </option>
+              <button className="secondary" disabled={busy} onClick={() => void defaults()}>
+                {webSettingLabels['action:defaults']}
+              </button>
+              {item.icon && (
+                <>
+                  <img className="web-applet-icon" src={item.icon} alt="WebAppletのアイコン" />
+                  <button className="text-button" onClick={() => change({ icon: '' })}>
+                    アイコンを戻す
+                  </button>
+                </>
               )}
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div
-            className="actions"
-            {...settingAnchor(appletSettingsPageId(item.id), 'action:accounts')}
-          >
-            <button className="text-button" onClick={onAccounts}>
-              {webSettingLabels['action:accounts']}
-            </button>
-          </div>
-          <p className="muted">
-            同じ枠を選んだWebAppletはログイン状態を共有します。Gmailの枠とは共有しません。
-          </p>
-          <div
-            className="actions"
-            {...settingAnchor(appletSettingsPageId(item.id), 'action:delete')}
-          >
-            <button
-              className="text-button danger"
-              onClick={() => {
-                if (onDelete) {
-                  onDelete();
-                  return;
-                }
-                edit({
-                  ...settings,
-                  webApplets: { ...data, items: data.items.filter((a) => a.id !== item.id) },
-                });
-                setSelected('');
-              }}
+            </div>
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'icon')}
+              title={webSettingLabels.icon}
             >
-              {webSettingLabels['action:delete']}
-            </button>
-          </div>
-          <p className="muted">
-            削除は設定の保存で反映します。アカウント枠とログイン状態は残ります。
-          </p>
+              <SettingsInput
+                aria-label="WebAppletのアイコン画像"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (
+                    file.size > 4 * 1024 * 1024 ||
+                    !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)
+                  ) {
+                    setMessage('4MB以下のPNG / JPEG / WebPを選んでください。');
+                    return;
+                  }
+                  const id = item.id,
+                    token = ++request.current;
+                  try {
+                    const image = await createImageBitmap(file);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 32;
+                    canvas.height = 32;
+                    canvas.getContext('2d')!.drawImage(image, 0, 0, 32, 32);
+                    image.close();
+                    if (token === request.current) {
+                      const current = liveEditor.current.value;
+                      edit({
+                        ...current,
+                        webApplets: {
+                          ...current.webApplets,
+                          items: current.webApplets.items.map((a) =>
+                            a.id === id ? { ...a, icon: canvas.toDataURL('image/png') } : a,
+                          ),
+                        },
+                      });
+                    }
+                  } catch {
+                    setMessage('画像を読み込めませんでした。');
+                  }
+                }}
+              />
+            </SettingsField>
+          </SettingsSection>
+          <SettingsSection
+            title="表示とページ遷移"
+            description="表示先と、Applet内で開けるページを選びます。"
+          >
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'display')}
+              title={webSettingLabels.display}
+            >
+              <select
+                aria-label="WebAppletの表示方法"
+                value={item.display}
+                onChange={(e) => change({ display: e.target.value as WebApplet['display'] })}
+              >
+                <option value="page">本体のページ</option>
+                <option value="window">別ウィンドウ</option>
+              </select>
+            </SettingsField>
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'navigation')}
+              title={webSettingLabels.navigation}
+            >
+              <select
+                aria-label="WebAppletのページ遷移"
+                value={item.navigation}
+                onChange={(e) => change({ navigation: e.target.value as WebNavigation })}
+              >
+                <option value="none">開始ページに固定</option>
+                <option value="same-origin">同じorigin内だけ</option>
+                <option value="any">HTTP(S)のページを許可</option>
+              </select>
+            </SettingsField>
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'allowedOrigins')}
+              title={webSettingLabels.allowedOrigins}
+            >
+              <SettingsTextarea
+                aria-label="WebAppletの追加許可先"
+                value={item.allowedOrigins.join('\n')}
+                onChange={(e) =>
+                  change({ allowedOrigins: e.target.value.split('\n').filter(Boolean) })
+                }
+                placeholder="https://accounts.example.com"
+              />
+            </SettingsField>
+          </SettingsSection>
+          <SettingsSection
+            title="ログイン用のアカウント枠"
+            description="同じ枠を選んだWebAppletはログイン状態を共有します。Gmailの枠とは共有しません。"
+          >
+            <SettingsField
+              {...settingAnchor(appletSettingsPageId(item.id), 'accountId')}
+              title={webSettingLabels.accountId}
+            >
+              <select
+                aria-label="WebAppletのアカウント"
+                value={item.accountId}
+                onChange={(e) => change({ accountId: e.target.value })}
+              >
+                {!accounts.some((a) => a.id === item.accountId) && (
+                  <option value={item.accountId} disabled>
+                    アカウント枠を選び直してください
+                  </option>
+                )}
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </SettingsField>
+            <div
+              className="actions"
+              {...settingAnchor(appletSettingsPageId(item.id), 'action:accounts')}
+            >
+              <button className="text-button" onClick={onAccounts}>
+                {webSettingLabels['action:accounts']}
+              </button>
+            </div>
+          </SettingsSection>
+          <SettingsSection title="管理" collapsible>
+            <div
+              className="actions"
+              {...settingAnchor(appletSettingsPageId(item.id), 'action:delete')}
+            >
+              <button
+                className="text-button danger"
+                onClick={() => {
+                  if (onDelete) {
+                    onDelete();
+                    return;
+                  }
+                  edit({
+                    ...settings,
+                    webApplets: { ...data, items: data.items.filter((a) => a.id !== item.id) },
+                  });
+                  setSelected('');
+                }}
+              >
+                {webSettingLabels['action:delete']}
+              </button>
+            </div>
+            <p className="muted">
+              削除すると、このWebAppletを一覧から取り除きます。アカウント枠とログイン状態は残ります。
+            </p>
+          </SettingsSection>
         </div>
       )}
       {message && <p role="status">{message}</p>}

@@ -293,6 +293,9 @@ export function settingsCatalog(
                 ),
                 ...(a.settingActions ?? []).map((s) => ({
                   ...item(id, `action:${s.command}`, s.title, s.description),
+                  keywords: (a.settingSections ?? [])
+                    .filter((section) => section.actions?.includes(s.command))
+                    .flatMap((section) => [section.title, section.description ?? '']),
                   unavailableReason:
                     !a.enabled || a.state !== 'running'
                       ? 'Appletを開始してから操作できます。'
@@ -300,7 +303,12 @@ export function settingsCatalog(
                 })),
                 ...(a.settings ?? []).map((s) => ({
                   ...item(id, `setting:${s.key}`, s.title, s.description, s),
-                  keywords: definitionTerms(s),
+                  keywords: [
+                    ...definitionTerms(s),
+                    ...(a.settingSections ?? [])
+                      .filter((section) => section.settings?.includes(s.key))
+                      .flatMap((section) => [section.title, section.description ?? '']),
+                  ],
                 })),
               ],
       };
@@ -368,13 +376,26 @@ export const readSettingsPath = (value: unknown, path: SettingsPath): any =>
   path.reduce((v: any, key) => (v != null && Object.hasOwn(v, key) ? v[key] : undefined), value);
 function writePath(value: any, path: SettingsPath, next: unknown) {
   let parent = value;
+  const ancestors: { parent: any; key: string }[] = [];
   for (const key of path.slice(0, -1)) {
-    if (!Object.hasOwn(parent, key)) parent[key] = {};
+    if (!Object.hasOwn(parent, key)) {
+      if (next === undefined) return;
+      parent[key] = {};
+    }
+    ancestors.push({ parent, key });
     parent = parent[key];
   }
   const key = path.at(-1)!;
-  if (next === undefined) delete parent[key];
-  else parent[key] = structuredClone(next);
+  if (next === undefined) {
+    delete parent[key];
+    // Removing a display override must not leave an invalid pages[id]: {} behind.
+    for (const ancestor of ancestors.reverse()) {
+      const child = ancestor.parent[ancestor.key];
+      if (!child || typeof child !== 'object' || Array.isArray(child) || Object.keys(child).length)
+        break;
+      delete ancestor.parent[ancestor.key];
+    }
+  } else parent[key] = structuredClone(next);
 }
 function webItem(value: Settings, page: SettingsPageDefinition) {
   const row = value.webApplets.items.find((a) => a.id === page.owner);

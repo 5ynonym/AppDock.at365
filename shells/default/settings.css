@@ -190,7 +190,7 @@ body,
   overflow: hidden;
 }
 .settings-panel .permission-table thead {
-  background: var(--raised);
+  background: var(--settings-group-background);
 }
 .settings-panel .command-shortcut-summary {
   flex-wrap: wrap;
@@ -199,7 +199,7 @@ body,
 .settings-panel .web-account-card,
 .settings-panel .notification-setting-card,
 .settings-panel .gesture-settings-card {
-  background: color-mix(in srgb, var(--raised) 40%, var(--panel));
+  background: var(--settings-group-background);
 }
 @container settings-page (max-width: 600px) {
   .settings-page-heading h1 {

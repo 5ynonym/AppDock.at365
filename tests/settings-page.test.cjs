@@ -3,6 +3,30 @@ const assert = require('node:assert/strict');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const { SettingsInputSession } = require('../out/main/main/core/settings-input-session');
 const { SettingsPageSession } = require('../out/main/main/core/settings-page');
+const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog');
+
+test('Applet page edits allow absent display overrides and reset them without empty page objects', () => {
+  const current = createDefaultSettings();
+  const id = 'fixture.pages';
+  current.extensions[id] = { enabled: false, settings: { preserved: 'value' } };
+  const applets = [
+    { id, pages: [{ id: 'main', title: 'Main', defaultDisplay: 'page' }], settings: [] },
+  ];
+  const page = { id: `applet:${id}`, kind: 'applet', owner: id, json: true };
+  const projected = settingsProjection(current, page, applets);
+  projected.extensions[id].startupDelaySeconds = 7;
+  const saved = applySettingsJson(current, page, applets, JSON.stringify(projected));
+  assert.equal(saved.extensions[id].startupDelaySeconds, 7);
+  assert.equal(saved.extensions[id].pages, undefined);
+  assert.deepEqual(saved.extensions[id].settings, { preserved: 'value' });
+  saved.extensions[id].pages = { main: { display: 'window' }, other: { display: 'window' } };
+  const reset = applySettingsJson(saved, page, applets, JSON.stringify(projected));
+  assert.deepEqual(reset.extensions[id].pages, { other: { display: 'window' } });
+  delete saved.extensions[id].pages.other;
+  const onlyPage = applySettingsJson(saved, page, applets, JSON.stringify(projected));
+  assert.equal(onlyPage.extensions[id].pages, undefined);
+  assert.doesNotThrow(() => require('../out/main/shared/settings-schema').parseSettings(onlyPage));
+});
 function fixture() {
   let saved = { value: createDefaultSettings(), revision: 1 };
   saved.value.extensions['private.other'] = {

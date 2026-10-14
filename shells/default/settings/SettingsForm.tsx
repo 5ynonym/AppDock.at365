@@ -18,7 +18,7 @@ import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
-import { AppletSettings } from './AppletSettings';
+import { AppletSettingsForm } from '../../../src/shared/settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField } from '../../../src/shared/settings-ui/SettingsSections';
 export interface FormEditor {
   value: Settings;
@@ -60,7 +60,7 @@ export function SettingsForm({
   };
   if (page.kind === 'applet')
     return (
-      <AppletSettings
+      <AppletSettingsForm
         applet={extensions.find((a) => a.id === page.owner)!}
         settings={settings}
         onChange={edit}

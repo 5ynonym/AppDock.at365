@@ -1,6 +1,7 @@
 import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { settingsControls } from './api';
 import { useState } from 'react';
+import { SettingsField } from './SettingsSections';
 import type { SettingDefinition } from '../contracts';
 import { readObjectList, objectFieldValue, normalizeObject } from '../object-list';
 
@@ -84,8 +85,7 @@ export function ObjectListSetting({
             const current = objectFieldValue(entry, field);
             const name = `${label}${index + 1} ${field.title}`;
             return (
-              <div className="object-field" key={field.key}>
-                <label>{field.title}</label>
+              <SettingsField title={field.title} description={field.description} key={field.key}>
                 {field.type === 'string-list' ? (
                   <div className="source-folders">
                     {((current as string[]) ?? []).map((folder, slot) => (
@@ -183,8 +183,7 @@ export function ObjectListSetting({
                     }
                   />
                 )}
-                {field.description && <p>{field.description}</p>}
-              </div>
+              </SettingsField>
             );
           })}
         </fieldset>

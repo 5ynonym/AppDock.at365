@@ -293,7 +293,7 @@ const checks = [];
     await body.getByLabel('検証項目 0', { exact: true }).fill('編集した値');
     assert.equal(await body.getByLabel('Appletの設定項目を検索').count(), 0);
     assert.equal(
-      await body.locator('.applet-settings .setting-row').count(),
+      await body.locator('.applet-settings [data-setting-item]').count(),
       30, // 24 strings, four typed settings, startup delay and the action row.
       'all declared settings, the common startup delay and action remain visible',
     );
@@ -352,7 +352,9 @@ const checks = [];
     );
 
     await chooseApplet('検証Applet 00');
-    await body.getByText('このAppletには設定項目がありません。').waitFor();
+    await body
+      .getByText('個別の設定項目はありません。操作キーは本体の「ショートカット」で設定できます。')
+      .waitFor();
     await button('Appletに戻る').click();
     await detailTab('設定').click();
     await button('ショートカットキー').click();
