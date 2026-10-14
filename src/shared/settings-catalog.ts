@@ -36,6 +36,7 @@ export const hostSettingsPages = [
   ['general', '一般'],
   ['notifications', '通知'],
   ['tts', '読み上げ'],
+  ['ai', 'AI'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカット'],
@@ -47,6 +48,18 @@ export const hostSettingsPages = [
   ['about', 'バージョン情報・更新'],
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
+  ai: [
+    ['commonPrompt', '共通プロンプト', '各AppletとMCPからの追加プロンプトに組み合わせる基本方針'],
+    ['defaultConnectionId', '既定のAI接続', '呼出し側が接続を省略したときに使用'],
+    [
+      'connections',
+      'AI接続設定',
+      'Ollama LM Studio llama.cpp OpenAI サーバー URL モデル 認証 互換性',
+    ],
+    ['apiKey', 'AIのAPIキー', 'このPCだけに暗号化保存'],
+    ['access', 'このPCで使用', 'Applet MCPからの送信先を確認して許可'],
+    ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
+  ],
   appearance: [
     ...shellRegions.map(({ id, title }): [string, string, string] => [
       'shellProviders.' + id,
@@ -157,6 +170,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
     (
       {
         useTts: 'TTSサーバーへ接続し、テキストから音声を生成・再生します。',
+        useAi:
+          'AIサーバーへ入力を送信し、文章生成やモデル一覧を利用します。生成にはコマンド実行の許可も必要です。',
         read: '公開された状態・設定・コマンド一覧を取得します。',
         execute: '公開されたコマンドを実行します。',
         write: '本体とAppletが公開した設定を変更します。',
@@ -334,6 +349,8 @@ export function settingsPaths(
       return ['theme', 'shellProviders'].map((k) => ['host', k]);
     case 'tts':
       return [['tts']];
+    case 'ai':
+      return [['ai']];
     case 'notifications':
       return [['host', 'notifications'], ['notificationPreferences']];
     case 'general':

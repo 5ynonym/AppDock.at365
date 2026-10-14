@@ -21,6 +21,7 @@ export interface ExtensionSettings {
 }
 export interface Settings {
   tts?: import('./tts').TtsSettings;
+  ai?: import('./ai').AiSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];
   gestures?: import('./gestures').GestureSettings;

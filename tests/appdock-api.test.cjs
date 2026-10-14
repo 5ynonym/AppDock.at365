@@ -70,12 +70,13 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   const f = setup(t);
   assert.equal((await f.call('system.getInfo')).ok, true);
   assert.equal(f.access.get().useTts, false);
+  assert.equal(f.access.get().useAi, false);
   assert.ok(
     Object.entries(f.access.get())
-      .filter(([k]) => k !== 'useTts')
+      .filter(([k]) => k !== 'useTts' && k !== 'useAi')
       .every(([, v]) => v === true),
   );
-  assert.equal(Object.keys(f.access.get()).length, 10);
+  assert.equal(Object.keys(f.access.get()).length, 11);
   f.grant({});
   assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
@@ -83,6 +84,7 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   for (const method of automationMethods.filter(
     (m) =>
       !m.startsWith('tts.') &&
+      !m.startsWith('ai.') &&
       !m.startsWith('input.') &&
       !m.startsWith('ui.') &&
       m !== 'commands.execute' &&

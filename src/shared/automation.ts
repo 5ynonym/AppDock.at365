@@ -7,6 +7,7 @@ export interface AutomationState {
   allowEditGestures: boolean;
   allowEditRibbon: boolean;
   allowUseTts: boolean;
+  allowUseAi: boolean;
   allowEditTray: boolean;
   port: number;
   running: boolean;
@@ -26,6 +27,7 @@ export type AutomationAction =
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
   | { kind: 'setTts'; allowed: boolean }
+  | { kind: 'setAi'; allowed: boolean }
   | { kind: 'setExecution'; allowed: boolean }
   | { kind: 'setAppletManagement'; allowed: boolean }
   | { kind: 'setShortcutEditing'; allowed: boolean }

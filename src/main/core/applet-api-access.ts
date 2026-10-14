@@ -32,7 +32,10 @@ export class AppletApiAccess {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         this.grants = Object.fromEntries(
-          Object.keys(appletApiPermissionLabels).map((key) => [key, key !== 'useTts']),
+          Object.keys(appletApiPermissionLabels).map((key) => [
+            key,
+            !['useTts', 'useAi'].includes(key),
+          ]),
         );
         return;
       }
