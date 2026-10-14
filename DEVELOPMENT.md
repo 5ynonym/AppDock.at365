@@ -9,6 +9,7 @@
 | 実装・コミット・Release | [共通手順](docs/development-workflow.md)、[Release](docs/RELEASING.md)、[全体パッケージ](docs/all-in-one.md) |
 | ホストとAppletの開発 | [ホスト開発](docs/host-development.md)、[Applet開発](docs/applet-development.md)、[Applet API](docs/extensions.md) |
 | 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
+| 設定の再起動通知・JSON復旧（設計案） | [ファイル受信・復旧と理由付き再起動通知](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
 | TTSサーバー連携・読み上げAPI | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
 | AI共通API・プロンプト設定 | [AI文章生成とApplet/MCP共通API](docs/ai.md)、[Gmail連携を含む設計](docs/ai-services-design.md)（Gmailは未実装） |
