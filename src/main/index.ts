@@ -31,6 +31,7 @@ import {
   net,
   screen,
   safeStorage,
+  clipboard,
   powerMonitor,
 } from 'electron';
 import fs from 'node:fs';
@@ -1372,6 +1373,11 @@ function settingsPageActions(
               'rotateToken',
               'selectConfig',
               'selectName',
+              'setConnectionScope',
+              'setNetworkHostnames',
+              'copyToken',
+              'copyEndpoint',
+              'retryStart',
             ];
       if (!value || !permitted.includes(value.kind))
         throw Error('このページでは利用できない操作です。');
@@ -2516,6 +2522,15 @@ async function initialize() {
       ai.forgetOwner(owner);
     },
     audit: (level, message) => log.write(level, 'automation', message),
+    writeClipboard: (value) => clipboard.writeText(value),
+    failed: (code, message) =>
+      errors.report({
+        eventId: randomUUID(),
+        source: 'automation',
+        title: 'MCP連携の処理に失敗しました',
+        code,
+        message,
+      }),
     createApi: () => operationApi,
   });
   await automation.initialize();

@@ -3387,6 +3387,11 @@ summary {
 .codex-settings {
   min-width: 0;
 }
+.codex-network-endpoint input {
+  flex: 1 1 20rem;
+  min-width: 0;
+  max-width: 100%;
+}
 .settings-form .codex-settings h3 {
   font-size: 16px;
   color: var(--text);

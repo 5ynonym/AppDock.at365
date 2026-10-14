@@ -18,6 +18,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   const [file, setFile] = useState('');
   const [port, setPort] = useState('0');
   const [name, setName] = useState('AppDock');
+  const [hostnames, setHostnames] = useState('');
   const operation = useRef(false);
   useEffect(() => {
     let active = true;
@@ -47,6 +48,18 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   useEffect(() => {
     if (state) setName(state.serverId);
   }, [state?.serverId]);
+  const savedHostnames = state?.networkHostnames.join('\n');
+  useEffect(() => {
+    setHostnames(savedHostnames ?? '');
+  }, [savedHostnames]);
+  function saveHostnames() {
+    const names = hostnames
+      .split(/\r?\n/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (JSON.stringify(names) !== JSON.stringify(state?.networkHostnames))
+      void run({ kind: 'setNetworkHostnames', hostnames: names });
+  }
   async function run(action: AutomationAction) {
     if (operation.current) return;
     operation.current = true;
@@ -85,10 +98,10 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         ? '確認が必要'
         : '未登録';
   return (
-    <section className="settings-sections codex-settings" aria-label="Codex連携">
+    <section className="settings-sections codex-settings" aria-label="MCP・Codex連携">
       <SettingsSection
         title="接続の状態"
-        description="連携を有効にして登録すると、同じPCのCodexからAppDockを操作できます。"
+        description="同じPCのCodexや、ネットワーク上のMCPクライアントからAppDockを操作できます。"
       >
         <dl className="settings-status-grid">
           <div>
@@ -100,10 +113,18 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             <dd>{registration}</dd>
           </div>
           <div>
-            <dt>クライアント接続</dt>
+            <dt>このPCからの最終接続</dt>
             <dd>
-              {state.lastClientAt
-                ? new Date(state.lastClientAt).toLocaleString()
+              {state.lastLocalClientAt
+                ? new Date(state.lastLocalClientAt).toLocaleString()
+                : 'まだ確認されていません'}
+            </dd>
+          </div>
+          <div>
+            <dt>ネットワークからの最終接続</dt>
+            <dd>
+              {state.lastNetworkClientAt
+                ? new Date(state.lastNetworkClientAt).toLocaleString()
                 : 'まだ確認されていません'}
             </dd>
           </div>
@@ -120,6 +141,35 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             onChange={(v) => configure(v)}
           />
         </SettingsField>
+        <SettingsField
+          title="接続範囲"
+          description="変更時に通信が一時切断されます。同じPCのCodexの再登録は不要です。"
+          {...settingAnchor('codex', 'connectionScope')}
+        >
+          <select
+            aria-label="接続範囲"
+            value={state.connectionScope}
+            disabled={busy}
+            onChange={(e) =>
+              void run({ kind: 'setConnectionScope', scope: e.target.value as 'local' | 'network' })
+            }
+          >
+            <option value="local">このPCのみ</option>
+            <option value="network">ネットワークからも接続可能（IPv4）</option>
+          </select>
+          {state.connectionScope === 'network' && (
+            <p>
+              到達可能な接続元に、認証トークンとMCPの操作許可を適用します。LAN直結は暗号化されないHTTP接続です。tailnet経由はTailscaleで保護されます。利用するネットワークとファイアウォールの設定を確認してください。
+            </p>
+          )}
+        </SettingsField>
+        {state.enabled && !state.running && (
+          <div className="settings-actions">
+            <button disabled={busy} onClick={() => void run({ kind: 'retryStart' })}>
+              接続を再試行
+            </button>
+          </div>
+        )}
         <SettingsFeedback
           error={error || state.error || state.registrationError}
           message={message}
@@ -140,7 +190,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             {state.registration === 'registered' ? '登録を修復' : 'Codexへ登録'}
           </button>
           <button disabled={busy || !state.running} onClick={() => void run({ kind: 'test' })}>
-            接続テスト
+            このPC内の接続テスト
           </button>
         </div>
         {!state.running && <p>先に「連携を有効にする」をオンにしてください。</p>}
@@ -151,7 +201,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           登録後はCodexを再読み込みまたは再起動し、新しいチャットで「AppDockの状態を確認して」と依頼してください。
         </p>
         <p>
-          接続テストはAppDock内の疎通確認です。Codexからの接続は上の「クライアント接続」で確認できます。
+          接続テストはAppDock内の疎通確認です。最終接続日時はCodex以外のMCPクライアントも含みます。Codexでの操作や別端末からの疎通は、それぞれのクライアントで確認してください。
         </p>
         <SettingsField
           title="操作できる範囲"
@@ -164,11 +214,100 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
       </SettingsSection>
       <SettingsSection
+        title="ネットワークからの接続"
+        description="別端末のMCPクライアントへ、Streamable HTTPの接続先とBearerトークンを設定します。"
+        {...settingAnchor('codex', 'network')}
+      >
+        {state.connectionScope !== 'network' ? (
+          <p>接続範囲を「ネットワークからも接続可能」にすると利用できます。</p>
+        ) : !state.running ? (
+          <p>MCPは停止中です。</p>
+        ) : state.networkEndpoints.length === 0 ? (
+          <p>ネットワークの接続先候補がありません。ネットワーク接続を確認してください。</p>
+        ) : (
+          <SettingsField
+            title="ネットワークの接続先候補"
+            description="接続できるかどうかは、利用する端末から確認してください。"
+          >
+            {state.networkEndpoints.map((endpoint) => (
+              <div key={endpoint} className="settings-actions codex-network-endpoint">
+                <SettingsInput aria-label={`接続先 ${endpoint}`} readOnly value={endpoint} />
+                <button
+                  disabled={busy}
+                  onClick={() => void run({ kind: 'copyEndpoint', endpoint })}
+                >
+                  接続先をコピー
+                </button>
+              </div>
+            ))}
+          </SettingsField>
+        )}
+        <div className="settings-actions">
+          <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
+            接続の状態を再読み込み
+          </button>
+          <button
+            disabled={busy || !state.canCopyToken}
+            onClick={() => void run({ kind: 'copyToken' })}
+          >
+            接続トークンをコピー
+          </button>
+        </div>
+        <p>
+          接続トークンはOSのクリップボードへコピーします。同じトークンを使うクライアントは、操作許可とAI・読み上げのジョブ管理を共有します。
+        </p>
+        <SettingsField
+          title="認証の設定例"
+          description="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
+        >
+          <div>
+            <p>
+              <strong>環境変数を使う場合</strong>
+              <br />
+              Bearerトークンを設定する環境変数の名前：<code>MCP_BEARER_TOKEN</code>（例）
+              <br />
+              接続元アプリが参照できる環境変数に、コピーしたトークンだけを保存します。
+              <code>Bearer </code>
+              は付けません。環境変数を追加・変更したら、接続元アプリを再起動してください。
+            </p>
+            <p>
+              <strong>ヘッダーを直接設定する場合</strong>
+              <br />
+              ヘッダーのキー：<code>Authorization</code>
+              <br />
+              ヘッダーの値：<code>{'Bearer <コピーしたトークン>'}</code>
+              <br />
+              <code>Bearer</code>の後に半角スペースを1つ入れ、
+              <code>{'<コピーしたトークン>'}</code>を実際のトークンに置き換えます。
+            </p>
+            <p>
+              通常はどちらか一方を設定します。環境変数名は接続元アプリの指定と一致させてください。
+              ヘッダーの値に<code>MCP_BEARER_TOKEN</code>
+              と書くだけでは、トークンに置き換わりません。
+            </p>
+          </div>
+        </SettingsField>
+      </SettingsSection>
+      <SettingsSection
         title="登録先と接続の詳細"
         description="設定ファイル・登録名・ポートの変更や、登録の解除ができます。"
         collapsible
         {...settingAnchor('codex', 'connection')}
       >
+        <SettingsField
+          title="追加の接続先ホスト名"
+          description="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名を1行ずつ指定します。入力欄を離れると保存します（16件まで）。"
+        >
+          <textarea
+            aria-label="追加の接続先ホスト名"
+            value={hostnames}
+            rows={3}
+            disabled={busy}
+            spellCheck={false}
+            onChange={(e) => setHostnames(e.target.value)}
+            onBlur={saveHostnames}
+          />
+        </SettingsField>
         <SettingsField
           title="Codexの設定ファイル"
           description="通常は初期表示の場所を使います。別PCやWSLはこの画面の登録対象ではありません。"
@@ -234,11 +373,11 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               ポートを適用
             </button>
           </div>
-          <p>接続先: {state.endpoint || '連携を有効にすると決まります'}</p>
+          <p>このPCの接続先: {state.endpoint || '連携を有効にすると決まります'}</p>
         </SettingsField>
         <SettingsField
           title="認証と登録の管理"
-          description="認証情報の再発行後は、登録を修復してください。接続トークンはCodexのローカル設定にも保存されます。"
+          description="認証情報の再発行後はCodexの登録を修復し、他のMCPクライアントのトークンも更新してください。接続トークンはCodexのローカル設定にも保存されます。"
         >
           <div className="settings-actions">
             <button

@@ -1,4 +1,13 @@
+export type ConnectionScope = 'local' | 'network';
+
 export interface AutomationState {
+  connectionScope: ConnectionScope;
+  activeConnectionScope: ConnectionScope | null;
+  networkHostnames: string[];
+  networkEndpoints: string[];
+  canCopyToken: boolean;
+  lastLocalClientAt?: string;
+  lastNetworkClientAt?: string;
   enabled: boolean;
   allowWrite: boolean;
   allowExecute: boolean;
@@ -21,6 +30,10 @@ export interface AutomationState {
 }
 
 export type AutomationAction =
+  | { kind: 'setConnectionScope'; scope: ConnectionScope }
+  | { kind: 'setNetworkHostnames'; hostnames: string[] }
+  | { kind: 'copyToken' | 'retryStart' }
+  | { kind: 'copyEndpoint'; endpoint: string }
   | { kind: 'status' }
   | { kind: 'configure'; enabled: boolean; allowWrite: boolean; port: number }
   | { kind: 'register' | 'unregister' | 'test' | 'rotateToken' }

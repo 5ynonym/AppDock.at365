@@ -4,7 +4,9 @@ import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { AutomationApi, AutomationError, automationMethods } from './automation-api';
+import { AutomationApi, AutomationError } from './automation-api';
+import type { ConnectionScope } from '../../shared/automation';
+import { isLocalClient, validMcpHeaders } from './automation-network';
 
 const entries = operationsFor('mcp');
 const definitions = entries.map(([, { callers, permissions, ...tool }]) => tool);
@@ -42,31 +44,93 @@ function body(req: IncomingMessage): Promise<unknown> {
 export class AutomationMcp {
   private server?: http.Server;
   private requests = new Set<Server>();
+  private accepting = false;
+  private epoch = 0;
+  private probe?: { id: string; seen: boolean };
   port = 0;
   constructor(
     private api: AutomationApi,
     private token: () => string,
-    private connected: () => void,
+    private connected: (local: boolean) => void,
     private version: string,
     private audit: (level: string, message: string) => void = () => {},
   ) {}
-  async start(port: number) {
+  activate() {
+    if (this.server?.listening) this.accepting = true;
+  }
+  async verifyLoopback() {
+    const probe = { id: randomUUID(), seen: false };
+    this.probe = probe;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: '127.0.0.1',
+            port: this.port,
+            path: '/mcp',
+            method: 'POST',
+            agent: false,
+            signal: AbortSignal.timeout(1500),
+            headers: {
+              Authorization: `Bearer ${this.token()}`,
+              'x-appdock-startup-probe': probe.id,
+            },
+          },
+          (response) => {
+            response.resume();
+            response.on('end', () =>
+              response.statusCode === 204 && probe.seen
+                ? resolve()
+                : reject(Error('LOOPBACK_MISMATCH')),
+            );
+            response.on('error', reject);
+          },
+        );
+        request.on('error', reject);
+        request.setTimeout(1500, () => request.destroy(Error('LOOPBACK_TIMEOUT')));
+        request.end();
+      });
+    } finally {
+      this.probe = undefined;
+    }
+  }
+  async start(
+    port: number,
+    scope: ConnectionScope = 'local',
+    hostnames: () => string[] = () => [],
+    deferred = false,
+  ) {
+    const epoch = ++this.epoch;
+    const current = () => this.accepting && this.epoch === epoch;
     const server = http.createServer(async (req, res) => {
       const fail = (status: number) => {
+        if (res.destroyed || res.writableEnded) return;
         if (!res.headersSent)
           res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
         res.end(http.STATUS_CODES[status]);
       };
+      const probe = this.probe;
+      const probing =
+        !this.accepting &&
+        this.epoch === epoch &&
+        probe &&
+        req.headers['x-appdock-startup-probe'] === probe.id &&
+        isLocalClient(req.socket.remoteAddress) &&
+        req.method === 'POST';
+      if (!current() && !probing) return fail(503);
       if (req.url !== '/mcp') return fail(404);
-      if (
-        req.headers.host !== `127.0.0.1:${this.port}` ||
-        (req.headers.origin && req.headers.origin !== `http://127.0.0.1:${this.port}`)
-      )
-        return fail(403);
+      const validHeaders = () => validMcpHeaders(req, this.port, scope, hostnames());
+      if (!validHeaders()) return fail(403);
       const authorization = Buffer.from(req.headers.authorization ?? '');
       const expected = Buffer.from(`Bearer ${this.token()}`);
       if (authorization.length !== expected.length || !timingSafeEqual(authorization, expected))
         return fail(401);
+      if (probing) {
+        probe.seen = true;
+        res.writeHead(204, { 'Cache-Control': 'no-store' });
+        res.end();
+        return;
+      }
       if (req.method !== 'POST') {
         res.setHeader('Allow', 'POST');
         return fail(405);
@@ -104,6 +168,20 @@ export class AutomationMcp {
         const context = `[MCP] API=${method} requestId=${requestId}${target ? ` target=${target}` : ''}`;
         if (method === 'commands.execute') this.audit('info', `${context} result=started`);
         try {
+          if (!current() || !validHeaders())
+            throw new AutomationError(
+              'NOT_READY',
+              '接続設定が変更されました。接続を確認してください。',
+            );
+          const latestToken = Buffer.from(`Bearer ${this.token()}`);
+          if (
+            authorization.length !== latestToken.length ||
+            !timingSafeEqual(authorization, latestToken)
+          )
+            throw new AutomationError(
+              'NOT_READY',
+              '認証情報が変更されました。接続を確認してください。',
+            );
           if (index < 0) throw new AutomationError('NOT_FOUND', '対応していないツールです。');
           const value = await this.api.call(methods[index], request.params.arguments ?? {});
           this.audit(
@@ -132,8 +210,16 @@ export class AutomationMcp {
       });
       try {
         const data = await body(req);
-        const current = Buffer.from(`Bearer ${this.token()}`);
-        if (authorization.length !== current.length || !timingSafeEqual(authorization, current)) {
+        if (!current() || !validHeaders()) {
+          fail(403);
+          dispose();
+          return;
+        }
+        const currentToken = Buffer.from(`Bearer ${this.token()}`);
+        if (
+          authorization.length !== currentToken.length ||
+          !timingSafeEqual(authorization, currentToken)
+        ) {
           fail(401);
           dispose();
           return;
@@ -142,6 +228,7 @@ export class AutomationMcp {
         res.setHeader('Cache-Control', 'no-store');
         await transport.handleRequest(req, res, data);
         if (
+          current() &&
           sdk.getClientVersion() &&
           data &&
           typeof data === 'object' &&
@@ -149,7 +236,7 @@ export class AutomationMcp {
           data.method === 'initialize' &&
           !req.headers['x-appdock-self-test']
         )
-          this.connected();
+          this.connected(isLocalClient(req.socket.remoteAddress));
       } catch (error) {
         fail((error as Error).message === 'TOO_LARGE' ? 413 : 400);
         dispose();
@@ -158,17 +245,21 @@ export class AutomationMcp {
     server.requestTimeout = 10000;
     server.headersTimeout = 10000;
     server.setTimeout(60000, (socket) => socket.destroy());
+    this.server = server;
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
-      server.listen(port, '127.0.0.1', () => {
+      server.listen(port, scope === 'network' ? '0.0.0.0' : '127.0.0.1', () => {
         server.removeListener('error', reject);
         resolve();
       });
     });
     this.port = (server.address() as { port: number }).port;
-    this.server = server;
+    if (!deferred) this.activate();
   }
   async close() {
+    this.accepting = false;
+    this.probe = undefined;
+    this.epoch++;
     const server = this.server;
     this.server = undefined;
     if (!server) return;

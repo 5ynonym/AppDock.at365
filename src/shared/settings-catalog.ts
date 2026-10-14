@@ -43,7 +43,7 @@ export const hostSettingsPages = [
   ['gestures', 'マウスジェスチャー'],
   ['web-accounts', 'Webアカウント'],
   ['permissions', '操作の許可'],
-  ['codex', 'Codex連携'],
+  ['codex', 'MCP・Codex連携'],
   ['profile', 'プロフィール'],
   ['about', 'バージョン情報・更新'],
 ] as const;
@@ -133,6 +133,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   'web-accounts': [['accounts', 'Webアカウント', 'アカウント名 追加 削除 ログイン情報をクリア']],
   codex: [
+    ['connectionScope', '接続範囲', 'このPCのみ ネットワーク LAN tailnet IPv4 MCP'],
+    ['network', 'ネットワークからの接続', '接続先 トークン コピー Bearer Streamable HTTP'],
     ['automation', '連携を有効にする', 'AppDockの起動中に接続できます。'],
     ['permissions', '操作の許可を開く'],
     ['registration', 'Codexへ登録', '設定ファイル 設定先を変更 登録・修復 登録を解除 接続テスト'],

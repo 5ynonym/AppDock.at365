@@ -196,7 +196,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, undefined);
     checks.push('notification speech settings inherit independently');
-    await select('Codex連携');
+    await select('MCP・Codex連携');
     await page.locator('summary').filter({ hasText: '登録先と接続の詳細' }).click();
     await page.getByLabel('Codexの設定ファイル', { exact: true }).fill(config);
     await page.getByRole('button', { name: '設定先を変更', exact: true }).click();
@@ -208,7 +208,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByRole('button', { name: 'Codexへ登録', exact: true }).click();
     await until(async () => (await automation()).registration === 'registered', 'registration');
     assert(fs.readFileSync(config, 'utf8').startsWith('# fixture\n'));
-    await page.getByRole('button', { name: '接続テスト', exact: true }).click();
+    await page.getByRole('button', { name: 'このPC内の接続テスト', exact: true }).click();
     await until(
       () =>
         page
@@ -246,7 +246,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         for (const name of [
           '読み上げ',
           '通知',
-          'Codex連携',
+          'MCP・Codex連携',
           '一般',
           '表示',
           'プロフィール',

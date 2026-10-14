@@ -2,7 +2,9 @@
 
 Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。
 
-本体に共通操作APIとローカルMCPを持ちます。利用者の手順は[README](../README.md#codex連携)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
+本体に共通操作APIとHTTP MCPを持ちます。初期の接続範囲はこのPCのみで、IPv4のネットワーク接続も選べます。利用者の手順は[README](../README.md#codex連携)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
+
+LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命は[ネットワーク接続の設計](mcp-network-access-design.md)にまとめています。
 
 ## 構成
 
@@ -227,7 +229,15 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 ## 通信と保存
 
-初期無効・初期読取り専用。本体は127.0.0.1だけにbindし、Host/Origin/専用Bearer tokenを検査します。CORS許可は付けません。32byte乱数のトークンを、AppDock側ではElectron safeStorageで暗号化してPC専用rootのautomation.jsonへ保存します。共有設定や配布物へ含めません。
+初期無効・初期読取り専用。PC専用automation.jsonのconnectionScopeは省略時local（127.0.0.1）、networkでは0.0.0.0へbindします。どちらもHost/Origin/専用Bearer tokenを検査し、CORS許可は付けません。networkのHostはループバック・現在のNICのIPv4・このPCのホスト名・networkHostnamesへ明示登録したDNS名に限定し、実ポートを必須とします。Originは未指定または検証済みHostと同じHTTP originだけを許可します。接続元IPの許可一覧は持ちません。32byte乱数のトークンを、AppDock側ではElectron safeStorageで暗号化してPC専用rootのautomation.jsonへ保存します。共有設定や配布物へ含めません。
+
+範囲切替では既存ポート・token・MCP許可・共通API・revisionを保持し、Codexの登録URLは常に127.0.0.1のままです。即時保存後に旧受付を停止して同じポートへ再bindします。起動中はランダムな識別子と認証付きの内部probeでループバックの到達先が自身のリスナーであることを確認し、実ポートの保存も成功してから公開要求を実行します。途中失敗では停止状態を表示し、勝手なポート変更・networkへの復帰はしません。保存失敗は以前の保存値と待受を保持します。「接続を再試行」は保存済み設定で再起動する操作です。MCP_SAVE_FAILED/MCP_START_FAILEDは共通エラー通知へ報告します。
+
+全MCPクライアントがtoken、許可、同時8要求の上限とAI/TTSの所有者を共有します。範囲切替は通信を一時切断しますが、開始済み操作の取消は保証しません。接続設定・認証を本文読込後とAPI呼出直前にも再検査し、停止した受付から新しい操作を開始しません。応答が失われた操作を自動で再実行しないでください。接続日時はsocketの接続元に基づき、このPCとネットワークを区別します。自己テストや内部probeは日時を更新せず、日時だけでCodex接続成功とは扱いません。
+
+トークンは「接続トークンをコピー」の明示操作時だけmainでOSクリップボードへ書き、IPC応答・画面・ログへ返しません。接続範囲、追加ホスト名、コピー、再試行は本体設定UI専用で、MCP/一般Appletへ公開しません。HTTP自体にはTLSがなく、LAN直結とtailnetによる経路保護を区別します。IPv6待受、CORS、HTTPSプロキシ設定、ファイアウォールの自動変更は含みません。
+
+接続先候補は`networkEndpointAddresses`で表示用に絞り、Hyper-Vの既知名`vEthernet (Default Switch)`だけを除外します。IP末尾が`.1`という理由や、仮想アダプターという理由では除外しません。Tailscaleと外部LAN用vEthernetを保持します。HTTPのHost検証は引き続き`networkAddresses`の全NIC候補を使うため、表示の除外は直接接続の拒否ではありません。アダプターが改名されている場合は既知名による除外の対象外です。認証の案内では環境変数`MCP_BEARER_TOKEN`を名前の例として示し、実際のHTTPヘッダー`Authorization: Bearer <token>`と区別します。AppDock自身がこの環境変数を読み書きする機能はありません。
 
 初回は空きポートを選び、以後保存した値を使います。競合時は勝手に変えずエラーにします。詳細のポートに0を指定して適用すると空きポートを選び直せます。変更後はCodex登録を修復してください。EXE配置の絶対パス由来のIDは内部識別と登録範囲の所有判定に使い、Codexへの登録名とは分離します。移動は別配置として扱い、旧登録を自動削除しません。
 

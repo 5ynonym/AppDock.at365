@@ -2,10 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
-import type { AutomationAction, AutomationState, AutomationReply } from '../../shared/automation';
+import type {
+  AutomationAction,
+  AutomationState,
+  AutomationReply,
+  ConnectionScope,
+} from '../../shared/automation';
 import { atomicWrite } from './settings';
 import { AutomationApi } from './automation-api';
 import { AutomationMcp } from './automation-mcp';
+import { networkEndpointAddresses, networkHostnames } from './automation-network';
 import {
   changeRegistration,
   codexConfigPath,
@@ -15,6 +21,8 @@ import {
 } from './codex-registration';
 
 interface LocalConfig {
+  connectionScope: ConnectionScope;
+  networkHostnames: string[];
   version: 1;
   enabled: boolean;
   allowWrite: boolean;
@@ -32,8 +40,16 @@ interface LocalConfig {
   serverName: string;
   owned: Record<string, string>;
 }
+class AutomationStorageError extends Error {
+  constructor() {
+    super('連携設定を保存できません。保存先のアクセス権と空き容量を確認してください。');
+  }
+}
 export class AutomationService {
   private config: LocalConfig;
+  private persistedConfig: LocalConfig;
+  private persistedToken = '';
+  private api?: AutomationApi;
   private token = '';
   private server?: AutomationMcp;
   private busy = false;
@@ -41,6 +57,8 @@ export class AutomationService {
   private loadError?: string;
   private error?: string;
   private lastClientAt?: string;
+  private lastLocalClientAt?: string;
+  private lastNetworkClientAt?: string;
   readonly id: string;
   private file: string;
   constructor(
@@ -63,6 +81,8 @@ export class AutomationService {
       changed(): void;
       authorizationChanged?(): void;
       audit?(level: string, message: string): void;
+      writeClipboard?(value: string): void;
+      failed?(code: string, message: string): void;
     },
   ) {
     this.id =
@@ -73,6 +93,8 @@ export class AutomationService {
         .slice(0, 16);
     this.file = path.join(options.localDirectory, 'automation.json');
     this.config = {
+      connectionScope: 'local',
+      networkHostnames: [],
       version: 1,
       enabled: false,
       allowWrite: false,
@@ -120,6 +142,11 @@ export class AutomationService {
         )
           throw Error();
         c.configFile = codexConfigPath(c.configFile);
+        if (c.connectionScope === undefined) c.connectionScope = 'local';
+        if (c.connectionScope !== 'local' && c.connectionScope !== 'network') throw Error();
+        c.networkHostnames = networkHostnames(
+          c.networkHostnames === undefined ? [] : c.networkHostnames,
+        );
         c.allowExecute ??= false;
         c.allowManageApplets ??= false;
         c.allowEditShortcuts ??= false;
@@ -137,13 +164,42 @@ export class AutomationService {
     } catch {
       this.loadError = '連携設定を読み取れません。PC専用のautomation.jsonを確認してください。';
     }
+    this.persistedConfig = structuredClone(this.config);
+    this.persistedToken = this.token;
   }
   private save() {
-    if (!this.token) {
-      this.token = randomBytes(32).toString('hex');
-      this.config.token = this.options.encrypt(this.token);
+    try {
+      if (!this.token) {
+        this.token = randomBytes(32).toString('hex');
+        this.config.token = this.options.encrypt(this.token);
+      }
+      atomicWrite(this.file, JSON.stringify(this.config, null, 2) + '\n');
+      this.persistedConfig = structuredClone(this.config);
+      this.persistedToken = this.token;
+    } catch {
+      this.restoreSaved();
+      throw new AutomationStorageError();
     }
-    atomicWrite(this.file, JSON.stringify(this.config, null, 2) + '\n');
+  }
+  private restoreSaved() {
+    this.config = structuredClone(this.persistedConfig);
+    this.token = this.persistedToken;
+  }
+  private reportFailure(code: string, message: string) {
+    try {
+      this.options.failed?.(code, message);
+    } catch {
+      /* Reporting must not change the result. */
+    }
+  }
+  private clearConnections() {
+    this.lastClientAt = this.lastLocalClientAt = this.lastNetworkClientAt = undefined;
+  }
+  private async stop() {
+    const server = this.server;
+    this.server = undefined;
+    this.clearConnections();
+    await server?.close();
   }
   allowed(
     key:
@@ -172,6 +228,16 @@ export class AutomationService {
   }
   state(): AutomationState {
     return {
+      connectionScope: this.config.connectionScope,
+      activeConnectionScope: this.server ? this.config.connectionScope : null,
+      networkHostnames: [...this.config.networkHostnames],
+      networkEndpoints:
+        this.server && this.config.connectionScope === 'network'
+          ? networkEndpointAddresses().map((address) => `http://${address}:${this.config.port}/mcp`)
+          : [],
+      canCopyToken: !this.loadError && !!this.persistedConfig.token && !!this.token,
+      lastLocalClientAt: this.lastLocalClientAt,
+      lastNetworkClientAt: this.lastNetworkClientAt,
       enabled: this.config.enabled,
       allowWrite: this.config.allowWrite,
       allowExecute: this.config.allowExecute,
@@ -202,7 +268,7 @@ export class AutomationService {
   private async start() {
     if (!this.config.enabled || this.server || this.loadError || this.closed) return;
     const server = new AutomationMcp(
-      this.options.createApi(
+      (this.api ??= this.options.createApi(
         () => this.config.enabled && this.config.allowWrite && !this.closed,
         this.id,
         () => this.config.enabled && this.config.allowExecute && !this.closed,
@@ -235,17 +301,26 @@ export class AutomationService {
           this.config.allowWrite &&
           this.config.allowEditTray &&
           !this.closed,
-      ),
+      )),
       () => this.token,
-      () => {
+      (local) => {
+        if (this.server !== server || this.closed) return;
         this.lastClientAt = new Date().toISOString();
+        if (local) this.lastLocalClientAt = this.lastClientAt;
+        else this.lastNetworkClientAt = this.lastClientAt;
         this.options.changed();
       },
       this.options.version,
       this.options.audit,
     );
     try {
-      await server.start(this.config.port);
+      await server.start(
+        this.config.port,
+        this.config.connectionScope,
+        () => this.config.networkHostnames,
+        true,
+      );
+      await server.verifyLoopback();
       if (this.closed) {
         await server.close();
         return;
@@ -253,10 +328,18 @@ export class AutomationService {
       this.config.port = server.port;
       this.save();
       this.server = server;
+      server.activate();
       this.error = undefined;
-    } catch {
+    } catch (error) {
       await server.close();
-      this.error = 'MCPを開始できません。ポートの競合や連携設定の保存先を確認してください。';
+      this.error =
+        error instanceof AutomationStorageError
+          ? error.message
+          : 'MCPを開始できません。ポートの競合や連携設定の保存先を確認して、接続を再試行してください。';
+      this.reportFailure(
+        error instanceof AutomationStorageError ? 'MCP_SAVE_FAILED' : 'MCP_START_FAILED',
+        this.error,
+      );
     }
   }
   async initialize() {
@@ -273,6 +356,59 @@ export class AutomationService {
     try {
       let message: string | undefined;
       switch (action.kind) {
+        case 'setConnectionScope': {
+          if (action.scope !== 'local' && action.scope !== 'network')
+            throw Error('接続範囲が不正です。');
+          if (action.scope === this.config.connectionScope) break;
+          this.config.connectionScope = action.scope;
+          this.save();
+          await this.stop();
+          this.error = undefined;
+          await this.start();
+          message =
+            this.error ||
+            '接続範囲を変更しました。同じPCのCodexの再登録は不要です。通信が戻らない場合は接続を再読み込みしてください。';
+          break;
+        }
+        case 'setNetworkHostnames': {
+          const names = networkHostnames(action.hostnames);
+          if (JSON.stringify(names) === JSON.stringify(this.config.networkHostnames)) break;
+          this.config.networkHostnames = names;
+          this.save();
+          message = '追加の接続先ホスト名を保存しました。';
+          break;
+        }
+        case 'copyToken':
+          if (!this.state().canCopyToken || !this.options.writeClipboard)
+            throw Error('接続トークンをコピーできません。先に連携設定を保存してください。');
+          try {
+            this.options.writeClipboard(this.token);
+          } catch {
+            throw Error('接続トークンをコピーできません。クリップボードを確認してください。');
+          }
+          message = '接続トークンをクリップボードへコピーしました。';
+          break;
+        case 'copyEndpoint': {
+          const state = this.state();
+          if (
+            !state.running ||
+            ![state.endpoint, ...state.networkEndpoints].includes(action.endpoint) ||
+            !this.options.writeClipboard
+          )
+            throw Error('接続先をコピーできません。接続の状態を再読み込みしてください。');
+          try {
+            this.options.writeClipboard(action.endpoint);
+          } catch {
+            throw Error('接続先をコピーできません。クリップボードを確認してください。');
+          }
+          message = '接続先をクリップボードへコピーしました。';
+          break;
+        }
+        case 'retryStart':
+          if (!this.config.enabled) throw Error('先に連携を有効にしてください。');
+          await this.start();
+          message = this.error || 'MCPは稼働中です。';
+          break;
         case 'configure': {
           if (
             typeof action.enabled !== 'boolean' ||
@@ -283,19 +419,19 @@ export class AutomationService {
             (action.port > 0 && action.port < 1024)
           )
             throw Error('連携設定が不正です。ポートは1024～65535、または0（自動選択）です。');
-          if (!this.token) {
-            this.token = randomBytes(32).toString('hex');
-            this.config.token = this.options.encrypt(this.token);
-          }
+          if (
+            action.enabled === this.config.enabled &&
+            action.allowWrite === this.config.allowWrite &&
+            action.port === this.config.port
+          )
+            break;
           this.config.enabled = action.enabled;
           this.config.allowWrite = action.allowWrite;
           this.config.port = action.port;
           this.save();
           if (!action.enabled || action.port !== previous.port) {
             if (!action.enabled) this.options.authorizationChanged?.();
-            await this.server?.close();
-            this.server = undefined;
-            this.lastClientAt = undefined;
+            await this.stop();
           }
           this.error = undefined;
           await this.start();
@@ -391,9 +527,10 @@ export class AutomationService {
           this.token = randomBytes(32).toString('hex');
           this.config.token = this.options.encrypt(this.token);
           this.save();
-          this.lastClientAt = undefined;
+          this.clearConnections();
           this.options.authorizationChanged?.();
-          message = '認証情報を再発行しました。「登録・修復」でCodexの登録を更新してください。';
+          message =
+            '認証情報を再発行しました。「登録・修復」でCodexの登録を更新し、他のMCPクライアントにも新しいトークンを設定してください。';
           break;
         case 'test': {
           if (!this.server) throw Error('MCPが起動していません。');
@@ -428,8 +565,8 @@ export class AutomationService {
       this.options.changed();
       return { state: this.state(), message };
     } catch (e) {
-      this.config = previous;
-      this.token = previous.token ? this.options.decrypt(previous.token) : '';
+      this.restoreSaved();
+      if (e instanceof AutomationStorageError) this.reportFailure('MCP_SAVE_FAILED', e.message);
       // Never echo credentials or raw TOML in an IPC error.
       if (e instanceof Error && !/Bearer |authorization|token =/i.test(e.message)) throw e;
       throw Error('連携操作に失敗しました。設定とアクセス権を確認してください。');
@@ -439,7 +576,6 @@ export class AutomationService {
   }
   async close() {
     this.closed = true;
-    await this.server?.close();
-    this.server = undefined;
+    await this.stop();
   }
 }

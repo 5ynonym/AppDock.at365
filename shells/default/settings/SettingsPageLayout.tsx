@@ -16,7 +16,7 @@ const descriptions: Record<string, string> = {
   permissions:
     'AppletとMCPの許可を、それぞれ設定します。Applet側はすべてのAppletに共通です。変更はすぐに反映されます。',
   codex:
-    '同じPCのCodexからAppDockの状態を確認し、基本設定の変更や公開されたコマンドの実行ができます。連携の設定はこのPCへ即時反映されます。',
+    '同じPCのCodexやネットワーク上のMCPクライアントから、AppDockの状態確認・設定変更・公開コマンドの実行ができます。連携の設定はこのPCへ即時反映されます。',
   profile: 'Dockで使う名前と、左下に表示するアバターを設定します。',
   about: 'AppDockとインストール済みAppletのバージョンを確認し、更新を管理します。',
 };
