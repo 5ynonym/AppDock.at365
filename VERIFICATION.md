@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-14: 設定の再起動通知・JSON復旧の設計
+
+- `61dca8477069dad12f0c6f8ef4605bebeb30da99`（0.37.1）から `design/settings-notifications` worktreeを作成し、[設計書](docs/settings-recovery-notifications-design.md)とDEVELOPMENTの入口を追加した。製品コード・版・配布物は変更していない。
+- SettingsStore、ファイル監視、通知種類/サービス、復元IPC/既存エラーバナー、通常再起動、Windows起動設定と現行文書を照合した。発行元の重複抑止、原因別の解消条件、復元前の破損bytes退避、正常な外部更新の優先、通知を無効にしても残る復旧導線を設計レビューした。
+- 起動不能時は通知基盤を使えないこと、app.ready後に復旧した場合は通常起動へ再起動してGPU設定を適用すること、通常再起動では管理者権限を解除できないことを設計へ反映した。
+- 文書の相対リンク先、コードフェンス、会話上の人物名の混入がないこと、差分の空白を検査した。製品の型検査・回帰・実EXE検証は文書だけの変更のため未実施。設計書の試験表は将来の実装で行う計画であり、動作確認済みではない。
+- 実装・commit・merge・push・publish・deployは未実施。
+
 ## 2026-10-14: URL入力の確定タイミング統一（0.37.1）
 
 - 指示に従いmain `dc9ab2e`上で修正。AI/TTSベースURL、WebApplet URL、Web追加許可先、本体/各Applet更新元を共通のURL入力部品へ統一。入力中のコロン・スラッシュ・不完全なURLを保持し、Enterまたはblurで補正・検証・即時保存する。IME変換EnterとEnter後のblurによる二重受付を抑止し、Web初期設定取得もURL確定後へ移した。URLリストはShift+Enterで改行し、追加許可先の厳密なorigin検証は維持。
