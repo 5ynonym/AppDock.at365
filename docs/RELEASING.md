@@ -96,7 +96,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
 
 これは既存の`release.cjs preflight`/`seal`を使う作業者向けの個別実行手順です。照合は作業者が行います。スクリプトがコミット前証跡を自動検証する機能ではありません。証跡の不足・不一致を解消できなければ、該当試験を実行します。`release.ps1 -Mode Prepare`を併用すると全試験が再実行されるため、この経路では呼びません。
 
-1. [再利用条件](development-workflow.md#検証結果を再利用する条件)をrepoごとに照合します。本体で再利用できるステップは`typecheck`と`regression`です。`regression`には同じ`dev.bat test`の全成功ログが必要で、部分的な試験成功だけでは代用できません。再利用元のログ・記録が改変されていないことを保存済みSHA256で確認します。
+1. [再利用条件](development-workflow.md#検証結果を再利用する条件)をrepoごとに照合します。本体で再利用できるステップは`typecheck`と`regression`です。このPrepare/seal経路は検証時と対象のrepo tree全体の一致（検証済みの文書のみの差分を除く）を必要とし、コミット前の試験単位の再利用とは区別します。`regression`には同じ`dev.bat test`の全成功ログが必要で、部分的な試験成功だけでは代用できません。再利用元のログ・記録が改変されていないことを保存済みSHA256で確認します。
 2. 新しい`$taskPlan`と確定済み`$taskNotes`を選び、次のpreflightで現在のcleanな本体/全Appletを記録します。外部コマンドの終了コードは直後に検査します。
 
    ```powershell
