@@ -129,7 +129,7 @@ function registry(exe) {
   );
 }
 async function quit() {
-  const pid = await evaluate('process.pid');
+  const { pid, parent } = await evaluate('({pid:process.pid,parent:process.ppid})');
   await evaluate(`setTimeout(()=>electron.app.quit(),50);true`);
   socket.close();
   await until(() => {
@@ -140,6 +140,15 @@ async function quit() {
       return true;
     }
   }, 'host shutdown');
+  // A command restart creates a new launcher, distinct from the original child handle.
+  await until(() => {
+    try {
+      process.kill(parent, 0);
+      return false;
+    } catch {
+      return true;
+    }
+  }, 'current launcher shutdown');
   if (child.exitCode === null && child.signalCode === null)
     await until(() => child.exitCode !== null, 'launcher shutdown');
 }

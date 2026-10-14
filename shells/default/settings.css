@@ -38,8 +38,9 @@ body,
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 20px;
+  padding: 24px;
   overflow: hidden;
+  container: settings-page / inline-size;
 }
 .settings-surface > main > :not(.settings-body) {
   flex-shrink: 0;
@@ -53,11 +54,183 @@ body,
   overflow: auto;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  scrollbar-gutter: stable;
 }
 .settings-surface .settings-body > textarea {
   width: 100%;
   height: 100%;
   resize: none;
+  display: block;
+  min-height: 180px;
+  font-family: Consolas, 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.settings-page-heading {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.settings-page-heading h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.settings-page-heading p {
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.settings-page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+.settings-page-toolbar .tabs {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+.settings-page-toolbar .tabs button {
+  min-height: 32px;
+  padding: 6px 18px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.settings-page-toolbar .tabs button.selected {
+  color: var(--accent);
+}
+.settings-save-status {
+  flex: 1;
+  font-size: 12px;
+}
+.settings-file-button,
+.settings-page-error > button,
+.settings-panel :where(button:not([class]), button.secondary) {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.settings-file-button:hover:not(:disabled),
+.settings-page-error > button:hover:not(:disabled),
+.settings-panel :where(button:not([class]), button.secondary):hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.settings-page-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.settings-page-error p {
+  flex: 1 1 240px;
+  overflow-wrap: anywhere;
+}
+/* The shared frame owns the card; individual forms only lay out their contents. */
+.settings-panel > .settings-form,
+.settings-panel > .settings-layout > .settings-form {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.settings-panel > .settings-layout {
+  min-height: 0;
+}
+.settings-panel h3,
+.settings-panel h4 {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.settings-panel .setting-row {
+  padding: 18px 0;
+  gap: 24px;
+}
+.settings-panel .setting-row:first-child {
+  padding-top: 0;
+}
+.settings-panel .setting-row strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.settings-panel .setting-row p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.settings-panel .setting-row > :is(input, select, textarea) {
+  flex-shrink: 0;
+  width: 48%;
+  max-width: 560px;
+  min-width: 0;
+}
+.settings-panel :where(input, select, textarea) {
+  border-radius: 9px;
+}
+.settings-panel .permission-table {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+.settings-panel .permission-table thead {
+  background: var(--raised);
+}
+.settings-panel .command-shortcut-summary {
+  flex-wrap: wrap;
+  padding-block: 8px;
+}
+.settings-panel .web-account-card,
+.settings-panel .notification-setting-card,
+.settings-panel .gesture-settings-card {
+  background: color-mix(in srgb, var(--raised) 40%, var(--panel));
+}
+@container settings-page (max-width: 600px) {
+  .settings-page-heading h1 {
+    font-size: 21px;
+  }
+  .settings-save-status {
+    order: 1;
+    flex-basis: 100%;
+  }
+  .settings-surface .settings-panel {
+    padding: 16px;
+  }
+  .settings-panel .setting-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .settings-panel .setting-row > :is(input, select, textarea),
+  .settings-panel .shell-region-controls {
+    width: 100%;
+    max-width: none;
+  }
+  .settings-panel .command-shortcut-tools {
+    gap: 8px;
+  }
+  .settings-panel .command-shortcut-tools .shortcut-status-filter {
+    width: 125px;
+    padding-inline: 8px;
+  }
+  .settings-panel .tray-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .settings-surface.applet > main {
   padding: 0;
@@ -163,8 +336,63 @@ body,
 }
 
 .shell-region-controls {
-  width: 55%;
+  width: 100%;
   flex-shrink: 0;
+}
+
+.settings-surface .settings-panel:has(> .settings-sections),
+.settings-surface .settings-panel:has(> .settings-layout > .settings-sections) {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 4px 20px 0;
+}
+.notification-settings .notification-targets {
+  display: block;
+  margin: 16px 0;
+  padding: 0;
+  min-width: 0;
+}
+.notification-targets legend {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.notification-settings .notification-targets .settings-choice {
+  gap: 10px;
+}
+.notification-settings .notification-center-only {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.notification-card-footer {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.notification-setting-card .settings-field {
+  padding-top: 0;
+}
+.notification-setting-card .settings-field-label {
+  padding-top: 0;
+}
+.notification-setting-card .notification-target-hint {
+  margin-bottom: 12px;
+}
+.notification-settings .settings-section-content > .notification-setting-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 22px 0;
+}
+.notification-settings .settings-section-content > .notification-setting-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.settings-field-control .shell-region-controls {
+  width: 100%;
 }
 .shell-region-controls select {
   width: 100%;
@@ -173,72 +401,61 @@ body,
 .shell-region-controls p {
   overflow-wrap: anywhere;
 }
+.about-installed-version {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.about-applets article {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.about-applets article:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.about-applet-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.about-page .version-check {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.about-page .update-check-control time,
+.update-last-checked {
+  font-size: 11px;
+}
+.update-last-checked {
+  margin-top: 12px;
+}
+.about-page button.update-primary {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.about-page .applet-update-source {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+}
+.tray-settings .tray-workspace {
+  margin-top: 16px;
+}
 @media (max-width: 900px) {
   .shell-region-controls {
     width: 100%;
   }
-}
-
-.tts-settings > div {
-  margin: 20px 0;
-}
-.tts-settings > div > label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-.tts-settings > div > label > input,
-.tts-settings > div > label > textarea {
-  width: min(100%, 700px);
-}
-.tts-settings > div > label > textarea {
-  min-height: 110px;
-  resize: vertical;
-}
-.tts-settings > div > button {
-  margin: 12px 8px 0 0;
-}
-.tts-settings .setting-row > textarea {
-  width: 55%;
-  min-height: 120px;
-}
-@media (max-width: 900px) {
-  .tts-settings .setting-row > textarea {
-    width: 100%;
-  }
-}
-
-.notification-speech-settings {
-  margin-bottom: 24px;
-}
-.notification-speech-settings > div {
-  margin: 12px 0;
-}
-.notification-speech-settings .setting-row {
-  padding: 12px 0;
-}
-.notification-speech-settings label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 12px 0;
-}
-.notification-speech-settings input {
-  width: min(100%, 540px);
-}
-.notification-speech-settings button:not(.toggle) {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.notification-speech-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-.notification-speech-actions p {
-  width: 100%;
 }

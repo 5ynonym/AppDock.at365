@@ -419,3 +419,126 @@ test('playback/server speed modes apply speed exactly once', async (t) => {
     assert.equal(played, mode === 'playback' ? 1.4 : 1);
   }
 });
+
+test('model discovery preserves base path and endpoint-bound auth without requiring a model', async (t) => {
+  const requests = [];
+  const f = setup(t, {
+    key: (url) => (url === 'http://localhost:8080/v1' ? 'fixture-key' : undefined),
+    fetcher: async (url, options) => {
+      requests.push({ url, options });
+      return Response.json({
+        data: [
+          { id: 'speech-a', object: 'model' },
+          { id: 'speech-b', name: 'Voice model' },
+        ],
+      });
+    },
+  });
+  f.config({ model: '' });
+  assert.deepEqual(await f.s.models('host'), {
+    models: [
+      { id: 'speech-a', name: 'speech-a' },
+      { id: 'speech-b', name: 'Voice model' },
+    ],
+  });
+  assert.equal(requests[0].url, 'http://localhost:8080/v1/models');
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer fixture-key');
+  assert.equal(requests[0].options.redirect, 'error');
+  f.config({ baseUrl: 'http://localhost:8081/api/v1' });
+  await f.s.models('host');
+  assert.deepEqual(requests[1].options.headers, {});
+});
+
+test('model discovery distinguishes empty, unsupported, auth and malformed responses', async (t) => {
+  const f = setup(t, { fetcher: async () => Response.json({ data: [] }) });
+  assert.deepEqual(await f.s.models('host'), { models: [] });
+  for (const [reply, code] of [
+    [() => new Response('', { status: 404 }), 'TTS_MODELS_UNSUPPORTED'],
+    [() => new Response('', { status: 405 }), 'TTS_MODELS_UNSUPPORTED'],
+    [() => new Response('PRIVATE RESPONSE', { status: 401 }), 'TTS_AUTH_FAILED'],
+    [() => Response.json({ data: [{ id: 'a' }, { id: 'a' }] }), 'TTS_INVALID_MODELS'],
+    [() => Response.json({ data: [{ id: '' }] }), 'TTS_INVALID_MODELS'],
+    [
+      () => Response.json({ data: Array.from({ length: 1001 }, (_, n) => ({ id: String(n) })) }),
+      'TTS_INVALID_MODELS',
+    ],
+    [() => Response.json({ voices: [] }), 'TTS_INVALID_MODELS'],
+    [
+      () => new Response('PRIVATE RESPONSE', { headers: { 'Content-Type': 'text/html' } }),
+      'TTS_INVALID_MODELS',
+    ],
+  ]) {
+    const g = setup(t, { fetcher: async () => reply() });
+    await assert.rejects(
+      g.s.models('host'),
+      (e) => e.code === code && !e.message.includes('PRIVATE RESPONSE'),
+    );
+  }
+  const large = setup(t, {
+    limits: { voiceBytes: 10 },
+    fetcher: async () => Response.json({ data: [{ id: 'too-long' }] }),
+  });
+  await assert.rejects(large.s.models('host'), (e) => e.code === 'TTS_INVALID_MODELS');
+});
+
+test('model requests coalesce per owner, remain independent from voices and cancel on reconfiguration or close', async (t) => {
+  for (const end of ['config', 'deny', 'close', 'key']) {
+    let calls = 0;
+    const f = setup(t, {
+      fetcher: async (url, options) => {
+        calls++;
+        if (url.endsWith('/audio/voices')) return Response.json({ voices: [{ id: 'voice' }] });
+        return new Promise((_, reject) =>
+          options.signal.addEventListener('abort', () => reject(Error('cancel')), { once: true }),
+        );
+      },
+    });
+    const pending = f.s.models('host');
+    assert.equal(f.s.models('host'), pending);
+    assert.equal((await f.s.voices('host')).voices.length, 1);
+    assert.equal(calls, 2);
+    if (end === 'config') f.config({ baseUrl: 'http://localhost:9000/v1' });
+    if (end === 'deny') f.deny();
+    if (end === 'close') void f.s.close();
+    if (end === 'key') f.s.reconcile(true);
+    await assert.rejects(pending, (e) => e.code === 'TTS_TIMEOUT');
+  }
+});
+
+test('model request deadline aborts the request', async (t) => {
+  const f = setup(t, {
+    limits: { voicesMs: 10 },
+    fetcher: async (_url, options) =>
+      new Promise((_, reject) =>
+        options.signal.addEventListener('abort', () => reject(Error()), { once: true }),
+      ),
+  });
+  await assert.rejects(f.s.models('host'), (e) => e.code === 'TTS_TIMEOUT');
+});
+
+test('Qwen model catalogs offer downloaded models using their server names', async (t) => {
+  const f = setup(t, {
+    fetcher: async () =>
+      Response.json({
+        models: [
+          { name: '1.7B-Base', downloaded: true, repo_id: 'repo-a' },
+          { name: '0.6B-Base', downloaded: false },
+          { id: 'other', name: 'Other model' },
+        ],
+      }),
+  });
+  assert.deepEqual(await f.s.models('host'), {
+    models: [
+      { id: '1.7B-Base', name: '1.7B-Base' },
+      { id: 'other', name: 'Other model' },
+    ],
+  });
+  for (const models of [
+    [{ name: 'bad', downloaded: 'yes' }],
+    [{ name: 'same' }, { name: 'same' }],
+    [null],
+  ]) {
+    const g = setup(t, { fetcher: async () => Response.json({ models }) });
+    await assert.rejects(g.s.models('host'), (e) => e.code === 'TTS_INVALID_MODELS');
+  }
+});

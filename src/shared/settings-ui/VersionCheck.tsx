@@ -1,6 +1,6 @@
 import { settingsControls } from './api';
 import { useEffect, useState } from 'react';
-import type { UpdateResult } from '../contracts';
+import type { UpdateResult, UpdateState } from '../contracts';
 export function UpdateCheckTime({ checkedAt }: { checkedAt?: string }) {
   return (
     <time dateTime={checkedAt} className="muted">
@@ -21,6 +21,43 @@ const updateError = (error: unknown) => {
   return message || '更新を確認できませんでした。通信環境を確認して、もう一度お試しください。';
 };
 
+export function useUpdateState() {
+  const [state, setState] = useState<UpdateState>({ busy: false, phase: '', results: [] });
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      void settingsControls.snapshot().then((snapshot) => {
+        if (alive) setState(snapshot.updates);
+      });
+    };
+    refresh();
+    const unsubscribe = settingsControls.onChanged(refresh);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
+  return state;
+}
+
+export function VersionDisplay({ version, result }: { version: string; result?: UpdateResult }) {
+  const available = result?.status === 'available' && result.currentVersion === version;
+  return (
+    <span className="version-display">
+      <span className="settings-badge version-current">{version}</span>
+      {available && result.latestVersion && (
+        <span
+          className="version-available"
+          aria-label={`更新後のバージョン ${result.latestVersion}`}
+        >
+          <span aria-hidden="true">→</span>
+          <span className="settings-badge">{result.latestVersion}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function VersionCheck({
   id,
   details = false,
@@ -33,94 +70,55 @@ export function VersionCheck({
   compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<UpdateResult>();
   const [error, setError] = useState('');
-  const [sharedBusy, setSharedBusy] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    const refresh = () => {
-      void settingsControls.snapshot().then((snapshot) => {
-        if (!alive) return;
-        setSharedBusy(snapshot.updates.busy);
-        setResult(snapshot.updates.results.find((result) => result.id === (id ?? 'host')));
-      });
-    };
-    refresh();
-    const unsubscribe = settingsControls.onChanged(refresh);
-    return () => {
-      alive = false;
-      unsubscribe();
-    };
-  }, [id]);
-  const check = async () => {
-    setBusy(true);
-    setError('');
-    try {
-      setResult(await settingsControls.checkUpdates(id));
-    } catch (err) {
-      setError(updateError(err));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const state = useUpdateState();
+  const result = state.results.find((result) => result.id === (id ?? 'host'));
   return (
     <span className="version-check">
-      <button
-        className={compact ? 'text-button' : 'update-primary'}
-        disabled={busy || sharedBusy || disabled}
-        title={disabled ? '未保存の設定を保存または破棄してから更新してください。' : undefined}
-        onClick={() => {
-          setError('');
-          setBusy(true);
-          void settingsControls
-            .installUpdates(id ?? 'host')
-            .catch((error) => setError(updateError(error)))
-            .finally(() => setBusy(false));
-        }}
-      >
-        {busy ? '処理中…' : id ? 'このAppletを更新' : 'AppDockを更新'}
-      </button>
       <span className="update-check-control">
         <button
-          className="text-button"
-          disabled={busy || sharedBusy || disabled}
-          onClick={() => void check()}
+          className={compact ? 'text-button' : 'update-primary'}
+          disabled={busy || state.busy || disabled}
+          title={disabled ? '設定の処理が完了するまでお待ちください。' : undefined}
+          onClick={() => {
+            setError('');
+            setBusy(true);
+            void settingsControls
+              .installUpdates(id ?? 'host')
+              .catch((error) => setError(updateError(error)))
+              .finally(() => setBusy(false));
+          }}
         >
-          {busy ? '更新を確認中…' : '更新を確認'}
+          {busy ? '処理中…' : id ? 'このAppletを更新' : 'AppDockを更新'}
         </button>
         {details && <UpdateCheckTime checkedAt={result?.checkedAt} />}
       </span>
-      {details && (
-        <details className="update-result-details">
-          <summary>確認結果</summary>
-          <div>
-            <span>
-              {!result
-                ? 'まだ更新を確認していません。'
-                : result.status === 'available'
-                  ? `${result.latestVersion} が公開されています。`
-                  : result.status === 'current'
-                    ? '最新版です。'
-                    : result.status === 'unpublished'
-                      ? '公開リリースが見つかりません。'
-                      : result.status === 'unsupported'
-                        ? '更新元が設定されていません。'
-                        : result.message}
-            </span>
-            {result?.status === 'available' && result.releaseUrl && (
-              <button
-                className="text-button"
-                onClick={() => {
-                  void settingsControls
-                    .openReleases(id)
-                    .catch((err: Error) => setError(updateError(err)));
-                }}
-              >
-                リリースを開く
-              </button>
-            )}
-          </div>
-        </details>
+      {details && result?.status !== 'current' && (
+        <span className="update-result-inline" role="status">
+          <span>
+            {!result
+              ? 'まだ更新を確認していません。'
+              : result.status === 'available'
+                ? `${result.latestVersion} が公開されています。`
+                : result.status === 'unpublished'
+                  ? '公開リリースが見つかりません。'
+                  : result.status === 'unsupported'
+                    ? '更新元が設定されていません。'
+                    : result.message}
+          </span>
+          {result?.status === 'available' && result.releaseUrl && (
+            <button
+              className="text-button"
+              onClick={() => {
+                void settingsControls
+                  .openReleases(id)
+                  .catch((err: Error) => setError(updateError(err)));
+              }}
+            >
+              リリースを開く
+            </button>
+          )}
+        </span>
       )}
       {error && (
         <span className="error-text" role="alert">

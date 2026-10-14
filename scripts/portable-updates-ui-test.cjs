@@ -285,16 +285,24 @@ async function restarted(inspectPort, predicate, previousPid) {
     );
     await about(page);
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
-    assert.equal(await page.locator('.about-host .update-primary').count(), 2);
-    assert.equal(await page.locator('.about-host .applet-update-source').count(), 0);
+    assert.equal(await page.locator('.about-page > .settings-section').count(), 5);
+    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 0);
+    assert.equal(
+      await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
+      0,
+    );
     assert.equal(await page.locator('.about-applets .applet-update-source').count(), 2);
+    assert.equal(await page.locator('.about-applets').isVisible(), false);
+    await page.getByText('インストール済みのApplet', { exact: true }).click();
     for (const control of await page.locator('.about-page .update-check-control').all()) {
       const button = await control.getByRole('button').boundingBox();
       const time = await control.locator('time').boundingBox();
-      assert.ok(time.x >= button.x + button.width, 'last-check time is beside the check button');
+      assert.ok(time.x >= button.x + button.width, 'last-check time is beside the update button');
       assert.ok(Math.abs(time.y + time.height / 2 - button.y - button.height / 2) < 2);
     }
-    checks.push('host, Applet and shared last-check times sit beside their check buttons');
+    checks.push(
+      'shared cards and update-only controls, per-target last-check times beside update buttons',
+    );
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
     // Both source resets save immediately and preserve unrelated settings.
     const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
@@ -348,7 +356,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       true,
     );
     await page.screenshot({ path: path.join(profile, 'updates-compact.png') });
-    await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).click();
+    await page.evaluate(() => window.dock.checkAllUpdates());
     await waitSnapshot(page, (s) => !s.updates.busy && s.updates.results.length === 3);
     checks.push(
       'settings save, shared check results, and immediate settings do not block update controls',
@@ -455,7 +463,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     const individualPid = await inspect(inspectPort, 'process.pid');
     await settingsRenderer(
       inspectPort,
-      "[...document.querySelectorAll('.about-applets button')].find(b => b.textContent.trim() === 'このAppletを更新').click()",
+      "(()=>{const button=[...document.querySelectorAll('.about-applets button')].find(b => b.textContent.trim() === 'このAppletを更新');button.closest('details.settings-section').querySelector('summary').click();button.click();})()",
     );
     await wait(1500);
     await restarted(inspectPort, (s) => !s.updates.busy, individualPid);

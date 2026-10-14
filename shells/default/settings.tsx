@@ -7,6 +7,7 @@ import { shortcutFromEvent } from '../../src/shared/commands';
 import { SettingsViewClient } from './settings/runtime';
 import { SettingsForm } from './settings/SettingsForm';
 import { SettingsIndex } from './settings/SettingsIndex';
+import { SettingsPageLayout } from './settings/SettingsPageLayout';
 import { SettingsTextarea } from '../../src/shared/settings-ui/SettingsInput';
 import '../../src/shared/settings-ui/controls.css';
 import './settings.css';
@@ -187,66 +188,40 @@ function App() {
           />
         </aside>
       )}
-      <main>
-        <div className="page-heading">
-          <h1>{page.title}</h1>
-          {page.json && (
-            <button onClick={() => void c.invoke('open-settings').catch(() => {})}>
-              ファイルを開く
-            </button>
-          )}
-        </div>
-        <p className="settings-help" role="status">
-          {editing.pending ? '保存中…' : '変更は自動で保存されます。'}
-        </p>
-        {page.json && (
-          <div className="tabs">
-            {(['form', 'json'] as const).map((mode) => (
-              <button
-                key={mode}
-                className={mode === editing.mode ? 'selected' : ''}
-                onClick={() => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
-              >
-                {mode === 'form' ? 'フォーム' : 'JSON'}
-              </button>
-            ))}
-          </div>
+      <SettingsPageLayout
+        page={page}
+        mode={editing.mode}
+        pending={editing.pending}
+        error={error || editing.error || ''}
+        onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
+        onOpenFile={() => void c.invoke('open-settings').catch(() => {})}
+        onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
+        announcement={
+          <span key={movement.id} className="settings-live" role="status" aria-live="polite">
+            {movement.text}
+          </span>
+        }
+      >
+        {page.unavailableReason ? (
+          <p role="status">{page.unavailableReason}</p>
+        ) : editing.mode === 'json' ? (
+          <SettingsTextarea
+            aria-label="設定JSON"
+            value={c.text(model)}
+            spellCheck={false}
+            onChange={(e) => {
+              c.setText(e.target.value);
+            }}
+          />
+        ) : (
+          <SettingsForm
+            model={model}
+            editor={editor}
+            select={(pageId) => act({ kind: 'select', pageId })}
+            invoke={c.invoke}
+          />
         )}
-        {(error || editing.error) && (
-          <p className="error-text" role="alert">
-            {error || editing.error}
-          </p>
-        )}
-        {(error || editing.error) && (
-          <button onClick={() => act({ kind: 'edit', action: { type: 'reload' } })}>
-            設定を再読み込み
-          </button>
-        )}
-        <div className="settings-body" key={page.id + editing.mode}>
-          {page.unavailableReason ? (
-            <p role="status">{page.unavailableReason}</p>
-          ) : editing.mode === 'json' ? (
-            <SettingsTextarea
-              aria-label="設定JSON"
-              value={c.text(model)}
-              spellCheck={false}
-              onChange={(e) => {
-                c.setText(e.target.value);
-              }}
-            />
-          ) : (
-            <SettingsForm
-              model={model}
-              editor={editor}
-              select={(pageId) => act({ kind: 'select', pageId })}
-              invoke={c.invoke}
-            />
-          )}
-        </div>
-        <span key={movement.id} className="settings-live" role="status" aria-live="polite">
-          {movement.text}
-        </span>
-      </main>
+      </SettingsPageLayout>
     </div>
   );
 }

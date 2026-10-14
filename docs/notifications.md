@@ -20,7 +20,7 @@ notificationCatalogは本体定義とmanifest.notificationTypesを集約する�
 
 「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。必須項目を無効化/時限化できない。
 
-検証して即時保存したオフは既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。現在の利用可能先はbanner/desktop/windowsで、3種類とも選択可能。「通知センターのみ」はtargets:[]として選択できる。
+検証して即時保存したオフは既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。画面の通知先はbanner/desktop/windowsと読み上げを選択できる。視覚的な表示先は従来のtargets、読み上げはspeakに保存する。「通知センターのみ」はtargets:[]かつspeak:falseで、選択時に両方を一度に反映する。targets:[]かつspeak:trueは読み上げとセンターの履歴だけを利用する。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
 
@@ -88,6 +88,8 @@ Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shel
 NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知状態・既読から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。read/busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
 
 Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protocol末尾16桁。callback URIはランダムtoken、所有者/世代/現行操作を本体で再検査する。通常の種類指定通知のクリックは通知センターへ移動する。複数ボタンはセンターで操作する。旧showのcommandと起動時更新のお知らせは従来どおり直接操作を1回だけ実行する。停止/期限/内容置換後の古いURIは操作できず本体を開く。終了時はcallbackを破棄してOS履歴を残し、再起動で過去の操作を復元しない。
+
+管理者起動中のAppDockへ通常権限のWindows通知から戻る場合も、portableランチャーは必要最小限の同期権限で既存ホストへ合流する。起動途中の通知引数はstartupReadyまで保留し、準備後に既存の通知操作へ渡す。`scripts/notification-portable-test.cjs`は起動直後の更新完了通知のShell URI起動を含み、`scripts/portable-mutex-access-test.cjs`は専用のGate/Runtimeだけに制限ACLを設定して全権限拒否と実EXEの引き継ぎ・終了・実行領域保持/回収を確認する。試験のACLはfinallyで復元し、UACや実利用のACLは変更しない。
 
 旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
 

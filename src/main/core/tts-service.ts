@@ -3,6 +3,7 @@ import { AutomationError } from './appdock-api';
 import {
   parseTtsSettings,
   parseTtsVoices,
+  parseTtsModels,
   type TtsSettings,
   type TtsVoice,
   type TtsJob,
@@ -131,6 +132,10 @@ export class TtsService {
     }
   >();
   private signature: string;
+  private modelLists = new Map<
+    string,
+    { abort: AbortController; promise: Promise<{ models: TtsVoice[] }> }
+  >();
   private closed = false;
   private limits: typeof ttsLimits;
   constructor(
@@ -304,6 +309,8 @@ export class TtsService {
         this.cancel(j);
     for (const [owner, list] of this.lists)
       if (changed || !this.options.canUse(owner, false)) list.abort.abort();
+    for (const [owner, list] of this.modelLists)
+      if (changed || !this.options.canUse(owner, false)) list.abort.abort();
   }
   async stopAll() {
     for (const j of this.jobs.values()) this.cancel(j);
@@ -312,6 +319,7 @@ export class TtsService {
   async close() {
     this.closed = true;
     for (const v of this.lists.values()) v.abort.abort();
+    for (const v of this.modelLists.values()) v.abort.abort();
     await this.stopAll();
   }
   private async pump() {
@@ -393,8 +401,14 @@ export class TtsService {
     url: string,
     init: RequestInit,
     limit: number,
-    voices: boolean,
+    voices: boolean | 'models',
   ): Promise<Buffer> {
+    const invalidCode =
+      voices === 'models'
+        ? 'TTS_INVALID_MODELS'
+        : voices
+          ? 'TTS_INVALID_VOICES'
+          : 'TTS_INVALID_AUDIO';
     let response: Response | undefined;
     try {
       response = await (this.options.fetcher ?? fetch)(url, { ...init, redirect: 'error' });
@@ -404,7 +418,12 @@ export class TtsService {
           fail('TTS_AUTH_FAILED', 'TTSサーバーの認証を確認してください。');
         if (s === 429) fail('TTS_RATE_LIMITED', 'TTSサーバーが受付を制限しています。');
         if (voices && [404, 405].includes(s))
-          fail('TTS_VOICES_UNSUPPORTED', 'このサーバーはボイス一覧の取得に対応していません。');
+          fail(
+            voices === 'models' ? 'TTS_MODELS_UNSUPPORTED' : 'TTS_VOICES_UNSUPPORTED',
+            voices === 'models'
+              ? 'このサーバーはモデル一覧に対応していません。モデルIDを直接入力してください。'
+              : 'このサーバーはボイス一覧の取得に対応していません。',
+          );
         fail('TTS_SERVER_ERROR', `TTSサーバーがHTTP ${s}を返しました。`);
       }
       const mime = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
@@ -419,12 +438,8 @@ export class TtsService {
               'application/octet-stream',
             ].includes(mime)
       )
-        fail(
-          voices ? 'TTS_INVALID_VOICES' : 'TTS_INVALID_AUDIO',
-          'TTSサーバーの応答形式が不正です。',
-        );
-      if (!response.body)
-        fail(voices ? 'TTS_INVALID_VOICES' : 'TTS_INVALID_AUDIO', 'TTSサーバーの応答が空です。');
+        fail(invalidCode, 'TTSサーバーの応答形式が不正です。');
+      if (!response.body) fail(invalidCode, 'TTSサーバーの応答が空です。');
       const reader = response.body!.getReader(),
         chunks: Buffer[] = [];
       let size = 0;
@@ -435,7 +450,7 @@ export class TtsService {
           size += next.value.length;
           if (size > limit)
             fail(
-              voices ? 'TTS_INVALID_VOICES' : 'TTS_AUDIO_TOO_LARGE',
+              voices ? invalidCode : 'TTS_AUDIO_TOO_LARGE',
               'TTSサーバーの応答が上限を超えました。',
             );
           chunks.push(Buffer.from(next.value));
@@ -452,6 +467,49 @@ export class TtsService {
     } finally {
       if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {});
     }
+  }
+  models(owner: string): Promise<{ models: TtsVoice[] }> {
+    this.authorize(owner, false);
+    const config = this.config(false);
+    const existing = this.modelLists.get(owner);
+    if (existing && !existing.abort.signal.aborted) return existing.promise;
+    let key: string | undefined;
+    try {
+      key = this.options.key(config.baseUrl);
+    } catch {
+      fail('TTS_AUTH_FAILED', 'TTSのAPIキーを確認してください。');
+    }
+    const abort = new AbortController();
+    const promise = (async () => {
+      const timer = setTimeout(() => abort.abort(), this.limits.voicesMs);
+      try {
+        const bytes = await this.download(
+          config.baseUrl + '/models',
+          {
+            headers: key ? { Authorization: 'Bearer ' + key } : {},
+            signal: abort.signal,
+          },
+          this.limits.voiceBytes,
+          'models',
+        );
+        if (abort.signal.aborted) fail('TTS_TIMEOUT', 'モデル一覧の取得を取り消しました。');
+        this.authorize(owner, false);
+        try {
+          const value = JSON.parse(bytes.toString('utf8'));
+          return { models: parseTtsModels(value) };
+        } catch {
+          return fail(
+            'TTS_INVALID_MODELS',
+            'モデル一覧の応答が不正です。モデルIDを直接入力できます。',
+          );
+        }
+      } finally {
+        clearTimeout(timer);
+        if (this.modelLists.get(owner)?.abort === abort) this.modelLists.delete(owner);
+      }
+    })();
+    this.modelLists.set(owner, { abort, promise });
+    return promise;
   }
   voices(owner: string): Promise<{ voices: TtsVoice[]; source: 'endpoint' | 'manual' }> {
     this.authorize(owner, false);

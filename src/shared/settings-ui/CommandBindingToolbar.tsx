@@ -1,8 +1,6 @@
-import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
+import { SettingsInput } from './SettingsInput';
 import type { ReactNode } from 'react';
 export function CommandBindingToolbar({
-  title,
-  description,
   inputName,
   count,
   visibleCount,
@@ -14,8 +12,6 @@ export function CommandBindingToolbar({
   showRegistrationErrors = false,
   children,
 }: {
-  title: string;
-  description: string;
   inputName: string;
   count: number;
   visibleCount: number;
@@ -29,13 +25,6 @@ export function CommandBindingToolbar({
 }) {
   return (
     <>
-      <header className="command-shortcuts-heading">
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-        <span className="command-count">{count} コマンド</span>
-      </header>
       {children}
       <div className="command-shortcut-tools">
         <div className="command-shortcut-search">

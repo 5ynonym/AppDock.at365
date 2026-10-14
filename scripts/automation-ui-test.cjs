@@ -236,6 +236,12 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
     const section = page.getByRole('region', { name: 'Codex連携' });
+    const openDetails = async () => {
+      const currentSection = page.getByRole('region', { name: 'Codex連携' });
+      if (!(await currentSection.locator('details').evaluate((e) => e.open)))
+        await currentSection.locator('summary').click();
+    };
+    await openDetails();
     async function togglePermission(name) {
       await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
       await page.getByRole('button', { name: '操作の許可', exact: true }).click();
@@ -281,7 +287,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       'config selection',
     );
     await section.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
-    await section.locator('summary').click();
+    await openDetails();
     await section
       .getByRole('textbox', { name: 'Codexへの登録名', exact: true })
       .fill('AppDock_Test');
@@ -292,7 +298,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         'AppDock_Test',
       'custom name saved',
     );
-    await section.getByRole('button', { name: '登録・修復' }).click();
+    await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/ }).click();
     await until(
       () => parse(fs.readFileSync(configFile, 'utf8')).mcp_servers?.AppDock_Test,
       'custom registration',
@@ -307,9 +313,9 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         'AppDock',
       'default name saved',
     );
-    await section.locator('summary').click();
+    await openDetails();
     checks.push('custom short name registers/unregisters via GUI; default AppDock restored');
-    await section.getByRole('button', { name: '登録・修復' }).click();
+    await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/ }).click();
     await until(
       () => fs.readFileSync(configFile, 'utf8').includes('BEGIN AppDock MCP'),
       'registration',
@@ -344,7 +350,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.registration,
       'absent',
     );
-    await section.getByRole('button', { name: '登録・修復', exact: true }).click();
+    await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/, exact: true }).click();
     await until(
       () => fs.readFileSync(configFile, 'utf8') === registeredBytes,
       'GUI repair after external uninstall',
@@ -352,7 +358,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     fs.writeFileSync(configFile, original + '# BEGIN AppDock MCP ' + markerId + '\n');
     await section.getByRole('button', { name: '登録を解除', exact: true }).click();
     await until(() => fs.readFileSync(configFile, 'utf8') === original, 'GUI orphan unregister');
-    await section.getByRole('button', { name: '登録・修復', exact: true }).click();
+    await section.getByRole('button', { name: /^(Codexへ登録|登録を修復)$/, exact: true }).click();
     await until(
       () => fs.readFileSync(configFile, 'utf8') === registeredBytes,
       'GUI re-register after orphan cleanup',
@@ -508,7 +514,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       if (id === 'appdock.logs.open')
         await page.getByRole('textbox', { name: 'ログを検索' }).waitFor({ state: 'visible' });
       if (id === 'appdock.updates.open')
-        await page.getByRole('region', { name: 'アップデート設定' }).waitFor({ state: 'visible' });
+        await page.getByRole('region', { name: 'バージョン情報・更新' }).waitFor({ state: 'visible' });
     }
     await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
@@ -561,7 +567,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         s.browser
           .contexts()
           .flatMap((c) => c.pages())
-          .find((p) => p.url().includes('/shells/default/')),
+          .find((p) => p.url().includes('/shells/default/index.html')),
       'Default Shell',
     );
     await shell.getByRole('button', { name: 'ログ', exact: true }).click();
@@ -771,7 +777,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           s.browser
             .contexts()
             .flatMap((c) => c.pages())
-            .find((p) => p.url().includes('/shells/default/')),
+            .find((p) => p.url().includes('/shells/default/index.html')),
         'Default Shell',
       ),
       client,
@@ -903,7 +909,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-${theme}-${width}.png`) });
-        await page.getByText('接続の詳細', { exact: true }).click();
+        await page.getByText('登録先と接続の詳細', { exact: true }).click();
         await page
           .getByRole('button', { name: '認証情報を再発行', exact: true })
           .scrollIntoViewIfNeeded();
@@ -912,7 +918,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-details-${theme}-${width}.png`) });
-        await page.getByText('接続の詳細', { exact: true }).click();
+        await page.getByText('登録先と接続の詳細', { exact: true }).click();
         await page.locator('.settings-body').evaluate((el) => {
           el.scrollTop = 0;
         });
@@ -959,7 +965,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         s.browser
           .contexts()
           .flatMap((c) => c.pages())
-          .find((p) => p.url().includes('/shells/default/')),
+          .find((p) => p.url().includes('/shells/default/index.html')),
       'restored Default Shell',
     );
     await restoredShell
@@ -987,6 +993,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await page.getByRole('button', { name: 'Codex連携', exact: true }).click();
+    await openDetails();
     await page.getByRole('button', { name: '登録を解除', exact: true }).click();
     await until(() => fs.readFileSync(configFile, 'utf8') === original, 'unregister');
     await page.getByRole('switch', { name: 'Codex連携を有効にする' }).click();

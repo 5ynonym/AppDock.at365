@@ -1,10 +1,7 @@
 import { hostSettingItem } from '../../../src/shared/settings-catalog';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
-import {
-  SettingsInput,
-  SettingsTextarea,
-  numberInput,
-} from '../../../src/shared/settings-ui/SettingsInput';
+import { SettingsInput } from '../../../src/shared/settings-ui/SettingsInput';
+import { SettingsSection, SettingsField } from '../../../src/shared/settings-ui/SettingsSections';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../../src/shared/contracts';
 import type { UiCommand } from '../../../src/shared/commands';
@@ -196,164 +193,174 @@ export function TraySettings({
   const commandTitle = (id: string | null) =>
     id ? (commands.find((c) => c.id === id)?.title ?? id) : '未設定';
   return (
-    <section className="tray-settings" aria-label="タスクトレイ設定">
-      <h3>タスクトレイ</h3>
-      {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
-        <div className="tray-click-setting" key={key} {...settingAnchor('tray', key)}>
-          <div>
-            <strong>{hostSettingItem('tray', key).title}</strong>
-            {key === 'trayDoubleClickCommand' && (
-              <small>
-                未設定ならクリックをすぐ実行。設定するとWindowsのダブルクリック判定時間だけ待機します。
-              </small>
-            )}
-          </div>
-          <div className="tray-click-controls">
-            <button
-              className="secondary"
-              aria-label={
-                key === 'trayClickCommand'
-                  ? 'トレイクリックのコマンドを選択'
-                  : 'トレイダブルクリックのコマンドを選択'
-              }
-              onClick={() => setPicker(key)}
-            >
-              {commandTitle(settings.host[key])}
-            </button>
-            {settings.host[key] && (
-              <small className="tray-click-id command-id">
-                {settings.host[key]}
-                {!commands.find((c) => c.id === settings.host[key])?.available &&
-                  ' · 現在利用できません'}
-              </small>
-            )}
-            {key === 'trayDoubleClickCommand' && settings.host[key] && (
+    <section className="settings-sections tray-settings" aria-label="タスクトレイ設定">
+      <SettingsSection
+        title="クリック時の動作"
+        description="トレイアイコンを左クリックしたときの操作を設定します。"
+      >
+        {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
+          <SettingsField
+            key={key}
+            title={hostSettingItem('tray', key).title}
+            description={
+              key === 'trayDoubleClickCommand'
+                ? '未設定ならクリックをすぐ実行。設定するとWindowsのダブルクリック判定時間だけ待機します。'
+                : '1回クリックしたときに実行するコマンドです。'
+            }
+            {...settingAnchor('tray', key)}
+          >
+            <div className="tray-click-controls">
               <button
                 className="secondary"
-                onClick={() =>
-                  onChange({
-                    ...settings,
-                    host: { ...settings.host, trayDoubleClickCommand: null },
-                  })
+                aria-label={
+                  key === 'trayClickCommand'
+                    ? 'トレイクリックのコマンドを選択'
+                    : 'トレイダブルクリックのコマンドを選択'
                 }
+                onClick={() => setPicker(key)}
               >
-                未設定に戻す
+                {commandTitle(settings.host[key])}
               </button>
+              {settings.host[key] && (
+                <small className="tray-click-id command-id">
+                  {settings.host[key]}
+                  {!commands.find((c) => c.id === settings.host[key])?.available &&
+                    ' · 現在利用できません'}
+                </small>
+              )}
+              {key === 'trayDoubleClickCommand' && settings.host[key] && (
+                <button
+                  className="secondary"
+                  onClick={() =>
+                    onChange({
+                      ...settings,
+                      host: { ...settings.host, trayDoubleClickCommand: null },
+                    })
+                  }
+                >
+                  未設定に戻す
+                </button>
+              )}
+            </div>
+          </SettingsField>
+        ))}
+      </SettingsSection>
+      <SettingsSection
+        title="コンテキストメニュー"
+        description="右クリックで開くメニューです。コマンド・グループ・区切り線を追加し、順番を調整できます。"
+        {...settingAnchor('tray', 'trayMenu')}
+      >
+        <div className="tray-toolbar">
+          <button className="secondary" onClick={() => setPicker('add')}>
+            ＋ コマンド
+          </button>
+          <button className="secondary" onClick={() => add('group')}>
+            ＋ グループ
+          </button>
+          <button className="secondary" onClick={() => add('separator')}>
+            ＋ 区切り線
+          </button>
+        </div>
+        <div className="tray-workspace">
+          <div>
+            <div className="tray-tree">
+              {rows(items)}
+              {!items.length && <p className="muted">コマンドやグループを追加できます。</p>}
+              <hr />
+              <div className="tray-fixed">
+                設定…<small>固定</small>
+              </div>
+              <div className="tray-fixed">
+                終了<small>固定</small>
+              </div>
+            </div>
+            {active && (
+              <div className="tray-item-editor" aria-label="選択したメニュー項目">
+                <div className="tray-toolbar">
+                  <button
+                    className="secondary"
+                    aria-label="メニュー項目を上へ移動"
+                    disabled={active.list.indexOf(active.item) === 0}
+                    onClick={() => move(-1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="secondary"
+                    aria-label="メニュー項目を下へ移動"
+                    disabled={active.list.indexOf(active.item) === active.list.length - 1}
+                    onClick={() => move(1)}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      modify((next) => {
+                        const row = find(next, selected)!;
+                        row.list.splice(
+                          row.list.indexOf(row.item),
+                          1,
+                          ...(row.item.type === 'group' ? row.item.children : []),
+                        );
+                      });
+                      select(null);
+                    }}
+                  >
+                    {active.item.type === 'group' ? 'グループを解除' : 'メニューから外す'}
+                  </button>
+                </div>
+                {active.item.type === 'group' ? (
+                  <label>
+                    グループ名
+                    <SettingsInput
+                      aria-label="グループ名"
+                      maxLength={80}
+                      value={active.item.title}
+                      onChange={(e) =>
+                        modify((next) => {
+                          const row = find(next, selected)!.item;
+                          if (row.type === 'group') row.title = e.target.value;
+                        })
+                      }
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    配置先
+                    <select
+                      aria-label="メニュー項目の配置先"
+                      value={active.parent ?? ''}
+                      onChange={(e) => place(e.target.value)}
+                    >
+                      <option value="">トップレベル</option>
+                      {items
+                        .filter((item) => item.type === 'group')
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.title || '名前未入力のグループ'}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+                {active.item.type === 'group' && (
+                  <small>解除すると、中の項目をその位置のトップレベルへ戻します。</small>
+                )}
+              </div>
             )}
           </div>
+          <aside className="tray-preview" aria-label="トレイメニューの表示イメージ">
+            <h4>表示イメージ</h4>
+            <div className="tray-preview-menu">
+              {preview(resolveTrayMenu(items, catalog))}
+              {resolveTrayMenu(items, catalog).length > 0 && <hr />}
+              <div className="tray-preview-item">設定…</div>
+              <div className="tray-preview-item">終了</div>
+            </div>
+          </aside>
         </div>
-      ))}
-      <h3 {...settingAnchor('tray', 'trayMenu')}>{hostSettingItem('tray', 'trayMenu').title}</h3>
-      <div className="tray-toolbar">
-        <button className="secondary" onClick={() => setPicker('add')}>
-          ＋ コマンド
-        </button>
-        <button className="secondary" onClick={() => add('group')}>
-          ＋ グループ
-        </button>
-        <button className="secondary" onClick={() => add('separator')}>
-          ＋ 区切り線
-        </button>
-      </div>
-      <div className="tray-workspace">
-        <div>
-          <div className="tray-tree">
-            {rows(items)}
-            {!items.length && <p className="muted">コマンドやグループを追加できます。</p>}
-            <hr />
-            <div className="tray-fixed">
-              設定…<small>固定</small>
-            </div>
-            <div className="tray-fixed">
-              終了<small>固定</small>
-            </div>
-          </div>
-          {active && (
-            <div className="tray-item-editor" aria-label="選択したメニュー項目">
-              <div className="tray-toolbar">
-                <button
-                  className="secondary"
-                  aria-label="メニュー項目を上へ移動"
-                  disabled={active.list.indexOf(active.item) === 0}
-                  onClick={() => move(-1)}
-                >
-                  ↑
-                </button>
-                <button
-                  className="secondary"
-                  aria-label="メニュー項目を下へ移動"
-                  disabled={active.list.indexOf(active.item) === active.list.length - 1}
-                  onClick={() => move(1)}
-                >
-                  ↓
-                </button>
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    modify((next) => {
-                      const row = find(next, selected)!;
-                      row.list.splice(
-                        row.list.indexOf(row.item),
-                        1,
-                        ...(row.item.type === 'group' ? row.item.children : []),
-                      );
-                    });
-                    select(null);
-                  }}
-                >
-                  {active.item.type === 'group' ? 'グループを解除' : 'メニューから外す'}
-                </button>
-              </div>
-              {active.item.type === 'group' ? (
-                <label>
-                  グループ名
-                  <SettingsInput
-                    aria-label="グループ名"
-                    maxLength={80}
-                    value={active.item.title}
-                    onChange={(e) =>
-                      modify((next) => {
-                        const row = find(next, selected)!.item;
-                        if (row.type === 'group') row.title = e.target.value;
-                      })
-                    }
-                  />
-                </label>
-              ) : (
-                <label>
-                  配置先
-                  <select
-                    aria-label="メニュー項目の配置先"
-                    value={active.parent ?? ''}
-                    onChange={(e) => place(e.target.value)}
-                  >
-                    <option value="">トップレベル</option>
-                    {items
-                      .filter((item) => item.type === 'group')
-                      .map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.title || '名前未入力のグループ'}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              )}
-              {active.item.type === 'group' && (
-                <small>解除すると、中の項目をその位置のトップレベルへ戻します。</small>
-              )}
-            </div>
-          )}
-        </div>
-        <aside className="tray-preview" aria-label="トレイメニューの表示イメージ">
-          <h4>表示イメージ</h4>
-          <div className="tray-preview-menu">
-            {preview(resolveTrayMenu(items, catalog))}
-            {resolveTrayMenu(items, catalog).length > 0 && <hr />}
-            <div className="tray-preview-item">設定…</div>
-            <div className="tray-preview-item">終了</div>
-          </div>
-        </aside>
-      </div>
+      </SettingsSection>
       {picker && (
         <CommandPicker
           commands={commands.filter(

@@ -157,6 +157,8 @@ Webアカウントの仮名とtemporaryNameフラグを保存し、観測account
 
 portableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
 
+名前付きmutexは[CreateMutexExW](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createmutexexw)で必要な権限だけ要求します。GateはSYNCHRONIZE | MUTEX_MODIFY_STATE、Runtime leaseはSYNCHRONIZEです。CreateMutexWの暗黙のMUTEX_ALL_ACCESSは管理者起動済みホストへ通常権限の通知起動が合流すると拒否されるため使いません。既定DACL、mutex名、待機/解放、DuplicateHandle、最終lease回収は変更しません。ACL緩和や通知クリックによる追加のUAC昇格を行いません。
+
 ## Node Appletのファイル選択と音声
 
 - `node-worker.ts`: `ui.pickFile`、`audio.play`、`tray.attention`、通知オプションを追加。ファイル選択だけRPC期限を5分に拡張。

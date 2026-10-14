@@ -55,7 +55,7 @@ TtsServiceは受付・設定解決・キュー・HTTP・状態・取消を所有
 | `tts.voicesPath` | ベースURL配下の相対パス。既定audio/voices |
 | `tts.manualVoices` | 手動ボイスのid/name配列。既定空配列 |
 
-URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。モデルは自由入力とし、モデル一覧APIは初期範囲外。ボイスIDの大文字・小文字は維持する。
+URL・モデル・ボイスIDに特定サーバーの値を埋め込まない。モデルとボイスは一覧からの選択と自由入力を提供する。一覧非対応でも直接入力したIDを保存できる。IDの大文字・小文字は維持する。
 
 APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化方式に合わせてPC専用rootのホスト用秘密領域へ保存する。Applet別SecretsのIDを流用しない。暗号化不可の場合は平文へフォールバックしない。キーの登録・置換・削除はホスト設定画面に限定し、Applet/MCPへ値を返さない。必要な状態表示にはapiKeyConfiguredだけを使う。
 
@@ -65,9 +65,9 @@ APIキーは共有設定へ保存せず、safeStorageによる既存の暗号化
 
 ## 設定画面
 
-既存設定へ「読み上げ」ページを追加する。通常項目はURL・APIキー・モデル・既定ボイス・速度とし、一覧方式・パス・手動一覧は詳細項目へまとめる。
+「読み上げ」は共通カードを使い、接続先（URL/APIキー）、モデルと声（モデル/既定ボイス/速度）、試聴の順に配置する。速度の適用先・ボイス一覧方式・パス・手動一覧は詳細項目へまとめる。
 
-即時保存・入力検証・revision競合・Shell描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
+即時保存・入力検証・revision競合・Shell描画は既存契約を使う。部分JSONは共有設定だけを対象とし、秘密値を含めない。保存や編集だけで音声を生成しない。「モデル一覧を更新」「ボイス一覧を更新」「試聴」「停止」を明示操作として提供する。試聴は保存済み設定と共通TtsServiceを使い、入力本文を共有設定に保存しない。
 
 Default Shellと追加Shellは同じ公開モデル・操作を使用する。秘密値を保存後の表示モデルへ戻さず、キー更新はホスト所有の専用操作に渡す。利用許可は「操作の許可」のApplet/MCP列へ追加する。
 
@@ -96,6 +96,12 @@ playback（既定）ではサーバーへspeed=1を送り、プレイヤーのpl
 HTTP成功だけで再生へ進めない。Content-Type・RIFF/WAVEコンテナー・サイズ・デコードを確認する。JSON/HTML、破損データ、上限超過はエラー。Content-Lengthを信用して全量確保せず、受信中の累積サイズにも上限を適用する。
 
 URLはhttp/httpsのみ。URL内の認証情報・クエリー・フラグメントを禁止し、リダイレクトは自動追従しない。本文・キー・生のサーバーエラーをログや公開エラーへ含めない。
+
+### モデル一覧
+
+設定ページの`ttsModels`操作から、同じ接続先・認証でベースURL配下の`models`へGETする。モデル未設定でも取得できる。標準の`{data:[{id,name?}]}`とQwen3-TTSの`{models:[{name,id?,downloaded?}]}`を明示的に受け付ける。後者は`id`がなければ`name`をIDとし、`downloaded:false`を候補から除く。モデルのダウンロードや自動選択は行わない。標準一覧に音声以外のモデルが含まれる場合、選択は利用者が判断する。
+
+取得期限5秒、応答1MiB、1000件の制限と重複ID/型検証を適用する。404/405は一覧非対応として手入力を案内する。他の通信障害と区別し、失敗や空一覧で保存済みモデルを消さない。接続先に紐付く認証、リダイレクト拒否、秘密情報を含めないエラーをボイス一覧と共有する。同一所有者の並行取得をまとめ、ボイス一覧とは独立させる。設定・キー・許可変更と終了で中断し、UIでも古い接続条件の応答を採用しない。永続キャッシュと新しい設定項目は追加しない。モデル一覧は設定ページ用の操作で、既存4種類のApplet/MCP TTS APIは変更しない。
 
 ### ボイス一覧
 
@@ -219,6 +225,7 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 | TTS_INVALID_AUDIO / TTS_AUDIO_TOO_LARGE | 不正音声／受信上限超過 |
 | TTS_AUDIO_TOO_LONG / TTS_PLAYBACK_FAILED | 再生時間超過／デコード・再生失敗 |
 | TTS_VOICES_UNSUPPORTED / TTS_INVALID_VOICES | 一覧API非対応／一覧形式不正 |
+| TTS_MODELS_UNSUPPORTED / TTS_INVALID_MODELS | 設定ページのモデル一覧API非対応／形式不正 |
 
 一覧取得の5秒期限もTTS_TIMEOUTとする。サーバーのエラー本文には入力テキストが含まれる可能性があるため、そのままUI・MCP・ログへ流さない。公開エラーはHTTP状態などの安全な情報に限る。
 
@@ -260,4 +267,5 @@ MCPのspeakは外部通信と再生を伴う操作として宣言する。状態
 
 - [OpenAI Create speech](https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create): 音声生成、速度、返却形式。互換サーバーの追加API・実装動作は別途確認する。
 - [OpenAI Text to speech](https://developers.openai.com/api/docs/guides/text-to-speech): ボイス・音声形式。
+- [OpenAI List models](https://developers.openai.com/api/reference/resources/models/methods/list): 標準モデル一覧のエンドポイントとdata/id形式。
 - 接続するサーバーの/openapi.json、/v1/audio/voices、モデル情報を実装時に再確認する。取得したボイス・ダウンロード済みモデルのスナップショットを製品の固定仕様にしない。

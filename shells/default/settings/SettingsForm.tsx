@@ -6,13 +6,12 @@ import type { SettingsPageModel } from '../../../src/shared/settings-page';
 import { defaultShellId, shellRegions, shellView } from '../../../src/shared/shell';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
-import { VersionCheck } from '../../../src/shared/settings-ui/VersionCheck';
+import { AboutSettings } from './AboutSettings';
 import { WebAppletSettings } from '../../../src/shared/settings-ui/WebAppletSettings';
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
-import { UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 import { TtsSettingsForm } from './TtsSettings';
 import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
@@ -20,6 +19,7 @@ import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettings } from './AppletSettings';
+import { SettingsSection, SettingsField } from '../../../src/shared/settings-ui/SettingsSections';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -77,6 +77,26 @@ export function SettingsForm({
         onDelete={() => void invoke('deleteWebApplet')}
       />
     );
+  if (category === 'about')
+    return (
+      <AboutSettings
+        settings={settings}
+        edit={edit}
+        extensions={extensions}
+        runtime={runtime}
+        version={version}
+        busy={busy}
+      />
+    );
+  if (category === 'tray')
+    return (
+      <TraySettings
+        settings={settings}
+        extensions={extensions}
+        commands={commands}
+        onChange={edit}
+      />
+    );
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
   if (category === 'notifications')
@@ -110,8 +130,9 @@ export function SettingsForm({
     );
   return (
     <div className="settings-layout">
-      <div className="settings-form">
-        {' '}
+      <div
+        className={`settings-form${['general', 'appearance', 'profile'].includes(category) ? ' settings-sections' : ''}`}
+      >
         {category === 'gestures' && (
           <GesturesEditor
             settings={settings}
@@ -122,61 +143,6 @@ export function SettingsForm({
         )}
         {category === 'ribbon' && (
           <RibbonSettings settings={settings} extensions={extensions} onChange={edit} />
-        )}
-        {category === 'about' && (
-          <section className="about-page" aria-label="バージョン情報・更新">
-            <div className="about-host" {...settingAnchor('about', 'versions')}>
-              <span className="section-label">APPDOCK</span>
-              <h2>
-                AppDock.at365 <span>v{version}</span>
-              </h2>
-              <p>現在使用しているバージョンと、公開されている正式版を確認できます。</p>
-              <VersionCheck details />
-              <UpdateSettings settings={settings} edit={edit} appletCount={extensions.length} />
-              <details className="update-disclosure">
-                <summary>実行環境の詳細</summary>
-                <dl className="runtime-versions">
-                  <div>
-                    <dt>Electron</dt>
-                    <dd>{runtime.electron}</dd>
-                  </div>
-                  <div>
-                    <dt>Chromium</dt>
-                    <dd>{runtime.chrome}</dd>
-                  </div>
-                  <div>
-                    <dt>Node.js</dt>
-                    <dd>{runtime.node}</dd>
-                  </div>
-                  <div>
-                    <dt>実行環境</dt>
-                    <dd>
-                      {runtime.platform} / {runtime.arch}
-                    </dd>
-                  </div>
-                </dl>
-              </details>
-            </div>
-            <h3 {...settingAnchor('about', 'updateSource')}>インストール済みのApplet</h3>
-            <p className="muted">
-              Appletごとに更新できます。更新元を変えるときは各欄の設定を開いてください。
-            </p>
-            {extensions.length === 0 && <p>Appletはインストールされていません。</p>}
-            <div className="about-applets">
-              {extensions
-                .filter((e) => e.runtime !== 'web')
-                .map((e) => (
-                  <article key={e.id}>
-                    <div>
-                      <strong>{e.displayName}</strong>
-                      <span className="muted">v{e.version}</span>
-                    </div>
-                    <VersionCheck id={e.id} details disabled={busy} />
-                    <AppletUpdateSource extension={e} settings={settings} edit={edit} />
-                  </article>
-                ))}
-            </div>
-          </section>
         )}
         {category === 'shortcuts' && (
           <ShortcutsEditor
@@ -189,19 +155,26 @@ export function SettingsForm({
           />
         )}
         {category === 'profile' && (
-          <ProfileEditor
-            name={settings.profile.name}
-            avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
-            busy={busy}
-            onName={(name) => edit({ ...settings, profile: { ...settings.profile, name } })}
-            onAvatar={(bytes, preview, name) => {
-              setAvatar(bytes, name);
-            }}
-          />
+          <SettingsSection
+            title="名前と画像"
+            description="ワークスペースに表示するプロフィールを設定します。"
+          >
+            <ProfileEditor
+              name={settings.profile.name}
+              avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
+              busy={busy}
+              onName={(name) => edit({ ...settings, profile: { ...settings.profile, name } })}
+              onAvatar={(bytes, preview, name) => {
+                setAvatar(bytes, name);
+              }}
+            />
+          </SettingsSection>
         )}
         {category === 'appearance' && (
-          <>
-            <h3>表示</h3>
+          <SettingsSection
+            title="ワークスペースの表示"
+            description="テーマと、各領域を描画するShellを選びます。"
+          >
             <h4>Shell</h4>
             {shellRegions.map(({ id, title }) => {
               const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
@@ -288,19 +261,14 @@ export function SettingsForm({
                 <option value="system">System</option>
               </select>
             </SettingRow>
-          </>
+          </SettingsSection>
         )}
-        {category === 'tray' && (
-          <TraySettings
-            settings={settings}
-            extensions={extensions}
-            commands={commands}
-            onChange={edit}
-          />
-        )}
+
         {category === 'general' && (
-          <>
-            <h3>一般</h3>
+          <SettingsSection
+            title="起動とウィンドウ"
+            description="Windowsへのサインイン時や、ウィンドウを閉じたときの動作を設定します。"
+          >
             <SettingRow pageId={category} itemKey="permissions">
               <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
             </SettingRow>
@@ -361,7 +329,7 @@ export function SettingsForm({
                 />
               </SettingRow>
             ))}
-          </>
+          </SettingsSection>
         )}
       </div>
     </div>
@@ -380,12 +348,12 @@ function SettingRow({
 }) {
   const item = hostSettingItem(pageId, itemKey);
   return (
-    <div className="setting-row" {...settingAnchor(pageId, itemKey)}>
-      <div>
-        <strong>{item.title}</strong>
-        <p>{description ?? item.description}</p>
-      </div>
+    <SettingsField
+      title={item.title}
+      description={description ?? item.description}
+      {...settingAnchor(pageId, itemKey)}
+    >
       {children}
-    </div>
+    </SettingsField>
   );
 }

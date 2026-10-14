@@ -47,15 +47,6 @@
 .tray-settings h4 {
   margin: 0;
 }
-.tray-click-setting {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr);
-  gap: 20px;
-  align-items: center;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.tray-click-setting small,
 .tray-item-editor small {
   display: block;
   color: var(--muted);
@@ -189,78 +180,6 @@
   .tray-workspace {
     grid-template-columns: 1fr;
   }
-}
-@media (max-width: 800px) {
-  .tray-click-setting {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-}
-.about-page {
-  display: grid;
-  gap: 18px;
-}
-.about-host {
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 14px;
-  padding: 24px;
-  display: grid;
-  gap: 18px;
-}
-.about-host h2 {
-  font-size: 22px;
-}
-.about-host h2 span {
-  color: var(--accent);
-  font-size: 16px;
-  margin-left: 10px;
-}
-.about-host p {
-  line-height: 1.8;
-}
-.runtime-versions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 0;
-  padding: 18px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.runtime-versions dt {
-  color: var(--muted);
-  font-size: 11px;
-  margin-bottom: 6px;
-}
-.runtime-versions dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.about-applets {
-  display: grid;
-  gap: 10px;
-}
-.about-applets article {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px;
-  display: grid;
-  gap: 10px;
-}
-.about-applets article > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.about-page .version-check {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.about-page .version-check time {
-  font-size: 11px;
 }
 * {
   box-sizing: border-box;
@@ -2351,6 +2270,7 @@ summary {
 }
 .update-check-control {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   font-size: 12px;
@@ -2419,35 +2339,33 @@ summary {
 .update-operation button:hover {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
-.update-result-details {
-  position: relative;
-  font-size: 11px;
-}
-.update-result-details summary {
-  cursor: pointer;
+.update-result-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
   color: var(--muted);
-}
-.update-result-details > div {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 5;
-  width: min(300px, 65vw);
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: 0 6px 24px #0002;
+  font-size: 11px;
   overflow-wrap: anywhere;
+}
+.version-display,
+.version-available {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.version-display {
+  flex-wrap: wrap;
+}
+.version-available {
+  color: var(--accent);
 }
 .update-check-control time {
   min-width: 175px;
-}
-@media (max-width: 1000px) {
-  .update-result-details > div {
-    left: 0;
-    right: auto;
-  }
 }
 @media (max-width: 760px) {
   .update-operation small {
@@ -2931,29 +2849,6 @@ summary {
 .applet-shortcut-edit > small {
   color: var(--muted);
 }
-.command-shortcuts-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
-}
-.command-shortcuts-heading h2 {
-  margin: 0 0 8px;
-}
-.command-shortcuts-heading p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.7;
-}
-.command-count {
-  flex: none;
-  border-radius: 20px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  padding: 6px 12px;
-  font-size: 12px;
-}
 .command-shortcut-tools {
   display: flex;
   align-items: stretch;
@@ -3037,9 +2932,6 @@ summary {
   flex: none;
 }
 @media (max-width: 800px) {
-  .command-shortcuts-heading {
-    flex-wrap: wrap;
-  }
   .command-shortcut-tools {
     gap: 8px;
   }

@@ -1,4 +1,3 @@
-import { hostSettingItem } from '../../../src/shared/settings-catalog';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import {
   SettingsInput,
@@ -177,10 +176,6 @@ export function RibbonSettings({
       {...settingAnchor('ribbon', 'ribbon')}
       aria-label="リボン設定"
     >
-      <h3>{hostSettingItem('ribbon', 'ribbon').title}</h3>
-      <p>
-        上寄せ・下寄せを選び、それぞれの並び順と表示を設定できます。行をドラッグするか上下ボタンで並べ替えると自動保存します。
-      </p>
       <p className="muted">
         設定ボタンを非表示にしても、リボンの右クリックや「設定を開く」コマンドから戻れます。
       </p>

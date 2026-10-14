@@ -28,9 +28,11 @@ let application;
       );
       await settingsPage.getByRole('button', { name: '一般', exact: true }).click();
       await settingsPage.getByLabel('スタートアップに登録', { exact: true }).waitFor();
-      const heading = await settingsPage.locator('.settings-surface .page-heading').boundingBox();
+      const heading = await settingsPage
+        .locator('.settings-surface .settings-page-heading')
+        .boundingBox();
       const toolbar = await settingsPage
-        .locator('.settings-surface .settings-toolbar')
+        .locator('.settings-surface .settings-page-toolbar')
         .boundingBox();
       const form = await settingsPage.locator('.settings-form').boundingBox();
       const scrollTop = await settingsPage
@@ -41,11 +43,11 @@ let application;
         });
       assert.ok(scrollTop > 0, `long category scrolls at ${width}`);
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-toolbar').boundingBox(),
         toolbar,
       );
       await settingsPage.getByRole('button', { name: '表示', exact: true }).click();
@@ -57,11 +59,11 @@ let application;
         0,
       );
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-toolbar').boundingBox(),
         toolbar,
       );
       const shortForm = await settingsPage.locator('.settings-form').boundingBox();
@@ -73,11 +75,11 @@ let application;
         element.scrollTop = element.scrollHeight;
       });
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .page-heading').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-heading').boundingBox(),
         heading,
       );
       assert.deepEqual(
-        await settingsPage.locator('.settings-surface .settings-toolbar').boundingBox(),
+        await settingsPage.locator('.settings-surface .settings-page-toolbar').boundingBox(),
         toolbar,
       );
       await settingsPage.getByRole('button', { name: 'フォーム', exact: true }).click();

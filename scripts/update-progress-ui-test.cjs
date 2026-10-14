@@ -44,6 +44,7 @@ const server = http.createServer((request, response) => {
     response.end(feed);
     return;
   }
+  response.setHeader('Content-Length', zip.length);
   if (!slow) {
     response.end(zip);
     return;
@@ -70,6 +71,23 @@ let app;
   settings.host.hardwareAcceleration = false;
   settings.host.notifications = false;
   settings.globalShortcutCommands = [];
+  const hostFeed = path.join(profile, 'host-update.json');
+  const hostVersion = require('../package.json').version;
+  const writeHostFeed = (version) =>
+    fs.writeFileSync(
+      hostFeed,
+      JSON.stringify({
+        schemaVersion: 1,
+        kind: 'host',
+        id: 'host',
+        version,
+        payload: { file: 'unused.exe', size: 2, sha256: '0'.repeat(64), format: 'exe' },
+      }),
+    );
+  writeHostFeed('999.0.0');
+  settings.updates.hostSource = hostFeed;
+  settings.updates.checkHostOnStartup = false;
+  settings.updates.checkAppletsOnStartup = false;
   settings.extensions.fixture = {
     enabled: false,
     settings: {},
@@ -84,7 +102,7 @@ let app;
       args: [`--test-profile=${profile}`],
       env,
     });
-    const page = await app.firstWindow();
+    const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
     page.setDefaultTimeout(15000);
     await require('./shell-overlay-helper.cjs').homePage(page);
     await page.getByRole('button', { name: '設定', exact: true }).click();
@@ -95,6 +113,59 @@ let app;
     const update = page
       .locator('.about-applets')
       .getByRole('button', { name: 'このAppletを更新', exact: true });
+    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(page);
+    const appletSection = settingsPage.locator('details.settings-section').filter({
+      has: settingsPage.getByRole('heading', { name: 'インストール済みのApplet', exact: true }),
+    });
+    assert.equal(await appletSection.getAttribute('open'), null);
+    assert.equal(await update.isVisible(), false);
+    await appletSection.locator('summary').first().click();
+    const hostVersions = settingsPage.locator('.about-installed-version');
+    assert.equal(await hostVersions.locator('.version-available').count(), 0);
+    await page.evaluate(() => window.dock.checkAllUpdates());
+    await hostVersions.getByLabel('更新後のバージョン 999.0.0', { exact: true }).waitFor();
+    await settingsPage
+      .locator('.about-applets')
+      .getByLabel('更新後のバージョン 2.0.0', { exact: true })
+      .waitFor();
+    const current = await hostVersions.locator('.version-current').boundingBox();
+    const next = await hostVersions.locator('.version-available').boundingBox();
+    assert.ok(next.x > current.x + current.width);
+    assert.ok(Math.abs(next.y - current.y) < 4);
+    const hostColor = await hostVersions
+      .locator('.version-current')
+      .evaluate((e) => getComputedStyle(e).backgroundColor);
+    const appletColor = await settingsPage
+      .locator('.about-applets .version-current')
+      .evaluate((e) => getComputedStyle(e).backgroundColor);
+    assert.equal(hostColor, appletColor);
+    assert.notEqual(hostColor, 'rgba(0, 0, 0, 0)');
+    assert.equal(await settingsPage.locator('.update-result-details').count(), 0);
+    assert.equal(
+      await settingsPage
+        .locator('.update-result-inline')
+        .first()
+        .evaluate((e) => getComputedStyle(e).position),
+      'static',
+    );
+    writeHostFeed(hostVersion);
+    await page.evaluate(() => window.dock.checkUpdates());
+    await hostVersions.locator('.version-available').waitFor({ state: 'detached' });
+    assert.equal(await settingsPage.getByText('最新版です。', { exact: true }).count(), 0);
+    fs.writeFileSync(hostFeed, 'invalid feed');
+    await page.evaluate(() => window.dock.checkUpdates());
+    assert.equal(await hostVersions.locator('.version-available').count(), 0);
+    writeHostFeed('999.0.0');
+    await page.evaluate(() => window.dock.checkUpdates());
+    await hostVersions.getByLabel('更新後のバージョン 999.0.0', { exact: true }).waitFor();
+    assert.equal(
+      await settingsPage.getByRole('button', { name: '更新を確認', exact: true }).count(),
+      0,
+    );
+    assert.equal(
+      await settingsPage.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
+      0,
+    );
     for (const theme of ['dark', 'light']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -111,10 +182,13 @@ let app;
       );
       await page.waitForFunction(
         () => document.querySelector('.update-operation progress')?.value > 131072,
+        undefined,
+        { polling: 100 },
       );
       const progress = await page.getByRole('progressbar').getAttribute('value');
       assert.ok(Number(progress) > 0 && Number(progress) < zip.length);
       await page.screenshot({ path: path.join(profile, `progress-${theme}.png`) });
+      await settingsPage.screenshot({ path: path.join(profile, `settings-${theme}.png`) });
       await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await page.waitForFunction(() => window.dock.snapshot().then((s) => !s.updates.busy));
       await page
@@ -146,6 +220,10 @@ let app;
         'dark/light screenshots',
         'cancel aborts transfer without replacing installed Applet',
         'retry and final confirmation cancellation',
+        'update-only controls on the settings page',
+        'host and Applet current/new versions align inline with matching colored badges',
+        'current/error checks remove the new-version badge; result text is inline, not a popup',
+        'installed Applets start collapsed and remain operable after expanding',
       ],
     };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));

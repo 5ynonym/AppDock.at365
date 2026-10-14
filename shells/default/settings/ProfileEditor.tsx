@@ -31,8 +31,6 @@ export function ProfileEditor({
   );
   return (
     <div className="profile-editor">
-      <h3>プロフィール</h3>
-      <p className="settings-help">Dockで使う名前と、左下に表示するアバターを設定します。</p>
       <div className="profile-preview">
         <div className="profile-avatar">
           {avatarUrl ? (

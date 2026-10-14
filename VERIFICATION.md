@@ -1,5 +1,49 @@
 # 検証記録
 
+## 2026-10-14: 設定UI整理のコミット前回帰と管理者起動時の通知経路（0.36.7）
+
+- 「最新版です。」の結果本文を削除。現在版、最終確認日時、新バージョンのバッジ、未確認/失敗などの必要な結果は維持。
+- Windows通知からの起動エラーを調査。通常権限の旧0.36.6は起動直後の更新完了通知を含むWindows Shell URI試験7群が成功した。一方、管理者起動中の実AppDockのGate/Runtimeへハンドルを開くだけの読み取り調査では、MUTEX_ALL_ACCESSは両方ERROR_ACCESS_DENIED(5)、SYNCHRONIZEおよびSYNCHRONIZE | MUTEX_MODIFY_STATEは成功。オブジェクトの取得/解放・ACL変更・実利用プロセス操作はしていない。
+- portable.nsiをCreateMutexExWへ変更し、GateはSYNCHRONIZE | MUTEX_MODIFY_STATE、Runtime leaseはSYNCHRONIZEだけ要求。既定ACL、名前、mutex待機/解放、子へのlease複製、最終回収を維持。権限付与や追加UACを導入しない。発行前レビューで必要権限と全3か所の作成/再作成経路、lease寿命、二重起動を確認し、未解決指摘なし。設定/保存/API変更がないためパッチ更新。
+- 隔離実EXEの[修正前再現](.artifacts/portable-mutex-1791957767932/日本語%20profile/result.json)で、テスト専用Gate/RuntimeのACLを個別に制限し、全権限拒否と同じSetupエラーダイアログを両方再現。finallyで元ACLを復元し、専用ホスト終了後の実行領域回収も確認。UACなしで権限条件を再現したもので、実管理者トークンでの通知クリック試験とは区別する。
+- コミット依頼に従い、ここまでの設定共通化・TTS一覧・通知先・Codex・トレイ・更新表示とランチャー修正を対象に必要回帰を確定。固定依存同期、型検査、標準build/fixture/実プロセスを含む **407/407、fail/skip 0** が終了0。証跡は[コミット前検証](.artifacts/commit-validation-settings-0.36.7-20261014/)へ保存。
+- `publish.bat`終了0。package/単一EXE/Default Shell/update.jsonは **0.36.7**、EXEは **144,184,430 bytes**、SHA256 **f1ddd2a9ff825df646606baa00b260ea89c84a3fdfbd7baf0ded69fafd8a84df**。lockfile/workspace/toolchainは前後hash一致。
+- [修正後の権限再現](.artifacts/portable-mutex-1791958081251/日本語%20profile/result.json)はGate/Runtimeとも二重起動終了0・既存PID維持・second-instance転送1回・最終領域回収を確認。同一発行物で起動直後の更新完了通知と通常Windows通知のShell URI起動、更新表示、設定UI、TTS、通知読み上げ、Codex、トレイ、検索、画面遷移、スクロール、実EXE更新、更新結果、再起動/終了、トレイ識別のGUI/実プロセス **15本が終了0**。各結果・完全ログ/hashは`gui-results.json`へ保存。実管理者トークンへの物理通知クリックは未自動化であり、権限制限fixtureと区別する。
+- 初回Codex試験は古い領域名、初回トレイ識別試験は再起動後の別ランチャーの終了待ち不足で失敗。テストだけを修正して各試験を再実行し成功。最後に標準回帰を新規実行し再度 **407/407、fail/skip 0**。製品内容は最初の発行物から不変。修正後stage tree **27c4b4aec14243a3684ff8120fccc8ae7c295f9a**、未stage差分・未追跡入力なし。検証後の変更はこの記録だけとし、最終tree/commitと文書例外を`validation.json`へ記録する。
+- 必要回帰・差分・発行物を再確認し未解決の製品指摘なし。コミット検証で参照するfixture/ログは再利用資料として保持し、実行失敗の調査資料も保持。今回のXX.TEMP作成なし。未変更Appletの発行、実利用先deploy、push、Releaseは行わず、本体のここまでの変更だけをローカルコミットする。
+
+## 2026-10-14: 確認結果のインライン化と新バージョン表示（0.36.6）
+
+- バージョン情報の「確認結果」ポップアップと絶対配置CSSを削除し、結果本文・リリースリンクをカード内へ表示。本体とAppletの現在版を共通の色付きバッジへ統一し、確認済みの新バージョンを右側へ矢印付きで表示する。availableかつ確認時currentVersionが現在版に一致する場合だけ表示し、同版や確認失敗を新バージョンとして表示しない。
+- 「インストール済みのApplet」を共通SettingsSectionの初期折りたたみに変更。個別更新と更新元編集は展開後に利用できる。確認処理・取得進捗・適用直前の確認/取消・保存仕様は維持。
+- 発行前レビュー1回で、更新購読、対象ID、旧結果の表示条件、共通バッジ、結果の配置、折りたたみと検索/個別操作を確認。未解決の指摘なし。設定項目・保存ファイル・公開API変更がないため0.36.5→0.36.6のパッチ更新。型検査・build成功。[ソース設定UI7群](.artifacts/settings-usability-1791956885609/result.json)は両テーマ/1280・760幅、初期折りたたみ、バッジとポップアップ削除を含め終了0。
+- `publish.bat`終了0。単一EXE、package、同梱Default Shell、update.jsonは **0.36.6**。EXEは **144,188,287 bytes**、SHA256 **59327a59c72ac72efb232cb86366212bbdbb121c78e071324dc5c613ca9b55e9**。固定依存同期成功、lockfile・workspace・toolchainの前後hash一致。版変更直後のPrettierは依存同期ガードで開始せず、通常publishの固定同期後に再実行して成功。diff検査も成功。
+- 同一hashの単一EXE隔離コピーで[設定UI7群](.artifacts/settings-usability-1791957047040/result.json)終了0。発行したwin-unpackedで[更新表示・進捗8群](.artifacts/update-progress-1791957034663/result.json)終了0。ローカルfixtureの本体/Applet新バージョン、右側の配置と色一致、同版/失敗時の非表示、ポップアップ不在、折りたたみ初期状態と展開後操作を確認。両テーマの実設定Surface画像と、取得途中/最終確認で取消して既存Appletファイルが変わらないことを確認した。
+- 同一hashの固定EXEで[設定検索7群](.artifacts/settings-search-1791957078187/result.json)終了0。検索対象アンカーへの移動と折りたたみ展開を確認。[発行・照合・整理記録](.artifacts/update-version-layout-20261014/)を保存し、テストプロセス残存0。新規成功分は種類/実行方式ごとに3件以内、古い検索資料は過去検証の参照保護対象のため削除0件。失敗/状態不明/fixtureも保持。バックエンド変更がないため単体全回帰・更新EXE交換全試験・無関係Appletの試験は未実行。commit・push・Release・実利用先deployなし。
+
+## 2026-10-14: トレイ設定とバージョン情報・更新の再構成（0.36.5）
+
+- タスクトレイを共通SettingsSectionの「クリック時の動作」と「コンテキストメニュー」に分離。割当、メニュー構造、操作、即時保存は既存経路を維持。バージョン情報はAboutSettingsへ切り出し、まとめて更新、本体、インストール済みApplet、折りたたみの更新設定と実行環境へ再構成した。
+- 共通VersionCheckの「更新を確認」と一括確認ボタンを削除。本体だけ・Appletだけ・個別・本体と全Appletの更新、最終確認日時、結果詳細は維持。更新ボタンから確認・準備・取消を行う。起動時のメタデータ確認と公開check APIは維持し、更新backend・設定項目・保存ファイル・公開APIの変更なし。
+- 発行前レビュー1回で要件、既存の更新範囲と取消経路、トレイID/保存、共通部品、検索アンカー、Applet詳細への影響を確認。不要CSSと旧dirty案内を整理し、未解決の指摘なし。保存仕様・破壊的変更がないため0.36.4→0.36.5のパッチ更新。
+- 型検査・build成功。tray-menu、portable-updates、settings-page、settings-editingの関連単体 **44/44、fail/skip 0**。ソースGUIは[設定使いやすさ7群](.artifacts/settings-usability-1791955994932/result.json)、[トレイ5群](.artifacts/tray-menu-ui-1791955791096/result.json)、[設定検索7群](.artifacts/settings-search-1791956010541/result.json)が終了0。8ページの両テーマ/1280・760幅、クリック割当、実Tray callback、保存・再起動、全検索アンカーと折りたたみ展開を確認。
+- トレイ試験のCDPマウス操作では埋め込みWebContentsViewへHTML5 dragイベントが届かず、ブラウザーのDataTransfer/dragイベント経路で並べ替えと保存を検証する方式に修正し再実行。物理マウスによるドラッグの検証とは区別する。更新進捗試験のソース版起動では製品の配布版限定ガードで更新準備できなかったため、発行したwin-unpackedを使う既存方式へ戻した。これらの途中失敗は成功に数えない。
+- `publish.bat`終了0。単一EXE、package、同梱Default Shell、update.jsonの版は **0.36.5** で一致。EXEは **144,171,493 bytes**、SHA256 **f17e9ffa911a50f156cdaf8c235ce4bb8395b8f8e698749eb63fd99a4f6a912a**。固定依存同期は成功し、lockfile・pnpm-workspace.yaml・toolchain.jsonの前後hash一致。
+- 同一hashの固定単一EXEの隔離コピーで[設定使いやすさ7群](.artifacts/settings-usability-1791956282011/result.json)と[トレイ4群](.artifacts/tray-menu-ui-1791956309548/result.json)が終了0。両テーマと狭い幅の実設定Surface画像を確認。今回発行のwin-unpackedで[更新進捗5群](.artifacts/update-progress-1791956355288/result.json)が終了0。ローカルHTTP配信の実IPC/進捗表示、途中取消、再試行、最終確認取消でインストール済みAppletが変わらないことを確認した。
+- [発行ログ・成果物照合・整理記録](.artifacts/settings-maintenance-20261014/)を保存。試験プロセス残存0。古い成功sourceのtray-menu-ui-1791896672861だけ整理し、直近3回と過去の検索検証参照、portable fixture、失敗・状態不明の資料を保持した。XX.TEMPの追加なし。本体全回帰、実EXE交換を含むportable-updates-ui-test全体、無関係Appletの試験は未実行。通常publishまでで、commit・push・Release・実利用先deployは行っていない。
+
+## 2026-10-14: 設定ページの共通化と読み上げ・通知・Codex連携の再構成（0.36.4）
+
+- 先行0.36.3の共通ページ枠を引き継ぎ、共通カード・項目行・選択カード・結果表示を追加。読み上げ、通知、Codex連携を再構成し、一般・表示・プロフィールにも共通カードを適用。Applet詳細を含むショートカット内部の重複見出し・説明と不要CSSを削除した。新規ページの利用手順を設定基盤の正本文書へ記載。
+- モデル未設定でも明示操作でモデル一覧を取得可能。標準data/id形式とQwen3-TTSのmodels/name/downloaded形式を受け付け、既知の未ダウンロードモデルを候補から除外。期限・サイズ・件数・重複・認証・取消を検証し、取得失敗でも保存済みIDを保持する。実サーバーの一覧をサービス経由で読み取り、`1.7B-Base`を確認した。モデルの自動選択・ダウンロード・実サーバーへの試験発声は行っていない。
+- 読み上げを通知先の選択肢へ統合。「通知センターのみ」は視覚的通知先と読み上げを一度に解除する。保存は既存targets/speakと共通の声・速度継承を維持。Codexは状態、登録/接続テスト、折りたたみの登録先・接続詳細に整理し、権限とTOML所有範囲を維持した。
+- 発行前レビュー1回で保存互換性、操作の所有者と認証、一覧取消、テンプレートの検索アンカー、Applet詳細、幅/テーマ、検証範囲を確認。APIキー保存後の結果表示、外部変更後の通知ボイス継承表示、狭い画面のショートカット検索と絞り込みの横並びを修正して再確認。未解決の指摘なし。設定項目・保存ファイル・破壊的公開API変更がないため0.36.3→0.36.4のパッチ更新。
+- 型検査・build・diff検査成功。TTS、通知読み上げ/方針、設定編集/ページ、automationの関連単体 **68/68、fail/skip 0**。ソースGUIは通知読み上げ9群、Node/.NET/MCP TTS9群、automation16群、navigation17群、設定検索7群が成功。固定見出し/ツールバー・本文スクロール・JSON切替は1280/900/760で成功。検索は全本体項目のアンカーと折りたたみ展開を確認した。
+- 初回の制限環境でのMCP待受EACCESは同じ試験を通常環境で再実行して成功。automation試験の再起動後Shell選択と旧ページ参照を修正し、最後まで再実行した。初回固定EXEの新GUI試験は、既存のページ全体とフォーム内の2つのエラー表示に対する曖昧なlocatorで失敗。フォーム内へ検証対象を限定して同じEXEで再実行し成功。これらの失敗を成功として数えていない。
+- `publish.bat`終了0。単一EXE、package、同梱Default Shell、update.jsonは **0.36.4** で一致。EXEは **144,172,341 bytes**、SHA256 **0cba62b94e1898733d47fe65aa6c88e3122c493d398624b95d7954ec12a0a2f5**。依存の固定同期は成功し、lockfile・pnpm-workspace.yaml・toolchain.jsonの前後hash一致。依存版・供給網検査・待機設定は変更していない。
+- 固定EXEの同一hashの隔離コピーで、[設定使いやすさ7群](.artifacts/settings-usability-1791954081914/result.json)、[通知読み上げ9群](.artifacts/notification-speech-ui-1791954113798/result.json)、[Node/.NET/MCP TTS9群](.artifacts/tts-ui-1791954148224/result.json)が終了0。6ページのライト/ダーク、1280/760幅、モデル取得・直接入力・Qwen候補、通知先・声/速度継承、Codex登録/解除、暗号化キー・試聴・31秒WAV停止・終了時回収を確認。スクリーンショットで余白と入力欄の表示を確認した。
+- [発行ログ・照合・検証一覧](.artifacts/settings-redesign-20261014/)へ記録。テストプロセス残存0。成功済みsourceの古いnavigation2件・通知読み上げ1件を整理し、種類/実行方式ごとの直近3回、過去検証の参照資料、portable fixture、失敗・状態不明の資料は保持した。XX.TEMPの追加なし。本体全標準回帰・無関係Applet GUIは未実行、物理スピーカーの可聴性は未確認。通常publishのみで、commit・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-14: publish時の固定依存自動同期（0.36.2）
 
 - publish.batの先頭で`dev.bat install --frozen-lockfile`を実行し、非0なら同じ終了コードで停止するよう変更。成功した場合だけ従来の`run dist`へ進む。発行の失敗コードも保持する。`dev.bat run`自体の自動復元は追加せず、固定ツール・依存検査・7日待機・install script許可・lockfileを維持。開発手順を更新し、既存の画面整理差分を保持した。

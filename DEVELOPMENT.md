@@ -18,7 +18,7 @@
 | Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
-| 設定基盤・移行設計 | [設定基盤とDefault Shellへの移行設計](docs/settings-foundation.md) |
+| 設定基盤・共通UIテンプレート | [設定基盤とDefault Shell](docs/settings-foundation.md)、[ページ・カード・項目行の共通部品](docs/settings-foundation.md#共通の画面構成) |
 | 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[通知種類設定と段階的な拡張の設計](docs/notification-foundation.md) |
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |
 | 独立アプリの追加機能を取り込む場合 | [現状と未着手候補](docs/migration.md) |

@@ -146,12 +146,8 @@ export function ApiPermissionsSettings({
   return (
     <section className="api-permissions" aria-label="操作の許可">
       <div className="permission-heading">
-        <h3>操作の許可</h3>
         <span className="muted">このPCに自動保存</span>
       </div>
-      <p className="muted">
-        AppletとMCPの許可を、それぞれ設定します。Applet側はすべてのAppletに共通です。変更はすぐに反映されます。
-      </p>
       <div className="permission-connection">
         <span>
           MCP連携：

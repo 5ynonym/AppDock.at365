@@ -1,4 +1,3 @@
-import { hostSettingItem } from '../../../src/shared/settings-catalog';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { CommandBindingToolbar } from '../../../src/shared/settings-ui/CommandBindingToolbar';
@@ -83,8 +82,6 @@ export function ShortcutsEditor({
       {...settingAnchor('shortcuts', 'keybindings')}
     >
       <CommandBindingToolbar
-        title={hostSettingItem('shortcuts', 'keybindings').title}
-        description="コマンドを見つけて、キーと使う場面を設定できます。"
         inputName="ショートカット"
         count={catalog.length}
         visibleCount={visible.length}

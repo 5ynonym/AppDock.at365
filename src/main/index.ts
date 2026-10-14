@@ -950,6 +950,7 @@ function settingsPageActions(
       changed();
     };
     actions.ttsVoices = async () => tts.voices('host');
+    actions.ttsModels = async () => tts.models('host');
     actions.ttsPreview = async ([text, requestId]) => {
       const job = tts.speak('host', { text, requestId });
       previewJobs.add(job.jobId as string);

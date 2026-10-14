@@ -33,6 +33,7 @@ const powershell = (code) => {
 };
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
+const activationPids = new Set();
 const copies = ['installed', 'test'].map((name) => {
   const folder = path.join(profile, name),
     exe = path.join(folder, 'AppDock.at365.exe');
@@ -43,6 +44,22 @@ const copies = ['installed', 'test'].map((name) => {
   settings.globalShortcutCommands = [];
   settings.extensions['test.notification'] = { enabled: true, settings: {} };
   settings.extensions['fixture.notifications.native'] = { enabled: true, settings: {} };
+  settings.notificationPreferences = {
+    overrides: [
+      {
+        ownerKind: 'host',
+        ownerId: 'updates',
+        typeId: 'applied',
+        targets: ['windows'],
+        durationSeconds: null,
+      },
+    ],
+  };
+  fs.mkdirSync(path.join(folder, 'data'), { recursive: true });
+  fs.writeFileSync(
+    path.join(folder, 'data/update-result.json'),
+    JSON.stringify({ ok: true, message: 'Synthetic update completion' }),
+  );
   fs.writeFileSync(path.join(folder, 'settings.json'), JSON.stringify(settings));
   fs.writeFileSync(
     path.join(folder, 'extensions/notification/extension.json'),
@@ -165,6 +182,22 @@ async function start(copy) {
     [`--test-profile=${copy.folder}`, `--remote-debugging-port=${port}`],
     { cwd: copy.folder, env, windowsHide: true, stdio: 'ignore' },
   );
+  // Launch the OS toast URI as soon as the startup update result reaches Windows.
+  // This intentionally races initial renderer/Window readiness.
+  const activation = powershell(`$ErrorActionPreference='Stop';
+    [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null;
+    $deadline=[DateTime]::UtcNow.AddSeconds(25); do {
+      foreach($toast in [Windows.UI.Notifications.ToastNotificationManager]::History.GetHistory('at365.appdock')) {
+        if(!$toast.Content -or !$toast.Content.DocumentElement){continue};
+        $uri=[string]$toast.Content.DocumentElement.GetAttribute('launch');
+        if($uri.StartsWith('${copy.protocol}://notification/')) {
+          $p=Start-Process -FilePath $uri -WindowStyle Hidden -PassThru;
+          ConvertTo-Json -Compress @{uri=$uri;pid=$p.Id}; return
+        }
+      }; Start-Sleep -Milliseconds 20
+    } while([DateTime]::UtcNow -lt $deadline); throw 'Startup toast missing'`);
+  copy.startupActivation = JSON.parse(activation);
+  if (copy.startupActivation.pid) activationPids.add(copy.startupActivation.pid);
   copy.browser = await until(
     () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
     'portable CDP',
@@ -209,7 +242,10 @@ function historyUri(copy) {
 function activate(copy, uri) {
   assert.ok(uri.startsWith(`${copy.protocol}://notification/`));
   assert.match(uri, /^appdock-notify-[a-f0-9]{32}:\/\/notification\/[a-f0-9-]{36}$/);
-  powershell(`Start-Process -FilePath '${uri}' -WindowStyle Hidden`);
+  const pid = Number(
+    powershell(`(Start-Process -FilePath '${uri}' -WindowStyle Hidden -PassThru).Id`),
+  );
+  if (pid) activationPids.add(pid);
 }
 const programs = powershell('[Environment]::GetFolderPath("Programs")');
 const shortcuts = ['AppDock.at365.lnk', 'Electron.lnk'].map((name) => {
@@ -229,7 +265,31 @@ const checks = [];
   for (const copy of copies) {
     assert.equal(sha256(copy.exe), hash);
     await start(copy);
+    await until(
+      () =>
+        copy.browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .some((p) => p.url().includes('notification-center.html')),
+      'startup update notification opens AppDock',
+    );
   }
+  await until(() => {
+    const rows = JSON.parse(
+      powershell(
+        `$rows=@(); foreach($id in @(${[...activationPids].join(',')})) { $p=Get-Process -Id $id -ErrorAction SilentlyContinue; if($p){$rows+=@{pid=$id;title=$p.MainWindowTitle}} }; ConvertTo-Json -Compress -InputObject $rows`,
+      ),
+    );
+    if (rows.length)
+      fs.writeFileSync(
+        path.join(profile, 'activation-processes.json'),
+        JSON.stringify(rows, null, 2),
+      );
+    return rows.length === 0;
+  }, 'startup notification launchers exit without an error dialog');
+  checks.push(
+    'startup update completion notification opens the correct host and the secondary launcher exits without an error dialog',
+  );
   const copy = copies[0];
   const typedTag = () => {
     const file = path.join(copy.folder, 'data/storage/test.notification/typed.json');
@@ -364,6 +424,10 @@ const checks = [];
     process.exitCode = 1;
   })
   .finally(async () => {
+    for (const pid of activationPids)
+      powershell(
+        `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if($p -and $p.Name -eq 'AppDock.at365.exe' -and $p.ExecutablePath.StartsWith('${profile}\\')) { Stop-Process -Id ${pid} -Force }`,
+      );
     for (const copy of copies) {
       if (copy.browser) await stop(copy).catch(() => {});
       if (copy.child?.exitCode === null) copy.child.kill();

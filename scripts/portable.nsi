@@ -63,12 +63,16 @@ Section
   StrCmp "$TEMP" "" failed
   ; Only this generated child directory can be removed, never TEMP or user data.
   StrCpy $INSTDIR "$TEMP\AppDock.at365-$PortableId"
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Global\AppDock.Gate.$PortableId") p .r0'
+  ; A non-elevated notification launch must join an elevated host. Full access
+  ; unnecessarily requests WRITE_DAC/WRITE_OWNER and is denied across elevation.
+  ; The gate needs only SYNCHRONIZE | MUTEX_MODIFY_STATE; keep the default ACL.
+  System::Call 'kernel32::CreateMutexExW(p 0, w "Global\AppDock.Gate.$PortableId", i 0, i 0x100001) p .r0'
   StrCpy $PortableGate $0
   StrCmp $PortableGate 0 failed
   Call AcquireGate
   System::Call 'kernel32::SetLastError(i 0)'
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Global\AppDock.Runtime.$PortableId") p .r0 ?e'
+  ; The runtime lease is held, duplicated and closed; it is never acquired.
+  System::Call 'kernel32::CreateMutexExW(p 0, w "Global\AppDock.Runtime.$PortableId", i 0, i 0x100000) p .r0 ?e'
   Pop $1
   StrCpy $PortableLease $0
   StrCmp $PortableLease 0 failed
@@ -142,7 +146,7 @@ Section
   System::Call 'kernel32::CloseHandle(p $PortableLease) i .r0'
   StrCpy $PortableLease 0
   System::Call 'kernel32::SetLastError(i 0)'
-  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Global\AppDock.Runtime.$PortableId") p .r0 ?e'
+  System::Call 'kernel32::CreateMutexExW(p 0, w "Global\AppDock.Runtime.$PortableId", i 0, i 0x100000) p .r0 ?e'
   Pop $1
   StrCpy $PortableLease $0
   StrCmp $PortableLease 0 done

@@ -83,7 +83,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
   tts: [
     ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],
     ['apiKey', 'APIキー', 'このPCに暗号化保存。空欄で認証なし'],
-    ['model', 'TTSモデル'],
+    ['model', 'TTSモデル', 'モデル一覧を更新 サーバーから取得 手動入力'],
     ['defaultVoice', '既定のボイス'],
     ['defaultSpeed', '読み上げ速度'],
     ['speedMode', '速度の適用先', 'AppDockの再生速度 サーバーの生成速度'],
@@ -124,7 +124,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['automation', '連携を有効にする', 'AppDockの起動中に接続できます。'],
     ['permissions', '操作の許可を開く'],
     ['registration', 'Codexへ登録', '設定ファイル 設定先を変更 登録・修復 登録を解除 接続テスト'],
-    ['connection', '接続の詳細', '登録名 接続ポート ポートを適用 認証情報を再発行'],
+    [
+      'connection',
+      '登録先と接続の詳細',
+      '設定ファイル 登録名 接続ポート ポートを適用 認証情報を再発行 登録を解除',
+    ],
   ],
   profile: [
     ['name', 'ユーザー名', '80文字以内で入力してください。'],
@@ -132,7 +136,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   about: [
     ['updateActions', '更新を適用', 'すべて更新 Appletを更新 更新を中止 更新を確認'],
-    ['versions', 'バージョン情報', 'AppDock Electron Chromium Node.js 実行環境 更新を確認'],
+    ['versions', 'バージョン情報', 'AppDock 現在のバージョン 本体を更新'],
+    ['runtime', '実行環境の詳細', 'Electron Chromium Node.js OS プラットフォーム'],
     ['updates', '更新の設定', '起動時の更新確認と更新元を設定します。'],
     ['updateSource', 'Appletの更新元', 'インストール済みのApplet 更新元の設定'],
     [

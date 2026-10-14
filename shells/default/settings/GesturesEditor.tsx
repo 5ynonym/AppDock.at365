@@ -78,8 +78,6 @@ export function GesturesEditor({
       aria-label="マウスジェスチャー設定"
     >
       <CommandBindingToolbar
-        title={hostSettingItem('gestures', 'gestures').title}
-        description="コマンドを見つけて、操作と使う場面を設定できます。"
         inputName="ジェスチャー"
         count={catalog.length}
         visibleCount={visible.length}

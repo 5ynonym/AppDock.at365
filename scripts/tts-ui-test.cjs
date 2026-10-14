@@ -201,7 +201,11 @@ async function configure(patch) {
     await page.getByRole('button', { name: '読み上げ', exact: true }).click();
     await page.getByLabel('TTSモデル', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
-    await page.getByText('1件のボイスを取得しました。', { exact: true }).waitFor();
+    await page
+      .getByText('1件のボイスを取得しました。候補から選ぶか、IDを直接入力できます。', {
+        exact: true,
+      })
+      .waitFor();
     checks.push('settings voice list');
     await page.getByLabel('APIキー', { exact: true }).fill('fixture-secret');
     await page.getByRole('button', { name: 'APIキーを設定', exact: true }).click();

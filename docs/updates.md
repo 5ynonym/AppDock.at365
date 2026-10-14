@@ -8,7 +8,9 @@
 
 明示操作の結果は一意ID・種別・メッセージを持つ`UpdateState.notice`に渡し、同じ内容を続けて確認しても再表示する。確認時の失敗/未設定を「更新なし」と混同しない。起動時の自動チェックは従来のWindows通知設定を維持し、通常結果のバーを追加しない。再起動後の適用結果は既存の`completion`から同じUIへ渡す。新しい操作開始時にnotice/completionをクリアし、保存済みの結果ファイル・ログの形式は変えない。
 
-通知の「更新画面を開く」から設定へ移動できる。各確認ボタンの隣は未確認時から日時欄の幅を確保し、結果文やリリースへのリンクは「確認結果」を開いたときだけ表示する。本文へ恒常的な結果ラベルを追加しない。
+通知の「更新画面を開く」から設定へ移動できる。各更新ボタンの隣は未確認時から日時欄の幅を確保し、結果文とリリースへのリンクはカード内へ直接表示する。確認結果のポップアップは使わない。本体とAppletの現在版は共通VersionDisplayの色付きバッジとし、statusがavailableで確認時のcurrentVersionが現在版に一致する場合だけ右側へ「→ 新しい版」を表示する。同版再適用、古い版、確認失敗を新バージョン表示に使わない。
+
+statusがcurrentの場合は結果本文を表示せず、現在のバージョンと最終確認日時だけを残す。「最新版です。」の表示は行わない。
 
 `settings.updates`はhostSource、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
 
@@ -41,7 +43,7 @@ Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のs
 
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。本体が未設定/取得失敗/同版の再適用不可/旧版なら現行host版を使う。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
-UpdateSettingsの先頭は「本体と全Appletを更新」。本体のみ・Appletのみ・個別の操作も維持し、全体操作はAppletが0件でも本体更新に使用できる。VersionCheckの日時は更新確認ボタンと同じ`.update-check-control`へ置き、全体確認の隣にはUpdateState.resultsの直近のcheckedAtを表示する。結果本文を日時とボタンの間に挟まず、狭い画面でも操作と日時をひとまとまりで折り返す。
+AboutSettingsは共通SettingsSectionで「まとめて更新」「AppDock.at365」「インストール済みのApplet」「更新の設定」「実行環境の詳細」を構成し、Applet一覧・更新設定・実行環境は初期状態で折りたたむ。先頭のUpdateActionsは「本体と全Appletを更新」と「Appletを一括更新」を提供し、本体のみ・個別の操作も維持する。WebAppletを一括対象件数に含めず、対象0件でも全体操作は本体更新に使える。確認専用ボタンは設置せず、更新候補の確認から最終確認/取消までは既存installUpdatesを使う。VersionCheckは更新ボタンと最終確認日時を同じ操作行に置き、全体操作の下には直近のcheckedAtを表示する。結果本文とリリースリンクは操作行の下へ直接表示する。フッター/個別Appletの共通VersionCheckも更新操作だけを表示する。確認用APIと起動時の自動確認は維持する。
 
 ## 検証
 
@@ -51,7 +53,7 @@ scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへ
 
 ## 操作画面と再起動
 
-更新・一括更新を先頭に置き、UpdateSettingsの共通設定と各AppletカードのAppletUpdateSourceをdetailsで折りたたむ。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存useSettingsEditorの下書き・revision付き保存へ統一する。
+更新・一括更新を先頭に置き、UpdateSettingsの共通設定と各AppletカードのAppletUpdateSourceをdetailsで折りたたむ。既定復帰は本体ではcreateDefaultSettings().updates.hostSource、AppletではupdateSource overrideの削除。既存の即時保存・revision付き入力キューへ接続する。
 
 通常のrelaunchとhelperのrestartArgsへ`--restore-view`を付ける。ホストはこの起動時だけstartMinimizedを上書きしてshowし、信頼済みホスト文書の固定URLへrestoreViewクエリーを付ける。IPCはその完全一致URLと送信元WebContents/mainFrameを照合する。通常起動の設定は変更しない。
 

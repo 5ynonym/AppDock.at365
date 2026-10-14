@@ -165,6 +165,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await new Promise((r) => setTimeout(r, 400));
     assert.equal(requests.length, 0);
     checks.push('default OFF');
+    await page.locator('summary').filter({ hasText: '通知の読み上げ' }).click();
     await page.getByLabel('通知の声に共通設定を使う').uncheck();
     await settleSettings(page);
     await page.getByLabel('通知用のボイスID').fill('notice');

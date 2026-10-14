@@ -1,30 +1,19 @@
 import { hostSettingItem } from '../../../src/shared/settings-catalog';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
-import {
-  SettingsInput,
-  SettingsTextarea,
-  numberInput,
-} from '../../../src/shared/settings-ui/SettingsInput';
+import { SettingsInput, numberInput } from '../../../src/shared/settings-ui/SettingsInput';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot, UpdateState } from '../../../src/shared/contracts';
 import { createDefaultSettings } from '../../../src/shared/settings-schema';
 import { UpdateCheckTime } from '../../../src/shared/settings-ui/VersionCheck';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsFeedback,
+} from '../../../src/shared/settings-ui/SettingsSections';
+import { Toggle } from '../../../src/shared/settings-ui/Toggle';
 
-export function UpdateSettings({
-  settings,
-  edit: onChange,
-  appletCount,
-}: {
-  settings: Settings;
-  edit(next: Settings): void;
-  appletCount: number;
-}) {
-  const edit = (change: (next: Settings) => void) => {
-    const next = structuredClone(settings);
-    change(next);
-    onChange(next);
-  };
+export function UpdateActions({ appletCount }: { appletCount: number }) {
   const [state, setState] = useState<UpdateState>({ busy: false, phase: '', results: [] });
   const [error, setError] = useState('');
   const checkedAt = state.results
@@ -52,12 +41,12 @@ export function UpdateSettings({
       .catch((error) => setError(String(error).replace(/^Error: /, '')));
   };
   return (
-    <section
+    <SettingsSection
       {...settingAnchor('about', 'updateActions')}
-      className="update-settings"
-      aria-label="アップデート設定"
+      title="まとめて更新"
+      description="更新候補を確認して準備します。最後の確認でキャンセルでき、適用する場合は1回の再起動にまとめます。"
     >
-      <div className="actions update-actions">
+      <div className="settings-actions update-actions">
         <button
           className="update-primary"
           disabled={state.busy}
@@ -72,100 +61,107 @@ export function UpdateSettings({
         >
           Appletを一括更新
         </button>
-        <span className="update-check-control">
-          <button
-            className="text-button"
-            disabled={state.busy}
-            onClick={() => action(() => settingsControls.checkAllUpdates())}
-          >
-            すべての更新を確認
-          </button>
-          <UpdateCheckTime checkedAt={checkedAt} />
-        </span>
       </div>
-      <p className="muted">
-        本体と全Appletの更新は、更新のある対象をまとめて準備し、最後に確認して1回の再起動で適用します。
-      </p>
-      {error && (
-        <p role="alert" className="error-text">
-          {error}
-        </p>
-      )}
-      <details className="update-disclosure" {...settingAnchor('about', 'updates')}>
-        <summary>{hostSettingItem('about', 'updates').title}</summary>
-        <div className="update-settings-content">
-          <label className="update-source" {...settingAnchor('about', 'hostSource')}>
-            <span>{hostSettingItem('about', 'hostSource').title}</span>
-            <SettingsInput
-              aria-label="AppDockの更新元"
-              value={settings.updates.hostSource}
-              onChange={(event) =>
-                edit((next) => {
-                  next.updates.hostSource = event.target.value;
-                })
-              }
-              placeholder="publishフォルダー / URL / github:owner/repo"
-            />
-          </label>
-          <button
-            className="text-button"
-            disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
-            onClick={() =>
+      <div className="update-last-checked">
+        <UpdateCheckTime checkedAt={checkedAt} />
+      </div>
+      <SettingsFeedback error={error} />
+    </SettingsSection>
+  );
+}
+
+export function UpdateSettings({
+  settings,
+  edit: onChange,
+}: {
+  settings: Settings;
+  edit(next: Settings): void;
+}) {
+  const edit = (change: (next: Settings) => void) => {
+    const next = structuredClone(settings);
+    change(next);
+    onChange(next);
+  };
+  return (
+    <SettingsSection
+      title="更新の設定"
+      description="起動時の確認方法と、本体の更新元を変更できます。"
+      collapsible
+      {...settingAnchor('about', 'updates')}
+    >
+      <SettingsField
+        title="AppDockの更新元"
+        description={hostSettingItem('about', 'hostSource').description}
+        {...settingAnchor('about', 'hostSource')}
+      >
+        <SettingsInput
+          aria-label="AppDockの更新元"
+          value={settings.updates.hostSource}
+          onChange={(event) =>
+            edit((next) => {
+              next.updates.hostSource = event.target.value;
+            })
+          }
+          placeholder="publishフォルダー / URL / github:owner/repo"
+        />
+        <button
+          className="text-button"
+          disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
+          onClick={() =>
+            edit((next) => {
+              next.updates.hostSource = createDefaultSettings().updates.hostSource;
+            })
+          }
+        >
+          AppDockの更新元を既定に戻す
+        </button>
+      </SettingsField>
+      {(
+        [
+          'checkHostOnStartup',
+          'checkAppletsOnStartup',
+          'notifyOnStartup',
+          'allowSameVersion',
+        ] as const
+      ).map((key) => (
+        <SettingsField
+          key={key}
+          title={hostSettingItem('about', key).title}
+          {...settingAnchor('about', key)}
+        >
+          <Toggle
+            label={hostSettingItem('about', key).title}
+            checked={settings.updates[key]}
+            onChange={(checked) =>
               edit((next) => {
-                next.updates.hostSource = createDefaultSettings().updates.hostSource;
+                next.updates[key] = checked;
               })
             }
-          >
-            AppDockの更新元を既定に戻す
-          </button>
-          <p className="muted">
-            ローカルの絶対パス・UNC・更新情報JSONのHTTP(S)
-            URL・GitHubリポジトリURLに対応します。空欄で更新確認を無効にします。
-          </p>
-          <div className="update-options">
-            {(
-              [
-                'checkHostOnStartup',
-                'checkAppletsOnStartup',
-                'notifyOnStartup',
-                'allowSameVersion',
-              ] as const
-            ).map((key) => (
-              <label key={key} {...settingAnchor('about', key)}>
-                <SettingsInput
-                  type="checkbox"
-                  checked={settings.updates[key]}
-                  onChange={(event) =>
-                    edit((next) => {
-                      next.updates[key] = event.target.checked;
-                    })
-                  }
-                />
-                {hostSettingItem('about', key).title}
-              </label>
-            ))}
-            <label {...settingAnchor('about', 'startupDelaySeconds')}>
-              {hostSettingItem('about', 'startupDelaySeconds').title}
-              <SettingsInput
-                aria-label="起動から確認までの秒数"
-                type="number"
-                min={0}
-                max={3600}
-                value={settings.updates.startupDelaySeconds}
-                onChange={(event) =>
-                  edit((next) => {
-                    next.updates.startupDelaySeconds = numberInput(event.target.value);
-                  })
-                }
-              />
-            </label>
-          </div>
-          <p className="muted">
-            起動時は更新情報の確認だけを行います。配布ファイルのダウンロードや適用は行いません。同じ版の再適用を許可しても古い版には戻しません。
-          </p>
-        </div>
-      </details>
-    </section>
+          />
+        </SettingsField>
+      ))}
+      <SettingsField
+        title={hostSettingItem('about', 'startupDelaySeconds').title}
+        description="0〜3,600秒で指定します。"
+        {...settingAnchor('about', 'startupDelaySeconds')}
+      >
+        <SettingsInput
+          aria-label="起動から確認までの秒数"
+          type="number"
+          min={0}
+          max={3600}
+          value={settings.updates.startupDelaySeconds}
+          onChange={(event) =>
+            edit((next) => {
+              next.updates.startupDelaySeconds = numberInput(event.target.value);
+            })
+          }
+        />
+      </SettingsField>
+      <p className="muted">
+        起動時は更新情報の確認だけを行います。配布ファイルのダウンロードや適用は行いません。同じ版の再適用を許可しても古い版には戻しません。
+      </p>
+    </SettingsSection>
   );
 }
 

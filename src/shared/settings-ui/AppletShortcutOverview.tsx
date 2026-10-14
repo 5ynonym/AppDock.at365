@@ -28,7 +28,6 @@ export function AppletShortcutOverview({
   );
   return (
     <div className="applet-shortcuts">
-      <h2>ショートカットキー</h2>
       <ShortcutCommandList
         commands={normal}
         allCommands={allCommands}

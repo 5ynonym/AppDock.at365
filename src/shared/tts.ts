@@ -68,6 +68,21 @@ export function parseTtsVoices(value: unknown): TtsVoice[] {
     return { id: v.id, name: typeof v.name === 'string' ? v.name : v.id };
   });
 }
+/** OpenAI-compatible catalogs and Qwen3-TTS catalogs use different envelopes. */
+export function parseTtsModels(value: unknown): TtsVoice[] {
+  if (!object(value)) throw Error('モデル一覧はオブジェクトです。');
+  if (Object.hasOwn(value, 'data')) return parseTtsVoices(value.data);
+  if (!Array.isArray(value.models) || value.models.length > 1000)
+    throw Error('モデル一覧は1000件以下の配列です。');
+  const rows = value.models.map((model) => {
+    if (!object(model) || (model.downloaded !== undefined && typeof model.downloaded !== 'boolean'))
+      throw Error('モデル一覧の項目が不正です。');
+    return { id: model.id ?? model.name, name: model.name, downloaded: model.downloaded };
+  });
+  const models = parseTtsVoices(rows);
+  // Never offer a known-unavailable model or trigger an implicit server download.
+  return models.filter((_, index) => rows[index].downloaded !== false);
+}
 export function parseTtsSettings(value: unknown): TtsSettings {
   if (value === undefined) return defaultTtsSettings();
   if (!object(value)) throw Error('ttsはオブジェクトです。');
