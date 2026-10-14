@@ -77,7 +77,9 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 
 通常更新は各バージョンの公開から7日待機します。`pnpm-workspace.yaml`の`minimumReleaseAge: 10080`（分）、`minimumReleaseAgeStrict: true`、`minimumReleaseAgeIgnoreMissingTime: false`を使い、実行時・開発用・間接依存へ適用します。条件を満たす版がなければ停止し、公開日時がない場合も停止します。既存lockfileを使ったインストールにも適用するため、若い版を別環境から持ち込んでも待機を回避できません。`outdated`に新版が残っても、待機中なら無理に導入しません。日数を変える場合は`toolchain.json`の`minimumReleaseAgeDays`も揃えます。setupは両設定の一致を確認します。
 
-`verifyDepsBeforeRun: error`により、ビルド・試験前に依存の不整合があれば自動インストールせず停止します。導入・復元は明示的な`dev.bat install --frozen-lockfile`、版更新は`dev.bat update --latest`で行います。
+`verifyDepsBeforeRun: error`により、`dev.bat run`によるビルド・試験前に依存の不整合があれば自動インストールせず停止します。導入・復元は明示的な`dev.bat install --frozen-lockfile`、依存版更新は`dev.bat update --latest`で行います。`publish.bat`は発行前に`dev.bat install --frozen-lockfile`を実行し、現在のworkspaceと固定依存を同期します。同期が非0で終わったら、その終了コードを返して発行を開始しません。同期と発行の両方が成功した場合だけ終了0となります。
+
+`package.json`の製品バージョンを変更した場合も、pnpmが記録するworkspaceの版との不一致で`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`になることがあります。`publish.bat`だけを実行すれば発行前に記録が同期されるため、製品の版更新後に手動でinstallする必要はありません。`dev.bat run typecheck`などを先に行う場合は、`dev.bat install --frozen-lockfile`で同期してください。同期には固定lockfileと公開後待機・供給網検査を適用し、検査の失敗を無視しません。復元後にTypeScriptの構文エラーが出る場合は、報告されたソースを修正して型検査を通します。依存の再インストールだけではソースの構文エラーは直りません。
 
 2026-10-11の導入時は、既存0.26.25で導入・検証済みのlockfileに7日未満の6件が含まれていました。版とlockfileを変えず現状を維持する移行例外として`@vitejs/plugin-react@6.1.2`、`electron@44.6.0`、`http-cache-semantics@4.3.0`、`nanoid@3.3.20`、`postcss@8.5.29`、`vite@8.3.3`だけを完全な版で除外しています。通常の新版には適用されません。全6件が成熟する2026-10-14 07:39:15 JST以降にこれらを取り除けます。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の除外は更新時に自動整理します。pnpm本体12.10.1は導入済みのものを再利用し、新規取得は成熟するまで拒否します（ツールの例外は追加していません）。
 

@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-14: publish時の固定依存自動同期（0.36.2）
+
+- publish.batの先頭で`dev.bat install --frozen-lockfile`を実行し、非0なら同じ終了コードで停止するよう変更。成功した場合だけ従来の`run dist`へ進む。発行の失敗コードも保持する。`dev.bat run`自体の自動復元は追加せず、固定ツール・依存検査・7日待機・install script許可・lockfileを維持。開発手順を更新し、既存の画面整理差分を保持した。
+- 発行前レビューで実行順序、正負の終了コード、別cwd/空白を含むパス、同期失敗時の発行停止、既存通常publishの範囲を確認。未解決の指摘なし。BATはCP932互換のASCII・CRLFを保持。設定・保存/APIの変更はなく、0.36.1→0.36.2へパッチ更新。
+- 実cmd.exeでランチャー回帰2/2・fail/skip 0。既存devの3ケースに加え、同期/発行成功、同期失敗7・STATUS_STACK_OVERFLOW、発行失敗19・STATUS_STACK_OVERFLOWの5ケースを確認した。初回は試験ランナーの空白入りパスの引用符処理が失敗し、windowsVerbatimArgumentsを指定して再検証。整形後にも2/2を再実行し、型検査・Prettier・git diff --checkも成功した。
+- package0.36.2／pnpm記録0.36.1の状態から、手動installなしでpublish.batを実行。自動同期は終了0、pnpm記録が0.36.2となり、そのまま発行終了0。lockfile・pnpm-workspace.yaml・toolchain.jsonの前後SHA256が一致した。供給網検査は既存キャッシュを使用し、依存解決は固定lockfileのまま省略された。
+- 単一EXEは144,176,054 bytes、SHA256 `a3e17d002042b30e9b4a6390d64e4d0929c331cea891ac1633b7e2a7b8851312`。package・FileVersion・Default Shell・update.jsonは0.36.2で一致、feedのsize/hashを照合。発行完了後の隔離コピーは同じhashで、portable smokeは終了0・ok:true、Default Shell running、UI bridge、Node非公開、設定/画像保存・トレイを確認し、試験アプリ残存なし。
+- [完全ログと前後・成果物照合](.artifacts/publish-sync-20261014/)と[固定EXEのsmoke結果](.artifacts/smoke-1791948447870/smoke-result.json)を保存。直近3回のsmokeと、古いコミット検証参照1件を保持。既存launcher fixtureは使用/参照状態を完全には確認できないため保持し、今回の引用符失敗fixtureも失敗ログとともに保持、削除0件。XX.TEMPの作成なし。全標準回帰・無関係GUI/兄弟Appletは未実行。通常publishのみで、commit・push・Release・全体ZIP・実利用先deployは行っていない。
+
+## 2026-10-14: publish.batの依存記録復元と設定画面の構文修復（0.36.1）
+
+- 初回publishは`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`で終了1。package.jsonは0.36.1、pnpmのworkspace記録は0.36.0だった。`dev.bat install --frozen-lockfile`で記録を同期し、終了0・359パッケージ再利用・取得0件。lockfileのSHA256は前後とも`E493D4630ACF4AD64463BAFBD2EDCE61E2C35FCA2CB6E229C13BAFDBCFC40DE3`。依存版・ローカルツール・7日待機・既存の完全版指定例外・供給網検査を変更していない。
+- 続く型検査でSettingsForm.tsxのdetails開始タグの文字列終端と`>`欠落を確認。`className="update-disclosure"`へ1行を復元し、既存の見出し整理・自動保存案内削除は保持。発行前レビューで修復行、既存差分、設定・保存/APIへの影響、版整合を確認し、未解決の指摘なし。既存の0.36.1へのパッチ更新をこの修復でも使用し、重ねて版を増やしていない。製品バージョン変更後のworkspace同期手順をDEVELOPMENTへ追記。
+- 修復後の型検査は終了0。関連するsettings-page回帰は5/5、fail/skip 0・終了0。publish.batも終了0。制限環境のpnpm installはSTATUS_STACK_OVERFLOW、publishは.NET工程で終了1となったため、同じ固定ツール・検査設定を維持して通常環境で再実行し成功した。失敗を成功に数えていない。
+- 単一EXEは144,167,089 bytes、SHA256 `fbac243d331d76a1d9c42ef886ab69d29523828485e0053c21a9ce5c33575a1a`。package、EXE FileVersion、Default Shell、update.jsonは0.36.1で一致し、feedのsize/hashも照合済み。隔離コピーのSHA256一致、portable smoke終了0・ok:trueを確認。Default Shell running、UI bridge、Node非公開、プロフィール画像・設定保存・トレイを検証した。
+- [検証ログ・成果物照合](.artifacts/publish-repair-20261014/)と[隔離smoke結果](.artifacts/smoke-1791947878718/smoke-result.json)を保存。試験専用プロセス残存なし。成功したportable smokeは直近3回だけ現存し、保持・削除0件。新規のXX.TEMPファイルなし。全標準回帰・設定画面全操作GUIは今回の構文修復では未実行。未変更Applet発行・全体ZIP・commit・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-14: 通知読み上げの実装とコミット前検証（0.36.0）
 
 - 通知種類ごとの`speak`（省略時OFF）と、通知全体の声・速度の任意上書きを実装。接続先・モデル・APIキー・速度適用方式は共通TTS設定を使用。共通設定ページの公開モデル・操作へ試聴と試聴だけの停止を追加し、通知ONで直接APIの利用許可を変更しない。
