@@ -110,6 +110,9 @@ import { webId } from '../shared/web-applets';
 import { AutomationService } from './core/automation';
 import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
+import { AiService } from './core/ai-service';
+import { AiSecrets } from './core/ai-secrets';
+import { defaultAiSettings, aiApprovalValue, type AiConnectionSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
 import { NotificationAvailability } from './core/notification-availability';
@@ -369,10 +372,71 @@ const tts = new TtsService({
       '[TTS] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
     ),
 });
+const aiSecrets = new AiSecrets(
+  path.join(dataDirectory, 'ai-keys.json'),
+  path.join(dataDirectory, 'ai-access.json'),
+  {
+    encrypt: (value) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw Error('Windowsの認証情報保護を利用できません。');
+      return safeStorage.encryptString(value).toString('base64');
+    },
+    decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
+  },
+);
+let aiMcpGeneration = 0;
+const aiOwner = (id?: string) =>
+  id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration;
+const ai = new AiService({
+  settings: () => settings.value.ai ?? defaultAiSettings(),
+  key: (c) => aiSecrets.key(c),
+  approved: (c) => aiSecrets.allowed(c),
+  canUse: (owner, kind) => {
+    if (quitting) return false;
+    if (owner === 'host') return startupReady;
+    if (owner === aiOwner()) {
+      const state = automation?.state();
+      return (
+        !!state?.enabled &&
+        (kind === 'read' ||
+          (kind === 'cancel'
+            ? mcpAllowed('allowExecute')
+            : mcpAllowed('allowUseAi') && (kind !== 'generate' || mcpAllowed('allowExecute'))))
+      );
+    }
+    const item = [...(manager?.items.values() ?? [])].find((e) => owner === aiOwner(e.manifest.id));
+    const grants =
+      item && ['starting', 'running'].includes(item.state)
+        ? appletApiAccess.get(item.manifest)
+        : {};
+    return (
+      !!grants.read &&
+      (kind === 'read' ||
+        (kind === 'cancel'
+          ? !!grants.execute
+          : !!grants.useAi && (kind !== 'generate' || !!grants.execute)))
+    );
+  },
+  fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
+  changed: () => changed(),
+  audit: (owner, id, state, code) =>
+    log.write(
+      'info',
+      owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
+      '[AI] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
+    ),
+});
+const aiPreviewJobs = new Set<string>();
 const previewJobs = new Set<string>();
 const notificationPreviewJobs = new Set<string>();
 const operationApi = new AppDockApi({
   handlers: {
+    'ai.text.generate': async (params, id) => ({ ...ai.generate(aiOwner(id), params) }),
+    'ai.jobs.get': async (params, id) => ({ ...ai.get(aiOwner(id), params.jobId) }),
+    'ai.jobs.cancel': async (params, id) => ({ ...ai.cancel(aiOwner(id), params.jobId) }),
+    'ai.models.list': async (params, id) => ({
+      ...(await ai.models(aiOwner(id), params.connectionId)),
+    }),
     'tts.speak': async (params, id) => tts.speak(ttsOwner(id), params),
     'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
     'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
@@ -420,6 +484,7 @@ const operationApi = new AppDockApi({
     return e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
   },
   ttsAllowed: () => mcpAllowed('allowUseTts'),
+  aiAllowed: () => mcpAllowed('allowUseAi'),
   writable: () => mcpAllowed('allowWrite'),
   executable: () => mcpAllowed('allowExecute'),
   manageable: () => mcpAllowed('allowManageApplets'),
@@ -910,6 +975,20 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         }),
       },
     };
+  if (id === 'ai')
+    return {
+      ai: {
+        connections: (settings.value.ai?.connections ?? []).map((c) => aiSecrets.status(c)),
+        jobs: [...aiPreviewJobs].flatMap((id) => {
+          try {
+            return [ai.get('host', id)];
+          } catch {
+            aiPreviewJobs.delete(id);
+            return [];
+          }
+        }),
+      },
+    };
   if (id === 'permissions') return { permissions: host.appletApi };
   return {};
 }
@@ -943,6 +1022,42 @@ function settingsPageActions(
       if (!isShellRegion(region)) throw Error('領域が不正です。');
       await retryShell(region);
     };
+  if (page.id === 'ai') {
+    const connection = (id: unknown): AiConnectionSettings => {
+      const c = settings.value.ai?.connections.find((c) => c.id === id);
+      if (!c) throw Error('AI接続が見つかりません。');
+      return c;
+    };
+    actions.aiSetKey = async ([id, endpoint, value]) => {
+      const c = connection(id);
+      if (endpoint !== c.baseUrl)
+        throw Error('AIの接続先が変わりました。内容を確認してもう一度操作してください。');
+      aiSecrets.setKey(c, value);
+      ai.reconcile(id as string);
+      changed();
+    };
+    actions.aiSetAllowed = async ([id, expected, allowed]) => {
+      const c = connection(id);
+      if (expected !== aiApprovalValue(c))
+        throw Error('AIの接続設定が変わりました。内容を確認してもう一度操作してください。');
+      aiSecrets.setAllowed(c, allowed);
+      ai.reconcile(id as string);
+      changed();
+    };
+    actions.aiModels = async ([id]) => ai.models('host', id);
+    actions.aiPreview = async ([input]) => {
+      const job = ai.generate('host', input);
+      aiPreviewJobs.add(job.jobId);
+      while (aiPreviewJobs.size > 64) aiPreviewJobs.delete(aiPreviewJobs.values().next().value!);
+      changed();
+      return job;
+    };
+    actions.aiCancel = async ([id]) => {
+      const job = ai.cancel('host', id);
+      changed();
+      return job;
+    };
+  }
   if (page.id === 'tts') {
     actions.ttsSetKey = async ([value]) => {
       ttsSecrets.set(settings.value.tts?.baseUrl ?? '', value);
@@ -1086,6 +1201,7 @@ function settingsPageActions(
               'setGestureEditing',
               'setRibbonEditing',
               'setTts',
+              'setAi',
               'setTrayEditing',
             ]
           : [
@@ -1101,12 +1217,14 @@ function settingsPageActions(
       if (!value || !permitted.includes(value.kind))
         throw Error('このページでは利用できない操作です。');
       const reply = await automation!.action(value);
+      ai.reconcile();
       tts.reconcile();
       return reply;
     };
     if (page.id === 'permissions')
       actions.setAppletApiPermissions = async ([value]) => {
         appletApiAccess.set(value);
+        ai.reconcile();
         tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
         changed();
@@ -1273,6 +1391,7 @@ function registerIpc() {
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
     appletApiAccess.set(permissions);
+    ai.reconcile();
     tts.reconcile();
     for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
     log.write('info', 'host', '[Applet API] shared permissions updated');
@@ -1281,6 +1400,7 @@ function registerIpc() {
   handle('dock:automation', async (action: AutomationAction) => {
     if (!automation || quitting) throw Error('連携機能の準備中です。');
     const reply = await automation.action(action);
+    ai.reconcile();
     tts.reconcile();
     return reply;
   });
@@ -1635,6 +1755,7 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    ai.reconcile();
     notificationSpeech?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
@@ -1645,6 +1766,7 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
+    ai.reconcile();
     notificationSpeech?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
@@ -2187,7 +2309,15 @@ async function initialize() {
       return safeStorage.encryptString(value).toString('base64');
     },
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
-    changed,
+    changed: () => {
+      ai.reconcile();
+      changed();
+    },
+    authorizationChanged: () => {
+      const owner = aiOwner();
+      aiMcpGeneration++;
+      ai.forgetOwner(owner);
+    },
     audit: (level, message) => log.write(level, 'automation', message),
     createApi: () => operationApi,
   });
@@ -2445,6 +2575,7 @@ app.on('before-quit', (event) => {
   void (async () => {
     for (const stop of [
       () => tts.close(),
+      () => ai.close(),
       () => automation?.close(),
       () => gestures?.close(),
       () => nativeInput?.close(),

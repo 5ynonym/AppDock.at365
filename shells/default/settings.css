@@ -459,3 +459,12 @@ body,
     width: 100%;
   }
 }
+pre.ai-preview-result {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel);
+}

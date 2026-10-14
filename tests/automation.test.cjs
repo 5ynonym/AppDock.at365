@@ -612,7 +612,14 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 18);
+  assert.equal(tools.length, 22);
+  for (const name of [
+    'appdock_ai_generate_text',
+    'appdock_ai_get_job',
+    'appdock_ai_cancel_job',
+    'appdock_ai_list_models',
+  ])
+    assert(tools.some((tool) => tool.name === name));
   for (const name of [
     'appdock_tts_speak',
     'appdock_tts_list_voices',

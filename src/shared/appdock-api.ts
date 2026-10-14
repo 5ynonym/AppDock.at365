@@ -1,5 +1,7 @@
+import { aiOperations } from './ai-api';
 // One operation catalog drives MCP tools and both Applet SDK entry points.
 export const appDockOperations = {
+  ...aiOperations,
   'tts.speak': {
     callers: ['mcp', 'applet'],
     permissions: ['read', 'execute', 'useTts'],
@@ -436,6 +438,7 @@ export function operationsFor(caller: ApiCaller) {
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
+  useAi: 'AIサーバーへの送信・文章生成',
   useTts: 'TTSサーバーへの送信・読み上げ',
   sendInput: 'Windowsへのキー・操作メッセージ送信',
   read: '公開情報の取得',
@@ -460,21 +463,31 @@ export class AppDockApiError extends Error {
     super(message);
   }
 }
-export type AppDockResult<M extends AppDockMethod> = M extends 'tts.speak'
-  ? import('./tts').TtsSpeakResult
-  : M extends 'tts.voices.list'
-    ? import('./tts').TtsVoicesResult
-    : M extends 'tts.jobs.get' | 'tts.stop'
-      ? import('./tts').TtsJob
-      : Record<string, unknown>;
+export type AppDockResult<M extends AppDockMethod> = M extends 'ai.text.generate'
+  ? import('./ai').AiJob & { completion: 'accepted' }
+  : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
+    ? import('./ai').AiJob
+    : M extends 'ai.models.list'
+      ? { models: import('./ai').AiModel[] }
+      : M extends 'tts.speak'
+        ? import('./tts').TtsSpeakResult
+        : M extends 'tts.voices.list'
+          ? import('./tts').TtsVoicesResult
+          : M extends 'tts.jobs.get' | 'tts.stop'
+            ? import('./tts').TtsJob
+            : Record<string, unknown>;
 export interface AppDockClient {
   call<M extends AppDockMethod>(
     method: M,
-    params?: M extends 'tts.speak'
-      ? import('./tts').TtsSpeakInput
-      : M extends 'tts.jobs.get' | 'tts.stop'
+    params?: M extends 'ai.text.generate'
+      ? import('./ai').AiGenerateInput
+      : M extends 'ai.jobs.get' | 'ai.jobs.cancel'
         ? { jobId: string }
-        : Record<string, unknown>,
+        : M extends 'tts.speak'
+          ? import('./tts').TtsSpeakInput
+          : M extends 'tts.jobs.get' | 'tts.stop'
+            ? { jobId: string }
+            : Record<string, unknown>,
   ): Promise<AppDockResult<M>>;
 }
 export function createAppDockClient(

@@ -109,3 +109,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 ## TTS読み上げ
 
 最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
+
+## AI文章生成
+
+最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。本体の共通プロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、どちらも初期OFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。

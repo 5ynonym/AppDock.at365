@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-14: 本体のAI共通APIと設定（0.37.0）
+
+- 確定設計を本体の範囲で実装。Gmail側は利用者指定で別工程とし、兄弟repoを変更していない。最新main `8bc9173`から専用worktree/branch `feature/ai-services`で作業した。共通AI設定、PC専用キー/接続許可、AIページ、Applet/MCPの4操作と独立したuseAiを追加した。
+- 発行前レビューで設定保存・部分JSON・秘密値・接続許可・所有者/世代・キュー/期限・重複・取消・出力形式・SDK/MCP・UI投影を照合。生成本文のタイマー回収、取消した通信の同時数保持、キー変更の接続単位取消、MCP認証更新時の即時回収、UIから保存する接続先の照合を補強し、必要な再検証を行った。製品の未解決指摘なし。
+- 型検査、build、Prettier、差分検査が終了0。実装時のAI・automation・TTS・設定ページ・設定編集の関連回帰 **65/65、fail/skip 0**。初回の旧TTS試験は出力親フォルダー不足を直して再実行。既存MCP HTTP試験と.NET buildは制限環境で失敗し、同じコマンドを通常環境で実行して成功した。Gmail回帰は今回の範囲外。
+- [.NET専用fixture](tests/fixtures/dotnet/AppDock.Extensions.AiProbe/AiProbe.cs)はRelease buildで警告/エラー0。隔離した[ソース統合試験](.artifacts/ai-ui-1791980762683/result.json)で、AIページ、キーの暗号化と画面モデルからの除外、接続許可、モデル一覧、上書きモデル、Node/.NET実RPC、MCP4操作・独立許可・所有者分離・重複・取消・認証更新・設定変更を確認。明暗テーマ・1280/760幅は画像で表示を確認した。初回の試験コードのエラー形式/Windowサイズ変更の扱いを修正して再実行成功。
+- LAN内Ollama **0.40.3 / gemma4:31b-mlx**に、実メールを含まない短い接続試験文を送信。共通AiServiceから推論none・出力256トークン指定で **430ms / 219ms**、2回ともcompleted。モデルは試験前にロード済みであり、冷起動時間は未確認。初期の64トークン・推論省略では思考で上限に達し、finish_reason:length/本文空を安全に拒否することを確認した。[実測](.artifacts/ai-ollama-result.json)と[応答形式](.artifacts/ai-ollama-response-summary.json)を保存。LM Studio・llama.cpp・OpenAIの実サービスは未確認、有料APIは利用していない。
+- Node24.21.0/pnpm12.10.1/.NET SDK10.0.402。worktreeのnode_modulesは独立、.toolsのみ既存ツールへのjunctionを使用した。固定lockfile・待機設定・toolchainのGit差分なし。mainとの比較ではCRLF/LFを正規化した内容が同一で、依存版と供給網検査を変更していない。設定とPC保存ファイルを追加するため本体のみ0.36.8→0.37.0へマイナー更新した。
+- `publish.bat`終了0。単一EXE・asar内package・Default Shell・update.jsonは **0.37.0**、EXEは **144,176,254 bytes**、SHA256 **018245258ff4ba53da81a336beec53dea8bbae01633041e438b4982b5259e9f2**。AIモジュールの収録と試験fixtureの除外を確認。固定配布物の隔離コピーで[AI統合6群](.artifacts/ai-ui-1791981056792/result.json)と[通常起動・終了のsmoke](.artifacts/smoke-1791981155056/smoke-result.json)が終了0。ASAR照合の初回はWindowsの内部パス区切りを誤って指定したため試験コードだけを修正し、収録を確認した。
+- コミット依頼後に本体標準回帰`dev.bat test`を実行。初回は427/429で、既存Applet許可試験に新しいuseAiの初期OFFを反映し、10/50msの結果保持試験を制御した時刻で検査する方式へ修正。製品・発行物は不変。修正後の標準build/fixture/実プロセスを含む **429/429、fail/skip 0** が終了0。ソース/配布EXEの統合試験、型検査、発行前レビューは入力と成果物hashを照合して再利用し、[コミット証跡](.artifacts/commit-validation-ai-services-20261014/validation.json)へ記録する。
+- 設計書へ本体の実装済み範囲とGmailの未実装範囲を反映してから、本体だけをローカルコミット・mainへマージする。検証後の文書追記、最終stage tree/commit/mergeと照合結果はコミット証跡へ記録する。再利用資料・失敗調査・固定配布物を保持し、XX.TEMPの作成なし。push・Release・実利用先deployは行わない。
+
 ## 2026-10-14: AI文章生成とGmail通知の設計調査
 
 - 本体commit `f48add7`から専用worktree、branch `design/ai-services`を作成。[AI文章生成機能の設計](docs/ai-services-design.md)を追加し、DEVELOPMENTへ未実装の入口を追加した。製品ソース・版・発行物の変更はない。

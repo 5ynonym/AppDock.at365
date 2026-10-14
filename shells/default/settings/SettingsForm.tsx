@@ -13,6 +13,7 @@ import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
 import { TtsSettingsForm } from './TtsSettings';
+import { AiSettingsForm } from './AiSettings';
 import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
@@ -99,6 +100,15 @@ export function SettingsForm({
     );
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
+  if (category === 'ai')
+    return (
+      <AiSettingsForm
+        editor={editor}
+        auxiliary={aux.ai}
+        invoke={invoke}
+        busy={busy || !!editing.error}
+      />
+    );
   if (category === 'notifications')
     return (
       <NotificationSettings

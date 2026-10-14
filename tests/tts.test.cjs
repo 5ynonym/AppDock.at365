@@ -8,6 +8,7 @@ const { TtsSecrets } = require('../out/main/main/core/tts-secrets');
 const { parseTtsSettings, defaultTtsSettings } = require('../out/main/shared/tts');
 const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { SettingsStore } = require('../out/main/main/core/settings');
+fs.mkdirSync(path.resolve('.artifacts/tts-implementation'), { recursive: true });
 function wave(seconds = 0.02) {
   const data = Math.ceil(seconds * 8000) * 2,
     b = Buffer.alloc(44 + data);
