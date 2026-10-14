@@ -8,7 +8,11 @@ import {
   type AiConnectionSettings,
   type AiModel,
 } from '../../../src/shared/ai';
-import { SettingsInput, SettingsTextarea } from '../../../src/shared/settings-ui/SettingsInput';
+import {
+  SettingsInput,
+  SettingsTextarea,
+  SettingsUrlInput,
+} from '../../../src/shared/settings-ui/SettingsInput';
 import {
   SettingsSection,
   SettingsField,
@@ -219,7 +223,8 @@ export function AiSettingsForm({
               title="APIのURL"
               description="/v1を含むベースURLです。Ollama: http://サーバー:11434/v1、LM Studio: http://サーバー:1234/v1。"
             >
-              <SettingsInput
+              <SettingsUrlInput
+                key={c.id}
                 aria-label="AIのAPIのURL"
                 spellCheck={false}
                 value={c.baseUrl}

@@ -3,7 +3,11 @@ import type { SettingsControlEditor } from '../../../src/shared/settings-ui/api'
 import type { SettingsPageAuxiliary } from '../../../src/shared/settings-page';
 import { defaultTtsSettings, type TtsSettings, type TtsVoice } from '../../../src/shared/tts';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
-import { SettingsInput, SettingsTextarea } from '../../../src/shared/settings-ui/SettingsInput';
+import {
+  SettingsInput,
+  SettingsTextarea,
+  SettingsUrlInput,
+} from '../../../src/shared/settings-ui/SettingsInput';
 import {
   SettingsSection,
   SettingsField,
@@ -93,7 +97,7 @@ export function TtsSettingsForm({
           description="サーバーのベースURLを入力します。"
           {...settingAnchor('tts', 'baseUrl')}
         >
-          <SettingsInput
+          <SettingsUrlInput
             aria-label="APIのURL"
             value={value.baseUrl}
             placeholder="http://host:8080/v1"

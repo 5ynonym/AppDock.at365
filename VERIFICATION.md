@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-14: URL入力の確定タイミング統一（0.37.1）
+
+- 指示に従いmain `dc9ab2e`上で修正。AI/TTSベースURL、WebApplet URL、Web追加許可先、本体/各Applet更新元を共通のURL入力部品へ統一。入力中のコロン・スラッシュ・不完全なURLを保持し、Enterまたはblurで補正・検証・即時保存する。IME変換EnterとEnter後のblurによる二重受付を抑止し、Web初期設定取得もURL確定後へ移した。URLリストはShift+Enterで改行し、追加許可先の厳密なorigin検証は維持。
+- 発行前レビューで入力/IME/補正、通常文字・数値、選択対象の寿命、Web初期設定の受付順、URL欄の適用範囲を照合し、Web URL/追加許可先を対象IDで分離した。未解決の製品指摘なし。保存形式・公開API変更はないため0.37.0→0.37.1のパッチ更新。
+- 型検査・build・Prettier・diff検査が終了0。設定編集/設定ページ/AI/TTS/Webの関連回帰 **59/59、fail/skip 0**。[URL入力のソースGUI7群](.artifacts/settings-url-1791982818991/result.json)は連続入力、未確定時の保存/通信抑止、Enter/blur、IME、不正値の保持と修正、Web確定後の初期設定取得、通常文字の即時保存を確認。[既存設定Shellのソース9群](.artifacts/settings-shell-1791982859427/result.json)は数値/IME、保存失敗、外部競合、追加Shell、再起動も確認した。
+- 初回依存同期は制限環境の別キャッシュに固定依存メタデータがなく失敗。同じ固定lockfile/offlineコマンドを通常環境の既存キャッシュで実行して成功した。GUI初回は入れ子のsummaryの指定、次は既存origin検証が末尾スラッシュを許可しないことに試験を合わせ、テストだけを修正して再実行成功。これらの途中失敗は成功に数えない。
+- `publish.bat`終了0。単一EXE・asar内package・Default Shell・update.jsonは **0.37.1**、EXEは **144,191,766 bytes**、SHA256 **ee2393764694644353044de02b6ec2ba6c6a414577d383ccd519b0c392a76d89**。同一hashの隔離コピーで[URL入力7群](.artifacts/settings-url-1791983051569/result.json)と[設定Shell7群](.artifacts/settings-shell-1791983065212/result.json)が終了0。配布版で利用できない保存失敗/故障fixtureの2群はソース試験と区別する。
+- [入力hash・ログ・発行物照合](.artifacts/url-input-20261014/validation.json)を保存。固定lockfile/workspace/toolchainのGit差分なし。今回のURL試験の成功分は方式ごとに3件以内、旧設定Shell資料は過去検証/コミット証跡の参照対象、途中失敗は調査資料として保持し、削除0件。XX.TEMPの作成なし。main上の修正をコミット対象とし、push・Release・実利用先deployは行わない。
+- コミット依頼後に製品・試験・依存/ビルド入力、既存ログ、配布EXEのSHA256とGUI成功記録を照合し、型検査/build/関連回帰/GUI/発行を再利用した。不足していた本体標準回帰`dev.bat test`を追加実行し、build/fixture/実プロセスを含む **429/429、fail/skip 0** が終了0。製品修正・再発行は不要。最終stage tree/commit、実行ログhash、再利用元と検証後の文書追記は[コミット証跡](.artifacts/commit-validation-url-input-20261014/validation.json)へ記録する。
+
 ## 2026-10-14: 本体のAI共通APIと設定（0.37.0）
 
 - 確定設計を本体の範囲で実装。Gmail側は利用者指定で別工程とし、兄弟repoを変更していない。最新main `8bc9173`から専用worktree/branch `feature/ai-services`で作業した。共通AI設定、PC専用キー/接続許可、AIページ、Applet/MCPの4操作と独立したuseAiを追加した。

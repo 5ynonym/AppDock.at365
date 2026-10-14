@@ -345,6 +345,7 @@ async function call(name, args = {}) {
     await page
       .getByLabel('AIのAPIのURL', { exact: true })
       .fill(`http://127.0.0.1:${server.address().port}/changed/v1`);
+    await page.getByLabel('AIのAPIのURL', { exact: true }).press('Enter');
     await settleSettings(page);
     await until(
       async () =>

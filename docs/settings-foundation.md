@@ -46,6 +46,10 @@ Applet本文は`src/shared/settings-ui/AppletSettingsForm.tsx`を共通テンプ
 
 `scripts/applet-settings-ui-test.cjs [固定EXE]`は兄弟Appletの宣言と配布物を隔離配置し、停止したまま全項目の描画・保存・検索・両入口の一致・明暗/狭幅を確認する。コマンドの実行中表示は専用Node fixtureを使い、実壁紙やロック・キー送信は実行しない。最低ホスト版と宣言形式は[Applet API](extensions.md#共通の設定ページ)を正本とする。
 
+URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・スラッシュ・不完全なURLを入力欄内に保持する。補正・検証・保存はEnterまたはフォーカスが外れた時だけ行い、Enter後のblurで同じ入力を二重送信しない。IME変換確定のEnterは設定確定として扱わない。AI/TTSのベースURL、WebAppletのURL、本体/各Appletの更新元に同じ動作を適用する。WebAppletの追加許可先は`SettingsUrlTextarea`を使い、Enterで確定、Shift+Enterで改行する。Web側の初期設定取得もURL確定後に行う。モデル一覧・更新等の通信は既存の明示操作を維持する。
+
+`scripts/settings-url-ui-test.cjs [固定EXE]`はURLの連続入力、確定前の保存/通信抑止、Enter/blurの補正と即時保存、IME、不正URLの保持/修正、各URL欄の共通動作を隔離fixtureで確認する。
+
 ## 検証と次の範囲
 
 tests/settings-editing.test.cjs・settings-page.test.cjsは即時保存、失敗/競合、再送、範囲を確認する。scripts/settings-shell-ui-test.cjs [固定EXE]は連続入力/IME、画像、不正入力、保存失敗fixture、外部競合、公開範囲、追加/旧Shell/故障復旧と再起動を確認する。settings-search/navigation/shortcuts/gestures/ribbon/tray/notification-settings/syncと実Windows起動タスクの関連回帰はVERIFICATIONを参照する。

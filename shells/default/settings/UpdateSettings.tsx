@@ -1,6 +1,10 @@
 import { hostSettingItem } from '../../../src/shared/settings-catalog';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
-import { SettingsInput, numberInput } from '../../../src/shared/settings-ui/SettingsInput';
+import {
+  SettingsInput,
+  SettingsUrlInput,
+  numberInput,
+} from '../../../src/shared/settings-ui/SettingsInput';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot, UpdateState } from '../../../src/shared/contracts';
@@ -94,7 +98,7 @@ export function UpdateSettings({
         description={hostSettingItem('about', 'hostSource').description}
         {...settingAnchor('about', 'hostSource')}
       >
-        <SettingsInput
+        <SettingsUrlInput
           aria-label="AppDockの更新元"
           value={settings.updates.hostSource}
           onChange={(event) =>
@@ -195,7 +199,7 @@ export function AppletUpdateSource({
       <div className="update-settings-content">
         <label className="update-source">
           <span>{extension.displayName}の更新元</span>
-          <SettingsInput
+          <SettingsUrlInput
             aria-label={`${extension.displayName}の更新元`}
             value={source ?? defaultSource}
             placeholder="publishフォルダー / URL / github:owner/repo"

@@ -332,6 +332,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',
     );
     await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(root, 'publish'));
+    await page.getByLabel('AppDockの更新元', { exact: true }).press('Enter');
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
 
     await settleSettings(page);

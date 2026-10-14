@@ -1,7 +1,7 @@
 import { SettingsSection, SettingsField } from './SettingsSections';
 import { webSettingLabels, appletSettingsPageId } from '../settings-catalog';
 import { settingAnchor } from './setting-anchor';
-import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
+import { SettingsInput, SettingsUrlInput, SettingsUrlTextarea, numberInput } from './SettingsInput';
 import { settingsControls } from './api';
 import { useEffect, useRef, useState } from 'react';
 import type { SettingsControlEditor as SettingsEditor } from './api';
@@ -97,7 +97,7 @@ export function WebAppletSettings({
       setBusy(false);
     }
   };
-  async function defaults() {
+  async function defaults(url = item?.url) {
     if (!item) return;
     if (onDefaults) {
       setBusy(true);
@@ -111,11 +111,11 @@ export function WebAppletSettings({
       return;
     }
     const token = ++request.current,
-      before = { ...item };
+      before = { ...item, url: url ?? item.url };
     setBusy(true);
     setMessage('Web側の設定JSONを確認しています…');
     try {
-      const result = await settingsControls.webDefaults(item.url);
+      const result = await settingsControls.webDefaults(before.url);
       if (token !== request.current) return;
       const current = live.current.items.find((a) => a.id === before.id);
       if (!current || current.url !== before.url) {
@@ -357,14 +357,16 @@ export function WebAppletSettings({
               {...settingAnchor(appletSettingsPageId(item.id), 'url')}
               title={webSettingLabels.url}
             >
-              <SettingsInput
+              <SettingsUrlInput
+                key={item.id}
                 aria-label="WebAppletのURL"
                 value={item.url}
                 maxLength={4096}
-                onChange={(e) => change({ url: e.target.value })}
-                onBlur={() => {
-                  if (item.name === '新しいWebApplet' && item.url !== 'https://example.com/')
-                    void defaults();
+                onChange={(e) => {
+                  const url = e.target.value;
+                  change({ url });
+                  if (item.name === '新しいWebApplet' && url !== 'https://example.com/')
+                    void defaults(url);
                 }}
               />
             </SettingsField>
@@ -465,13 +467,15 @@ export function WebAppletSettings({
               {...settingAnchor(appletSettingsPageId(item.id), 'allowedOrigins')}
               title={webSettingLabels.allowedOrigins}
             >
-              <SettingsTextarea
+              <SettingsUrlTextarea
+                key={item.id}
                 aria-label="WebAppletの追加許可先"
                 value={item.allowedOrigins.join('\n')}
                 onChange={(e) =>
                   change({ allowedOrigins: e.target.value.split('\n').filter(Boolean) })
                 }
                 placeholder="https://accounts.example.com"
+                aria-description="Enterで確定、Shift+Enterで改行します。"
               />
             </SettingsField>
           </SettingsSection>
