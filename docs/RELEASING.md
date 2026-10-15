@@ -135,7 +135,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
   -Mode Draft -PlanPath $taskPlan -GhPath $taskGh
 ```
 
-公開先は`5ynonym/AppDock.at365`です。originとremote main、既存タグの参照先、ローカルの準備物を再検査します。未作成なら`v<版>`/対象commit/ノートで**下書き**を作り、3ファイルを添付します。GitHubの各assetがuploaded状態で、sizeとSHA256 digestがplanに一致して初めて`draft`になります。タイトル・ノート・対象commit・余分なassetも検査します。GitHubからdigestが得られない場合も推測せず停止します。
+公開先は`yukichi-7sai/AppDock.at365`です。originとremote main、既存タグの参照先、ローカルの準備物を再検査します。未作成なら`v<版>`/対象commit/ノートで**下書き**を作り、3ファイルを添付します。GitHubの各assetがuploaded状態で、sizeとSHA256 digestがplanに一致して初めて`draft`になります。タイトル・ノート・対象commit・余分なassetも検査します。GitHubからdigestが得られない場合も推測せず停止します。
 
 同じplanの再実行は、一致する下書きの不足assetだけを添付します。`--clobber`は使いません。公開済みRelease、タグの別commit、既存asset不一致は拒否します。タグはGitHub Releaseの対象commitから作成し、既存タグの移動/強制pushは行いません。
 
@@ -157,7 +157,7 @@ Publishは検証済み下書きと全アセットを再照合してから、最�
 - Prepare失敗: GitHub未変更。ログを確認して修正/コミットし、新しいplanで再実行。
 - Draft失敗: 公開しない。不足assetだけなら同じplanのDraftを再実行。不一致asset/ノート/対象commitは自動修復しない。下書きの内容と所有関係を確認してから、人が修正・削除の範囲を判断する。
 - Publish前の検査失敗: 下書きのまま停止。条件を緩めたり手動で公開を先に行ったりしない。
-- Publishの通信切断/応答不明: 公開操作はサーバー側で完了している可能性がある。`gh release view <tag> --repo 5ynonym/AppDock.at365`とAPIで状態を読む。公開済みならVerifyへ進み、同じタグで再作成しない。下書きと確定できた場合だけ再Publishする。
+- Publishの通信切断/応答不明: 公開操作はサーバー側で完了している可能性がある。`gh release view <tag> --repo yukichi-7sai/AppDock.at365`とAPIで状態を読む。公開済みならVerifyへ進み、同じタグで再作成しない。下書きと確定できた場合だけ再Publishする。
 - 公開後Verify失敗: 既に公開済みの可能性を明示し、原因と到達済み段階を報告する。自動削除・非公開化・asset上書きはしない。回線回復後のVerify再実行か、新しい修正版のReleaseを判断する。
 - 公開後検証成功・Release整理失敗: planのphaseはverifiedのまま、retentionReportに失敗・削除済みID・応答不明のpendingDeleteを残す。公開の失敗と混同しない。GitHubの実状態を読取確認し、同じReleaseのPublishやcreateを再実行せず、Verifyをやり直すか共通整理コマンドを新しい結果ファイルで再実行する。
 
@@ -173,7 +173,7 @@ planの`retentionReport`が指すJSONに、削除前一覧・保持対象・削�
 
 ## 不具合のある旧Releaseの個別削除
 
-保持3件内の不具合Releaseなど、通常の件数整理に加えてユーザーが対象を指定した場合に実施します。まず修正版のPrepare→Draft→Publish→Verifyを完了させ、latestと匿名取得、本体更新チェックを確認します。その後、指定された旧タグのRelease ID・公開状態を再確認して、`gh release delete <旧タグ> --repo 5ynonym/AppDock.at365 --yes`でReleaseと添付アセットを削除します。`--cleanup-tag`は使わず、Gitタグとコミット履歴は残します。
+保持3件内の不具合Releaseなど、通常の件数整理に加えてユーザーが対象を指定した場合に実施します。まず修正版のPrepare→Draft→Publish→Verifyを完了させ、latestと匿名取得、本体更新チェックを確認します。その後、指定された旧タグのRelease ID・公開状態を再確認して、`gh release delete <旧タグ> --repo yukichi-7sai/AppDock.at365 --yes`でReleaseと添付アセットを削除します。`--cleanup-tag`は使わず、Gitタグとコミット履歴は残します。
 
 削除後は旧タグのRelease APIが404、修正版がlatestで全アセットを持つこと、旧Gitタグが保持されていることを確認し、削除対象のmetadataと結果を.artifactsへ記録します。削除結果が不明な場合は読み取りで状態を確認し、別のReleaseを推測で削除しません。公開後Verifyの失敗を理由に自動で削除する処理とは区別します。
 

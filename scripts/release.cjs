@@ -15,7 +15,7 @@ const CHECKS = [
   'update-recovery',
   'all-in-one',
 ];
-const REPOSITORY = '5ynonym/AppDock.at365';
+const REPOSITORY = 'yukichi-7sai/AppDock.at365';
 const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const hash = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const save = (file, data) => {

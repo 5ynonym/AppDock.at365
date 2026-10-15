@@ -36,7 +36,7 @@ function fixture(t) {
       const command = args.slice(4);
       if (command[0] === 'status') return state.dirty ? ' M file' : '';
       if (command[0] === 'rev-parse') return state.commit;
-      if (command[0] === 'remote') return 'https://github.com/5ynonym/AppDock.at365.git';
+      if (command[0] === 'remote') return 'https://github.com/yukichi-7sai/AppDock.at365.git';
       if (command[0] === 'ls-remote') return state.tag;
     }
     if (exe === 'gh') {
