@@ -2167,3 +2167,11 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 単一EXE 0.33.0: 144124612 bytes、SHA256 `53bb083c087cab40378065c9efbb1fd9ea8c47e082da30b57739689044d8b78c`。update.json、Default Shell版、固定コピー、最終EXEを照合。artifacts.jsonの固定確認開始treeとの差分は起動/更新/保存待機の試験3ファイルだけで製品不変。固定確認も最終treeで再実行。検証後の文書のみの追記はdocs-after-validation.patch、最終tree/commitはseal.jsonへ保存。
 - 終了/明示成功/実行方式/参照証跡/絶対パス/再解析点/使用中を検査し、古い成功profile 21件を整理。各方式の直近3件・固定/再利用/失敗/不明を保持（cleanup-result.json）。不要な一時編集スクリプトも整理。隔離試験プロセス残存0。現行文書のローカルリンク221件に欠落なし。
 - 物理Windows toastクリック、実Gmail認証/受信、UAC承認/実管理者トークン/実サインイン、物理混在DPIは自動確認していない。本体のみpublishとローカルcommitまで。未変更Applet再発行・全体ZIP・push/Release/実利用deployなし。依頼された通知基盤と即時保存に未実装段階はない。
+
+## 2026-10-16: 0.46.0 Release準備と全体ZIP試験の追従
+
+- GitHubアカウント変更をAPIで確認し、release.cjsとRelease手順・fixtureの公開先をyukichi-7sai/AppDock.at365へ更新。公開先fixture10/10成功。製品の版更新は行わない。
+- 初回Prepareは型検査・標準485/485・本体発行・6Applet全体ZIP生成まで成功し、portable-updatesの初回起動接続が失敗。同じ配布物による再試験11項目が成功。第2準備は更新GUI・進捗・復旧まで成功したが、全体ZIP試験が起動待機と旧Shell想定で失敗した。全失敗ログを保持する。
+- 全体ZIP試験の待機上限を60秒へ変更し、接続失敗時にCDPを解放。現行のsettings-aware-pageを利用し、内蔵Default Shellの正常起動と外部Applet全一覧を個別に検査する。失敗時にも接続済みの専用AppDockへ終了を依頼する。
+- 修正後の同一ZIP試験は成功。ZIP全収録ファイルのsize/SHA256、本体EXEとの一致、6Appletの版/初期無効/エラーなし、内蔵Shell、更新設定の既定値と正常終了を確認。証跡 `.artifacts/release-0.46.0-20261016-02/bundle-ui-retry2.json` と `all-in-one-retry2.log`。各Appletのソース回帰は同フォルダーの `source-reuse.json` に入力・ログhashの再利用判定を保存。
+- 製品ソースは変更せず、修正はRelease試験のみ。公開前にコミットして新しいPrepareを実行する。GitHub公開と公開後検証の最終結果は、新しいRelease planを正本とする。

@@ -42,7 +42,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function connect(port) {
   let last;
   let browser;
-  for (let i = 0; i < 40; i++) {
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
     try {
       browser ??= await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
       const pages = browser.contexts().flatMap((context) => context.pages());
@@ -58,6 +59,7 @@ async function connect(port) {
       await wait(200);
     }
   }
+  await browser?.close().catch(() => {});
   throw last;
 }
 async function waitSnapshot(page, predicate) {
@@ -91,10 +93,15 @@ async function about(page) {
   let connected;
   try {
     connected = await connect(port);
-    const page = connected.page;
+    const page = require('./settings-aware-page.cjs').settingsAwarePage(connected.page);
     const s = await waitSnapshot(page, (s) => s.startupReady);
     assert.equal(s.version, bundle.hostVersion);
-    assert.deepEqual(s.extensions.map((e) => e.id).sort(), bundle.applets.map((a) => a.id).sort());
+    const external = s.extensions.filter((e) => e.sourceKind !== 'builtin');
+    const builtin = s.extensions.filter((e) => e.sourceKind === 'builtin');
+    assert.deepEqual(builtin.map((e) => e.id), ['appdock.default-shell']);
+    assert.equal(builtin[0].state, 'running');
+    assert.ok(!builtin[0].error, builtin[0].error);
+    assert.deepEqual(external.map((e) => e.id).sort(), bundle.applets.map((a) => a.id).sort());
     for (const a of bundle.applets) {
       const e = s.extensions.find((e) => e.id === a.id);
       assert.equal(e.version, a.version);
@@ -111,7 +118,8 @@ async function about(page) {
       archiveSha256,
       bundle,
       version: s.version,
-      applets: s.extensions.map((e) => ({ id: e.id, version: e.version, enabled: e.enabled })),
+      applets: external.map((e) => ({ id: e.id, version: e.version, enabled: e.enabled })),
+      builtin: builtin.map((e) => ({ id: e.id, version: e.version, state: e.state })),
       settingsCreatedBesideExe: true,
     };
     await page.evaluate(() => {
@@ -131,6 +139,9 @@ async function about(page) {
     );
     console.log(JSON.stringify({ ok: true, profile, version, applets: report.applets }, null, 2));
   } finally {
+    await connected?.page
+      .evaluate(() => void window.dock.executeCommand('appdock.quit'))
+      .catch(() => {});
     try {
       await connected?.browser.close();
     } catch {}
