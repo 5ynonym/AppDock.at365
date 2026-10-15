@@ -3,7 +3,7 @@ import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
 import path from 'node:path';
 import { imageDirectory, registerLocalImages } from './panel-images';
-import { safeStorage, shell, dialog, nativeTheme } from 'electron';
+import { safeStorage, shell, dialog, nativeTheme, nativeImage } from 'electron';
 import { legacyNotificationTypeId } from '../../shared/notification-types';
 import { queueSound } from './sounds';
 import { RegisteredSounds } from './registered-sounds';
@@ -23,6 +23,8 @@ import { pathToFileURL } from 'node:url';
 import { contained } from './extensions';
 import { pageKey } from '../../shared/applet-pages';
 import { openLocalPage, pageHostShortcut } from './applet-pages';
+import { disposeAppletPage, hideAppletPage, updateAppletPage } from './applet-pages';
+import { parseDynamicPages } from '../../shared/dynamic-pages';
 export function createHostApi(
   settings: SettingsStore,
   dataRoot: string,
@@ -39,8 +41,9 @@ export function createHostApi(
   }),
   typedNotifications?: () => TypedNotifications | undefined,
   shellState?: (id: string) => import('../../shared/shell').OwnShellState | undefined,
+  collectionHost?: () => import('./page-collections').PageCollectionManager,
 ) {
-  return async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
+  const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
     const p = params;
     const id = e.manifest.id;
@@ -73,6 +76,98 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.webProfiles.list':
+      case 'host.webProfiles.add':
+      case 'host.webProfiles.rename':
+      case 'host.webProfiles.clear':
+      case 'host.webProfiles.delete': {
+        requireCapability('web-profiles');
+        if (!collectionHost) throw Error('WebプロフィールAPIは準備中です。');
+        const profiles = collectionHost().profiles(id);
+        if (method === 'host.webProfiles.list') return profiles.accounts();
+        if (method === 'host.webProfiles.add') return profiles.addAccount(p.name);
+        if (typeof p.id !== 'string') throw Error('アカウントIDを指定してください。');
+        if (method === 'host.webProfiles.rename') return profiles.renameAccount(p.id, p.name);
+        if (method === 'host.webProfiles.clear') return profiles.clearAccount(p.id);
+        return profiles.deleteAccount(p.id);
+      }
+      case 'host.images.normalize': {
+        requireCapability('images');
+        if (
+          !Array.isArray(p.bytes) ||
+          p.bytes.length > 4 * 1024 * 1024 ||
+          !p.bytes.every((v: unknown) => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 255)
+        )
+          throw Error('画像は4MB以下で指定してください。');
+        const bytes = Buffer.from(p.bytes);
+        const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+        const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+        const webp =
+          bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+        if (!png && !jpeg && !webp) throw Error('PNG・JPEG・WebP画像を指定してください。');
+        const source = nativeImage.createFromBuffer(bytes);
+        const size = source.getSize();
+        if (source.isEmpty() || size.width > 2048 || size.height > 2048)
+          throw Error('画像の形式・サイズを確認してください。');
+        const result = source.resize({ width: 32, height: 32 }).toDataURL();
+        if (result.length > 24576) throw Error('画像が大きすぎます。');
+        return result;
+      }
+      case 'host.settings.update': {
+        requireCapability('settings');
+        if (!Number.isSafeInteger(p.expectedRevision))
+          throw Error('現在の設定revisionを指定してください。');
+        settings.assertRevision(p.expectedRevision as number);
+        settingsCommands.setOwnSetting(e.manifest, key(), p.value);
+        return { revision: settings.revision };
+      }
+      case 'host.pages.openItem': {
+        requireCapability('pages');
+        if (!collectionHost || typeof p.id !== 'string')
+          throw Error('ページIDを指定してください。');
+        const page = collectionHost().find(p.id);
+        if (!page || page.binding.owner !== id) throw Error('自身のページだけを開けます。');
+        return collectionHost().open(page.id);
+      }
+      case 'host.pages.list':
+        requireCapability('pages');
+        return {
+          revision: e.pageRevision ?? 0,
+          pages: structuredClone([...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])]),
+        };
+      case 'host.pages.replace': {
+        const next = parseDynamicPages(e.manifest, p.pages);
+        if (
+          !Number.isSafeInteger(p.expectedRevision) ||
+          p.expectedRevision !== (e.pageRevision ?? 0)
+        )
+          throw Error('ページの登録が変更されています。現在の一覧を取得してください。');
+        for (const page of next) contained(e.manifest.folder, page.ui!);
+        if (next.some((page) => e.commands.some((command) => command.id === page.openCommand)))
+          throw Error('ページ操作が実行中のコマンドと重複しています。');
+        for (const page of e.dynamicPages ?? []) {
+          const replacement = next.find((candidate) => candidate.id === page.id);
+          if (!replacement || replacement.ui !== page.ui || replacement.source !== page.source)
+            disposeAppletPage(pageKey(id, page.id));
+        }
+        e.dynamicPages = next;
+        e.pageRevision = (e.pageRevision ?? 0) + 1;
+        for (const page of next)
+          updateAppletPage(pageKey(id, page.id), page.title, page.defaultDisplay);
+        commandsChanged();
+        return { revision: e.pageRevision };
+      }
+      case 'host.pages.hide':
+      case 'host.pages.dispose': {
+        requireCapability('pages');
+        const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
+          (page) => page.id === p.id,
+        );
+        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        if (method === 'host.pages.hide') hideAppletPage(pageKey(id, page.id));
+        else disposeAppletPage(pageKey(id, page.id));
+        return null;
+      }
       case 'host.shell.getState': {
         requireCapability('shell');
         if (!shellState) throw Error('Shell状態APIは準備中です。');
@@ -84,7 +179,9 @@ export function createHostApi(
         return appdockCall(e, p);
       case 'host.pages.open': {
         requireCapability('pages');
-        const page = e.manifest.pages?.find((page) => page.id === p.id);
+        const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
+          (page) => page.id === p.id,
+        );
         if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
         return openLocalPage(
           {
@@ -104,6 +201,19 @@ export function createHostApi(
           },
           {
             snapshot: () => ({
+              revision: settings.revision,
+              collectionPages:
+                collectionHost?.()
+                  .entries()
+                  .filter((page) => page.binding.owner === id)
+                  .map((page) => ({ id: page.id, key: page.binding.key, itemId: page.item.id })) ??
+                [],
+              page: {
+                id: page.id,
+                context: structuredClone(
+                  e.dynamicPages?.find((current) => current.id === page.id)?.context ?? {},
+                ),
+              },
               dark: nativeTheme.shouldUseDarkColors,
               settings: e.manifest.capabilities?.includes('settings')
                 ? Object.fromEntries(
@@ -125,6 +235,56 @@ export function createHostApi(
               )
                 throw Error('自身の実行中コマンドだけを呼び出せます。');
               return executeCommand(command);
+            },
+            call: async (operation, input) => {
+              if (operation === 'actions.invoke') {
+                if (
+                  e.state !== 'running' ||
+                  !isObject(input) ||
+                  typeof input.id !== 'string' ||
+                  !isObject(input.input)
+                )
+                  throw Error('ページ操作の引数を確認してください。');
+                const declaration = e.manifest.pageActions?.find(
+                  (action) => action.id === input.id,
+                );
+                const fields = declaration?.parameters ?? {};
+                if (
+                  !declaration ||
+                  JSON.stringify(input.input).length > 65536 ||
+                  Object.keys(input.input).some((key) => !Object.hasOwn(fields, key)) ||
+                  Object.entries(fields).some(
+                    ([key, type]) => typeof (input.input as Record<string, unknown>)[key] !== type,
+                  )
+                )
+                  throw Error('宣言されたページ操作と引数だけを使用できます。');
+                const generation = e.runtimeSession;
+                const result = await e.peer?.request('page.action', {
+                  id: declaration.id,
+                  input: input.input,
+                  pageId: page.id,
+                });
+                if (e.state !== 'running' || e.runtimeSession !== generation)
+                  throw Error('ページの提供元が終了しました。');
+                return result;
+              }
+              const allowed = [
+                'settings.update',
+                'webProfiles.list',
+                'webProfiles.add',
+                'webProfiles.rename',
+                'webProfiles.clear',
+                'webProfiles.delete',
+                'images.normalize',
+                'pages.openItem',
+              ];
+              if (
+                e.state !== 'running' ||
+                typeof operation !== 'string' ||
+                !allowed.includes(operation)
+              )
+                throw Error('このページから利用できない操作です。');
+              return api(e, `host.${operation}`, input);
             },
             changed: (callback) => {
               settings.on('changed', callback);
@@ -561,4 +721,5 @@ export function createHostApi(
         throw new Error(`未対応のHost API: ${method}`);
     }
   };
+  return api;
 }

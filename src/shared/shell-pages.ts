@@ -71,6 +71,7 @@ export interface HomePageModel {
       description: string;
       state: 'waiting' | 'running' | 'stopped' | 'starting' | 'stopping' | 'error';
       runtime: 'node' | 'dotnet' | 'native' | 'web';
+      collection?: boolean;
       version: string;
       actionId: string;
     }[];

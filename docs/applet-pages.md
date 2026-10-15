@@ -48,7 +48,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 
-「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の設定下書き/revision/全保存に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
+「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の即時保存/revision/競合検査に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
 
 同じ配置を外部から取得・編集できます。許可と操作形式は[共通操作APIのリボン編集](automation.md#リボン編集)を参照してください。GUIとAPIは同じ検証と設定revisionを使います。
 
@@ -59,3 +59,9 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 既存のWebアカウントGUI試験はUIをBrowserWindowのrootとして想定していたため、UIページの取得はElectron contextの全pagesを使い、親Windowの操作はview所有関係を照合してください。ローカルUIのcapturePageは子WebContentsViewの合成画面を含まないため、各Viewのキャプチャと実領域も照合します。
 
 `scripts/ribbon-layout-ui-test.cjs [win-unpackedのEXE]`は上下配置・セパレーター操作・グループ間ドラッグ・再起動保持・削除/初期化と、Gmailの余白/本文の上端を確認します。ドラッグの試験時だけ画面を縮小し、移動元と移動先を同時に可視領域へ収めます。
+
+## 動的ページと設定由来のページ（0.44.0）
+
+固定pagesに加え、pages/dynamic-pages capabilityでNodeのcontext.pages.list/replace/open/hide/disposeを使えます。実行中のlocalページを最大64件まで追加・置換・削除でき、同じHTMLへページ固有contextを渡せます。登録revisionで競合を拒否します。停止時は動的定義とSurfaceを回収します。
+
+manifest.pageCollectionsは自身のobject-list設定からlocal/remoteページと管理項目を投影します。親の停止中も設定を保持し、子は独立したプロセス・配布物・更新対象を作りません。最低ホスト版は0.44.0。API、manifest、所有範囲、限定bridge、実装例は[動的ページの設計と契約](dynamic-pages-webapplet-design.md)を正本とします。

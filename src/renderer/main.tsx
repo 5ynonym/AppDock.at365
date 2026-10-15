@@ -27,7 +27,7 @@ import { UpdateProgress } from './UpdateProgress';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 import { defaultShellId } from '../shared/shell';
-import { WebAppletSettings } from '../shared/settings-ui/WebAppletSettings';
+
 declare global {
   interface Window {
     dock: DockApi;
@@ -35,7 +35,7 @@ declare global {
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
 type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
-const webManagerId = 'appdock.web-manager';
+
 function Brand({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand-mark ${small ? 'small' : ''}`}>
@@ -382,11 +382,6 @@ function App() {
     setSelected(id);
     setPage('extensions');
   };
-  const goWebManager = () => {
-    setSelected(webManagerId);
-    setDetailView('settings');
-    setPage('extensions');
-  };
   const commands: UiCommand[] = [
     ...hostCommands.map((command) => ({ ...command, extensionId: null })),
     ...appletManagementCommands(snapshot?.extensions ?? []),
@@ -441,27 +436,7 @@ function App() {
     }
     await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
   }
-  const webManagerSelected = selected === webManagerId;
-  const selectedApplet: ExtensionSnapshot | undefined = webManagerSelected
-    ? {
-        apiVersion: 1,
-        id: webManagerId,
-        name: 'WebApplet',
-        displayName: 'WebApplet',
-        description: 'WebサイトをAppletとして追加・管理します。各サイトをリボンから開けます。',
-        version: snapshot?.version ?? '',
-        runtime: 'web',
-        entry: '',
-        folder: '',
-        state: 'running',
-        enabled: true,
-        error: null,
-        commands: [],
-        tray: [],
-        panel: null,
-        settingOptions: {},
-      }
-    : (orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0]);
+  const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
   const active = orderedApplets.filter((e) => e.state === 'running').length;
   return (
     <div
@@ -524,8 +499,7 @@ function App() {
           <AppletIndex
             applets={orderedApplets}
             selected={selectedApplet?.id}
-            webManagerSelected={webManagerSelected}
-            onWebManager={() => goExtension(webManagerId)}
+
             onSelect={goExtension}
             editor={editor}
             busy={busy}
@@ -571,8 +545,8 @@ function App() {
           <div className="page-content">
             {page.startsWith('page:') && (
               <div className="applet-page-body">
-                {snapshot.settings.value.webApplets.items
-                  .filter((a) => `page:${a.id}:main` === page)
+                {snapshot.extensions
+                  .filter((a) => !!snapshot.webPages[a.id] && `page:${a.id}:main` === page)
                   .map((a) => (
                     <div className="web-page-toolbar" key={a.id}>
                       <strong>{a.name}</strong>
@@ -628,14 +602,6 @@ function App() {
                     <div className="actions">
                       <button
                         className="secondary"
-                        onClick={() => {
-                          goWebManager();
-                        }}
-                      >
-                        WebAppletを追加
-                      </button>
-                      <button
-                        className="secondary"
                         onClick={() => void action(() => window.dock.openPath('extensions'))}
                       >
                         <Icon name="folder" size={16} />
@@ -650,7 +616,6 @@ function App() {
                 )}
                 <div className="extensions-layout">
                   <ExtensionDetail
-                    builtin={webManagerSelected}
                     extension={selectedApplet}
                     view={detailView}
                     onView={(view) => {
@@ -667,39 +632,21 @@ function App() {
                             editor={editor}
                             currentRevision={snapshot.settings.revision}
                           />
-                          {webManagerSelected ? (
-                            <div className="applet-settings-panel">
-                              <WebAppletSettings
-                                editor={editor}
-                                accounts={snapshot.webAccounts}
-                                applets={orderedApplets.map((e) => ({
-                                  id: e.id,
-                                  title: e.displayName,
-                                }))}
-                                tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
-                                onAccounts={() => {
-                                  setPage('settings');
-                                  setWebAccountsRequest((n) => n + 1);
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <AppletSettingsPanel
-                              commands={shortcutCommands}
-                              applets={orderedApplets.map((e) => ({
-                                id: e.id,
-                                title: e.displayName,
-                              }))}
-                              applet={selectedApplet}
-                              editor={editor}
-                              tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
-                              webAccounts={snapshot.webAccounts}
-                              onWebAccounts={() => {
-                                setPage('settings');
-                                setWebAccountsRequest((n) => n + 1);
-                              }}
-                            />
-                          )}
+                          <AppletSettingsPanel
+                            commands={shortcutCommands}
+                            applets={orderedApplets.map((e) => ({
+                              id: e.id,
+                              title: e.displayName,
+                            }))}
+                            applet={selectedApplet}
+                            editor={editor}
+                            tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
+                            webAccounts={snapshot.webAccounts}
+                            onWebAccounts={() => {
+                              setPage('settings');
+                              setWebAccountsRequest((n) => n + 1);
+                            }}
+                          />
                         </>
                       ) : undefined
                     }
@@ -707,11 +654,7 @@ function App() {
                       detailView === 'logs' && selectedApplet ? (
                         <ShellPageSlot
                           key={selectedApplet.id}
-                          scope={
-                            webManagerSelected
-                              ? { type: 'web' }
-                              : { type: 'applet', id: selectedApplet.id }
-                          }
+                          scope={{ type: 'applet', id: selectedApplet.id }}
                           navigationRequest={snapshot.navigation.request}
                         />
                       ) : undefined
@@ -827,8 +770,8 @@ function ExtensionDetail({
             ) : (
               <>
                 v{e.version} <span className="divider">/</span>{' '}
-                {e.runtime === 'web'
-                  ? 'WebApplet'
+                {!!e.collection
+                  ? 'Appletページ'
                   : e.runtime === 'node'
                     ? 'TypeScript · Node.js'
                     : 'C# · .NET 10'}
@@ -910,21 +853,12 @@ function ExtensionDetail({
           aria-labelledby="applet-detail-tab-description"
         >
           <p className="detail-description">{e.description}</p>
-          {builtin ? (
-            <>
-              <p className="muted">
-                設定タブでサイトを追加し、ショートカットタブで新しく追加するサイトの初期割り当てを編集できます。
-              </p>
-              <button className="secondary" onClick={() => onView('settings')}>
-                WebAppletを追加・管理
-              </button>
-            </>
-          ) : (
+          {
             <>
               {e.minimumHostVersion && (
                 <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
               )}
-              {e.runtime !== 'web' && (
+              {!e.collection && (
                 <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
               )}
               <div className="detail-state">
@@ -1066,7 +1000,7 @@ function ExtensionDetail({
                 </div>
               </details>
             </>
-          )}
+          }
         </div>
       )}
     </section>

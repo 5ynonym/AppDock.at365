@@ -20,6 +20,7 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
   tts?: import('./tts').TtsSettings;
   ai?: import('./ai').AiSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
@@ -28,7 +29,6 @@ export interface Settings {
   gestureDefaultsInitialized?: string[];
   keybindings?: import('./keybindings').Keybinding[];
   keybindingDefaultsInitialized?: string[];
-  webApplets: import('./web-applets').WebAppletSettings;
   schemaVersion: 1;
   host: HostSettings;
   updates: UpdateSettings;
@@ -91,8 +91,21 @@ export interface SettingDefinition {
   fields?: SettingDefinition[];
   itemTitle?: string;
   aliases?: string[];
-  format?: 'directory';
+  format?: 'directory' | 'url';
   numericOptions?: boolean;
+  /** Opt-in read-only summary table with grouped editing. */
+  list?: {
+    columns: string[];
+    titleKey: string;
+    descriptionKey?: string;
+    enabledKey?: string;
+    idKey?: string;
+    iconKey?: string;
+    confirmDelete?: boolean;
+  };
+  /** Nested storage path for an object-list field; never a JavaScript expression. */
+  propertyPath?: string[];
+  optionSource?: 'web-profiles';
 }
 export interface SettingOption {
   label: string;
@@ -135,6 +148,8 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
+  pageCollections?: import('./page-collections').PageCollectionDefinition[];
   notificationTypes?: import('./notification-types').NotificationTypeDefinition[];
   shell?: { apiVersion: 1; ui?: string; views?: Record<string, string> };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
@@ -160,6 +175,7 @@ export interface ExtensionManifest {
   pages?: import('./applet-pages').AppletPageDefinition[];
 }
 export interface ExtensionSnapshot extends ExtensionManifest {
+  collection?: import('./page-collections').CollectionBinding;
   sourceKind?: 'builtin' | 'external';
   displayName: string;
   folder: string;
@@ -188,8 +204,8 @@ export interface HostSnapshot {
     error?: string;
   };
   launch: LaunchState;
-  webAccounts: import('./web-applets').WebProfile[];
-  webPages: Record<string, import('./web-applets').WebPageState>;
+  webAccounts: import('./web-content').WebProfile[];
+  webPages: Record<string, import('./web-content').WebPageState>;
   startupReady: boolean;
   windowVisible: boolean;
   updates: UpdateState;
@@ -245,10 +261,10 @@ export interface DockApi {
   onFlushSettingsInputs(callback: (id: string) => void): () => void;
   settingsInputsFlushed(id: string): Promise<void>;
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
-  webDefaults(url: string): Promise<import('./web-applets').WebDefaults>;
+
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
   clearWebAccount(id: string): Promise<boolean>;
-  createWebAccount(name: string): Promise<import('./web-applets').WebProfile>;
+  createWebAccount(name: string): Promise<import('./web-content').WebProfile>;
   renameWebAccount(id: string, name: string): Promise<void>;
   deleteWebAccount(id: string): Promise<false | 'deleted' | 'deferred'>;
   cancelUpdates(): Promise<boolean>;

@@ -10,7 +10,7 @@
 
 PC専用データはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
 
-EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。WebApplet名簿は`data/web-applets/accounts.json`の`schemaVersion/accounts`だけを共有する。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backup、通知履歴notifications/history.jsonはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
+EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。Webプロフィール名簿は`data/web-profiles/<Applet ID>/accounts.json`の`schemaVersion/accounts`だけを共有する。移行済みWebAppletは既存の`data/web-applets/accounts.json`を継続使用する。CookieとsessionはPC専用の同じ所有者の領域へ保存し、共有しない。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backup、通知履歴notifications/history.jsonはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
 
 旧.appdockからのPC専用データの移行・削除は実装しないというユーザー指定。旧chromium/web-accounts/storage/secrets/web-applets/sessionsが残る場合は警告する。同期を始める前に完全終了して旧保存データを整理する。既存settings.jsonの読み取り互換性と、従来からある名簿の旧フィールド読み取りとは区別する。
 
@@ -27,7 +27,7 @@ EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材�
 
 `file-observer.ts`は親フォルダーのwatchと2秒のpollを併用する。イベント後100msから読み、同じbytesを180ms隔てて2回確認してから検証・反映する。途中JSON/一時的削除/ロック/通知欠落は直近正常値を維持して再照合する。同じ内容は再適用せず、受信ファイルを整形して書き戻さない。名簿とsettingsの到着順が違う場合は不足枠を同期待ちとして表示する。名簿未到着の起動時は空の共有accounts.jsonを生成しない。枠が0件ならユーザーの明示的な追加で名簿を作成できる。旧設定に残った参照は自動置換せず、WebApplet設定で新しい枠を選んで保存する。追加直前に届いた未反映名簿・破損名簿は上書きしない。既存枠を保持しているときの一時的欠落も同期待ちとする。
 
-SettingsStoreのchanged経由でホスト/キー/トレイ/WebApplet/実行中Appletへ適用する。保存済み値を正本として画面を更新し、現在のUIだけが不完全入力を保持する。変更した項目についてbeforeと現在値を比較し、同じ項目の外部変更を拒否する。hardwareAcceleration等の起動専用項目、Windows起動タスクの保存トランザクションは維持する。
+SettingsStoreのchanged経由でホスト/キー/トレイ/ページコレクション/実行中Appletへ適用する。保存済み値を正本として画面を更新し、現在のUIだけが不完全入力を保持する。変更した項目についてbeforeと現在値を比較し、同じ項目の外部変更を拒否する。hardwareAcceleration等の起動専用項目、Windows起動タスクの保存トランザクションは維持する。
 
 WebProfileStoreのpendingDeletionはPC専用の別ファイル。共有名簿の外部削除は対象Viewを閉じるが、このPCのCookieの物理削除を予約しない。明示的なこのPCでの枠削除だけが当該PCの保存領域を回収する。回収で共有accounts.jsonを書き換えない。
 

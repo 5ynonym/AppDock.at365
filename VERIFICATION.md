@@ -1,5 +1,34 @@
 # 検証記録
 
+## 2026-10-15: WebApplet分離・一覧設定のコミット前確認
+
+- 対象はmain `d3bb01e`以降の動的ページ/独立WebApplet/宣言型一覧の差分と新Applet repo。実装時の本体530・Applet21入力ファイル、成功ログ、EXEと配布Applet全8ファイルを照合し一致。型検査、本体68件、Applet2件・配置6件、固定EXE一覧5群/Web動作4群、発行win-unpacked動的4群を再利用した。照合と今回の結果は[コミット検証](.artifacts/commit-validation-webapplet-20261015/validation.json)と同所`reuse.json`を参照。
+- 未実行の標準回帰62ファイルを追加実行し416/416成功。再利用68件と合わせて**本体484/484、fail/skip 0**。実Node/.NETの起動・設定・コマンド・異常終了/再起動・停止も含む。最初の制限環境では保存rename/loopback等で45件が失敗。同一コマンドの通常権限実行では415/416となり、旧runtime=webとURLをdescriptionに置く試験fixture1件を現行コレクション形式へ更新。公開説明と非公開URL/アカウントの分離の検証を維持して416件を再実行し成功した。製品コードの追加変更はない。
+- 本体EXEは0.45.0 / SHA256 `ba1875a7e5cc1f01c06de017ba6c501b4261062516c50b8053904e4338bd5c33`のまま。Applet0.2.0のZIPは前回後に再作成されており、現在85,065 bytes / SHA256 `0941e1f9474eb178e9d0600ae262595c4ed5adb5ebc928c1172b63c25945913d`。feed一致と全8エントリの内容が前回および配布フォルダーとbyte単位で同一と確認し、runtimeのGUI結果を再利用。版追加・再publishなし。
+- Windows26300 x64、Node24.21.0/pnpm12.10.1/Electron44.6.0、.NET SDK10.0.402/Runtime10.0.13。記録へソース/試験・生成物・fixture・配布物・ログhashとstage treeを保存し、コミット後のtree一致を照合する。実サービス認証・物理入力/受信の追加確認、実利用先deploy、push、Releaseは行わない。
+
+## 2026-10-15: 宣言型一覧設定とWebApplet（0.45.0 / 0.2.0）
+
+- `object-list.list`を宣言したApplet設定へ、閲覧用一覧、追加/編集ダイアログ、アイコン操作、トグル、削除確認、並べ替えを自動生成する。宣言のない既存一覧は維持。WebApplet管理ページも同じSettingsListTableを同梱し、登録サイト・初期ショートカットを統一した。宣言、保存パス、同一所有者のプロフィール候補、対象一覧の競合、未宣言値の保持を検証する。
+- 旧webApplets reader・自動移行・旧名簿取り込み・移行専用GUIを撤去。既に保存済みのID/名簿/session参照は維持し、新規の移行記録を作らない。本体0.45.0、Applet0.2.0、最低ホスト0.45.0。Appletの配布資産8ファイルに.NETのDLL/EXEはない。
+- 型検査・ビルド、関連単体57件と名簿/同期11件、Applet単体2件、配置6件が成功。[レビューとログ](.artifacts/list-ui-20261015/review.md)、[入力・配布物照合](.artifacts/list-ui-20261015/validation.json)。無関係な全標準回帰は再実行していない。配置試験は最終表示更新修正前で、変更のない配置スクリプト/8資産の照合・利用データ保持を検証した結果を再利用する。
+- [最終単一EXEの一覧5群](.artifacts/web-list-ui-1792054680258/result.json)で管理ページ・本体設定・Applet詳細設定、追加/編集/削除/順序、トグル、取消、URL失敗時の入力保持、外部更新の競合、未宣言値保持、入れ子のショートカット条件、明暗テーマ、狭幅、画面間同期を確認。狭幅はCDPの720pxエミュレーションで、物理モニターの確認とは区別。画像を目視し、列の縦折り返し/トグルCSSを修正後に再確認した。
+- [最終単一EXEのWeb動作4群](.artifacts/web-portable-1792054729699/result.json)は外部Node Applet、推奨JSON/手動編集保持、page/windowのView保持、実Cookie再起動保持、remoteへのbridge非公開、親停止を確認。[発行win-unpackedの動的ページ4群](.artifacts/dynamic-pages-ui-1792054777784/result.json)は保存済み旧ID/名簿参照、localページの独立性と非表示/更新時状態保持、破棄、追加/ショートカット生成、所有境界、親停止を確認。実サービス認証・長時間受信は試していない。
+- 発行前レビューとGUIで、Applet設定ダイアログの入力一時停止操作の不足と、旧インライン入力向けガードによるショートカット保存後の一覧更新漏れを修正。最終内容で該当GUIを再実行した。最初のportableへのPlaywright直接接続は待機したため試験プロセスだけを停止しCDPへ変更。Browser window-size API非対応は試験方法を変更。失敗記録を保持。pnpmの制限環境エラーは同じ固定依存検査を通常権限で成功させ、lockfile/待機方針を変更していない。
+- 両publish成功。本体EXE **144,211,820 bytes / SHA256 ba1875a7e5cc1f01c06de017ba6c501b4261062516c50b8053904e4338bd5c33**、Applet ZIP **85,065 bytes / SHA256 1ef8ec7bf5fc46cb4f219b3d24d5c2ca9ff5934d0d838476ddb5b5bb19f2d5ee**。feed/manifest/package/asar版、out全166ファイル、GUIの固定EXEとApplet8資産、[ZIP内容](.artifacts/list-ui-20261015/applet-archive.json)が一致。撤去モジュールはasarにも含まれない。
+- 本体/当該Appletのpublishまで。実利用先deploy・commit/push/Releaseは未実施。0.1.1のdeploy成功は利用者から報告済みで、今回の0.2.0配置成功とは区別する。利用時は本体とAppletの両方を更新する。
+
+## 2026-10-15: 動的ページと独立WebApplet（0.44.0 / 0.1.0）
+
+- main `d3bb01e`を基点に[設計と契約](docs/dynamic-pages-webapplet-design.md)を実装。実行中localページのlist/replace/open/hide/dispose、保存設定からlocal/remoteページを投影するpageCollections、所有範囲付きWebプロフィール・画像・ローカルbridgeを追加。本体のWebApplet専用manager/フォーム/固定管理項目を除去し、独立repo `../Applet.WebApplet.at365`へサイト管理と推奨JSON処理を移した。Appletの実行資産に.NET/Electronを含まない。
+- 新保存形式・ファイル領域を追加するため本体0.43.1→**0.44.0**、新Applet **0.1.0**、最低ホスト0.44.0。旧サイトID、キー、リボン、名簿/session保存先を継続。旧版0.43.1で保存した実Cookieの移行と名称変更後の保持が成功：[移行結果](.artifacts/web-profile-migration-1792049648834/result.json)。旧版試験コピーは`.artifacts/dynamic-pages-legacy-0.43.1`へ保持。
+- 型検査とビルド成功。関連単体54/54＋同期競合追加1件、新Applet2/2、fail/skip 0。証跡は`.artifacts/dynamic-pages-20261015/unit-final.log`、`dynamic-final.log`、`applet-unit.log`。最終のUTF-8 byte上限と別名衝突はdynamic-finalの5件で確認。その他の単体成功は非影響として再利用。
+- [発行版の動的GUI](.artifacts/dynamic-pages-ui-1792050840750/result.json)は旧ID/名簿、2つのlocal画面のcontext/独立性、更新/非表示で入力保持、破棄、所有範囲/フォルダー外拒否、別Appletの名簿非公開、remote bridge非公開、追加時キー生成、親停止時破棄を確認。既存固定ページ/Gmailの7群は[既存ページ結果](.artifacts/applet-pages-1792049713570/result.json)が成功。Gmailの実OAuth/受信ではなくオフラインfixture。
+- [最終単一EXE](.artifacts/web-portable-1792050916554/result.json)は隔離コピーを通常起動し、外部Node Applet読込、推奨JSON、手動名保持、page/windowのView保持、実Cookie再起動保持、明暗テーマ、親停止を確認。画像を目視。途中のテーマ切替直後の0幅キャプチャ失敗は試験側のレイアウト待ちを修正して再試験成功。失敗ログ/プロファイルを保持。最終製品差分はなし。
+- 発行前レビューは[review.md](.artifacts/dynamic-pages-20261015/review.md)。移行順序、保存と実効状態、部分JSON、画像/登録境界、非同期Surface破棄、コレクション別Window保存先、コマンド別名衝突を修正し、影響する型/単体/GUIを確認。未解決の発行阻害なし。制限環境のpnpm stack overflowと原子的ファイル置換EPERMは同じ検証を通常Windows権限で再実行して成功し、lockfile/依存検査を変更していない。
+- 両publish.bat終了0。本体EXE **144,197,270 bytes / SHA256 278f41eaf6be7f18438544fb235e1c194dbe4cd6cd818ae583c6070ecd0ef975**。package/asar/Default Shell/feed版一致、main139・Shell26ファイルと出力一致、固定コピーのhash一致。Applet update.zip **11,771 bytes / SHA256 166670cca5e39f7209e2712925018383205e278dd3e2d4d9aa8ac5b779630063**、manifest/feed版一致、ZIP6ファイルと配布フォルダー一致、DLL/EXEなし。[検証証跡](.artifacts/dynamic-pages-20261015/validation.json)と[ZIP照合](.artifacts/dynamic-pages-20261015/applet-archive.json)へ記録。入力358ファイルのhashを照合。
+- 今回の隔離プロセス終了を確認。成功した同種GUIは直近3回以内、移行/固定物/失敗調査資料を保持し削除0件。実サイトへのログイン、全サイトの長時間受信、旧ホストとの双方向同期、全体ZIP、公開リポジトリ/更新元の設定、deploy、commit、push、Releaseは未実施。新Appletは独立Git repoとして初期化済みで未コミット。本体単独更新では新Appletを自動導入しないため、利用時は対応Appletも配置する。
+
 ## 2026-10-15: ネットワークMCPの認証案内と接続先候補（0.43.1）
 
 - 利用者からネットワーク越しのMCP接続成功の報告を受けた。今回の独立した遠隔試験ではなく、接続元アプリ・経路・配置版の詳細は照合していない。「ネットワークからの接続」へ、環境変数名`MCP_BEARER_TOKEN`の例、値はトークンだけであること、直接ヘッダーのキー`Authorization`と値`Bearer <コピーしたトークン>`、半角スペース・変数名の一致・接続元アプリの再起動を案内する説明を追加した。READMEにも反映。

@@ -212,7 +212,8 @@ test('all JSON pages round-trip only selected ranges; unknown owners, leaves and
 test('web partial arrays preserve other rows and immutable fields', () => {
   const v = createDefaultSettings(),
     id = 'web.11111111-1111-1111-1111-111111111111';
-  v.webApplets.items = [
+  v.extensions['at365.web-applet'] = { enabled: true, settings: { items: [] } };
+  v.extensions['at365.web-applet'].settings.items = [
     {
       id,
       name: 'Site',
@@ -226,15 +227,25 @@ test('web partial arrays preserve other rows and immutable fields', () => {
       imported: { name: 'Original' },
     },
   ];
-  const a = [{ id, displayName: 'Site', runtime: 'web' }],
+  const a = [
+      {
+        id,
+        displayName: 'Site',
+        runtime: 'node',
+        collection: { owner: 'at365.web-applet', key: 'items', itemId: id },
+        settings: require('../../Applet.WebApplet.at365/extension.json').pageCollections[0].fields,
+      },
+    ],
     p = settingsCatalog(a, v).find((p) => p.owner === id);
   const json = settingsProjection(v, p, a);
-  json.webApplets.items[0].name = 'Changed';
+  json.extensions[id].settings.name = 'Changed';
   const next = applySettingsJson(v, p, a, JSON.stringify(json));
-  assert.equal(next.webApplets.items[0].enabled, false);
-  assert.deepEqual(next.webApplets.items[0].imported, { name: 'Original' });
-  json.webApplets.items = [];
-  assert.throws(() => applySettingsJson(v, p, a, JSON.stringify(json)), /ID/);
+  assert.equal(next.extensions['at365.web-applet'].settings.items[0].enabled, false);
+  assert.deepEqual(next.extensions['at365.web-applet'].settings.items[0].imported, {
+    name: 'Original',
+  });
+  json.extensions[id].settings.id = 'changed';
+  assert.throws(() => applySettingsJson(v, p, a, JSON.stringify(json)));
 });
 test('stable catalog search uses static metadata and NFKC AND matching', () => {
   const v = createDefaultSettings(),

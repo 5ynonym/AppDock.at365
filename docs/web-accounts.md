@@ -110,3 +110,9 @@ snapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。�
 ## WebViewの言語
 
 Webアカウントのsession/表示WebContentsView/背景Windowは、ChromiumがWindowsから取得する優先言語を使います。ホストでAccept-Languageやnavigator.languageの独自上書きを行いません。サイト側のアカウント設定やURLによる表示言語は別です。隔離セッションでの実測は[検証記録](../VERIFICATION.md)を参照してください。
+
+## 任意URL向けのWebプロフィール（0.44.0）
+
+web-profiles capabilityとcontext.webProfiles.list/add/rename/clear/deleteは、Applet自身のログイン保存枠を管理します。任意URLのページ表示にはpageCollectionsのsource:remoteを使います。Cookieやsession、任意保存パスはAppletへ渡しません。上記webAccountsのサービス観測・専用UIとは別契約です。Gmail等の既存APIと保存先を維持します。
+
+新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。旧WebAppletは既存web-applets領域を継続します。宣言と操作の詳細は[動的ページ設計](dynamic-pages-webapplet-design.md)を参照してください。

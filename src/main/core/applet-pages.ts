@@ -63,6 +63,21 @@ export function closeAppletPages(extensionId: string) {
   for (const [key, surface] of surfaces)
     if (key.startsWith(`page:${extensionId}:`)) surface.close();
 }
+export function updateAppletPage(key: string, title: string, display: PageDisplay = 'page') {
+  const surface = surfaces.get(key);
+  if (!surface) return;
+  surface.options.title = title;
+  surface.options.defaultDisplay = display;
+  if (surface.display === 'window') surface.window?.setTitle(title);
+  surface.refreshDisplay();
+  if (!surface.ui.webContents.isDestroyed()) surface.ui.webContents.send('applet-page:changed');
+}
+export function disposeAppletPage(key: string) {
+  surfaces.get(key)?.close();
+}
+export function hideAppletPage(key: string) {
+  surfaces.get(key)?.hide();
+}
 export interface SurfaceOptions {
   appletId?: string;
   key?: string;
@@ -251,6 +266,17 @@ export class AppletSurface {
     }
     this.layout();
   }
+  hide() {
+    if (this.closed) return;
+    this.opened = false;
+    this.standalone?.hide();
+    if (selected === this.options.key) {
+      selected = null;
+      bounds = null;
+      host?.selected(null);
+    }
+    this.layout();
+  }
   layout() {
     if (this.closed) return;
     const window = this.window;
@@ -284,8 +310,8 @@ export class AppletSurface {
     this.detach();
     this.state.flush();
     if (this.options.key) {
-      surfaces.delete(this.options.key);
-      if (selected === this.options.key) {
+      if (surfaces.get(this.options.key) === this) surfaces.delete(this.options.key);
+      if (selected === this.options.key && !surfaces.has(this.options.key)) {
         selected = null;
         bounds = null;
         host?.selected(null);
@@ -301,6 +327,7 @@ export interface LocalPageServices {
   snapshot(): unknown;
   execute(id: unknown): Promise<unknown>;
   changed(callback: () => void): () => void;
+  call?(operation: unknown, input: unknown): Promise<unknown>;
 }
 const localPages = new Map<
   Electron.WebContents,

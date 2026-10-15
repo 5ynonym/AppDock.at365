@@ -77,7 +77,30 @@
 
 本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、Shellは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。SettingsModalは同じ設定Surface内のダイアログであり、別WebContentsにまたがる表示には[Shellの共通オーバーレイ](shell-overlays.md)を使う。
 
-Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ)を確認する。manifestの設定宣言だけでこの一覧編集が自動生成されるわけではなく、一般Appletへ本体のSettingsPage操作がそのまま公開されるわけでもない。利用できるAPIと保存範囲を確認し、必要な基盤拡張は別途設計する。
+Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ)を確認する。`object-list`に`list`を宣言すると、本体が共通の一覧・追加/編集・削除確認・並べ替えダイアログを自動生成する。既存の`list`未指定の表示は維持する。WebAppletの管理ページも同じ`SettingsListTable`を利用する。
+
+## Appletの一覧宣言
+
+`minimumHostVersion: "0.45.0"`以上が必要。例:
+
+```json
+{
+  "key": "items", "title": "登録一覧", "type": "object-list", "default": [], "itemTitle": "項目",
+  "list": { "columns": ["name"], "titleKey": "name", "descriptionKey": "url", "enabledKey": "enabled", "idKey": "id", "confirmDelete": true },
+  "fields": [
+    { "key": "id", "title": "ID", "type": "string" },
+    { "key": "name", "title": "名前", "type": "string", "default": "新しい項目" },
+    { "key": "url", "title": "URL", "type": "string", "format": "url", "default": "https://example.com/" },
+    { "key": "enabled", "title": "有効", "type": "boolean", "default": true }
+  ]
+}
+```
+
+`columns`は既存フィールドから1～4列、`titleKey`は主情報、`descriptionKey`はその下の補足。selectの値はラベルで表示する。`enabledKey`はbooleanフィールドのトグル。`idKey`は編集欄に出さず、新規登録時だけUUIDを生成する。`iconKey`は行画像のdata PNG/JPEG/WebP文字列を参照する。`confirmDelete`省略時は即時削除で、ショートカットの既存契約を維持する。
+
+フィールドの`propertyPath`は最大3階層の保存パス（例:`["when", "scope"]`）。prototype系キーは禁止。未知の保存項目は保持する。selectの`optionSource: "web-profiles"`は同じAppletの共通プロフィール名簿だけを選択肢に使い、capabilityを必要とする。空の名簿ではAppletの管理画面で枠を追加してから選択する。
+
+本体の保存操作は表示中Appletの宣言済み一覧だけを受け付け、開いた時点の一覧と現在値を照合する。変更があればダイアログへ競合を返す。正常時は最新設定へその一覧だけを合成し、共通SettingsCommandsで検証・保存する。任意のApplet向けSettingsPage操作は公開しない。
 
 ## 実装時の確認項目
 

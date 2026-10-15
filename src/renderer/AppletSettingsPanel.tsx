@@ -2,10 +2,10 @@ import type { ExtensionSnapshot } from '../shared/contracts';
 import type { UiCommand } from '../shared/commands';
 import { ShellPageSlot } from './ShellPageSlot';
 import { appletSettingsPageId } from '../shared/settings-catalog';
-import { WebAppletSettings } from '../shared/settings-ui/WebAppletSettings';
+
 import { AppletShortcutOverview } from '../shared/settings-ui/AppletShortcutOverview';
 import type { SettingsEditor } from './useSettingsEditor';
-import type { WebProfile } from '../shared/web-applets';
+import type { WebProfile } from '../shared/web-content';
 import { useLayoutEffect, useRef } from 'react';
 
 /** Separate detail tabs edit the same host settings session. */

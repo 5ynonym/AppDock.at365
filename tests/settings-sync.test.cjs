@@ -66,7 +66,7 @@ test('PC-local generations survive corruption and restart; incoming valid settin
     path.join(root, 'shared', 'accounts.json'),
     path.join(root, 'local', 'web-applets'),
   );
-  roster.load(second);
+  roster.loadStandalone(() => false);
   assert.deepEqual(roster.snapshot(), []);
   assert.throws(() => second.save(defaults(), second.revision));
   const good = defaults();
@@ -92,8 +92,8 @@ test('shared roster updates live while remote removal never schedules deletion o
   const file = path.join(root, 'shared', 'accounts.json');
   const a = new WebProfileStore(file, path.join(root, 'PC-A')),
     b = new WebProfileStore(file, path.join(root, 'PC-B'));
-  a.load(settings);
-  b.load(settings);
+  a.loadStandalone(() => false);
+  b.loadStandalone(() => false);
   t.after(() => {
     a.close();
     b.close();
@@ -139,9 +139,13 @@ test('startup never writes an empty shared roster while metadata is still in tra
   settings.load();
   const file = path.join(root, 'shared', 'accounts.json');
   const empty = new WebProfileStore(file, path.join(root, 'local'));
-  empty.load(settings);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  empty.loadStandalone(() => !!settings.value.extensions['test.pages']?.settings.items?.length);
   assert.equal(fs.existsSync(file), false);
-  settings.value.webApplets.items = [{ accountId: 'account.00000000-0000-0000-0000-000000000001' }];
+  settings.value.extensions['test.pages'] = { enabled: true, settings: {} };
+  settings.value.extensions['test.pages'].settings.items = [
+    { accountId: 'account.00000000-0000-0000-0000-000000000001' },
+  ];
   fs.writeFileSync(file, '{in-progress');
   assert.throws(() => empty.add('overwrite risk'));
   assert.equal(fs.readFileSync(file, 'utf8'), '{in-progress');
@@ -149,7 +153,7 @@ test('startup never writes an empty shared roster while metadata is still in tra
   const added = empty.add('explicit recovery');
   assert.deepEqual(JSON.parse(fs.readFileSync(file)).accounts, [added]);
   assert.equal(
-    settings.value.webApplets.items[0].accountId,
+    settings.value.extensions['test.pages'].settings.items[0].accountId,
     'account.00000000-0000-0000-0000-000000000001',
   );
   assert.equal(empty.get(added.id).name, 'explicit recovery');
@@ -159,11 +163,15 @@ test('empty-roster recovery preserves a newly delivered roster and retained loca
   const root = fixture(t),
     settings = new SettingsStore(path.join(root, 'settings.json'));
   settings.load();
-  settings.value.webApplets.items = [{ accountId: 'account.00000000-0000-0000-0000-000000000001' }];
+  settings.value.extensions['test.pages'] = { enabled: true, settings: {} };
+  settings.value.extensions['test.pages'].settings.items = [
+    { accountId: 'account.00000000-0000-0000-0000-000000000001' },
+  ];
   const file = path.join(root, 'shared', 'accounts.json'),
     local = path.join(root, 'local');
   const store = new WebProfileStore(file, local);
-  store.load(settings);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  store.loadStandalone(() => settings.value.extensions['test.pages'].settings.items.length > 0);
   t.after(() => store.close());
   const remote = { id: 'account.00000000-0000-0000-0000-000000000002', name: 'delivered' };
   const bytes = JSON.stringify({ schemaVersion: 1, accounts: [remote] });
@@ -180,7 +188,7 @@ test('empty-roster recovery preserves a newly delivered roster and retained loca
   const marker = path.join(
     local,
     'sessions',
-    settings.value.webApplets.items[0].accountId,
+    settings.value.extensions['test.pages'].settings.items[0].accountId,
     'cookie-marker',
   );
   fs.mkdirSync(path.dirname(marker), { recursive: true });

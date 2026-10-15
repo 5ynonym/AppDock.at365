@@ -24,6 +24,7 @@ import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import { closeAppletPages } from './applet-pages';
 import { parseAppletPages } from '../../shared/applet-pages';
+import { parsePageCollections } from '../../shared/page-collections';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -156,6 +157,36 @@ function readManifest(
     throw Error('デスクトップ通知にはminimumHostVersion:0.31.1以上が必要です。');
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
+  m.pageCollections = parsePageCollections(m as unknown as ExtensionManifest);
+  if (
+    (m.capabilities?.includes('dynamic-pages') ||
+      m.capabilities?.includes('web-profiles') ||
+      m.pageActions) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.44.0') < 0)
+  )
+    throw Error('動的ページにはminimumHostVersion:0.44.0以上が必要です。');
+  if (
+    m.pageActions !== undefined &&
+    (!Array.isArray(m.pageActions) ||
+      m.pageActions.length > 32 ||
+      m.pageActions.some(
+        (action: any) =>
+          !action ||
+          typeof action.id !== 'string' ||
+          !/^[a-z][a-z0-9.-]{0,79}$/.test(action.id) ||
+          (action.parameters !== undefined &&
+            (!isObject(action.parameters) ||
+              Object.entries(action.parameters).some(
+                ([key, type]) =>
+                  !/^[a-z][a-zA-Z0-9]{0,79}$/.test(key) ||
+                  !['string', 'number', 'boolean'].includes(String(type)),
+              ))),
+      ) ||
+      new Set(m.pageActions.map((action: any) => action.id)).size !== m.pageActions.length)
+  )
+    throw Error('ページ操作の宣言を確認してください。');
+  for (const collection of m.pageCollections)
+    if (collection.source === 'local') contained(folder, collection.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
   for (const command of commands ?? []) {
     const requirement = command.shellRequirement;
@@ -172,6 +203,18 @@ function readManifest(
       );
   }
   const settingDefinitions = parseSettingDefinitions(m.settings);
+  if (
+    settingDefinitions?.some((s) => s.list) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.45.0') < 0)
+  )
+    throw Error('一覧ダイアログにはminimumHostVersion:0.45.0以上が必要です。');
+  if (
+    settingDefinitions?.some((s) =>
+      s.fields?.some((field) => field.optionSource === 'web-profiles'),
+    ) &&
+    !m.capabilities?.includes('web-profiles')
+  )
+    throw Error('プロフィールの選択肢にはweb-profiles capabilityが必要です。');
   validateSettingCommandIds(m.id, settingDefinitions ?? [], commands ?? []);
   if (
     settingDefinitions?.some((s) => s.automation || s.generateCommands) &&
@@ -225,6 +268,8 @@ type LoadedManifest = ExtensionManifest & {
   sourceKind: 'builtin' | 'external';
 };
 export interface ExtensionInstance {
+  dynamicPages?: import('../../shared/dynamic-pages').DynamicPageDefinition[];
+  pageRevision?: number;
   runtimeSession?: string;
   shellStateRequested?: boolean;
   attention?: boolean;
@@ -354,6 +399,7 @@ class ExtensionManager extends EventEmitter {
   snapshot(): ExtensionSnapshot[] {
     return [...this.items.values()].map((e) => ({
       ...e.manifest,
+      pages: [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])],
       displayName: appletDisplayName(e.manifest),
       state: e.state,
       scheduledStartAt: e.scheduledStartAt,
@@ -383,6 +429,13 @@ class ExtensionManager extends EventEmitter {
   }
   commandCatalog(e: ExtensionInstance): AppletCommand[] {
     const catalog = new Map<string, AppletCommand>();
+    for (const page of e.dynamicPages ?? [])
+      catalog.set(page.openCommand, {
+        id: page.openCommand,
+        title: `${page.title}を開く`,
+        automation: false,
+        available: e.state === 'running',
+      });
     for (const command of e.manifest.commands ?? [])
       catalog.set(command.id, {
         ...command,
@@ -516,6 +569,8 @@ class ExtensionManager extends EventEmitter {
   }
   async start(e: ExtensionInstance) {
     e.runtimeSession = randomUUID();
+    e.dynamicPages = [];
+    e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.shellStateRequested = false;
     e.state = 'starting';
     e.error = null;
@@ -619,6 +674,8 @@ class ExtensionManager extends EventEmitter {
     if (e.state === 'stopping') return;
     void closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
+    e.dynamicPages = [];
+    e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.state = 'error';
     e.attention = false;
     e.error = message;
@@ -634,6 +691,8 @@ class ExtensionManager extends EventEmitter {
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
+    e.dynamicPages = [];
+    e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.attention = false;
     this.emit('changed');
     const child = e.child;
@@ -662,6 +721,13 @@ class ExtensionManager extends EventEmitter {
     id: string,
     invocation?: { session: string; window: string; process: string; source: string },
   ) {
+    for (const item of this.items.values()) {
+      const page = item.dynamicPages?.find((candidate) => candidate.openCommand === id);
+      if (page) {
+        if (item.state !== 'running') throw Error('ページの提供元は停止しています。');
+        return this.api(item, 'host.pages.open', { id: page.id });
+      }
+    }
     for (const item of this.items.values()) {
       const target = item.manifest.commands?.find((command) => command.aliases?.includes(id));
       if (target) {

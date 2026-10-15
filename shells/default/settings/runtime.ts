@@ -187,7 +187,7 @@ export class SettingsViewClient {
       renameWebAccount: (id, name) => invoke('renameWebAccount', [id, name]),
       deleteWebAccount: (id) => invoke('deleteWebAccount', [id]),
       clearWebAccount: (id) => invoke('clearWebAccount', [id]),
-      webDefaults: (url) => invoke('webDefaults', [url]),
+
       chooseDirectory: () => invoke('chooseDirectory'),
       setAppletApiPermissions: (value) => invoke('setAppletApiPermissions', [value]),
       automation: (value) => invoke('automation', [value]),

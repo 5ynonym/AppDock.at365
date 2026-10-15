@@ -7,7 +7,7 @@ import { defaultShellId, shellRegions, shellView } from '../../../src/shared/she
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
 import { AboutSettings } from './AboutSettings';
-import { WebAppletSettings } from '../../../src/shared/settings-ui/WebAppletSettings';
+
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
@@ -65,17 +65,9 @@ export function SettingsForm({
         applet={extensions.find((a) => a.id === page.owner)!}
         settings={settings}
         onChange={edit}
-      />
-    );
-  if (page.kind === 'web')
-    return (
-      <WebAppletSettings
-        editor={editor}
-        itemId={page.owner}
-        accounts={aux.accounts ?? []}
-        onDefaults={() => invoke('importWebDefaults')}
-        onAccounts={() => void invoke('openWebAccounts')}
-        onDelete={() => void invoke('deleteWebApplet')}
+        accounts={aux.accounts}
+        onListCommit={(key, value, before) => invoke('replaceAppletList', [key, value, before])}
+        onListOpen={(key, id) => invoke('openAppletListItem', [key, id])}
       />
     );
   if (category === 'about')
@@ -128,7 +120,7 @@ export function SettingsForm({
     return (
       <WebAccountSettings
         accounts={aux.accounts ?? []}
-        savedItems={(aux.accountReferences?.saved as Settings['webApplets']['items']) ?? []}
+        savedItems={aux.accountReferences?.saved ?? []}
       />
     );
   return (

@@ -1,8 +1,9 @@
+import { collectionRecord } from './page-collections';
 import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
 import type { ExtensionSnapshot, Settings, SettingDefinition } from './contracts';
 import { createDefaultSettings, parseSettings } from './settings-schema';
-import { validateAppletSettings } from './setting-definitions';
+import { validateSettingValue, validateAppletSettings } from './setting-definitions';
 import { orderApplets } from './applet-order';
 import { getKeybindings } from './keybindings';
 import { appletApiPermissionLabels } from './appdock-api';
@@ -23,7 +24,8 @@ export interface SettingsPageDefinition {
   id: string;
   title: string;
   owner?: string;
-  kind: 'host' | 'applet' | 'web';
+  kind: 'host' | 'applet';
+  collection?: import('./page-collections').CollectionBinding;
   json: boolean;
   items: SettingsItem[];
   unavailableReason?: string;
@@ -191,18 +193,6 @@ export function hostSettingItem(pageId: string, key: string): SettingsItem {
   if (!row) throw Error('Unknown settings item: ' + pageId + '/' + key);
   return item(pageId, row[0], row[1], row[2]);
 }
-export const webSettingLabels: Record<string, string> = {
-  name: '名前',
-  url: '開始URL',
-  icon: 'アイコン画像（PNG / JPEG / WebP、4MB以下）',
-  display: '表示方法',
-  navigation: 'ページ遷移',
-  allowedOrigins: '追加の許可先（認証用など、1行1origin）',
-  accountId: '使用するWebアカウント',
-  'action:defaults': 'Web側の推奨設定を取得',
-  'action:accounts': 'Webアカウントを管理',
-  'action:delete': 'このWebAppletを削除',
-};
 export const appletCommonDescriptions = {
   display: '同じ画面をAppDock本体のページ、または別ウィンドウで表示します。',
   startupDelaySeconds:
@@ -223,7 +213,7 @@ const updateKeys = [
   'notifyOnStartup',
   'allowSameVersion',
 ];
-const webKeys = ['name', 'url', 'icon', 'display', 'navigation', 'allowedOrigins', 'accountId'];
+
 const item = (
   pageId: string,
   key: string,
@@ -279,54 +269,43 @@ export function settingsCatalog(
         id,
         title: a.displayName,
         owner: a.id,
-        kind: a.runtime === 'web' ? ('web' as const) : ('applet' as const),
+        kind: 'applet' as const,
+        collection: a.collection,
         json: true,
-        items:
-          a.runtime === 'web'
-            ? Object.entries(webSettingLabels).map(([key, title]) => ({
-                ...item(id, key, title),
-                keywords:
-                  key === 'display'
-                    ? ['本体のページ', '別ウィンドウ']
-                    : key === 'navigation'
-                      ? ['開始ページに固定', '同じorigin内だけ', 'HTTP(S)のページを許可']
-                      : undefined,
-              }))
-            : [
-                ...(a.pages ?? []).map((p) =>
-                  item(
-                    id,
-                    `page:${p.id}`,
-                    `${p.title}の表示方法`,
-                    appletCommonDescriptions.display,
-                  ),
-                ),
+        items: [
+          ...(!a.collection ? (a.pages ?? []) : []).map((p) =>
+            item(id, `page:${p.id}`, `${p.title}の表示方法`, appletCommonDescriptions.display),
+          ),
+          ...(!a.collection
+            ? [
                 item(
                   id,
                   'startupDelaySeconds',
                   '開始までの秒数',
                   appletCommonDescriptions.startupDelaySeconds,
                 ),
-                ...(a.settingActions ?? []).map((s) => ({
-                  ...item(id, `action:${s.command}`, s.title, s.description),
-                  keywords: (a.settingSections ?? [])
-                    .filter((section) => section.actions?.includes(s.command))
-                    .flatMap((section) => [section.title, section.description ?? '']),
-                  unavailableReason:
-                    !a.enabled || a.state !== 'running'
-                      ? 'Appletを開始してから操作できます。'
-                      : undefined,
-                })),
-                ...(a.settings ?? []).map((s) => ({
-                  ...item(id, `setting:${s.key}`, s.title, s.description, s),
-                  keywords: [
-                    ...definitionTerms(s),
-                    ...(a.settingSections ?? [])
-                      .filter((section) => section.settings?.includes(s.key))
-                      .flatMap((section) => [section.title, section.description ?? '']),
-                  ],
-                })),
-              ],
+              ]
+            : []),
+          ...(a.settingActions ?? []).map((s) => ({
+            ...item(id, `action:${s.command}`, s.title, s.description),
+            keywords: (a.settingSections ?? [])
+              .filter((section) => section.actions?.includes(s.command))
+              .flatMap((section) => [section.title, section.description ?? '']),
+            unavailableReason:
+              !a.enabled || a.state !== 'running'
+                ? 'Appletを開始してから操作できます。'
+                : undefined,
+          })),
+          ...(a.settings ?? []).map((s) => ({
+            ...item(id, `setting:${s.key}`, s.title, s.description, s),
+            keywords: [
+              ...definitionTerms(s),
+              ...(a.settingSections ?? [])
+                .filter((section) => section.settings?.includes(s.key))
+                .flatMap((section) => [section.title, section.description ?? '']),
+            ],
+          })),
+        ],
       };
     }),
   ];
@@ -342,7 +321,13 @@ export function settingsPaths(
     return [
       ['extensions', a.id, 'settings'],
       ['extensions', a.id, 'startupDelaySeconds'],
-      ...(a.pages ?? []).map((p) => ['extensions', a.id, 'pages', p.id, 'display']),
+      ...(!a.collection ? (a.pages ?? []) : []).map((p) => [
+        'extensions',
+        a.id,
+        'pages',
+        p.id,
+        'display',
+      ]),
     ];
   }
   switch (page.id) {
@@ -383,7 +368,7 @@ export function settingsPaths(
       return [
         ...updateKeys.map((k) => ['updates', k]),
         ...applets
-          .filter((a) => a.runtime !== 'web' && a.sourceKind !== 'builtin')
+          .filter((a) => !a.collection && a.sourceKind !== 'builtin')
           .map((a) => ['extensions', a.id, 'updateSource']),
       ];
     default:
@@ -415,22 +400,26 @@ function writePath(value: any, path: SettingsPath, next: unknown) {
     }
   } else parent[key] = structuredClone(next);
 }
-function webItem(value: Settings, page: SettingsPageDefinition) {
-  const row = value.webApplets.items.find((a) => a.id === page.owner);
-  if (!row) throw Error('設定対象が見つかりません。');
-  return row;
-}
 export function settingsProjection(
   value: Settings,
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
 ): Record<string, unknown> {
   if (!page.json) throw Error('このページはJSON編集に対応していません。');
-  if (page.kind === 'web') {
-    const row = webItem(value, page);
+  if (page.collection) {
+    const applet = applets.find((a) => a.id === page.owner);
+    const fields = applet?.settings ?? [];
+    const source = value.extensions[page.collection.owner]?.settings[page.collection.key];
+    const row = Array.isArray(source)
+      ? collectionRecord(value, page.collection)
+      : (value.extensions[page.owner!]?.settings ?? {});
     return {
-      webApplets: {
-        items: [Object.fromEntries(['id', ...webKeys].map((k) => [k, (row as any)[k]]))],
+      extensions: {
+        [page.owner!]: {
+          settings: Object.fromEntries(
+            fields.map((field) => [field.key, row[field.key] ?? field.default]),
+          ),
+        },
       },
     };
   }
@@ -466,21 +455,20 @@ export function applySettingsJson(
   const value = JSON.parse(text);
   if (!object(value) || !page.json) throw Error('部分JSONはオブジェクトで指定してください。');
   const next = structuredClone(current);
-  if (page.kind === 'web') {
-    assertScope(value, [['webApplets', 'items']]);
-    const rows = value.webApplets?.items;
-    if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.id !== page.owner)
-      throw Error('対象IDを変更・削除することはできません。');
+  if (page.collection) {
+    const applet = applets.find((a) => a.id === page.owner);
+    const fields = applet?.settings ?? [];
     assertScope(
-      rows[0],
-      ['id', ...webKeys].map((k) => [k]),
+      value,
+      fields.map((field) => ['extensions', page.owner!, 'settings', field.key]),
     );
-    const row = webItem(next, page);
-    for (const key of webKeys) writePath(row, [key], rows[0][key]);
-    const check = createDefaultSettings();
-    check.webApplets.items = [row];
-    const parsed = parseSettings(check).webApplets.items[0];
-    for (const key of webKeys) writePath(row, [key], (parsed as any)[key]);
+    const input = value.extensions?.[page.owner!]?.settings;
+    if (!object(input)) throw Error('ページ設定を指定してください。');
+    const row = collectionRecord(next, page.collection);
+    for (const field of fields) {
+      validateSettingValue(field, input[field.key]);
+      row[field.key] = input[field.key];
+    }
     return next;
   }
   const paths = settingsPaths(page, applets);

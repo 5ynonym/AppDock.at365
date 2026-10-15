@@ -7,7 +7,6 @@ import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu
 import { parseGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
 import { avatarReference } from './asset-names';
-import { defaultWebShortcutDefaults, parseWebApplets } from './web-applets';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import {
@@ -24,7 +23,6 @@ export const createDefaultSettings = (): Settings => ({
   appletOrder: [],
   gestures: defaultGestures(),
   gestureDefaultsInitialized: [],
-  webApplets: { items: [], shortcutDefaults: defaultWebShortcutDefaults() },
   schemaVersion: 1,
   host: {
     shellProviders: {},
@@ -219,7 +217,6 @@ export function parseSettings(value: unknown): Settings {
     gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),
     ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),
-    webApplets: parseWebApplets(value.webApplets),
     updates,
     schemaVersion: value.schemaVersion,
     extensions: value.extensions,
@@ -245,6 +242,22 @@ export function parseSettings(value: unknown): Settings {
     profile: { ...profile, name: profile.name.trim() },
   };
   const parsed = structuredClone(next) as unknown as Settings;
+  // Saved identity/storage aliases remain readable; no legacy settings are imported.
+  if (value.migrations !== undefined) {
+    const marker = value.migrations as Settings['migrations'];
+    const web = marker?.webApplet;
+    if (
+      !web ||
+      web.version !== 1 ||
+      web.owner !== 'at365.web-applet' ||
+      !Array.isArray(web.ids) ||
+      web.ids.length > 64 ||
+      web.ids.some((id) => typeof id !== 'string' || !/^web\.[a-f0-9-]{36}$/.test(id)) ||
+      new Set(web.ids).size !== web.ids.length
+    )
+      throw Error('保存済みページの識別情報が不正です。');
+    parsed.migrations = structuredClone(marker);
+  }
   const result = keybindings ? withKeybindings(parsed, keybindings) : parsed;
   if (new TextEncoder().encode(JSON.stringify(result)).length > 1024 * 1024)
     throw new Error('設定は1MB以下にしてください。');

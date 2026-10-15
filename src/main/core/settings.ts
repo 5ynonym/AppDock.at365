@@ -113,7 +113,9 @@ class SettingsStore extends EventEmitter {
   }
   private parse(bytes: Buffer | string) {
     try {
-      return validate(JSON.parse(bytes.toString().replace(/^\uFEFF/, '')));
+      const raw = JSON.parse(bytes.toString().replace(/^\uFEFF/, ''));
+      const value = validate(raw);
+      return value;
     } catch {
       throw new SettingsReadError('read-invalid');
     }

@@ -1,6 +1,7 @@
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { appletManagementCommands, type AppletOperation } from '../../shared/applet-management';
 import type { SettingsStore } from './settings';
+import { collectionRecord } from '../../shared/page-collections';
 
 export class AppletManagementError extends Error {
   constructor(
@@ -65,11 +66,14 @@ export class AppletManagement {
       throw new AppletManagementError('UNAVAILABLE', '無効なAppletは再起動できません。');
     this.busy.add(id);
     try {
-      const changed = operation !== 'restart' && applet.enabled !== (operation === 'enable');
+      const savedEnabled = applet.collection
+        ? collectionRecord(settings.value, applet.collection).enabled
+        : applet.enabled;
+      const changed = operation !== 'restart' && savedEnabled !== (operation === 'enable');
       if (changed) {
         const next = structuredClone(settings.value);
-        if (applet.runtime === 'web') {
-          const item = next.webApplets.items.find((a) => a.id === id);
+        if (applet.collection) {
+          const item = collectionRecord(next, applet.collection);
           if (!item) throw new AppletManagementError('NOT_FOUND', 'Appletがありません。');
           item.enabled = operation === 'enable';
         } else {

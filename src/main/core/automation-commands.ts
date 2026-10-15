@@ -43,10 +43,7 @@ export function automationApplets(applets: ExtensionSnapshot[]): AutomationApple
     version: a.version,
     state: a.state,
     enabled: a.enabled,
-    description:
-      a.runtime === 'web'
-        ? '登録したWebページを表示します。'
-        : (a.description ?? '').slice(0, 1000),
+    description: (a.description ?? '').slice(0, 1000),
     runtime: a.runtime,
     // Raw startup errors can contain paths, URLs, and credentials.
     errorSummary:

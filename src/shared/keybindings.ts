@@ -6,6 +6,7 @@ import {
   validCommandId,
 } from './commands';
 import type { Settings } from './contracts';
+import { collectionPages, collectionIdentity } from './page-collections';
 
 export const shortcutScopes = [
   { id: 'global', title: 'グローバル' },
@@ -127,19 +128,43 @@ export function initializeExtensionDefaults(
   return withKeybindings({ ...settings, keybindingDefaultsInitialized: [...initialized] }, rows);
 }
 
-export function initializeWebAppletDefaults(settings: Settings, previous: Settings): Settings {
-  const existing = new Set(previous.webApplets.items.map((item) => item.id));
+export function initializeCollectionDefaults(
+  settings: Settings,
+  previous: Settings,
+  parents: import('./contracts').ExtensionSnapshot[],
+): Settings {
+  const prior = new Set(
+    parents.flatMap((parent) =>
+      (parent.pageCollections ?? []).flatMap((definition) => {
+        const rows = previous.extensions[parent.id]?.settings[definition.key];
+        return Array.isArray(rows)
+          ? rows
+              .filter((row) => typeof row?.id === 'string')
+              .map((row) => collectionIdentity(previous, parent.id, definition.key, row.id))
+          : [];
+      }),
+    ),
+  );
   let rows = getKeybindings(settings);
-  for (const item of settings.webApplets.items) {
-    if (existing.has(item.id)) continue;
-    rows = addDefaultBindings(
-      rows,
-      item.id,
-      settings.webApplets.shortcutDefaults.map((binding) => ({
-        ...binding,
-        command: `${item.id}.${binding.command}`,
-      })),
+  for (const page of collectionPages(settings, parents)) {
+    if (!page.definition.shortcutDefaultsKey) continue;
+    const fallback = page.parent.settings?.find(
+      (setting) => setting.key === page.definition.shortcutDefaultsKey,
+    )?.default;
+    const bindings = parseKeybindingDefaults(
+      settings.extensions[page.binding.owner]?.settings[page.definition.shortcutDefaultsKey] ??
+        fallback,
+      page.definition.source === 'remote'
+        ? ['open', 'back', 'forward', 'reload', 'home']
+        : ['open'],
+      20,
     );
+    if (!prior.has(page.id))
+      rows = addDefaultBindings(
+        rows,
+        page.id,
+        bindings.map((binding) => ({ ...binding, command: `${page.id}.${binding.command}` })),
+      );
   }
   return withKeybindings(settings, rows);
 }
@@ -155,13 +180,7 @@ export function resetAppletKeybindings(
 ): Settings {
   const owned = new Set(applet.commands.map((command) => command.id));
   const remaining = getKeybindings(settings).filter((row) => !owned.has(row.command));
-  const defaults =
-    applet.runtime === 'web'
-      ? settings.webApplets.shortcutDefaults.map((binding) => ({
-          ...binding,
-          command: `${applet.id}.${binding.command}`,
-        }))
-      : (applet.defaultKeybindings ?? []);
+  const defaults = applet.defaultKeybindings ?? [];
   return withKeybindings(settings, addDefaultBindings(remaining, applet.id, defaults));
 }
 export function migrateKeybindings(

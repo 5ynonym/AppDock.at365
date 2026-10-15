@@ -50,6 +50,10 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
       fail();
       return;
     }
+    if (definition.list?.idKey) {
+      const ids = items.map((item) => item[definition.list!.idKey!]);
+      if (ids.some((id) => typeof id !== 'string' || !id.trim() || id.length > 100) || new Set(ids).size !== ids.length) fail();
+    }
     for (const item of items)
       for (const field of definition.fields ?? []) {
         let fieldValue: unknown;
@@ -102,7 +106,9 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
     (typeof value !== 'string' ||
       !value ||
       value.length > 256 ||
-      (!definition.dynamic && !definition.options?.some((o) => o.value === value)))
+      (!definition.dynamic &&
+        !definition.optionSource &&
+        !definition.options?.some((o) => o.value === value)))
   )
     fail();
 }
@@ -162,7 +168,8 @@ export function parseSettingDefinitions(
       (depth > 0 && ['object-list', 'shortcut-list', 'json'].includes(s.type)) ||
       (s.itemTitle !== undefined &&
         (typeof s.itemTitle !== 'string' || s.itemTitle.length > 100)) ||
-      (s.format !== undefined && s.format !== 'directory') ||
+      (s.format !== undefined && !['directory', 'url'].includes(s.format)) ||
+      (s.format === 'url' && s.type !== 'string') ||
       (s.numericOptions !== undefined && typeof s.numericOptions !== 'boolean') ||
       (s.aliases !== undefined &&
         (!Array.isArray(s.aliases) ||
@@ -189,6 +196,47 @@ export function parseSettingDefinitions(
       ...(s.type === 'select' ? { options: parseSettingOptions(s.options) } : {}),
       ...(s.type === 'object-list' ? { fields: parseSettingDefinitions(s.fields, depth + 1) } : {}),
     } as SettingDefinition;
+    const safeKey = (key: unknown) =>
+      typeof key === 'string' &&
+      /^[a-zA-Z0-9_-]{1,100}$/.test(key) &&
+      !['__proto__', 'prototype', 'constructor'].includes(key);
+    if (
+      s.propertyPath !== undefined &&
+      (depth !== 1 ||
+        !Array.isArray(s.propertyPath) ||
+        !s.propertyPath.length ||
+        s.propertyPath.length > 3 ||
+        !s.propertyPath.every(safeKey))
+    )
+      throw Error('一覧項目の保存パスが不正です。');
+    if (
+      s.optionSource !== undefined &&
+      (depth !== 1 || s.type !== 'select' || s.optionSource !== 'web-profiles')
+    )
+      throw Error('一覧項目の選択肢取得元が不正です。');
+    if (s.list !== undefined) {
+      const list = s.list,
+        fields = definition.fields ?? [];
+      const has = (key: unknown, type?: string) =>
+        fields.some((field) => field.key === key && (!type || field.type === type));
+      if (
+        s.type !== 'object-list' ||
+        !object(list) ||
+        !Array.isArray(list.columns) ||
+        !list.columns.length ||
+        list.columns.length > 4 ||
+        !list.columns.every((key: unknown) => has(key)) ||
+        new Set(list.columns).size !== list.columns.length ||
+        !has(list.titleKey) ||
+        !list.columns.includes(list.titleKey) ||
+        (list.descriptionKey !== undefined && !has(list.descriptionKey)) ||
+        (list.enabledKey !== undefined && !has(list.enabledKey, 'boolean')) ||
+        (list.idKey !== undefined && !has(list.idKey, 'string')) ||
+        (list.iconKey !== undefined && !safeKey(list.iconKey)) ||
+        (list.confirmDelete !== undefined && typeof list.confirmDelete !== 'boolean')
+      )
+        throw Error('一覧の表示列・識別子・操作定義を確認してください。');
+    }
     if (definition.default !== undefined) validateSettingValue(definition, definition.default);
     return definition;
   });

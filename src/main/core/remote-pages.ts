@@ -5,43 +5,36 @@ import type { SettingsStore } from './settings';
 import { WebProfileStore } from './web-profiles';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import {
-  allowedWebAppletNavigation,
-  manifestDefaults,
-  webId,
-  webUrl,
-  webAppletSettingDefinitions,
-  type WebApplet,
-  type WebDefaults,
+  allowedWebNavigation,
+  type RemotePageDefinition,
   type WebPageState,
-} from '../../shared/web-applets';
+} from '../../shared/web-content';
 
-export class WebAppletManager {
+export class RemotePageService {
   private views = new Map<
     string,
-    { surface: AppletSurface; item: WebApplet; state: WebPageState }
+    { surface: AppletSurface; item: RemotePageDefinition; state: WebPageState }
   >();
   private clearing = new Set<string>();
   private sessions = new Map<string, Electron.Session>();
   private closed = false;
   private profiles: WebProfileStore;
   constructor(
-    private settings: SettingsStore,
-    private root: string,
+    private items: () => RemotePageDefinition[],
+    private localDirectory: string,
     private changed: () => void,
-    private execute: (id: string) => Promise<unknown>,
-    sharedRoot = root,
+    sharedFile: string,
     failed: (error: Error) => void = () => {},
   ) {
-    this.profiles = new WebProfileStore(
-      path.join(sharedRoot, 'web-applets', 'accounts.json'),
-      sharedRoot !== root ? path.join(root, 'web-applets') : undefined,
-    );
+    this.profiles = new WebProfileStore(sharedFile, localDirectory);
+    this.profiles.loadStandalone(() => this.items().length > 0);
     try {
-      this.profiles.load(settings);
-    } catch (error) {
-      failed(error instanceof Error ? error : new Error(String(error)));
+      this.profiles.cleanupSessions(this.items().map((a) => a.accountId));
+    } catch {
+      queueMicrotask(() =>
+        failed(Error('ページ参照を確認できないためアカウントの後処理を保留しました。')),
+      );
     }
-    this.profiles.cleanupSessions(settings.value.webApplets.items.map((a) => a.accountId));
     this.profiles.watch(() => {
       this.reconcile();
       this.changed();
@@ -50,7 +43,7 @@ export class WebAppletManager {
   accounts() {
     return this.profiles.snapshot();
   }
-  validateAccounts(items: WebApplet[]) {
+  validateAccounts(items: RemotePageDefinition[]) {
     for (const item of items) {
       this.profiles.get(item.accountId);
       if (this.clearing.has(item.accountId))
@@ -70,11 +63,11 @@ export class WebAppletManager {
   }
   async deleteAccount(id: string) {
     const account = this.profiles.get(id);
-    const used = () => this.settings.value.webApplets.items.some((a) => a.accountId === id);
+    const used = () => this.items().some((a) => a.accountId === id);
     if (this.closed || this.clearing.has(id)) throw Error('Webアカウントを処理中です。');
     if (used())
       throw Error(
-        '使用中の枠は削除できません。WebAppletのアカウントを変更して設定を保存してください。',
+        '使用中の枠は削除できません。ページのアカウントを変更して設定を保存してください。',
       );
     this.clearing.add(id);
     try {
@@ -82,21 +75,21 @@ export class WebAppletManager {
         type: 'warning',
         message: `「${account.name}」のアカウント枠を削除しますか？`,
         detail:
-          'この枠と保存されたログイン情報・サイトデータを削除します。元に戻せません。使用中で消せないファイルは次回起動時に自動で片づけます。Gmailのアカウントには影響しません。',
+          'この枠と保存されたログイン情報・サイトデータを削除します。元に戻せません。使用中で消せないファイルは次回起動時に自動で片づけます。ほかのAppletのアカウントには影響しません。',
         buttons: ['キャンセル', '枠を削除'],
         defaultId: 0,
         cancelId: 0,
       });
       if (answer.response !== 1 || this.closed) return false;
-      if (used()) throw Error('この枠がWebAppletに割り当てられたため、削除を中止しました。');
+      if (used()) throw Error('この枠がWebページに割り当てられたため、削除を中止しました。');
       const ses = this.sessions.get(id);
       if (ses) await this.eraseSession(ses);
       if (this.closed) return false;
-      if (used()) throw Error('この枠がWebAppletに割り当てられたため、削除を中止しました。');
+      if (used()) throw Error('この枠がWebページに割り当てられたため、削除を中止しました。');
       this.profiles.remove(id);
       this.changed();
       const remaining = this.profiles.cleanupSessions(
-        this.settings.value.webApplets.items.map((a) => a.accountId),
+        this.items().map((a) => a.accountId),
         this.sessions.keys(),
       );
       this.changed();
@@ -109,78 +102,19 @@ export class WebAppletManager {
     this.profiles.get(id);
     const cached = this.sessions.get(id);
     if (cached) return cached;
-    const ses = session.fromPath(path.join(this.root, 'web-applets', 'sessions', id));
+    const ses = session.fromPath(path.join(this.localDirectory, 'sessions', id));
     ses.setSpellCheckerEnabled(false);
     ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
     ses.setPermissionCheckHandler(() => false);
     this.sessions.set(id, ses);
     return ses;
   }
-  snapshot(): ExtensionSnapshot[] {
-    const accounts = new Set(this.accounts().map((a) => a.id));
-    return this.settings.value.webApplets.items.map((a) => ({
-      apiVersion: 1,
-      id: a.id,
-      name: a.name,
-      displayName: a.name,
-      version: '1.0.0',
-      runtime: 'web',
-      entry: '',
-      folder: '',
-      description: `Webページ · ${new URL(a.url).origin}`,
-      enabled: a.enabled,
-      state: !a.enabled
-        ? 'stopped'
-        : !accounts.has(a.accountId) || this.views.get(a.id)?.state.error
-          ? 'error'
-          : 'running',
-      error: !accounts.has(a.accountId)
-        ? 'Webアカウント一覧の同期を待っています。枠が削除された場合は別の枠を選んでください。'
-        : this.views.get(a.id)?.state.error || null,
-      capabilities: [],
-      settings: webAppletSettingDefinitions,
-      tray: [],
-      settingOptions: {},
-      commands: ['open', 'back', 'forward', 'reload', 'home'].map((key) => ({
-        id: `${a.id}.${key}`,
-        title: (
-          {
-            open: '開く',
-            back: '戻る',
-            forward: '進む',
-            reload: 'リロード',
-            home: '開始ページへ',
-          } as Record<string, string>
-        )[key],
-        activateOnExecute: key === 'open',
-        automation: true,
-        available: a.enabled,
-      })),
-      pages: [
-        {
-          id: 'main',
-          title: a.name,
-          icon: 'extensions',
-          iconImage: a.icon,
-          source: 'local',
-          ui: '',
-          openCommand: `${a.id}.open`,
-          defaultDisplay: a.display,
-        },
-      ],
-      panel: {
-        title: a.name,
-        description: '専用アカウントでWebページを表示します。',
-        actions: [{ title: 'Webページを開く', command: `${a.id}.open` }],
-      },
-    }));
-  }
   states() {
     return Object.fromEntries([...this.views].map(([id, v]) => [id, v.state]));
   }
   reconcile() {
     for (const [id, v] of this.views) {
-      const a = this.settings.value.webApplets.items.find((a) => a.id === id);
+      const a = this.items().find((a) => a.id === id);
       if (
         !a ||
         !a.enabled ||
@@ -199,10 +133,10 @@ export class WebAppletManager {
     }
   }
   async open(id: string) {
-    if (this.closed || !webId(id)) throw Error('WebAppletがありません。');
-    const a = this.settings.value.webApplets.items.find((a) => a.id === id);
+    if (this.closed) throw Error('Webページがありません。');
+    const a = this.items().find((a) => a.id === id);
     if (!a?.enabled || this.clearing.has(a.accountId))
-      throw Error('WebAppletが無効またはアカウント処理中です。');
+      throw Error('Webページが無効またはアカウント処理中です。');
     let v = this.views.get(id);
     if (!v) {
       const state: WebPageState = {
@@ -221,14 +155,13 @@ export class WebAppletManager {
         partition: `web-applet-${a.accountId}`,
         session: this.account(a.accountId),
         remote: true,
-        stateFile: path.join(this.root, 'web-applets', 'windows', `${id}.json`),
+        stateFile: path.join(this.localDirectory, 'windows', `${id}.json`),
         defaultDisplay: a.display,
         onLayout: () => {},
         onCreated: (contents) => {
           wc = contents;
-          const current = () =>
-            this.settings.value.webApplets.items.find((item) => item.id === id) ?? a;
-          const permitted = (url: string) => allowedWebAppletNavigation(current(), url);
+          const current = () => this.items().find((item) => item.id === id) ?? a;
+          const permitted = (url: string) => allowedWebNavigation(current(), url);
           const blocked = () => {
             state.error = '設定で許可されていないページへの移動を止めました。';
             this.changed();
@@ -320,7 +253,7 @@ export class WebAppletManager {
         entries = h.getAllEntries(),
         offset = action === 'back' ? -1 : 1;
       const target = entries[h.getActiveIndex() + offset];
-      if (target && allowedWebAppletNavigation(v.item, target.url)) h.goToOffset(offset);
+      if (target && allowedWebNavigation(v.item, target.url)) h.goToOffset(offset);
     } else throw Error('Webページの操作が不正です。');
   }
   restart(id: string) {
@@ -338,7 +271,7 @@ export class WebAppletManager {
       const answer = await dialog.showMessageBox({
         type: 'warning',
         message: `「${account.name}」のログイン情報とサイトデータをクリアしますか？`,
-        detail: 'この枠を使うWebAppletを閉じます。Gmailのアカウントには影響しません。',
+        detail: 'この枠を使うWebページを閉じます。ほかのAppletのアカウントには影響しません。',
         buttons: ['キャンセル', 'クリア'],
         defaultId: 0,
         cancelId: 0,
@@ -372,7 +305,7 @@ export class WebAppletManager {
     let cleanupFailed = false;
     try {
       this.profiles.cleanupSessions(
-        this.settings.value.webApplets.items.map((a) => a.accountId),
+        this.items().map((a) => a.accountId),
         this.sessions.keys(),
       );
     } catch {
@@ -388,124 +321,5 @@ export class WebAppletManager {
     );
     if (cleanupFailed || results.some((r) => r.status === 'rejected'))
       throw Error('Webアカウントの保存に失敗しました。');
-  }
-}
-
-async function resource(
-  ses: Electron.Session,
-  raw: string,
-  origin: string,
-  limit: number,
-): Promise<{ bytes: Buffer; url: string }> {
-  let url = webUrl(raw);
-  for (let i = 0; i < 4; i++) {
-    url = webUrl(url);
-    if (new URL(url).origin !== origin) throw Error('別のoriginへの取得は許可されていません。');
-    // Session.fetch rejects manual redirects without exposing Location.
-    // Inspect ClientRequest's redirect event before issuing the next request.
-    const response = await new Promise<{ bytes?: Buffer; location?: string }>((resolve, reject) => {
-      const request = net.request({ url, session: ses, redirect: 'manual', credentials: 'omit' });
-      let settled = false;
-      const finish = (result?: { bytes?: Buffer; location?: string }) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        request.abort();
-        if (result) resolve(result);
-        else reject(Error('Web設定の取得に失敗しました。'));
-      };
-      const timer = setTimeout(() => finish(), 5000);
-      request.on('error', () => finish());
-      request.on('redirect', (_status, _method, location) => finish({ location }));
-      request.on('response', (incoming) => {
-        if (incoming.statusCode < 200 || incoming.statusCode >= 300) {
-          finish();
-          return;
-        }
-        const chunks: Buffer[] = [];
-        let size = 0;
-        incoming.on('data', (chunk: Buffer) => {
-          if (settled) return;
-          size += chunk.length;
-          if (size > limit) {
-            finish();
-            return;
-          }
-          chunks.push(chunk);
-        });
-        incoming.on('error', () => finish());
-        incoming.on('aborted', () => finish());
-        incoming.on('end', () => finish({ bytes: Buffer.concat(chunks, size) }));
-      });
-      request.end();
-    });
-    if (response.location) {
-      url = new URL(response.location, url).href;
-      continue;
-    }
-    if (!response.bytes) throw Error('取得できません。');
-    return { bytes: response.bytes, url };
-  }
-  throw Error('転送が多すぎます。');
-}
-export async function discoverWebDefaults(raw: string): Promise<WebDefaults> {
-  const url = webUrl(raw),
-    origin = new URL(url).origin;
-  const ses = session.fromPartition('web-metadata');
-  ses.setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
-  let manifestUrl: string | undefined;
-  try {
-    const page = await resource(ses, url, origin, 256000);
-    const html = page.bytes.toString('utf8');
-    for (const tag of html.match(/<link\b[^>]{0,2048}>/gi) ?? []) {
-      const attrs = Object.fromEntries(
-        [...tag.matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)].map((m) => [
-          m[1].toLowerCase(),
-          m[2] ?? m[3] ?? m[4],
-        ]),
-      );
-      if ((attrs.rel ?? '').toLowerCase().split(/\s+/).includes('manifest') && attrs.href) {
-        manifestUrl = new URL(attrs.href.replaceAll('&amp;', '&'), page.url).href;
-        break;
-      }
-    }
-    manifestUrl ??= new URL('/.well-known/appdock.json', url).href;
-    const manifest = await resource(ses, manifestUrl, origin, 64000);
-    const defaults = manifestDefaults(
-      JSON.parse(manifest.bytes.toString('utf8')),
-      manifest.url,
-      url,
-    );
-    let icon: string | undefined;
-    if (defaults.iconUrl)
-      try {
-        const { bytes } = await resource(ses, defaults.iconUrl, origin, 256000);
-        const png =
-          bytes.length >= 24 &&
-          bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-        const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-        if (!png && !jpeg) throw Error('アイコンはPNG/JPEGを指定してください。');
-        if (png && (bytes.readUInt32BE(16) > 2048 || bytes.readUInt32BE(20) > 2048))
-          throw Error('アイコンの解像度が大きすぎます。');
-        const image = nativeImage.createFromBuffer(bytes),
-          size = image.getSize();
-        if (!image.isEmpty() && size.width <= 2048 && size.height <= 2048) {
-          const data = image.resize({ width: 32, height: 32 }).toDataURL();
-          if (data.length <= 24576) icon = data;
-        }
-      } catch {}
-    return {
-      name: defaults.name,
-      url: defaults.url,
-      navigation: defaults.navigation,
-      source: defaults.source,
-      icon,
-      message: 'Web側の推奨設定を読み込みました。',
-    };
-  } catch {
-    return { message: 'Web側の設定JSONを取得できませんでした。手動で設定できます。' };
-  } finally {
-    await ses.clearStorageData();
-    await ses.clearCache();
   }
 }

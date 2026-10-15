@@ -377,12 +377,15 @@ test('command policy uses provider declarations, projects details and never acti
   native.commands.slice(0, 3).forEach((c) => {
     c.automation = true;
   });
-  const web = make('web.11111111-2222-3333-4444-555555555555', 'web', [
+  const web = make('web.11111111-2222-3333-4444-555555555555', 'node', [
     'web.11111111-2222-3333-4444-555555555555.open',
     'web.11111111-2222-3333-4444-555555555555.reload',
   ]);
   web.commands[0].automation = true;
-  web.description = 'https://secret.test';
+  web.description = 'Public page description';
+  web.collection = { owner: 'test.pages', key: 'items', itemId: 'site.one' };
+  web.url = 'https://secret.test';
+  web.settings = [{ key: 'accountId', default: 'SECRET_ACCOUNT' }];
   web.error = 'SECRET_TOKEN';
   const impostor = make('other', 'native', ['at365.gmail.open', 'other.open']);
   impostor.commands[0].automation = true;
@@ -406,6 +409,7 @@ test('command policy uses provider declarations, projects details and never acti
   const details = automationApplets(input);
   assert.ok(!JSON.stringify(details).includes('SECRET_'));
   assert.ok(!JSON.stringify(details).includes('secret.test'));
+  assert.equal(details.find((item) => item.id === web.id).description, 'Public page description');
   f.options.applets = () => automationApplets(input);
   f.options.commands = () => automationCommands(input);
   let allowed = false,

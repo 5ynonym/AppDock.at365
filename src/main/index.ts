@@ -62,8 +62,9 @@ import { parseSettings } from '../shared/settings-schema';
 import {
   getKeybindings,
   initializeExtensionDefaults,
-  initializeWebAppletDefaults,
+  initializeCollectionDefaults,
   resolveKeybindings,
+  safePageShortcut,
 } from '../shared/keybindings';
 import { ShortcutDispatcher } from './core/shortcut-dispatcher';
 import { GestureManager, type GestureInvocation } from './core/gestures';
@@ -98,8 +99,11 @@ import {
   localPageSource,
 } from './core/applet-pages';
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
-import { WebAppletManager, discoverWebDefaults } from './core/web-applets';
-import { mergeWebDefaults } from '../shared/web-applets';
+import { PageCollectionManager } from './core/page-collections';
+import { WebProfileStore } from './core/web-profiles';
+import { contained } from './core/extensions';
+import { openLocalPage, pageHostShortcut } from './core/applet-pages';
+
 import { orderApplets } from '../shared/applet-order';
 import { TypedNotifications } from './core/typed-notifications';
 import {
@@ -112,7 +116,7 @@ import { NotificationSurfaceHost } from './core/notification-surface-host';
 import { NotificationDesktopHost } from './core/notification-desktop-host';
 import { NotificationWindowsAdapter } from './core/notification-windows-adapter';
 import { NotificationSurfaceController } from './core/notification-surface-controller';
-import { webId } from '../shared/web-applets';
+
 import { AutomationService } from './core/automation';
 import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
@@ -303,17 +307,17 @@ const settingsEditing = new SettingsInputSession({
     changed();
   },
 });
-let webApplets: WebAppletManager;
-const allApplets = () => [...manager.snapshot(), ...(webApplets?.snapshot() ?? [])];
+let pageCollections: PageCollectionManager;
+const allApplets = () => [...manager.snapshot(), ...(pageCollections?.snapshot() ?? [])];
 const appletManagement = new AppletManagement({
   settings,
   applets: allApplets,
   ready: () => startupReady && !quitting,
   reconcile: async () => {
-    webApplets.reconcile();
+    pageCollections.reconcile();
     await manager.reconcile();
   },
-  restart: (id) => (webId(id) ? webApplets.restart(id) : manager.restart(id)),
+  restart: (id) => (pageCollections.find(id) ? pageCollections.restart(id) : manager.restart(id)),
 });
 const settingsCommands = new SettingsCommands({
   settings,
@@ -761,10 +765,10 @@ async function executeCommand(id: string, invocation?: GestureInvocation) {
   }
   const split = id.lastIndexOf('.');
   const web = id.slice(0, split);
-  if (webId(web))
+  if (pageCollections.find(web))
     return id.endsWith('.open')
-      ? webApplets.open(web)
-      : webApplets.navigate(web, id.slice(split + 1));
+      ? pageCollections.open(web)
+      : pageCollections.navigate(web, id.slice(split + 1));
   return manager.execute(id, invocation);
 }
 const shortcutDispatcher = new ShortcutDispatcher(
@@ -846,8 +850,8 @@ function snapshot(): HostSnapshot {
     globalHotKeys: hotKeys?.statuses ?? [],
     settings: settings.snapshot(),
     extensions: allApplets(),
-    webPages: webApplets.states(),
-    webAccounts: webApplets.accounts(),
+    webPages: pageCollections.states(),
+    webAccounts: pageCollections.accounts(),
     logs: log.entries,
     version: app.getVersion(),
     runtime: {
@@ -876,7 +880,7 @@ function refreshWindowTheme() {
 }
 function applySettings() {
   try {
-    webApplets?.reconcile();
+    pageCollections?.reconcile();
     trayClicks?.cancel();
     nativeTheme.themeSource = settings.value.host.theme;
     refreshWindowTheme();
@@ -1001,9 +1005,9 @@ async function restoreSettingsBackup() {
 function prepareSettings(value: Settings) {
   let next = parseSettings(value);
   validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
-  webApplets.validateAccounts(next.webApplets.items);
+  pageCollections.validate(next);
   validateAppletSettings(next, manager.snapshot());
-  return initializeWebAppletDefaults(next, settings.value);
+  return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
 function commitSettings(
   value: Settings,
@@ -1025,6 +1029,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     displayName: a.displayName,
     version: id === 'about' ? a.version : '',
     runtime: a.runtime,
+    collection: a.collection,
     entry: '',
     folder: '',
     state: a.state,
@@ -1045,6 +1050,8 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       applets: [
         {
           ...summary(a),
+          collection: a.collection,
+          pageCollections: a.pageCollections,
           settings: a.settings,
           settingActions: a.settingActions,
           settingSections: a.settingSections,
@@ -1052,9 +1059,12 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           startupDelaySeconds: a.startupDelaySeconds,
         },
       ],
+      accounts: a.capabilities?.includes('web-profiles')
+        ? pageCollections.profiles(a.id).accounts()
+        : [],
     };
   }
-  if (page.kind === 'web') return { accounts: host.webAccounts };
+
   if (id === 'appearance')
     return {
       applets: applets.filter((a) => a.shell).map(summary),
@@ -1114,10 +1124,10 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     return {
       accounts: host.webAccounts,
       accountReferences: {
-        saved: settings.value.webApplets.items.map(({ id, name, accountId }) => ({
+        saved: pageCollections.entries().map(({ id, item: { name, accountId } }) => ({
           id,
           name,
-          accountId,
+          accountId: accountId ?? '',
         })),
       },
     };
@@ -1169,6 +1179,17 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  if (page.kind === 'applet')
+    actions.replaceAppletList = async ([key, value, before]) => {
+      const owner = manager.items.get(page.owner!);
+      if (!owner) throw Error('Appletがありません。');
+      return settingsCommands.replaceOwnList(owner.manifest, key, value, before);
+    };
+  if (page.kind === 'applet') actions.openAppletListItem = async ([key, id]) => {
+    const item = pageCollections.entries().find((item) => item.binding.owner === page.owner && item.binding.key === key && item.item.id === id);
+    if (!item) throw Error('ページがありません。');
+    return pageCollections.open(item.id);
+  };
   const string = (v: unknown) => {
     if (typeof v !== 'string') throw Error('入力が不正です。');
     return v;
@@ -1286,14 +1307,15 @@ function settingsPageActions(
       quitHost();
     };
   }
-  if (['shortcuts', 'gestures', 'ai'].includes(page.id)) {
+  if (['shortcuts', 'gestures', 'ai'].includes(page.id) || page.kind === 'applet') {
     actions.setShortcutRecording = async ([value]) => {
       if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
       settingsRecording = value;
       shortcutRecording = value && !!window?.isFocused();
       await syncHotKeys();
     };
-    if (page.id !== 'ai') actions.retryGlobalHotKeys = async () => syncHotKeys(true);
+    if (['shortcuts', 'gestures'].includes(page.id))
+      actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
   if (['shortcuts', 'gestures', 'tray'].includes(page.id)) {
     actions.openCommandPalette = async ([request]) => {
@@ -1337,15 +1359,16 @@ function settingsPageActions(
     };
   }
   if (page.id === 'web-accounts') {
-    actions.createWebAccount = async ([name]) => webApplets.addAccount(name);
-    actions.renameWebAccount = async ([id, name]) => webApplets.renameAccount(string(id), name);
+    actions.createWebAccount = async ([name]) => pageCollections.addAccount(name);
+    actions.renameWebAccount = async ([id, name]) =>
+      pageCollections.renameAccount(string(id), name);
     actions.deleteWebAccount = async ([id]) => {
       const target = string(id);
-      if (settingsEditing.value.webApplets.items.some((a) => a.accountId === target))
+      if (pageCollections.entries().some((a) => a.item.accountId === target))
         throw Error('WebAppletがこのアカウントを使用しています。');
-      return webApplets.deleteAccount(target);
+      return pageCollections.deleteAccount(target);
     };
-    actions.clearWebAccount = async ([id]) => webApplets.clearAccount(string(id));
+    actions.clearWebAccount = async ([id]) => pageCollections.clearAccount(string(id));
   }
   if (['permissions', 'codex'].includes(page.id)) {
     actions.automation = async ([action]) => {
@@ -1424,56 +1447,6 @@ function settingsPageActions(
         });
         return result.canceled ? null : (result.filePaths[0] ?? null);
       };
-  }
-  if (page.kind === 'web') {
-    actions.importWebDefaults = async () => {
-      const before = settingsEditing.value.webApplets.items.find((a) => a.id === page.owner);
-      if (!before) throw Error('設定対象が見つかりません。');
-      const result = await discoverWebDefaults(before.url);
-      const state = settingsEditing.snapshot(),
-        value = state.value;
-      const current = value.webApplets.items.find((a) => a.id === page.owner);
-      if (!current || current.url !== before.url) throw Error('読取中に設定が変更されました。');
-      value.webApplets.items = value.webApplets.items.map((a) =>
-        a.id === page.owner ? mergeWebDefaults(current, before, result) : a,
-      );
-      await settingsEditing.act({
-        sessionId: state.sessionId,
-        editRevision: state.editRevision,
-        operationId: randomUUID(),
-        action: { type: 'values', before: settingsEditing.value, value },
-      });
-      return `${result.message} 設定へ反映しました。`;
-    };
-    actions.openWebAccounts = async () => {
-      const state = settingsEditing.snapshot();
-      await settingsEditing.act({
-        sessionId: state.sessionId,
-        editRevision: state.editRevision,
-        operationId: randomUUID(),
-        action: { type: 'select-page', pageId: 'web-accounts' },
-      });
-      navigation.navigate('settings');
-    };
-    actions.deleteWebApplet = async () => {
-      const state = settingsEditing.snapshot();
-      const value = state.value;
-      value.webApplets.items = value.webApplets.items.filter((a) => a.id !== page.owner);
-      await settingsEditing.act({
-        sessionId: state.sessionId,
-        editRevision: state.editRevision,
-        operationId: randomUUID(),
-        action: { type: 'values', before: settingsEditing.value, value },
-      });
-      const next = settingsEditing.snapshot();
-      await settingsEditing.act({
-        sessionId: next.sessionId,
-        editRevision: next.editRevision,
-        operationId: randomUUID(),
-        action: { type: 'select-page', pageId: 'appearance' },
-      });
-      navigation.navigate('extensions', undefined, 'appdock.web-manager');
-    };
   }
   return Object.fromEntries(
     Object.entries(actions).map(([key, run]) => [
@@ -1583,23 +1556,31 @@ function registerIpc() {
     if (paletteSession?.request.requestId === requestId) paletteSession.cancel('owner-disposed');
   });
   handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
-    if (webId(extensionId) && pageId === 'main') return webApplets.open(extensionId);
+    if (pageCollections.find(extensionId) && pageId === 'main')
+      return pageCollections.open(extensionId);
     const extension = manager.items.get(extensionId);
-    const page = extension?.manifest.pages?.find((page) => page.id === pageId);
+    const page = [...(extension?.manifest.pages ?? []), ...(extension?.dynamicPages ?? [])].find(
+      (page) => page.id === pageId,
+    );
     if (!page) throw Error('Appletページがありません。');
     await executeCommand(page.openCommand);
   });
   handle('dock:pageViewport', updatePageViewport);
-  handle('dock:webDefaults', discoverWebDefaults);
-  handle('dock:webNavigate', (id: string, action: string) => webApplets.navigate(id, action));
-  handle('dock:clearWebAccount', (id: string) => webApplets.clearAccount(id));
-  handle('dock:createWebAccount', (name: unknown) => webApplets.addAccount(name));
+
+  handle('dock:webNavigate', (id: string, action: string) => pageCollections.navigate(id, action));
+  handle('dock:clearWebAccount', (id: string) => pageCollections.clearAccount(id));
+  handle('dock:createWebAccount', (name: unknown) => pageCollections.addAccount(name));
   handle('dock:renameWebAccount', (id: string, name: unknown) =>
-    webApplets.renameAccount(id, name),
+    pageCollections.renameAccount(id, name),
   );
-  handle('dock:deleteWebAccount', (id: string) => webApplets.deleteAccount(id));
+  handle('dock:deleteWebAccount', (id: string) => pageCollections.deleteAccount(id));
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
+  ipcMain.handle('applet-page:call', (event, operation: unknown, input: unknown) => {
+    const source = localPageSource(event);
+    if (!source.call) throw Error('このページは操作APIに対応していません。');
+    return source.call(operation, input);
+  });
   handle('dock:chooseDirectory', async () => {
     const result = await dialog.showOpenDialog(window!, {
       title: '画像ソースフォルダーを選ぶ',
@@ -1775,6 +1756,7 @@ async function initialize() {
       settingsCommands,
       () => typedNotifications,
       (id) => shellRegistry?.ownState(id),
+      () => pageCollections,
     ),
     log: log.write,
   });
@@ -1880,14 +1862,66 @@ async function initialize() {
     (message) => log.write('error', 'hotkeys', message),
     (key) => dispatchShortcut(key, true),
   );
-  webApplets = new WebAppletManager(
-    settings,
-    dataDirectory,
+  pageCollections = new PageCollectionManager({
+    settings: () => settings.value,
+    parents: () => manager.snapshot(),
+    localRoot: dataDirectory,
+    sharedRoot: sharedDirectory,
     changed,
-    executeCommand,
-    sharedDirectory,
-    (error) => log.write('error', 'web-accounts', error.message),
-  );
+    failed: (error) => log.write('error', 'web-profiles', error.message),
+    openLocal: async (page) => {
+      const parent = manager.items.get(page.binding.owner);
+      if (!parent || parent.state !== 'running') throw Error('ページの提供元が停止しています。');
+      return openLocalPage(
+        {
+          appletId: page.id,
+          key: pageKey(page.id, 'main'),
+          title: page.item.name,
+          url: pathToFileURL(contained(parent.manifest.folder, page.definition.ui!)).href,
+          preload: path.join(__dirname, 'applet-page-preload.js'),
+          stateFile: path.join(
+            dataDirectory,
+            'pages',
+            page.binding.owner,
+            page.binding.key,
+            page.item.id,
+            'window-state.json',
+          ),
+          defaultDisplay: page.item.display,
+          partition: 'applet-page-' + page.id,
+          onLayout: () => {},
+          onCreated: (contents) =>
+            contents.on('before-input-event', (event, input) => {
+              if (safePageShortcut(input) && pageHostShortcut(input, page.id))
+                event.preventDefault();
+            }),
+        },
+        {
+          snapshot: () => ({
+            dark: nativeTheme.shouldUseDarkColors,
+            page: { id: page.item.id, context: pageCollections.find(page.id)?.item ?? {} },
+          }),
+          execute: async (id) => {
+            if (
+              typeof id !== 'string' ||
+              parent.state !== 'running' ||
+              !parent.commands.some((command) => command.id === id)
+            )
+              throw Error('自身のコマンドだけを実行できます。');
+            return executeCommand(id);
+          },
+          changed: (callback) => {
+            settings.on('changed', callback);
+            nativeTheme.on('updated', callback);
+            return () => {
+              settings.off('changed', callback);
+              nativeTheme.off('updated', callback);
+            };
+          },
+        },
+      );
+    },
+  });
   nativeInput = new NativeInput(
     path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
   );
@@ -1916,6 +1950,7 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    pageCollections.reconcile();
     ai.reconcile();
     notificationSpeech?.reconcile();
     tts.reconcile();
@@ -2331,10 +2366,10 @@ async function initialize() {
     },
     window: () => window,
     display: (key, fallback) => {
-      const web = settings.value.webApplets.items.find((item) => pageKey(item.id, 'main') === key);
-      if (web) return web.display;
+      const web = pageCollections.entries().find((entry) => pageKey(entry.id, 'main') === key);
+      if (web) return settings.value.extensions[web.id]?.pages?.main?.display ?? web.item.display;
       for (const extension of manager.items.values()) {
-        const page = extension.manifest.pages?.find(
+        const page = [...(extension.manifest.pages ?? []), ...(extension.dynamicPages ?? [])].find(
           (page) => pageKey(extension.manifest.id, page.id) === key,
         );
         if (page) return pageDisplay(settings.value, extension.manifest.id, page);
@@ -2794,7 +2829,7 @@ app.on('before-quit', (event) => {
       () => gestures?.close(),
       () => nativeInput?.close(),
       () => hotKeys?.close(),
-      () => webApplets.close(),
+      () => pageCollections.close(),
       () => manager.shutdown(),
     ]) {
       try {

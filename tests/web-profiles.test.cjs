@@ -6,7 +6,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { WebProfileStore } = require('../out/main/main/core/web-profiles');
 const { SettingsStore, defaults } = require('../out/main/main/core/settings');
-const { parseWebProfiles } = require('../out/main/shared/web-applets');
+const { parseWebProfiles } = require('../out/main/shared/web-content');
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-web-profiles-'));
@@ -32,40 +32,16 @@ function fixture() {
   fs.writeFileSync(settings.file, JSON.stringify(value));
   settings.load();
   const file = path.join(root, 'data', 'web-applets', 'accounts.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, accounts: [account] }));
   return { root, account, settings, file, value };
 }
-
-test('Legacy roster migrates once with stable account IDs and untouched login storage', () => {
-  const f = fixture();
-  try {
-    const cookies = path.join(f.root, 'data', 'web-applets', 'sessions', f.account.id, 'marker');
-    fs.mkdirSync(path.dirname(cookies), { recursive: true });
-    fs.writeFileSync(cookies, 'login-cookie-fixture');
-    const store = new WebProfileStore(f.file);
-    store.load(f.settings);
-    assert.deepEqual(store.snapshot(), [f.account]);
-    const saved = JSON.parse(fs.readFileSync(f.settings.file));
-    assert.equal(saved.webApplets.accounts, undefined);
-    assert.deepEqual(saved.webApplets.items, f.value.webApplets.items);
-    assert.equal(fs.readFileSync(cookies, 'utf8'), 'login-cookie-fixture');
-    store.rename(f.account.id, '変更した枠');
-    // An old copied settings file must not restore a removed account or old name.
-    fs.writeFileSync(f.settings.file, JSON.stringify(f.value));
-    f.settings.load();
-    const restarted = new WebProfileStore(f.file);
-    restarted.load(f.settings);
-    assert.equal(restarted.get(f.account.id).name, '変更した枠');
-    assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).webApplets.accounts, undefined);
-  } finally {
-    fs.rmSync(f.root, { recursive: true, force: true });
-  }
-});
 
 test('Immediate account operations persist independently of settings bytes/revision and restart', () => {
   const f = fixture();
   try {
     const store = new WebProfileStore(f.file);
-    store.load(f.settings);
+    store.loadStandalone(() => true);
     const before = fs.readFileSync(f.settings.file),
       revision = f.settings.revision;
     const other = store.add('仕事用');
@@ -78,7 +54,7 @@ test('Immediate account operations persist independently of settings bytes/revis
     assert.deepEqual(fs.readFileSync(f.settings.file), before);
     assert.equal(f.settings.revision, revision);
     const restarted = new WebProfileStore(f.file);
-    restarted.load(f.settings);
+    restarted.loadStandalone(() => true);
     assert.deepEqual(restarted.snapshot(), [f.account]);
     assert.throws(() => restarted.get(other.id));
     assert.throws(() => store.rename(f.account.id, ''));
@@ -92,7 +68,7 @@ test('Invalid or externally changed roster is preserved instead of overwritten',
   const f = fixture();
   try {
     const store = new WebProfileStore(f.file);
-    store.load(f.settings);
+    store.loadStandalone(() => true);
     const external = JSON.stringify({
       schemaVersion: 1,
       accounts: [{ ...f.account, name: '外部で変更' }],
@@ -102,7 +78,7 @@ test('Invalid or externally changed roster is preserved instead of overwritten',
     assert.equal(fs.readFileSync(f.file, 'utf8'), external);
     fs.writeFileSync(f.file, 'invalid account file');
     const settingsBytes = fs.readFileSync(f.settings.file);
-    assert.throws(() => new WebProfileStore(f.file).load(f.settings));
+    assert.throws(() => new WebProfileStore(f.file).loadStandalone(() => true));
     assert.equal(fs.readFileSync(f.file, 'utf8'), 'invalid account file');
     assert.deepEqual(fs.readFileSync(f.settings.file), settingsBytes);
     assert.throws(() => parseWebProfiles([f.account, f.account]));
@@ -120,7 +96,7 @@ test('Deletion persists its cleanup record and only removes the unused session d
   const f = fixture();
   try {
     const store = new WebProfileStore(f.file);
-    store.load(f.settings);
+    store.loadStandalone(() => true);
     const removed = store.add('削除する枠');
     const root = path.join(path.dirname(f.file), 'sessions');
     const target = path.join(root, removed.id);
@@ -149,7 +125,7 @@ test('Locked deletion remains tracked across restart and retries without touchin
   const f = fixture();
   try {
     const store = new WebProfileStore(f.file);
-    store.load(f.settings);
+    store.loadStandalone(() => true);
     const removed = store.add('ロックされる枠');
     const target = path.join(path.dirname(f.file), 'sessions', removed.id);
     fs.mkdirSync(target, { recursive: true });
@@ -162,7 +138,7 @@ test('Locked deletion remains tracked across restart and retries without touchin
     });
     assert.deepEqual(store.cleanupSessions([]), [removed.id]);
     const restarted = new WebProfileStore(f.file);
-    restarted.load(f.settings);
+    restarted.loadStandalone(() => true);
     assert.deepEqual(restarted.pendingDeletion(), [removed.id]);
     assert.ok(fs.existsSync(target));
     mock.mock.restore();
@@ -179,7 +155,7 @@ test('Cleanup rejects path traversal and redirected roots, and preserves files b
   const f = fixture();
   try {
     const store = new WebProfileStore(f.file);
-    store.load(f.settings);
+    store.loadStandalone(() => true);
     const removed = store.add('リンクの枠');
     store.remove(removed.id);
     const root = path.join(path.dirname(f.file), 'sessions');
@@ -204,7 +180,7 @@ test('Cleanup rejects path traversal and redirected roots, and preserves files b
       pendingDeletion: ['../outside'],
     });
     fs.writeFileSync(f.file, unsafe);
-    assert.throws(() => new WebProfileStore(f.file).load(f.settings));
+    assert.throws(() => new WebProfileStore(f.file).loadStandalone(() => true));
     assert.equal(fs.readFileSync(f.file, 'utf8'), unsafe);
     assert.equal(fs.readFileSync(path.join(outside, 'marker'), 'utf8'), 'keep');
   } finally {

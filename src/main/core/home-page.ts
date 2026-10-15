@@ -150,6 +150,7 @@ export class HomePageSession implements ShellPageController {
         description: e.description ?? '',
         state: e.state,
         runtime: e.runtime,
+        collection: !!e.collection,
         version: e.version,
         actionId: action('applet:' + e.id, { applet: e.id }),
       })),

@@ -6,7 +6,10 @@ import {
 } from '../../../src/shared/settings-ui/SettingsInput';
 import { settingsControls } from '../../../src/shared/settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
-import type { WebApplet, WebProfile } from '../../../src/shared/web-applets';
+import type {
+  RemotePageDefinition as WebApplet,
+  WebProfile,
+} from '../../../src/shared/web-content';
 
 function AccountRow({
   account,
@@ -114,7 +117,7 @@ export function WebAccountSettings({
   savedItems,
 }: {
   accounts: WebProfile[];
-  savedItems: WebApplet[];
+  savedItems: Pick<WebApplet, 'id' | 'name' | 'accountId'>[];
 }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);

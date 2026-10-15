@@ -71,7 +71,7 @@ export interface SettingsPageAuxiliary {
   updates?: HostSnapshot['updates'];
   accounts?: HostSnapshot['webAccounts'];
   accountReferences?: {
-    saved: Pick<Settings['webApplets']['items'][number], 'id' | 'name' | 'accountId'>[];
+    saved: { id: string; name: string; accountId: string }[];
   };
   permissions?: HostSnapshot['appletApi'];
   avatarUrl?: string | null;

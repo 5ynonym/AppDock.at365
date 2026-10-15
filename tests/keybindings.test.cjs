@@ -9,7 +9,7 @@ const {
   safePageShortcut,
   parseKeybindingDefaults,
   initializeExtensionDefaults,
-  initializeWebAppletDefaults,
+  initializeCollectionDefaults,
   resetAppletKeybindings,
   moveKeybindingWithinKey,
   keybindingGroups,
@@ -228,7 +228,10 @@ test('Applet manifest defaults are scoped to declared commands and applied only 
     false,
   );
 });
-test('new WebApplets copy current template without changing existing bindings', () => {
+test('new collection pages copy current template without changing existing bindings', () => {
+  const parent = require('../../Applet.WebApplet.at365/extension.json');
+  const initializeWebAppletDefaults = (value, prior) =>
+    initializeCollectionDefaults(value, prior, [parent]);
   const previous = createDefaultSettings();
   const oldId = 'web.00000000-0000-0000-0000-000000000001';
   const newId = 'web.00000000-0000-0000-0000-000000000002';
@@ -243,12 +246,25 @@ test('new WebApplets copy current template without changing existing bindings', 
     allowedOrigins: [],
     icon: '',
   });
-  previous.webApplets.items = [makeItem(oldId)];
+  const previousItems = [makeItem(oldId)];
+  previous.migrations = { webApplet: { version: 1, owner: parent.id, ids: [oldId, newId] } };
+  previous.extensions[parent.id] = {
+    enabled: true,
+    settings: {
+      items: previousItems,
+      shortcutDefaults: structuredClone(
+        parent.settings.find((f) => f.key === 'shortcutDefaults').default,
+      ),
+    },
+  };
   const changed = structuredClone(previous);
-  changed.webApplets.items.push(makeItem(newId));
-  changed.webApplets.shortcutDefaults[0].key = 'Ctrl+F5';
-  changed.webApplets.shortcutDefaults[1].enabled = false;
-  changed.webApplets.shortcutDefaults[2].when = { scope: 'applets', appletIds: ['test.defaults'] };
+  changed.extensions[parent.id].settings.items.push(makeItem(newId));
+  changed.extensions[parent.id].settings.shortcutDefaults[0].key = 'Ctrl+F5';
+  changed.extensions[parent.id].settings.shortcutDefaults[1].enabled = false;
+  changed.extensions[parent.id].settings.shortcutDefaults[2].when = {
+    scope: 'applets',
+    appletIds: ['test.defaults'],
+  };
   const result = initializeWebAppletDefaults(changed, previous);
   assert.equal(
     getKeybindings(result).some((r) => r.command.startsWith(oldId + '.')),

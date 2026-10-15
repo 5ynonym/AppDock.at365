@@ -47,7 +47,7 @@ export function SettingsPageLayout({
   const description =
     page.kind === 'host'
       ? descriptions[page.id]
-      : page.kind === 'web'
+      : page.collection
         ? '表示方法・アカウント・サイトの動作を設定します。'
         : 'Appletの表示方法・起動時の動作と、個別の設定を変更します。';
   return (

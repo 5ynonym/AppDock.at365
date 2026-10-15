@@ -10,16 +10,12 @@ export function AppletIndex({
   onSelect,
   editor,
   busy,
-  onWebManager,
-  webManagerSelected,
 }: {
   applets: ExtensionSnapshot[];
   selected?: string;
   onSelect(id: string): void;
   editor: SettingsEditor;
   busy: boolean;
-  onWebManager(): void;
-  webManagerSelected: boolean;
 }) {
   const [search, setSearch] = useState('');
   const [reordering, setReordering] = useState(false);
@@ -77,18 +73,6 @@ export function AppletIndex({
         </div>
       )}
       <div className={`sidebar-extensions${reordering ? ' reordering' : ''}`}>
-        {!reordering && (!search || 'WebApplet'.toLowerCase().includes(search.toLowerCase())) && (
-          <div className="applet-index-row">
-            <button
-              className={`applet-select${webManagerSelected ? ' selected' : ''}`}
-              onClick={onWebManager}
-              aria-current={webManagerSelected ? 'true' : undefined}
-            >
-              <span title="WebApplet">WebApplet</span>
-              <small>組み込み</small>
-            </button>
-          </div>
-        )}
         {filtered.map((applet, index) => (
           <div
             key={applet.id}

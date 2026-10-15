@@ -62,7 +62,7 @@ const api: DockApi = {
     ipcRenderer.on('dock:flushSettingsInputs', listener);
     return () => ipcRenderer.removeListener('dock:flushSettingsInputs', listener);
   },
-  webDefaults: (url) => ipcRenderer.invoke('dock:webDefaults', url),
+
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
   clearWebAccount: (id) => ipcRenderer.invoke('dock:clearWebAccount', id),
   createWebAccount: (name) => ipcRenderer.invoke('dock:createWebAccount', name),

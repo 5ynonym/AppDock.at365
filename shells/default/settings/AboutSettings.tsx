@@ -25,7 +25,7 @@ export function AboutSettings({
   busy: boolean;
 }) {
   const updates = useUpdateState();
-  const applets = extensions.filter((extension) => extension.runtime !== 'web');
+  const applets = extensions.filter((extension) => !extension.collection);
   return (
     <section className="settings-sections about-page" aria-label="バージョン情報・更新">
       <UpdateActions appletCount={applets.length} />
@@ -50,7 +50,7 @@ export function AboutSettings({
         {...settingAnchor('about', 'updateSource')}
       >
         {!applets.length && (
-          <p>個別に更新するAppletはありません。WebAppletは本体と一緒に管理されます。</p>
+          <p>個別に更新するAppletはありません。ページは提供元のAppletと一緒に管理されます。</p>
         )}
         <div className="about-applets">
           {applets.map((extension) => (

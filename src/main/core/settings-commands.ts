@@ -13,7 +13,7 @@ import {
 import { validateSettingValue } from '../../shared/setting-definitions';
 import type { SettingsStore } from './settings';
 import type { AutomationCommand } from './automation-commands';
-import { applyWebAppletPublicSettings, webId } from '../../shared/web-applets';
+import { collectionRecord } from '../../shared/page-collections';
 
 export class SettingsCommandError extends Error {
   constructor(
@@ -26,6 +26,7 @@ export class SettingsCommandError extends Error {
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 interface Owner {
+  collection?: import('../../shared/page-collections').CollectionBinding;
   id: string;
   title: string;
   fields: SettingDefinition[];
@@ -45,6 +46,7 @@ export class SettingsCommands {
     return [
       { id: 'appdock', title: 'AppDock', fields: hostSettingDefinitions, available: true },
       ...this.options.applets().map((a) => ({
+        collection: a.collection,
         id: a.id,
         title: a.displayName,
         fields: a.settings ?? [],
@@ -64,7 +66,23 @@ export class SettingsCommands {
     const store = this.options.settings;
     const next = structuredClone(store.value);
     this.applyAppletChanges(next, owner.id, changes);
-    store.save(next, store.revision);
+    this.options.save(next, store.revision);
+  }
+  replaceOwnList(
+    owner: { id: string; settings?: SettingDefinition[] },
+    key: unknown,
+    value: unknown,
+    before: unknown,
+  ) {
+    const field = owner.settings?.find(
+      (field) => field.key === key && field.type === 'object-list' && field.list,
+    );
+    if (!field) throw Error('一覧設定の宣言がありません。');
+    const current =
+      this.options.settings.value.extensions[owner.id]?.settings[field.key] ?? field.default ?? [];
+    if (JSON.stringify(current) !== JSON.stringify(before))
+      throw Error('一覧が別の場所で変更されました。閉じて開き直してください。');
+    this.setOwnSetting(owner, field.key, value);
   }
   private validateChanges(
     fields: SettingDefinition[],
@@ -102,8 +120,8 @@ export class SettingsCommands {
     const saved: Record<string, unknown> =
       owner.id === 'appdock'
         ? { ...settings.host }
-        : webId(owner.id)
-          ? { ...settings.webApplets.items.find((a) => a.id === owner.id) }
+        : owner.collection
+          ? { ...collectionRecord(settings, owner.collection) }
           : (settings.extensions[owner.id]?.settings ?? {});
     return Object.fromEntries(
       fields.map((f) => [f.key, Object.hasOwn(saved, f.key) ? saved[f.key] : f.default]),
@@ -252,7 +270,7 @@ export class SettingsCommands {
       throw new SettingsCommandError('REVISION_CONFLICT', '設定を再取得してください。');
   }
   private applies(owner: string, key: string) {
-    if (webId(owner)) return 'immediate';
+    if (this.options.applets().some((a) => a.id === owner && a.collection)) return 'immediate';
     return owner === 'appdock'
       ? ({ closeToTray: 'nextClose', startMinimized: 'nextStart' }[key] ?? 'immediate')
       : 'settingsChanged';
@@ -280,16 +298,19 @@ export class SettingsCommands {
       next = structuredClone(store.value);
     const before = this.values(owner, store.value, fields);
     if (owner.id === 'appdock') Object.assign(next.host, changes);
-    else if (webId(owner.id)) {
-      const item = next.webApplets.items.find((a) => a.id === owner.id);
+    else if (owner.collection) {
+      const item = collectionRecord(next, owner.collection);
       if (!item?.enabled)
-        throw new SettingsCommandError('UNAVAILABLE', 'WebAppletが有効である必要があります。');
+        throw new SettingsCommandError('UNAVAILABLE', 'ページが有効である必要があります。');
       try {
-        applyWebAppletPublicSettings(item, changes);
+        Object.assign(item, changes);
+        if (typeof item.name === 'string') item.name = item.name.trim();
+        if (!item.name || item.name.length > 80 || /[\x00-\x1f\x7f]/.test(item.name))
+          throw Error('ページ名が不正です。');
       } catch {
         throw new SettingsCommandError(
           'INVALID_ARGUMENT',
-          '公開されたWebApplet設定の値を確認してください。',
+          '公開されたページ設定の値を確認してください。',
         );
       }
     } else {

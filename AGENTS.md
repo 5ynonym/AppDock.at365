@@ -63,7 +63,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 ## WebとApplet
 
 - [WebApplet](docs/web-applets.md)と[WebアカウントAPI](docs/web-accounts.md)の保存領域・認証・表示寿命を区別する。リモートページへpreload/Node/ホストIPCを渡さない。提供JSONは検証した初期値だけを取り込み、手動変更・権限を上書きしない。
-- WebAppletの追加/削除/初期ショートカットは一覧内の組み込み管理項目で行う。個別サイトのID・設定・リボンを保持し、組み込み管理項目をruntimeや更新対象へ混ぜない。公開設定・コマンドは提供元の宣言に従う。
+- WebAppletの追加/削除/初期ショートカットは独立したApplet.WebApplet.at365の管理画面と本体の宣言型一覧設定から操作する。一覧は共通部品を使い、追加/編集はダイアログで確定する。個別サイトは汎用pageCollectionsとしてID・設定・リボンを保持し、親Appletだけをruntimeと更新対象にする。公開設定・コマンドは提供元の宣言に従う。
 - Webアカウントは別ファイルへ即時保存する。名前のblur/Enter確定・Escape取消・IME/重複送信防止、削除/クリアの警告と参照中ガードを維持する。削除待ちsessionは検証済み専用root内で次回起動時に回収し、Gmail・別枠・外部リンク先を削除しない。
 - 表示先切替でWebContents/session/入力を再生成しない。非選択/非表示でも背景描画を維持する。rAF・visibilityState・observer.readyやPlaywrightのfocus emulationだけで実受信成功と扱わず、通常起動の描画/取得を確認する。
 - keepActiveの遷移/破棄時解除、native focusの優先、Debugger接続の冪等回収を維持する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。

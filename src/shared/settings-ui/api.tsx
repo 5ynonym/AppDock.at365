@@ -16,7 +16,6 @@ export type SettingsControlsApi = Pick<
   | 'renameWebAccount'
   | 'deleteWebAccount'
   | 'clearWebAccount'
-  | 'webDefaults'
   | 'chooseDirectory'
   | 'setAppletApiPermissions'
   | 'automation'

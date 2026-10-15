@@ -192,11 +192,7 @@ function App() {
             <p>{e.description}</p>
             <div className="card-bottom">
               <span>
-                {e.runtime === 'web'
-                  ? 'WebApplet'
-                  : e.runtime === 'node'
-                    ? 'TypeScript'
-                    : '.NET 10'}
+                {!!e.collection ? 'Appletページ' : e.runtime === 'node' ? 'TypeScript' : '.NET 10'}
                 <span className="divider">/</span>v{e.version}
               </span>
               <Icon name="arrow" size={16} />

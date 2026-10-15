@@ -7,6 +7,7 @@ import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { SettingsSection, SettingsField } from './SettingsSections';
 import { ShortcutListSetting } from './ShortcutListSetting';
 import { ObjectListSetting } from './ObjectListSetting';
+import { ObjectListDialogSetting } from './ObjectListDialogSetting';
 import { settingsControls } from './api';
 
 /** Shared manifest-driven body for the settings index and Applet detail tab. */
@@ -14,10 +15,20 @@ export function AppletSettingsForm({
   applet,
   settings,
   onChange,
+  onListCommit,
+  onListOpen,
+  accounts = [],
 }: {
   applet: ExtensionSnapshot;
   settings: Settings;
   onChange(value: Settings): void;
+  onListOpen?(key: string, id: unknown): Promise<unknown>;
+  onListCommit?(
+    key: string,
+    value: Record<string, unknown>[],
+    before: Record<string, unknown>[],
+  ): Promise<unknown>;
+  accounts?: { id: string; name: string }[];
 }) {
   const pageId = appletSettingsPageId(applet.id);
   const executing = useRef(false);
@@ -99,7 +110,22 @@ export function AppletSettingsForm({
         className={wide ? 'settings-field-wide' : ''}
         {...settingAnchor(pageId, `setting:${item.key}`)}
       >
-        {item.type === 'object-list' ? (
+        {item.type === 'object-list' && item.list && onListCommit ? (
+          <ObjectListDialogSetting
+            definition={item}
+            value={value}
+            onOpen={applet.pageCollections?.some((c) => c.key === item.key) && onListOpen ? (entry) => onListOpen(item.key, entry.id) : undefined}
+            options={Object.fromEntries(
+              (item.fields ?? [])
+                .filter((field) => field.optionSource === 'web-profiles')
+                .map((field) => [
+                  field.key,
+                  accounts.map((account) => ({ value: account.id, label: account.name })),
+                ]),
+            )}
+            onCommit={(next, before) => onListCommit(item.key, next, before)}
+          />
+        ) : item.type === 'object-list' ? (
           <ObjectListSetting definition={item} value={value} onChange={set} />
         ) : item.type === 'shortcut-list' ? (
           <ShortcutListSetting title={item.title} value={value} onChange={set} />
@@ -182,7 +208,7 @@ export function AppletSettingsForm({
           <p>個別の設定項目はありません。操作キーは本体の「ショートカット」で設定できます。</p>
         </SettingsSection>
       )}
-      {!!applet.pages?.length && (
+      {!applet.collection && !!applet.pages?.length && (
         <SettingsSection
           title="ページの表示"
           description="Appletのページをどこに表示するか選びます。"
@@ -214,29 +240,31 @@ export function AppletSettingsForm({
           ))}
         </SettingsSection>
       )}
-      <SettingsSection title="起動" description="AppDockを起動したときの動作です。">
-        <SettingsField
-          title="開始までの秒数"
-          description={appletCommonDescriptions.startupDelaySeconds}
-          {...settingAnchor(pageId, 'startupDelaySeconds')}
-        >
-          <SettingsInput
-            aria-label="開始までの秒数"
-            type="number"
-            min={0}
-            max={86400}
-            step={1}
-            value={current.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0}
-            onChange={(e) =>
-              update({
-                ...current,
-                startupDelaySeconds:
-                  e.target.value === '' ? ('' as unknown as number) : numberInput(e.target.value),
-              })
-            }
-          />
-        </SettingsField>
-      </SettingsSection>
+      {!applet.collection && (
+        <SettingsSection title="起動" description="AppDockを起動したときの動作です。">
+          <SettingsField
+            title="開始までの秒数"
+            description={appletCommonDescriptions.startupDelaySeconds}
+            {...settingAnchor(pageId, 'startupDelaySeconds')}
+          >
+            <SettingsInput
+              aria-label="開始までの秒数"
+              type="number"
+              min={0}
+              max={86400}
+              step={1}
+              value={current.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0}
+              onChange={(e) =>
+                update({
+                  ...current,
+                  startupDelaySeconds:
+                    e.target.value === '' ? ('' as unknown as number) : numberInput(e.target.value),
+                })
+              }
+            />
+          </SettingsField>
+        </SettingsSection>
+      )}
     </div>
   );
 }

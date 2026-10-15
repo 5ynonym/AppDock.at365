@@ -19,7 +19,28 @@ export interface NodeExtensionContext {
     onChanged(handler: (state: OwnShellState) => unknown | Promise<unknown>): () => void;
   };
   appdock: AppDockClient;
-  pages: { open(id: string): Promise<unknown> };
+  pages: {
+    open(id: string): Promise<unknown>;
+    openItem(id: string): Promise<unknown>;
+    hide(id: string): Promise<unknown>;
+    dispose(id: string): Promise<unknown>;
+    list(): Promise<{
+      revision: number;
+      pages: import('../shared/dynamic-pages').DynamicPageDefinition[];
+    }>;
+    replace(
+      pages: Omit<import('../shared/dynamic-pages').DynamicPageDefinition, 'openCommand'>[],
+      expectedRevision: number,
+    ): Promise<{ revision: number }>;
+  };
+  webProfiles: {
+    list(): Promise<import('../shared/web-content').WebProfile[]>;
+    add(name: string): Promise<unknown>;
+    rename(id: string, name: string): Promise<unknown>;
+    clear(id: string): Promise<unknown>;
+    delete(id: string): Promise<unknown>;
+  };
+  images: { normalize(bytes: number[]): Promise<string> };
   webAccounts: {
     start(): Promise<unknown>;
     open(): Promise<unknown>;
@@ -74,6 +95,7 @@ export interface NodeExtension {
   activate(context: NodeExtensionContext): Promise<void>;
   deactivate?(): Promise<void>;
   onPanelAction?(actionId: string): Promise<void>;
+  onPageAction?(actionId: string, input: Record<string, unknown>, pageId: string): Promise<unknown>;
 }
 const commands: (Command & { handler: Handler })[] = [];
 const tray: TrayItem[] = [];
@@ -112,7 +134,33 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             ...(execution.getStore()?.id ? { executionId: execution.getStore()!.id } : {}),
           }),
         ),
-        pages: { open: (id) => peer.request('host.pages.open', { id }) },
+        pages: {
+          open: (id) => peer.request('host.pages.open', { id }),
+          openItem: (id) => peer.request('host.pages.openItem', { id }),
+          hide: (id) => peer.request('host.pages.hide', { id }),
+          dispose: (id) => peer.request('host.pages.dispose', { id }),
+          list: () =>
+            peer.request('host.pages.list', {}) as ReturnType<
+              NodeExtensionContext['pages']['list']
+            >,
+          replace: (pages, expectedRevision) =>
+            peer.request('host.pages.replace', { pages, expectedRevision }) as Promise<{
+              revision: number;
+            }>,
+        },
+        webProfiles: {
+          list: () =>
+            peer.request('host.webProfiles.list', {}) as Promise<
+              import('../shared/web-content').WebProfile[]
+            >,
+          add: (name) => peer.request('host.webProfiles.add', { name }),
+          rename: (id, name) => peer.request('host.webProfiles.rename', { id, name }),
+          clear: (id) => peer.request('host.webProfiles.clear', { id }),
+          delete: (id) => peer.request('host.webProfiles.delete', { id }),
+        },
+        images: {
+          normalize: (bytes) => peer.request('host.images.normalize', { bytes }) as Promise<string>,
+        },
         webAccounts: {
           start: () => peer.request('host.webAccounts.start', {}),
           open: () => peer.request('host.webAccounts.open', {}),
@@ -238,6 +286,9 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         if (entry.session === p.session) entry.controller.abort();
       return null;
     }
+    case 'page.action':
+      if (!extension?.onPageAction) throw Error('ページ操作は提供されていません。');
+      return extension.onPageAction(p.id, p.input, p.pageId);
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
       await extension.onPanelAction(p.id);

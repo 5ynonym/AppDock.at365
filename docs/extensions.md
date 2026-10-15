@@ -320,3 +320,7 @@ native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.Output
 最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
 
 AIの文章生成は最低ホスト版0.37.0。既存context.appdock.call / context.AppDock.CallAsyncからai.text.generate等を利用できます。appdock-api capabilityと独立したuseAi許可が必要です。[モデル・追加プロンプトの指定とジョブAPI](ai.md#共通api)を参照してください。
+
+### 宣言型の一覧編集
+
+`object-list`の`list`指定で、読み取り用の表・アイコン操作・有効トグルと追加/編集ダイアログを自動生成できます。最低ホスト版は0.45.0です。列、識別子、入れ子フィールド、保存の競合検査は[一覧形式の設定編集UI](settings-list-editing.md#appletの一覧宣言)を参照してください。

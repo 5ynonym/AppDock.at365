@@ -1,21 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { atomicWrite, type SettingsStore } from './settings';
+import { atomicWrite } from './settings';
 import { observeFile } from './file-observer';
 import {
   parseWebProfiles,
   profileId,
   webProfileName,
   type WebProfile,
-} from '../../shared/web-applets';
+} from '../../shared/web-content';
 
 /** Account operations own their file and never change the settings revision. */
 export class WebProfileStore {
   private value: WebProfile[] = [];
   private pending: string[] = [];
   private observer?: ReturnType<typeof observeFile>;
-  private settings?: SettingsStore;
+  private referenced?: () => boolean;
   constructor(
     readonly file: string,
     private localDirectory?: string,
@@ -46,28 +46,13 @@ export class WebProfileStore {
       throw Error('Webアカウントの削除待ち記録が不正です。');
     return { accounts, pendingDeletion: pending as string[] };
   }
-  load(settings: SettingsStore) {
-    this.settings = settings;
-    fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    const legacy = settings.recovered
-      ? undefined
-      : JSON.parse(fs.readFileSync(settings.file, 'utf8').replace(/^\uFEFF/, ''))?.webApplets
-          ?.accounts;
+  loadStandalone(referenced: () => boolean) {
+    this.referenced = referenced;
     if (fs.existsSync(this.file)) {
       const saved = this.read();
       this.value = saved.accounts;
       this.pending = saved.pendingDeletion;
-    } else if (legacy !== undefined) {
-      const migrated = parseWebProfiles(legacy ?? []);
-      atomicWrite(
-        this.file,
-        JSON.stringify({ schemaVersion: 1, accounts: migrated }, null, 2) + '\n',
-      );
-      this.value = migrated;
     }
-    // Only remove legacy metadata after the new file is successfully written.
-    // Existing account IDs/session directories are not moved or recreated.
-    if (legacy !== undefined) settings.save(settings.value, settings.revision);
   }
   watch(changed: () => void, failed: (error: Error) => void) {
     this.observer = observeFile(
@@ -96,11 +81,7 @@ export class WebProfileStore {
     return { ...result };
   }
   private unchanged(allowEmptyInitialization = false) {
-    if (
-      !allowEmptyInitialization &&
-      !fs.existsSync(this.file) &&
-      this.settings?.value.webApplets.items.length
-    )
+    if (!allowEmptyInitialization && !fs.existsSync(this.file) && this.referenced?.())
       throw Error('Webアカウント一覧の同期を待っています。枠が届いてから操作してください。');
     if (
       JSON.stringify(this.read()) !==

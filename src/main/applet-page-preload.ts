@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('appletPage', {
   snapshot: () => ipcRenderer.invoke('applet-page:snapshot'),
   executeCommand: (id: string) => ipcRenderer.invoke('applet-page:execute', id),
+  call: (operation: string, input: unknown = {}) =>
+    ipcRenderer.invoke('applet-page:call', operation, input),
   onChanged: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('applet-page:changed', handler);
