@@ -83,6 +83,7 @@ export class AutomationService {
       audit?(level: string, message: string): void;
       writeClipboard?(value: string): void;
       failed?(code: string, message: string): void;
+      informed?(message: string): void;
     },
   ) {
     this.id =
@@ -563,9 +564,22 @@ export class AutomationService {
           throw Error('対応していない連携操作です。');
       }
       this.options.changed();
+      if (message && message !== this.error) {
+        try {
+          this.options.informed?.(message);
+        } catch {
+          /* Reporting preserves the result. */
+        }
+      }
       return { state: this.state(), message };
     } catch (e) {
       this.restoreSaved();
+      if (action.kind === 'test') {
+        const message =
+          'AppDock内の疎通を確認できませんでした。連携が有効でMCPが稼働中かを確認して、もう一度接続テストを実行してください。';
+        this.reportFailure('MCP_CONNECTION_TEST_FAILED', message);
+        throw Error(message);
+      }
       if (e instanceof AutomationStorageError) this.reportFailure('MCP_SAVE_FAILED', e.message);
       // Never echo credentials or raw TOML in an IPC error.
       if (e instanceof Error && !/Bearer |authorization|token =/i.test(e.message)) throw e;

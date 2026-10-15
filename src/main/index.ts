@@ -118,6 +118,7 @@ import { NotificationWindowsAdapter } from './core/notification-windows-adapter'
 import { NotificationSurfaceController } from './core/notification-surface-controller';
 
 import { AutomationService } from './core/automation';
+import { InformationReporter } from './core/information-reporter';
 import { AppDockApi, AutomationError } from './core/appdock-api';
 import { TtsService } from './core/tts-service';
 import { AiService } from './core/ai-service';
@@ -425,6 +426,13 @@ const warnings = new WarningReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('warning', source, message),
 });
+const information = new InformationReporter({
+  notifications: () => (quitting ? undefined : typedNotifications),
+  log: (source, message) => log.write('info', source, message),
+});
+function commandCompleted() {
+  information.report('commands', 'コマンド実行', 'コマンドを実行しました。');
+}
 let legacyLocalData: LegacyLocalDataMonitor | undefined;
 const ai = new AiService({
   settings: () => settings.value.ai ?? defaultAiSettings(),
@@ -737,8 +745,10 @@ function openCommandPalette(request: CommandPaletteRequest) {
   overlayHost.open(session);
   return session.result
     .then((result) => {
-      if (result.status === 'executed' && window && !window.isDestroyed())
-        window.webContents.send('dock:paletteExecuted');
+      if (result.status === 'executed') {
+        commandCompleted();
+        if (window && !window.isDestroyed()) window.webContents.send('dock:paletteExecuted');
+      }
       return result;
     })
     .finally(() => {
@@ -1187,11 +1197,17 @@ function settingsPageActions(
       if (!owner) throw Error('Appletがありません。');
       return settingsCommands.replaceOwnList(owner.manifest, key, value, before);
     };
-  if (page.kind === 'applet') actions.openAppletListItem = async ([key, id]) => {
-    const item = pageCollections.entries().find((item) => item.binding.owner === page.owner && item.binding.key === key && item.item.id === id);
-    if (!item) throw Error('ページがありません。');
-    return pageCollections.open(item.id);
-  };
+  if (page.kind === 'applet')
+    actions.openAppletListItem = async ([key, id]) => {
+      const item = pageCollections
+        .entries()
+        .find(
+          (item) =>
+            item.binding.owner === page.owner && item.binding.key === key && item.item.id === id,
+        );
+      if (!item) throw Error('ページがありません。');
+      return pageCollections.open(item.id);
+    };
   const string = (v: unknown) => {
     if (typeof v !== 'string') throw Error('入力が不正です。');
     return v;
@@ -1235,6 +1251,11 @@ function settingsPageActions(
       notificationSpeech?.reconcile(true);
       tts.reconcile(true);
       changed();
+      information.report(
+        'tts',
+        '読み上げ設定',
+        value ? 'APIキーをこのPCに保存しました。' : 'APIキーを削除しました。',
+      );
     };
     actions.ttsVoices = async () => tts.voices('host');
     actions.ttsModels = async () => tts.models('host');
@@ -1242,11 +1263,15 @@ function settingsPageActions(
       const job = tts.speak('host', { text, requestId });
       previewJobs.add(job.jobId as string);
       while (previewJobs.size > 512) previewJobs.delete(previewJobs.values().next().value!);
+      information.report('tts', '読み上げ', '読み上げを受け付けました。', job.jobId as string);
       return job;
     };
     actions.ttsStop = async () => {
       notificationSpeech?.stopAll();
       await tts.stopAll();
+      information.report('tts', '読み上げ', '読み上げを停止しました。');
+      // The stop receipt must not start another spoken notification.
+      notificationSpeech?.stopAll();
     };
   }
   if (page.id === 'notifications') {
@@ -1419,6 +1444,7 @@ function settingsPageActions(
         tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
         changed();
+        information.report('permissions', '操作許可', 'このPCに保存しました。');
       };
   }
   if (page.kind === 'applet') {
@@ -1456,7 +1482,19 @@ function settingsPageActions(
       key,
       async (args: unknown[]) => {
         if (!startupReady || quitting) throw Error('AppDockは準備中です。');
-        return run(args);
+        const result = await run(args);
+        const accountMessages: Record<string, string> = {
+          createWebAccount: 'アカウント枠を追加しました。',
+          renameWebAccount: 'アカウント名を変更しました。',
+          deleteWebAccount:
+            result === 'deferred'
+              ? 'アカウント枠を削除しました。残る保存ファイルは次回起動時に自動で片づけます。'
+              : 'アカウント枠と保存データを削除しました。',
+          clearWebAccount: 'ログイン情報とサイトデータをクリアしました。',
+        };
+        if (page.id === 'web-accounts' && accountMessages[key] && result !== false)
+          information.report('web-accounts', 'Webアカウント', accountMessages[key]);
+        return result;
       },
     ]),
   );
@@ -1621,11 +1659,13 @@ function registerIpc() {
       throw new Error('開始待ちのAppletが見つかりません。');
     return manager.restart(id, true);
   });
-  handle('dock:dispatchShortcut', (key: unknown) => {
+  handle('dock:dispatchShortcut', async (key: unknown) => {
     if (!window?.isFocused()) return;
     const normalized = normalizeShortcut(key);
     if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
-    return dispatchShortcut(normalized);
+    const result = await dispatchShortcut(normalized);
+    if (result?.executed && !result.failed) commandCompleted();
+    return result;
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:setShortcutRecording', async (recording: boolean) => {
@@ -1670,8 +1710,13 @@ function registerIpc() {
   });
   handle('dock:restartExtension', async (id: string) => {
     await appletManagement.run(id, 'restart');
+    information.report('applets', 'Applet', 'Appletを再起動しました。');
   });
-  handle('dock:executeCommand', (id: string) => executeCommand(id));
+  handle('dock:executeCommand', async (id: string) => {
+    const result = await executeCommand(id);
+    commandCompleted();
+    return result;
+  });
   handle('dock:executePanelAction', (id: string, actionId: string) =>
     manager.executePanelAction(id, actionId),
   );
@@ -1821,6 +1866,25 @@ async function initialize() {
     stateDirectory: dataDirectory,
     fetcher: net.fetch,
     changed,
+    notified: (notice, message) => {
+      if (notice.kind === 'error') {
+        errors.report({
+          eventId: notice.id,
+          source: 'updates',
+          title: '更新処理に失敗しました',
+          code: 'UPDATE_OPERATION_FAILED',
+          message,
+        });
+      } else {
+        information.report('updates', '更新のお知らせ', message, notice.id, [
+          {
+            key: 'details',
+            label: '更新画面を開く',
+            run: () => executeCommand('appdock.updates.open'),
+          },
+        ]);
+      }
+    },
     confirm: async (names) => {
       const response = await dialog.showMessageBox(window!, {
         type: 'question',
@@ -2279,6 +2343,7 @@ async function initialize() {
     execute: executeCommand,
     changed,
     completed: (result) => {
+      if (result.message) commandCompleted();
       if (!quitting && window && !window.isDestroyed() && navigation.state.route !== 'home')
         window.webContents.send('dock:homeCommandResult', result);
     },
@@ -2578,6 +2643,7 @@ async function initialize() {
     },
     audit: (level, message) => log.write(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),
+    informed: (message) => information.report('automation', 'Codex連携', message),
     failed: (code, message) =>
       errors.report({
         eventId: randomUUID(),
@@ -2604,7 +2670,16 @@ async function initialize() {
           openDetails: () => executeCommand('appdock.updates.open'),
           warn: (message) => log.write('warn', 'updates', message),
         });
-      } else updater.state.completion = { ok: false, message: String(result.message) };
+      } else {
+        updater.state.completion = { ok: false, message: String(result.message) };
+        errors.report({
+          eventId: randomUUID(),
+          source: 'updates',
+          title: '更新適用に失敗しました',
+          code: 'UPDATE_APPLY_FAILED',
+          message: '更新の適用を完了できませんでした。更新画面とログで結果を確認してください。',
+        });
+      }
       log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
       const temporary =
         typeof result.temporaryDirectory === 'string'

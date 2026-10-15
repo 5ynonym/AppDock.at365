@@ -189,6 +189,7 @@ export class PortableUpdates {
       stateDirectory?: string;
       fetcher?: Fetcher;
       changed(): void;
+      notified?(notice: NonNullable<UpdateState['notice']>, safeMessage: string): void;
       confirm(names: string[]): Promise<boolean>;
       shutdown(): void;
       processIds(): number[];
@@ -332,8 +333,22 @@ export class PortableUpdates {
     this.state.phase = phase;
     this.options.changed();
   }
-  private notice(kind: NonNullable<UpdateState['notice']>['kind'], message: string) {
+  private notice(
+    kind: NonNullable<UpdateState['notice']>['kind'],
+    message: string,
+    safeMessage = message,
+  ) {
     this.state.notice = { id: randomUUID(), kind, message };
+    try {
+      this.options.notified?.(
+        this.state.notice,
+        kind === 'error'
+          ? '更新処理を完了できませんでした。更新画面で対象と結果を確認して、もう一度実行してください。'
+          : safeMessage,
+      );
+    } catch {
+      /* Preserve update outcome. */
+    }
   }
   private checkedNotice(results: UpdateResult[]) {
     const available = results.filter((result) => result.status === 'available');
@@ -356,6 +371,7 @@ export class PortableUpdates {
       this.notice(
         'available',
         `${updates}${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
+        `${available.length}件の更新があります。${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
       );
     else if (skipped.length)
       this.notice(

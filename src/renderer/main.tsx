@@ -123,7 +123,6 @@ function App() {
   const openingRestoredPage = useRef(false);
   const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
   const openPalette = () =>
     window.dock
       .openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' })
@@ -235,11 +234,9 @@ function App() {
       void execute(id);
     });
   }, []);
-  useEffect(() => window.dock.onPaletteExecuted(() => setToast('コマンドを実行しました。')), []);
   useEffect(
     () =>
-      window.dock.onHomeCommandResult(({ message, error }) => {
-        if (message) setToast(message);
+      window.dock.onHomeCommandResult(({ error }) => {
         if (error) setError(error);
       }),
     [],
@@ -347,7 +344,6 @@ function App() {
           .then((result) => {
             if (result?.failed)
               setError('ショートカットの一部を実行できませんでした。ログを確認してください。');
-            else if (result?.executed) setToast('コマンドを実行しました。');
           })
           .catch((error) => setError(String(error)));
       }
@@ -358,19 +354,12 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = snapshot?.dark ? 'dark' : 'light';
   }, [snapshot?.dark]);
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(''), 3500);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
-  async function action(work: () => Promise<unknown>, message?: string) {
+  async function action(work: () => Promise<unknown>) {
     setBusy(true);
     setError('');
     try {
       await work();
       await load();
-      if (message) setToast(message);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -439,7 +428,7 @@ function App() {
       setPage('settings');
       return;
     }
-    await action(() => window.dock.executeCommand(id), 'コマンドを実行しました。');
+    await action(() => window.dock.executeCommand(id));
   }
   const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
   const active = orderedApplets.filter((e) => e.state === 'running').length;
@@ -701,20 +690,8 @@ function App() {
           <Icon name="command" size={12} />
           コマンドパレット {paletteKey && <kbd>{paletteKey}</kbd>}
         </button>
-        {snapshot && (
-          <UpdateProgress
-            state={snapshot.updates}
-            visible={snapshot.windowVisible}
-            onDetails={() => void execute('appdock.updates.open')}
-          />
-        )}
+        {snapshot && <UpdateProgress state={snapshot.updates} />}
       </footer>
-      {toast && (
-        <div className="toast" role="status">
-          <Icon name="check" size={17} />
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
@@ -728,7 +705,7 @@ function PageHeading({ title, action }: { title: string; action?: React.ReactNod
     </div>
   );
 }
-type Run = (work: () => Promise<unknown>, message?: string) => Promise<void>;
+type Run = (work: () => Promise<unknown>) => Promise<void>;
 function ExtensionDetail({
   extension: e,
   busy,
@@ -866,9 +843,7 @@ function ExtensionDetail({
                 <button
                   className="text-button"
                   disabled={busy || !e.enabled}
-                  onClick={() =>
-                    void run(() => window.dock.restartExtension(e.id), 'Appletを再起動しました。')
-                  }
+                  onClick={() => void run(() => window.dock.restartExtension(e.id))}
                 >
                   <Icon name="refresh" size={14} />
                   再起動

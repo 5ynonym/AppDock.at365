@@ -105,7 +105,6 @@ export function ApiPermissionsSettings({
   const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const operation = useRef(false);
   useEffect(() => {
     let active = true;
@@ -130,10 +129,8 @@ export function ApiPermissionsSettings({
     operation.current = true;
     setBusy(true);
     setError('');
-    setMessage('');
     try {
       await action();
-      setMessage('このPCに保存しました。');
     } catch (e) {
       setError(String(e));
     } finally {
@@ -173,7 +170,7 @@ export function ApiPermissionsSettings({
         </p>
       )}
       <p className="permission-save-status" role="status">
-        {busy ? '保存しています…' : message || '変更は保存ボタンを押さずに保存されます。'}
+        {busy ? '保存しています…' : '変更は保存ボタンを押さずに保存されます。'}
       </p>
       <table className="permission-table">
         <thead>

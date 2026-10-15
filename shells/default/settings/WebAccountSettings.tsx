@@ -123,11 +123,7 @@ export function WebAccountSettings({
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
-  async function run(
-    work: () => Promise<unknown>,
-    success: string | ((result: unknown) => string),
-    lock = true,
-  ) {
+  async function run(work: () => Promise<unknown>, lock = true) {
     if (lock && locked.current) return false;
     if (lock) {
       locked.current = true;
@@ -137,13 +133,7 @@ export function WebAccountSettings({
       setMessage('');
       try {
         const result = await work();
-        setMessage(
-          result === false
-            ? '操作をキャンセルしました。'
-            : typeof success === 'function'
-              ? success(result)
-              : success,
-        );
+        if (result === false) setMessage('操作をキャンセルしました。');
         return result !== false;
       } catch (error) {
         setMessage(error instanceof Error ? error.message : '操作に失敗しました。');
@@ -170,9 +160,8 @@ export function WebAccountSettings({
           className="secondary"
           disabled={busy || accounts.length >= 32}
           onClick={() =>
-            void run(
-              () => settingsControls.createWebAccount(`Webアカウント ${accounts.length + 1}`),
-              'アカウント枠を追加しました。',
+            void run(() =>
+              settingsControls.createWebAccount(`Webアカウント ${accounts.length + 1}`),
             )
           }
         >
@@ -196,28 +185,9 @@ export function WebAccountSettings({
             account={account}
             users={users}
             busy={busy}
-            rename={(name) =>
-              run(
-                () => settingsControls.renameWebAccount(account.id, name),
-                'アカウント名を変更しました。',
-                false,
-              )
-            }
-            remove={() =>
-              void run(
-                () => settingsControls.deleteWebAccount(account.id),
-                (result) =>
-                  result === 'deferred'
-                    ? 'アカウント枠を削除しました。残る保存ファイルは次回起動時に自動で片づけます。'
-                    : 'アカウント枠と保存データを削除しました。',
-              )
-            }
-            clear={() =>
-              void run(
-                () => settingsControls.clearWebAccount(account.id),
-                'ログイン情報とサイトデータをクリアしました。',
-              )
-            }
+            rename={(name) => run(() => settingsControls.renameWebAccount(account.id, name), false)}
+            remove={() => void run(() => settingsControls.deleteWebAccount(account.id))}
+            clear={() => void run(() => settingsControls.clearWebAccount(account.id))}
           />
         );
       })}

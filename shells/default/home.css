@@ -315,16 +315,6 @@ h1 {
   color: #e37c8f;
   overflow-wrap: anywhere;
 }
-.home-result {
-  position: fixed;
-  bottom: 12px;
-  right: 12px;
-  padding: 12px 18px;
-  background: var(--raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  z-index: 1;
-}
 @media (max-width: 850px) {
   .stats > div {
     padding: 14px 11px;

@@ -13,7 +13,6 @@ import {
 export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
   const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [file, setFile] = useState('');
   const [port, setPort] = useState('0');
@@ -65,11 +64,9 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
     operation.current = true;
     setBusy(true);
     setError('');
-    setMessage('');
     try {
       const r = await settingsControls.automation(action);
       setState(r.state);
-      setMessage(r.message ?? '更新しました。');
     } catch (e) {
       setError(String(e));
     } finally {
@@ -170,11 +167,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             </button>
           </div>
         )}
-        <SettingsFeedback
-          error={error || state.error || state.registrationError}
-          message={message}
-          busy={busy}
-        />
+        <SettingsFeedback error={error || state.error || state.registrationError} busy={busy} />
       </SettingsSection>
       <SettingsSection
         title="Codexへ登録"

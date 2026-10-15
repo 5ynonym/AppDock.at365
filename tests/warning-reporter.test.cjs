@@ -82,7 +82,7 @@ test('warnings have independent preferences and safe history; details stay in lo
   );
   assert.equal(type.defaultDurationSeconds, null);
   assert.deepEqual(type.defaultTargets, ['banner', 'desktop']);
-  assert.deepEqual(type.requiredTargets, []);
+  assert.deepEqual(type.requiredTargets, ['banner']);
   assert.equal(notificationSpeechEnabled(type, f.settings), false);
   const episode = f.reporter.episode();
   episode.update(warning);
@@ -95,7 +95,7 @@ test('warnings have independent preferences and safe history; details stay in lo
   assert(!JSON.stringify(f.history.list()).includes('C:\\fixture'));
   assert(!f.active()[0].body.includes('C:\\fixture'));
   f.prefs({ targets: [], durationSeconds: null });
-  assert.deepEqual(f.active()[0].targets, []);
+  assert.deepEqual(f.active()[0].targets, ['banner']);
   f.prefs({ enabled: false });
   episode.update({ ...warning, logDetails: ['整理対象: C:\\fixture\\data\\secrets'] });
   assert.equal(f.logs.length, 4);

@@ -16,6 +16,7 @@
 | TTSサーバー連携・読み上げAPI | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
 | AI共通API・プロンプト設定 | [AI文章生成とApplet/MCP共通API](docs/ai.md)、[Gmail連携を含む設計](docs/ai-services-design.md)（Gmailは未実装） |
 | 通知の読み上げ | [種類別ON/OFFと通知全体の声・速度](docs/notification-speech-design.md) |
+| 情報通知・操作結果 | [設定・発行・移行範囲](docs/information-notifications-design.md) |
 | 共通警告・旧PC専用データ | [通知・対象一覧・整理導線の設計](docs/warning-notifications-design.md) |
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
 | 動的ページとWebApplet分離 | [汎用ページ登録・共通Web基盤・独立Appletと移行の設計](docs/dynamic-pages-webapplet-design.md) |

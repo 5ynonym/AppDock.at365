@@ -8,7 +8,7 @@
 
 ## 種類と利用者の設定
 
-識別子は `host / warnings / attention-required`、レベルはwarning。通知設定のAppDock欄で「エラー通知」「警告通知」の順に表示する。既定はON、バナーとデスクトップ通知、閉じるまで表示、読み上げOFF。表示先・時間・読み上げとON/OFFを既存の `notificationPreferences.overrides` で変更する。必須先は設けず、センターのみも選択できる。エラー通知、設定の再起動要求、Applet通知の親スイッチから独立させる。
+識別子は `host / warnings / attention-required`、レベルはwarning。通知設定のAppDock欄で「エラー通知」「警告通知」の順に表示する。既定はON、バナーとデスクトップ通知、閉じるまで表示、読み上げOFF。表示先・時間・読み上げとON/OFFを既存の `notificationPreferences.overrides` で変更する。有効な間はバナーを必須とし、バナー解除とセンターのみは選択できない。通知全体のOFFは許可する。旧設定のバナー不足は実効方針で補い、読み込みだけでは保存しない。エラー通知、設定の再起動要求、Applet通知の親スイッチから独立させる。
 
 ## 共通入口と状態の寿命
 

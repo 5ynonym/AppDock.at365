@@ -1198,25 +1198,6 @@ main {
   text-align: center;
   font-size: 12px;
 }
-.toast {
-  position: fixed;
-  bottom: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  padding: 13px 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  z-index: 10;
-}
-.toast svg {
-  color: var(--accent);
-}
 .modal-backdrop {
   position: fixed;
   inset: 43px 0 28px;
@@ -2283,7 +2264,7 @@ summary {
   flex-basis: 100%;
 }
 
-/* The notice occupies the existing footer, including over native WebContentsView pages. */
+/* Progress occupies the existing footer, including over native WebContentsView pages. */
 .statusbar:has(> .update-operation) > :not(.update-operation) {
   visibility: hidden;
 }
@@ -2330,12 +2311,6 @@ summary {
   font-size: 10px;
   color: inherit;
   padding: 2px 5px;
-}
-.update-operation .update-notice-close {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border-radius: 50%;
 }
 .update-operation button:hover {
   background: color-mix(in srgb, var(--accent) 15%, transparent);

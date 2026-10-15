@@ -500,6 +500,8 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     decrypt: (s) => Buffer.from(s, 'base64').toString(),
     changed: () => {},
     audit: (level, message) => audit.push({ level, message }),
+    informed: (message) => audit.push({ level: 'information', message }),
+    failed: (code, message) => audit.push({ level: 'failure', code, message }),
     createApi: (
       writable,
       instanceId,
@@ -575,6 +577,13 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
     403,
   );
   await service.action({ kind: 'test' });
+  assert.equal(
+    audit.filter((e) => e.level === 'information' && e.message.includes('疎通に成功')).length,
+    1,
+  );
+  const informationCount = audit.filter((e) => e.level === 'information').length;
+  await service.action({ kind: 'status' });
+  assert.equal(audit.filter((e) => e.level === 'information').length, informationCount);
   assert.equal(service.state().lastClientAt, undefined);
   assert.equal((await fetch(s.endpoint, { headers })).status, 405);
   assert.equal(

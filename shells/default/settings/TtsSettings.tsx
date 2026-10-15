@@ -131,7 +131,6 @@ export function TtsSettingsForm({
                   setKey('');
                   setModels([]);
                   setVoices([]);
-                  setMessage('APIキーをこのPCに保存しました。');
                 })
               }
             >
@@ -145,7 +144,6 @@ export function TtsSettingsForm({
                   setKey('');
                   setModels([]);
                   setVoices([]);
-                  setMessage('APIキーを削除しました。');
                 })
               }
             >
@@ -289,7 +287,6 @@ export function TtsSettingsForm({
               onClick={() =>
                 void run(async () => {
                   await invoke('ttsPreview', [text, crypto.randomUUID()]);
-                  setMessage('読み上げを受け付けました。');
                 })
               }
             >
@@ -300,7 +297,6 @@ export function TtsSettingsForm({
               onClick={() =>
                 void run(async () => {
                   await invoke('ttsStop');
-                  setMessage('読み上げを停止しました。');
                 })
               }
             >

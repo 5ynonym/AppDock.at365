@@ -258,7 +258,22 @@ const invoke = (p, actionId) =>
         'disabled busy button',
       );
       await until(async () => !(await model(p)).content.busy, 'complete');
-      await p.getByRole('status').waitFor();
+      assert.equal(await p.locator('.home-result').count(), 0);
+      await until(async () => {
+        for (const page of dock
+          .context()
+          .pages()
+          .filter((p) => p.url().endsWith('/notifications.html'))) {
+          const { snapshot } = await page.evaluate(() => window.appdockNotifications.connect());
+          if (
+            snapshot.items.some(
+              (i) => i.ownerId === 'information' && i.body === 'コマンドを実行しました。',
+            )
+          )
+            return true;
+        }
+        return false;
+      }, 'home command information notification');
       await p.getByRole('button', { name: /Fail/ }).click();
       await p.getByRole('alert').filter({ hasText: 'Home fixture error' }).waitFor();
       await navigate('settings');
@@ -272,6 +287,7 @@ const invoke = (p, actionId) =>
       'navigation retains in-flight guard and reports detached command completion',
       async () => {
         let p = await home();
+        const startedAt = Date.now();
         await p.getByRole('button', { name: /Run slow/ }).click();
         await until(async () => (await model(p)).content.busy, 'command started');
         await p.locator('.extension-card').filter({ hasText: 'Fixture Home' }).click();
@@ -285,7 +301,24 @@ const invoke = (p, actionId) =>
         );
         await p.getByRole('button', { name: 'ログを開く', exact: true }).click();
         await require('./shell-overlay-helper.cjs').logsPage(dock);
-        await dock.locator('.toast').filter({ hasText: 'コマンドを実行しました。' }).waitFor();
+        await until(async () => {
+          for (const page of dock
+            .context()
+            .pages()
+            .filter((p) => p.url().endsWith('/notifications.html'))) {
+            const { snapshot } = await page.evaluate(() => window.appdockNotifications.connect());
+            if (
+              snapshot.items.some(
+                (i) =>
+                  i.createdAt >= startedAt &&
+                  i.ownerId === 'information' &&
+                  i.body === 'コマンドを実行しました。',
+              )
+            )
+              return true;
+          }
+          return false;
+        }, 'command information notification');
         await navigate('home');
         p = await home();
         assert.equal((await model(p)).content.busy, false);

@@ -100,11 +100,6 @@ function App() {
   return (
     <main className="home-page">
       {(error || content.error) && <p role="alert">{error || content.error}</p>}
-      {content.message && (
-        <div className="home-result" role="status">
-          {content.message}
-        </div>
-      )}
 
       <div className="page-heading">
         <h1>ホーム</h1>

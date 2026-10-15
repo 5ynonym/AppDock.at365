@@ -35,6 +35,7 @@ function fixture(t) {
     source,
     destination: path.join(directory, 'extensions/fixture'),
   };
+  const notices = [];
   const updater = new PortableUpdates({
     targets: () => [target],
     settings: () => settings,
@@ -44,13 +45,30 @@ function fixture(t) {
     executable: '',
     restartArgs: [],
     changed() {},
+    notified: (notice, safeMessage) => notices.push({ notice, safeMessage }),
     shutdown() {},
     confirm: async () => false,
     processIds: () => [],
     log() {},
   });
-  return { directory, source, manifest, settings, target, updater };
+  return { directory, source, manifest, settings, target, updater, notices };
 }
+
+test('manual update events publish once with safe counts; silent checks do not replay', async (t) => {
+  const f = fixture(t);
+  f.target.name = 'PRIVATE_ACCOUNT';
+  await f.updater.check();
+  assert.equal(f.notices.length, 1);
+  assert.equal(f.notices[0].notice.kind, 'available');
+  assert.equal(f.notices[0].safeMessage, '1件の更新があります。');
+  await f.updater.check(undefined, true);
+  assert.equal(f.notices.length, 1);
+  f.target.source = path.join(f.directory, 'PRIVATE_PATH');
+  await f.updater.check();
+  assert.equal(f.notices[1].notice.kind, 'error');
+  assert(!f.notices[1].safeMessage.includes('PRIVATE'));
+  assert.notEqual(f.notices[0].notice.id, f.notices[1].notice.id);
+});
 test('update settings migrate old settings and validate local, UNC, HTTP and GitHub sources', () => {
   const value = createDefaultSettings();
   delete value.updates;
