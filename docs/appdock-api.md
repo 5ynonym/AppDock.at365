@@ -56,7 +56,7 @@ const current = await context.appdock.call('settings.get');
 await context.appdock.call('commands.execute', {
   id: 'appdock.settings.update',
   args: {
-    changes: { notifications: false },
+    changes: { closeToTray: false },
     expectedRevision: current.revision,
     dryRun: true,
   },
@@ -70,7 +70,7 @@ var current = await context.AppDock.CallAsync("settings.get", cancellationToken:
 await context.AppDock.CallAsync("commands.execute", new {
     id = "appdock.settings.update",
     args = new {
-        changes = new { notifications = false },
+        changes = new { closeToTray = false },
         expectedRevision = current.GetProperty("revision").GetString(),
         dryRun = true
     }

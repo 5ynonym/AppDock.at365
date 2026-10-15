@@ -10,9 +10,6 @@ export interface NotificationTypeDefinition {
   description: string;
   levels: NotificationLevel[];
   defaultLevel: NotificationLevel;
-  defaultEnabled: boolean;
-  canDisable: boolean;
-  disabledControlReason: string;
   allowedTargets: NotificationTarget[];
   defaultTargets: NotificationTarget[];
   requiredTargets: NotificationTarget[];
@@ -26,7 +23,6 @@ export interface NotificationTypeEntry extends NotificationTypeDefinition, Notif
 }
 export interface NotificationPreference extends NotificationOwner {
   typeId: string;
-  enabled?: boolean;
   targets?: NotificationTarget[];
   durationSeconds?: number | null;
   speak?: boolean;
@@ -81,9 +77,6 @@ const legacyNotificationType: NotificationTypeDefinition = {
   description: '種類を指定しない旧通知APIの通知です。本文から種類は推定しません。',
   levels: ['info'],
   defaultLevel: 'info',
-  defaultEnabled: true,
-  canDisable: true,
-  disabledControlReason: '',
   allowedTargets: ['banner', 'desktop', 'windows'],
   defaultTargets: ['windows'],
   requiredTargets: [],
@@ -138,10 +131,10 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       new Set(v.levels).size !== v.levels.length ||
       v.levels.some((l: unknown) => !['info', 'warning', 'error'].includes(String(l))) ||
       !v.levels.includes(v.defaultLevel) ||
-      typeof v.defaultEnabled !== 'boolean' ||
-      typeof v.canDisable !== 'boolean' ||
-      typeof v.disabledControlReason !== 'string' ||
-      v.disabledControlReason.length > 1000 ||
+      (v.defaultEnabled !== undefined && typeof v.defaultEnabled !== 'boolean') ||
+      (v.canDisable !== undefined && typeof v.canDisable !== 'boolean') ||
+      (v.disabledControlReason !== undefined &&
+        (typeof v.disabledControlReason !== 'string' || v.disabledControlReason.length > 1000)) ||
       !targets(v.allowedTargets) ||
       !targets(v.defaultTargets) ||
       !targets(v.requiredTargets) ||
@@ -150,11 +143,12 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       !['userDuration', 'fixedManual', 'condition'].includes(v.lifetimePolicy) ||
       !['persistent', 'session', 'none'].includes(v.history) ||
       (v.defaultDurationSeconds !== undefined &&
-        (v.lifetimePolicy !== 'userDuration' || !duration(v.defaultDurationSeconds))) ||
-      (!v.canDisable && (!host || !v.defaultEnabled || !v.disabledControlReason.trim()))
+        (v.lifetimePolicy !== 'userDuration' || !duration(v.defaultDurationSeconds)))
     )
       throw Error('通知種類の定義が不正です。');
-    return structuredClone(v) as NotificationTypeDefinition;
+    // Accept obsolete manifest fields without using them to suppress notifications.
+    const { defaultEnabled, canDisable, disabledControlReason, ...definition } = v;
+    return structuredClone(definition) as NotificationTypeDefinition;
   });
   if (new Set(result.map((v) => v.typeId)).size !== result.length)
     throw Error('通知種類IDが重複しています。');
@@ -193,7 +187,9 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
       (v.durationSeconds !== undefined && !duration(v.durationSeconds))
     )
       throw Error('通知設定の値が不正です。');
-    return structuredClone(v) as NotificationPreference;
+    // Old ON/OFF values are readable but no longer participate in delivery or persistence.
+    const { enabled, ...preference } = v;
+    return structuredClone(preference) as NotificationPreference;
   });
   if (new Set(rows.map(notificationTypeKey)).size !== rows.length)
     throw Error('通知設定が重複しています。');
@@ -223,12 +219,9 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       typeId: 'operation-failed',
       title: 'エラー通知',
       description:
-        'AI文章生成、設定の読み込み・保存・反映・復旧、更新処理、接続テストの失敗を通知します。有効な間はバナーが必須です。通知をオフにしてもログは残ります。',
+        'AI文章生成、設定の読み込み・保存・反映・復旧、更新処理、接続テストの失敗を通知します。バナーで必ず通知し、本体ログにも記録します。',
       levels: ['error'],
       defaultLevel: 'error',
-      defaultEnabled: true,
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       defaultTargets: ['banner', 'desktop'],
       requiredTargets: ['banner'],
@@ -244,12 +237,9 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       typeId: 'attention-required',
       title: '警告通知',
       description:
-        '旧PC専用データなど、確認や対処が必要な状態を通知します。有効な間はバナーが必須です。通知をオフにしてもログと設定画面で確認できます。',
+        '旧PC専用データなど、確認や対処が必要な状態を通知します。バナーで必ず通知し、本体ログでも確認できます。',
       levels: ['warning'],
       defaultLevel: 'warning',
-      defaultEnabled: true,
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       defaultTargets: ['banner', 'desktop'],
       requiredTargets: ['banner'],
@@ -265,12 +255,9 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       typeId: 'operation-completed',
       title: 'インフォメーション通知',
       description:
-        '更新確認や接続テスト、保存などの操作結果を通知します。有効な間はバナーが必須です。通知をオフにしてもログは残ります。',
+        '更新確認や接続テスト、保存などの操作結果を通知します。バナーで必ず通知し、本体ログにも記録します。',
       levels: ['info'],
       defaultLevel: 'info',
-      defaultEnabled: true,
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       defaultTargets: ['banner'],
       requiredTargets: ['banner'],
@@ -289,9 +276,6 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
         '保存済みのハードウェアアクセラレーションを反映するため、再起動が必要な間表示します。',
       levels: ['warning'],
       defaultLevel: 'warning',
-      defaultEnabled: true,
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       defaultTargets: ['banner'],
       requiredTargets: [],
@@ -302,7 +286,6 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerKind: 'host',
       ownerTitle: 'AppDock',
       ownerState: 'running',
-      defaultEnabled: true,
       history: 'persistent',
       defaultTargets: ['banner'],
       ownerId: 'updates',
@@ -311,8 +294,6 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       description: '更新後の再起動で、更新を適用したことを通知します。',
       levels: ['info'],
       defaultLevel: 'info',
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       requiredTargets: [],
       lifetimePolicy: 'userDuration',
@@ -322,7 +303,6 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerKind: 'host',
       ownerTitle: 'AppDock',
       ownerState: 'running',
-      defaultEnabled: true,
       history: 'persistent',
       ownerId: 'updates',
       typeId: 'available',
@@ -330,8 +310,6 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       description: '起動時の更新確認で、利用可能な更新を通知します。',
       levels: ['info'],
       defaultLevel: 'info',
-      canDisable: true,
-      disabledControlReason: '',
       allowedTargets: ['banner', 'desktop', 'windows'],
       defaultTargets: ['windows'],
       requiredTargets: [],
@@ -374,14 +352,7 @@ export function resolveNotificationPolicy(
         ? row.durationSeconds
         : (type.defaultDurationSeconds ?? null)
       : null;
-  const enabled = !type.canDisable || (row?.enabled ?? type.defaultEnabled);
-  const reason = !enabled
-    ? 'type-disabled'
-    : type.ownerKind === 'applet' && !settings.host.notifications
-      ? 'applet-disabled'
-      : invalidTargets && type.canDisable
-        ? 'type-definition-changed'
-        : undefined;
+  const reason = invalidTargets ? 'type-definition-changed' : undefined;
   return {
     enabled: !reason,
     selectedTargets,
@@ -410,7 +381,6 @@ export function validateNotificationPreferenceChanges(
     const type = catalog.find((t) => notificationTypeKey(t) === notificationTypeKey(row));
     if (!type) continue;
     if (
-      (!type.canDisable && row.enabled === false) ||
       (row.durationSeconds !== undefined && type.lifetimePolicy !== 'userDuration') ||
       row.targets?.some((t) => !type.allowedTargets.includes(t)) ||
       type.requiredTargets.some((t) => row.targets !== undefined && !row.targets.includes(t))

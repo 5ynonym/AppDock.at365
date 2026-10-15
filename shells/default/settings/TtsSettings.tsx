@@ -91,7 +91,7 @@ export function TtsSettingsForm({
   return (
     <div className="settings-sections tts-settings" aria-label="読み上げ">
       <SettingsSection
-        title="接続先"
+        title="TTS接続先"
         description="使用するTTSサーバーを設定します。APIキーが不要なサーバーでは空欄のまま使えます。"
       >
         <SettingsField

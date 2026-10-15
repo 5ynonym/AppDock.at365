@@ -177,18 +177,18 @@ module.exports = async function checkCodex({ executable, configFile, server, out
       id: 'appdock.settings.update',
       args: {
         expectedRevision: values.revision,
-        changes: { notifications: !values.values.notifications },
+        changes: { closeToTray: !values.values.closeToTray },
       },
     });
     assert.equal(next.isError ?? false, false);
-    assert.equal(next.structuredContent.values.notifications, !values.values.notifications);
+    assert.equal(next.structuredContent.values.closeToTray, !values.values.closeToTray);
     const after = await call('appdock_get_settings');
-    assert.equal(after.structuredContent.values.notifications, !values.values.notifications);
+    assert.equal(after.structuredContent.values.closeToTray, !values.values.closeToTray);
     const restore = await call('appdock_execute_command', {
       id: 'appdock.settings.update',
       args: {
         expectedRevision: after.structuredContent.revision,
-        changes: { notifications: values.values.notifications },
+        changes: { closeToTray: values.values.closeToTray },
       },
     });
     assert.equal(restore.isError ?? false, false);

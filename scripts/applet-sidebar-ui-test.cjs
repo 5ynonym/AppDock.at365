@@ -167,7 +167,7 @@ async function launch() {
     await settingsSeparator.press('ArrowRight');
     assert.equal(await width(), 320);
     await body.getByRole('button', { name: '一般', exact: true }).click();
-    await body.getByRole('switch', { name: '閉じるとトレイに常駐', exact: true }).click();
+    await body.getByRole('switch', { name: '閉じるとトレイに収納', exact: true }).click();
     await settleSettings(page);
     assert.equal(await body.getByText('未保存の変更があります', { exact: true }).count(), 0);
     assert.equal(await body.locator('.settings-categories .unsaved-mark').count(), 0);
@@ -188,7 +188,7 @@ async function launch() {
     await clickRibbon(page, '設定');
     assert.equal(
       await body
-        .getByRole('switch', { name: '閉じるとトレイに常駐', exact: true })
+        .getByRole('switch', { name: '閉じるとトレイに収納', exact: true })
         .getAttribute('aria-checked'),
       'false',
       'saved value survives page switches',

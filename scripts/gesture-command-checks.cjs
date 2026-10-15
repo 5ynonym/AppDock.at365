@@ -248,14 +248,14 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   checks.push(
     'host defaults / assignment filters / both themes at 1280, 900, 700 / bounded editor and matching toolbar',
   );
-  await page.getByText('動作設定', { exact: false }).click();
+  await page.locator('summary').filter({ hasText: '動作設定' }).click();
   await page.getByLabel('Webブラウザのexe', { exact: true }).fill('firefox.exe, msedge.exe');
   await page.getByLabel('移動距離（px）').fill('70');
   await save();
   const state = (await snapshot()).settings.value;
   assert.equal(state.gestures.distance, 70);
   assert.deepEqual(state.gestures.browsers, ['firefox', 'msedge']);
-  await page.getByText('動作設定', { exact: false }).click();
+  await page.locator('summary').filter({ hasText: '動作設定' }).click();
   const persisted = structuredClone(state.gestures);
   await host.reload();
   await host.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);

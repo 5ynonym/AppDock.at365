@@ -248,11 +248,11 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 
 登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップ・通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
 
-最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、Applet共通スイッチと種類別設定を適用します。安全な汎用要約だけを履歴へ保存します。
+最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを履歴へ保存します。
 
 ```json
 {
-  "minimumHostVersion": "0.30.0",
+  "minimumHostVersion": "0.50.0",
   "capabilities": ["notifications"],
   "notificationTypes": [{
     "typeId": "new-message",
@@ -260,9 +260,6 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
     "description": "新しいメッセージを受信したときに通知します。",
     "levels": ["info", "warning"],
     "defaultLevel": "info",
-    "defaultEnabled": true,
-    "canDisable": true,
-    "disabledControlReason": "",
     "allowedTargets": ["banner", "desktop", "windows"],
     "defaultTargets": ["banner"],
     "requiredTargets": [],
@@ -273,7 +270,7 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 }
 ```
 
-定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。AppletはcanDisable:falseを宣言できません。requiredTargets:['banner']は宣言でき、通知が有効な間だけバナーを必須にします。種類全体のOFFとApplet共通許可は尊重します。[通知先の必須指定とOFF可否](notifications.md#通知種類の制約)は独立した方針です。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
+定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。0.50.0以降は旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
 
 | 操作 | Node context.notifications | .NET context.Notifications |
 | --- | --- | --- |

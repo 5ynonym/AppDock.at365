@@ -56,14 +56,14 @@ function setup(t) {
     },
   };
 }
-test('shared error type uses AppDock preferences and logs once even when disabled', (t) => {
+test('shared error type uses AppDock preferences and ignores obsolete OFF values and logs once', (t) => {
   const f = setup(t),
     type = notificationCatalog([]).find((n) => n.ownerId === 'errors');
   assert.equal(type.title, 'エラー通知');
   assert.equal(type.defaultDurationSeconds, null);
   assert.deepEqual(type.defaultTargets, ['banner', 'desktop']);
   assert.deepEqual(type.requiredTargets, ['banner']);
-  assert.equal(type.canDisable, true);
+  assert.equal('canDisable' in type, false);
   assert.equal(notificationSpeechEnabled(type, f.settings()), false);
   f.reporter.report(failure);
   f.reporter.report(failure);
@@ -81,12 +81,12 @@ test('shared error type uses AppDock preferences and logs once even when disable
   f.prefs({ enabled: false });
   f.reporter.report({ ...failure, eventId: 'job-three' });
   assert.equal(f.logs.length, 3);
-  assert.equal(f.published.length, 2);
+  assert.equal(f.published.length, 3);
   f.prefs({ enabled: true, targets: [] });
-  assert.equal(f.service.list().filter((n) => n.status === 'active').length, 0);
+  assert.equal(f.service.list().filter((n) => n.status === 'active').length, 3);
   f.reporter.report({ ...failure, eventId: 'job-four' });
   const active = f.service.list().filter((n) => n.status === 'active');
-  assert.equal(active.length, 1);
+  assert.equal(active.length, 4);
   assert.deepEqual(active[0].targets, ['banner']);
   assert.equal(f.logs.length, 4);
 });

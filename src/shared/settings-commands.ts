@@ -6,12 +6,11 @@ export const hostSettingDefinitions: SettingDefinition[] = [
     key: 'theme',
     title: '表示テーマ',
     type: 'select',
-    default: 'dark',
+    default: 'light',
     automation: true,
     options: ['dark', 'light', 'system'].map((value) => ({ value, label: value })),
   },
   ...[
-    ['notifications', '通知', true],
     ['closeToTray', '閉じるとトレイに格納', true],
     ['startMinimized', '起動時に最小化', false],
   ].map(([key, title, value]) => ({

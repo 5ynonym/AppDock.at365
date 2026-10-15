@@ -71,14 +71,14 @@ test('enable/disable persist and preserve settings; redundant changes and restar
 test('unobserved external edit is adopted and rejected, never overwritten', async (t) => {
   const f = fixture(t),
     value = structuredClone(f.settings.value);
-  value.host.theme = 'light';
+  value.host.theme = 'dark';
   fs.writeFileSync(f.settings.file, JSON.stringify(value));
   await assert.rejects(f.management.run('test.provider', 'disable'), { code: 'CONFLICT' });
   assert.equal(
     JSON.parse(fs.readFileSync(f.settings.file)).extensions['test.provider'].enabled,
     true,
   );
-  assert.equal(f.settings.value.host.theme, 'light');
+  assert.equal(f.settings.value.host.theme, 'dark');
 });
 test('local and external operations share per-Applet busy guard', async (t) => {
   const f = fixture(t);

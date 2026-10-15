@@ -237,7 +237,7 @@ test('shared revision rejects stale edits, restarted API tokens, and disk confli
     old = f.get().revision;
   await f.api.call('commands.execute', {
     id: 'appdock.settings.update',
-    args: { expectedRevision: old, changes: { theme: 'light' } },
+    args: { expectedRevision: old, changes: { theme: 'dark' } },
   });
   await assert.rejects(f.edit([update('home', { visible: false })], { expectedRevision: old }), {
     code: 'REVISION_CONFLICT',
@@ -251,10 +251,10 @@ test('shared revision rejects stale edits, restarted API tokens, and disk confli
     { code: 'REVISION_CONFLICT' },
   );
   const disk = JSON.parse(fs.readFileSync(f.settings.file, 'utf8'));
-  disk.host.theme = 'dark';
+  disk.host.theme = 'light';
   fs.writeFileSync(f.settings.file, JSON.stringify(disk));
   await assert.rejects(f.edit([update('home', { visible: false })]));
-  assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'dark');
+  assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'light');
 });
 test('save failure is sanitized and leaves settings intact', async (t) => {
   const f = fixture(t),

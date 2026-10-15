@@ -77,7 +77,7 @@ test('shortcut read is scoped, lists assignable commands while stopped, and mask
     value = f.get();
   assert.equal(value.bindings[0].command, 'private.run');
   assert.ok(value.assignableCommands.some((c) => c.id === 'sample.run'));
-  assert.ok(value.assignableCommands.some((c) => c.id === 'appdock.settings.notifications.toggle'));
+  assert.ok(value.assignableCommands.some((c) => c.id === 'appdock.settings.closeToTray.toggle'));
   assert.ok(!value.assignableCommands.some((c) => c.id.endsWith('.update')));
   assert.equal(JSON.stringify(value).includes('SECRET'), false);
   assert.equal(value.settings, undefined);
@@ -202,7 +202,7 @@ test('stale, cross-setting and restart revisions and unobserved disk edits preve
     op = [{ kind: 'add', binding: binding('new') }];
   await f.api.call('commands.execute', {
     id: 'appdock.settings.update',
-    args: { expectedRevision: revision, changes: { theme: 'light' } },
+    args: { expectedRevision: revision, changes: { theme: 'dark' } },
   });
   await assert.rejects(f.edit(op, { expectedRevision: revision }), { code: 'REVISION_CONFLICT' });
   const latest = f.get().revision;

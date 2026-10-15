@@ -71,7 +71,7 @@ export class LegacyLocalDataMonitor {
             next.scanFailed
               ? '一部の旧保存先を確認できません。アクセス権と保存先を確認してください。'
               : '',
-            '対象は「設定 → 一般 → 旧PC専用データ」と本体ログで確認できます。',
+            '対象は本体ログの「整理対象」から確認できます。',
             legacyLocalDataInstructions,
           ]
             .filter(Boolean)

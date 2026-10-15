@@ -19,7 +19,7 @@ public sealed class ApiProbe : IAppDockExtension
                         result = new { ok = true };
                     } else if (action == "write") {
                         var current = await context.AppDock.CallAsync("settings.get", cancellationToken: token);
-                        result = await context.AppDock.CallAsync("commands.execute", new { id = "appdock.settings.update", args = new { changes = new { notifications = false }, expectedRevision = current.GetProperty("revision").GetString() } }, token);
+                        result = await context.AppDock.CallAsync("commands.execute", new { id = "appdock.settings.update", args = new { changes = new { closeToTray = false }, expectedRevision = current.GetProperty("revision").GetString() } }, token);
                     } else if (action == "self") {
                         result = await context.AppDock.CallAsync("commands.execute", new { id = "appdock.applets." + context.ExtensionId + ".restart" }, token);
                     } else {

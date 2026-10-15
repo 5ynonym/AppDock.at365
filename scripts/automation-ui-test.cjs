@@ -25,11 +25,11 @@ fs.mkdirSync(profile, { recursive: true });
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
-settings.host.notifications = false;
+settings.host.closeToTray = false;
 settings.keybindings = [];
 settings.keybindings.push({
   id: 'test-settings-switch',
-  command: 'appdock.settings.notifications.toggle',
+  command: 'appdock.settings.closeToTray.toggle',
   key: 'Ctrl+Alt+F11',
   enabled: true,
   when: { scope: 'app', appletIds: [] },
@@ -837,9 +837,9 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
     await page
       .getByRole('searchbox', { name: 'ショートカットのコマンドを検索' })
-      .fill('appdock.settings.notifications.toggle');
+      .fill('appdock.settings.closeToTray.toggle');
     await page
-      .getByText('appdock.settings.notifications.toggle', { exact: true })
+      .getByText('appdock.settings.closeToTray.toggle', { exact: true })
       .first()
       .waitFor();
     await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
@@ -851,12 +851,12 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     await page.getByRole('button', { name: 'MCP・Codex連携', exact: true }).click();
     await page.keyboard.press('Control+Alt+F11');
     await until(
-      async () => (await call(client, 'appdock_get_settings')).values.notifications === true,
+      async () => (await call(client, 'appdock_get_settings')).values.closeToTray === true,
       'generated host keyboard command',
     );
     await page.keyboard.press('Control+Alt+F11');
     await until(
-      async () => (await call(client, 'appdock_get_settings')).values.notifications === false,
+      async () => (await call(client, 'appdock_get_settings')).values.closeToTray === false,
       'generated host keyboard restore',
     );
     checks.push(

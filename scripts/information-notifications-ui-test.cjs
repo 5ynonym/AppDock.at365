@@ -151,12 +151,11 @@ async function main() {
   const cards = (await settingsPage(host)).locator('.notification-setting-card');
   assert.deepEqual(
     await Promise.all(
-      [0, 1, 2].map((i) =>
-        cards.nth(i).locator('.settings-field-label strong').first().innerText(),
-      ),
+      [0, 1, 2].map((i) => cards.nth(i).locator(':scope > summary > h2').innerText()),
     ),
     ['エラー通知', '警告通知', 'インフォメーション通知'],
   );
+  for (const card of await cards.all()) await card.locator(':scope > summary').click();
   for (const name of ['警告通知', 'インフォメーション通知']) {
     const checkbox = ui.getByRole('checkbox', { name: name + 'のバナー', exact: true });
     assert(await checkbox.isChecked());
@@ -196,21 +195,22 @@ async function main() {
   await until(async () => !(await info()).some((i) => i.id === success.id), 'six second expiry');
   assert.equal(await host.locator('.toast').count(), 0);
   checks.push('real loopback test success, no status replay, automatic expiry and no bottom toast');
-  const toggle = ui.getByRole('switch', { name: 'インフォメーション通知を通知', exact: true });
-  await toggle.click();
-  await settleSettings(host);
+  assert.equal(
+    await ui.getByRole('switch', { name: 'インフォメーション通知を通知', exact: true }).count(),
+    0,
+  );
   await dismissAll();
   await automation({ kind: 'test' });
-  assert.equal((await info()).length, 0);
+  await until(async () => (await info()).length === 1, 'new result remains enabled');
   assert(
     (await snapshot()).logs.some(
       (l) => l.source === 'automation' && l.message.includes('疎通に成功'),
     ),
   );
-  await toggle.click();
-  await settleSettings(host);
+  await dismissAll();
+  await automation({ kind: 'status' });
   assert.equal((await info()).length, 0);
-  checks.push('OFF logs without notification, ON does not replay');
+  checks.push('no OFF control; results notify and log, status does not replay dismissed results');
   await automation({ kind: 'configure', enabled: false, allowWrite: false, port: 0 });
   await assert.rejects(automation({ kind: 'test' }), /AppDock内の疎通を確認できません/);
   const failure = await until(

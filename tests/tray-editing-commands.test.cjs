@@ -212,7 +212,7 @@ test('shared revision, restart tokens, unobserved disk edits and save failures p
     revision = f.get().revision;
   await f.api.call('commands.execute', {
     id: 'appdock.settings.update',
-    args: { expectedRevision: revision, changes: { theme: 'light' } },
+    args: { expectedRevision: revision, changes: { theme: 'dark' } },
   });
   await assert.rejects(
     f.edit([configure({ doubleClickCommand: null })], { expectedRevision: revision }),
@@ -246,10 +246,10 @@ test('shared revision, restart tokens, unobserved disk edits and save failures p
     (e) => e.code === 'SAVE_FAILED' && !e.message.includes('PRIVATE'),
   );
   const disk = JSON.parse(fs.readFileSync(f.settings.file, 'utf8'));
-  disk.host.theme = 'dark';
+  disk.host.theme = 'light';
   fs.writeFileSync(f.settings.file, JSON.stringify(disk));
   await assert.rejects(f.edit([configure({ singleClickCommand: 'sample.run' })]));
-  assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'dark');
+  assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'light');
 });
 test('legacy layout is projected without saving and menu item count is bounded', async (t) => {
   const f = fixture(t),

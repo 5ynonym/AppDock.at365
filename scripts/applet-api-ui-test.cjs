@@ -24,7 +24,7 @@ fs.mkdirSync(profile, { recursive: true });
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
-settings.host.notifications = true;
+settings.host.closeToTray = true;
 settings.keybindings = [];
 settings.gestures.enabled = false;
 const ids = ['test.api-node', 'test.api-dotnet'];
@@ -75,7 +75,7 @@ for (const id of ids) {
           await context.appdock.call('applets.get',{id:'${id}'});result={ok:true};
         }else if(action==='write'){
           const current=await context.appdock.call('settings.get');
-          result=await context.appdock.call('commands.execute',{id:'appdock.settings.update',args:{changes:{notifications:false},expectedRevision:current.revision}});
+          result=await context.appdock.call('commands.execute',{id:'appdock.settings.update',args:{changes:{closeToTray:false},expectedRevision:current.revision}});
         }else if(action==='self')result=await context.appdock.call('commands.execute',{id:'appdock.applets.${id}.restart'});
         else{await context.settings.set('flag',true);await context.settings.set('privateFlag',true);result={ok:true};}
       }catch(error){result={code:error.code||'FAILED'};}
@@ -216,11 +216,12 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 10);
+    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 11);
     assert.equal((await snapshot()).appletApi.permissions.useTts, false);
+    assert.equal((await snapshot()).appletApi.permissions.useAi, false);
     assert.ok(
       Object.entries((await snapshot()).appletApi.permissions)
-        .filter(([k]) => k !== 'useTts')
+        .filter(([k]) => !['useTts', 'useAi'].includes(k))
         .every(([, v]) => v === true),
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
@@ -230,12 +231,13 @@ async function grant(id, permissions) {
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 10);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 8);
+    await panel.getByRole('switch', { name: 'Applet：公開情報の取得', exact: true }).waitFor();
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 11);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 9);
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
       assert.equal(
         await control.isChecked(),
-        !(await control.getAttribute('aria-label')).includes('TTS'),
+        !/TTS|AI/.test(await control.getAttribute('aria-label')),
       );
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
@@ -329,11 +331,11 @@ async function grant(id, permissions) {
     assert.equal((await probe(ids[1], 'read')).ok, true);
     for (const id of ids) {
       assert.equal((await probe(id, 'write')).completion, 'settingsSaved');
-      assert.equal((await snapshot()).settings.value.host.notifications, false);
+      assert.equal((await snapshot()).settings.value.host.closeToTray, false);
     }
     assert.equal((await probe(ids[1], 'self')).code, 'SELF_CALL');
     checks.push(
-      'all 11 public methods through both SDKs; GUI grant, shared mutation and own-lifecycle rejection',
+      'shared public methods through both SDKs; GUI grant, shared mutation and own-lifecycle rejection',
     );
     const configFile = path.join(profile, 'codex', 'config.toml');
     await page.evaluate(async (configFile) => {
@@ -359,7 +361,7 @@ async function grant(id, permissions) {
     );
     const denied = await client.callTool({
       name: 'appdock_execute_command',
-      arguments: { id: 'appdock.settings.notifications.off' },
+      arguments: { id: 'appdock.settings.closeToTray.off' },
     });
     assert.equal(denied.structuredContent.code, 'WRITE_DISABLED');
     for (const id of ids) {
@@ -410,7 +412,9 @@ async function grant(id, permissions) {
           ).screenshot({
             path: path.join(profile, `permissions-${theme}-${width}-input.png`),
           });
-          await panel.getByRole('heading', { name: '操作の許可' }).scrollIntoViewIfNeeded();
+          await settingsSurface
+            .getByRole('heading', { name: '操作の許可', level: 1, exact: true })
+            .scrollIntoViewIfNeeded();
         }
       }
     }
@@ -443,13 +447,15 @@ async function grant(id, permissions) {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
-    if (page)
-      await (
-        await require('./settings-shell-helper.cjs').settingsPage(page)
-      )
-        .screenshot({ path: path.join(profile, 'failure.png') })
-        .catch(() => {});
     console.error(error);
+    try {
+      if (page)
+        await (
+          await require('./settings-shell-helper.cjs').settingsPage(page)
+        ).screenshot({
+          path: path.join(profile, 'failure.png'),
+        });
+    } catch {}
     process.exitCode = 1;
   } finally {
     await client?.close().catch(() => {});

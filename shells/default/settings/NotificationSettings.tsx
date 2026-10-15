@@ -25,7 +25,6 @@ const targetTitles = { banner: 'バナー', desktop: 'デスクトップ通知',
 const ownerGroup = (type: NotificationTypeEntry) =>
   type.ownerKind === 'host' ? 'host' : JSON.stringify([type.ownerKind, type.ownerId]);
 const reasonTitles: Record<string, string> = {
-  'applet-disabled': 'Applet共通設定で停止中です。',
   'type-definition-changed': '通知種類の仕様が変わりました。設定を確認してください。',
 };
 export function NotificationSettings({
@@ -99,7 +98,6 @@ export function NotificationSettings({
       ...patch,
     };
     // Keep edits valid when an older saved preference lacks newly required controls.
-    if (!type.canDisable) updated.enabled = true;
     if (updated.targets && type.requiredTargets.length)
       updated.targets = [...new Set([...updated.targets, ...type.requiredTargets])];
     next.push(updated);
@@ -116,148 +114,13 @@ export function NotificationSettings({
     <div className="settings-sections notification-settings">
       <SettingsSection
         title="通知の受け取り方"
+        collapsible
         description="種類ごとに通知先を組み合わせられます。必須の通知先がない種類は、通知センターだけに残すこともできます。"
       >
-        <SettingsField
-          title="Appletからの通知を許可"
-          description="本体の通知はこのスイッチの影響を受けません。"
-          {...settingAnchor('notifications', 'notifications')}
-        >
-          <Toggle
-            label="Appletからの通知を許可"
-            checked={settings.host.notifications}
-            onChange={(notifications) =>
-              editor.edit({ ...settings, host: { ...settings.host, notifications } })
-            }
-          />
-        </SettingsField>
+        <p>
+          通知は通知センターで確認できます。バナー・デスクトップ通知・Windows通知・読み上げを組み合わせて、受け取り方を選んでください。バナー必須の通知は「通知センターのみ」に変更できません。
+        </p>
       </SettingsSection>
-      {owners.map((owner) => {
-        const rows = types.filter((t) => ownerGroup(t) === owner);
-        return (
-          <SettingsSection
-            key={owner}
-            title={rows[0].ownerTitle}
-            aria-label={rows[0].ownerTitle + 'の通知'}
-          >
-            {rows.map((type) => {
-              const policy = resolveNotificationPolicy(type, settings);
-              const row = overrides.find(
-                (r) => notificationTypeKey(r) === notificationTypeKey(type),
-              );
-              const checked = !type.canDisable || (row?.enabled ?? type.defaultEnabled);
-              const speaking = row?.speak === true;
-              return (
-                <article
-                  className="notification-setting-card"
-                  key={notificationTypeKey(type)}
-                  {...settingAnchor('notifications', notificationSettingKey(type))}
-                >
-                  <SettingsField title={type.title} description={type.description}>
-                    <Toggle
-                      label={type.title + 'を通知'}
-                      checked={checked}
-                      disabled={!type.canDisable}
-                      onChange={(enabled) => change(type, { enabled })}
-                    />
-                  </SettingsField>
-                  {!type.canDisable && <p className="muted">{type.disabledControlReason}</p>}
-                  {type.ownerKind === 'applet' &&
-                    !['starting', 'running'].includes(type.ownerState) && (
-                      <p className="muted">Appletは停止中です。通知設定を編集できます。</p>
-                    )}
-                  {policy.reason && policy.reason !== 'type-disabled' && (
-                    <p role="status">{reasonTitles[policy.reason] ?? policy.reason}</p>
-                  )}
-                  <fieldset className="notification-targets">
-                    <legend>通知先</legend>
-                    <div className="settings-choice-grid">
-                      {type.allowedTargets.map((target) => (
-                        <SettingsChoice
-                          key={target}
-                          label={targetTitles[target]}
-                          ariaLabel={type.title + 'の' + targetTitles[target]}
-                          checked={policy.selectedTargets.includes(target)}
-                          disabled={type.requiredTargets.includes(target)}
-                          description={
-                            type.requiredTargets.includes(target) ? 'この通知では必須' : undefined
-                          }
-                          onChange={(on) =>
-                            change(type, {
-                              targets: on
-                                ? [...policy.selectedTargets, target]
-                                : policy.selectedTargets.filter((t) => t !== target),
-                            })
-                          }
-                        />
-                      ))}
-                      <SettingsChoice
-                        label="読み上げ"
-                        description="タイトルと本文を音声で通知"
-                        ariaLabel={type.title + 'を読み上げる'}
-                        checked={speaking}
-                        onChange={(speak) => change(type, { speak })}
-                      />
-                    </div>
-                    <label className="notification-center-only">
-                      <SettingsInput
-                        type="checkbox"
-                        aria-label={type.title + 'の通知センターのみ'}
-                        checked={!policy.selectedTargets.length && !speaking}
-                        disabled={!!type.requiredTargets.length}
-                        onChange={(e) => {
-                          if (e.target.checked) change(type, { targets: [], speak: false });
-                        }}
-                      />
-                      通知センターのみ
-                    </label>
-                  </fieldset>
-                  {speaking && (!auxiliary?.configured || !effective.voice) && (
-                    <p className="notification-target-hint">
-                      読み上げには接続先・モデル・声の設定が必要です。
-                      <button onClick={() => select('tts')}>読み上げ設定を開く</button>
-                    </p>
-                  )}
-                  {type.lifetimePolicy === 'userDuration' ? (
-                    <SettingsField
-                      title="自動消去までの秒数"
-                      description="1〜86,400秒。空欄なら閉じるまで表示します。"
-                    >
-                      <SettingsInput
-                        type="text"
-                        inputMode="numeric"
-                        aria-label={type.title + 'の表示時間'}
-                        placeholder="閉じるまで表示"
-                        value={
-                          row?.durationSeconds === undefined
-                            ? (type.defaultDurationSeconds ?? '')
-                            : (row.durationSeconds ?? '')
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          change(type, {
-                            durationSeconds: (value === ''
-                              ? null
-                              : /^\d+$/.test(value)
-                                ? Number(value)
-                                : value) as number | null,
-                          });
-                        }}
-                      />
-                    </SettingsField>
-                  ) : (
-                    <p className="muted">
-                      {type.lifetimePolicy === 'condition'
-                        ? '問題が解消するまで表示します。'
-                        : '閉じるまで表示します。'}
-                    </p>
-                  )}
-                </article>
-              );
-            })}
-          </SettingsSection>
-        );
-      })}
       <SettingsSection
         title="通知の読み上げ"
         description={`現在の声: ${effective.voice || '未設定'} ／ 速度: ${effective.speed}倍。通常は共通の読み上げ設定を使います。`}
@@ -385,6 +248,138 @@ export function NotificationSettings({
         ))}
         <SettingsFeedback busy={pending} error={error} />
       </SettingsSection>
+      {owners.map((owner) => {
+        const rows = types.filter((t) => ownerGroup(t) === owner);
+        return (
+          <SettingsSection
+            key={owner}
+            title={rows[0].ownerTitle}
+            aria-label={rows[0].ownerTitle + 'の通知'}
+          >
+            {rows.map((type) => {
+              const policy = resolveNotificationPolicy(type, settings);
+              const row = overrides.find(
+                (r) => notificationTypeKey(r) === notificationTypeKey(type),
+              );
+              const speaking = row?.speak === true;
+              const delivery = policy.selectedTargets.map((target) => targetTitles[target]);
+              const duration =
+                type.lifetimePolicy === 'condition'
+                  ? '問題が解消するまで'
+                  : policy.durationSeconds === null
+                    ? '閉じるまで表示'
+                    : `表示時間: ${policy.durationSeconds}秒`;
+              const summary = [
+                delivery.length ? delivery.join('・') : speaking ? '音声のみ' : '通知センターのみ',
+                duration,
+                `読み上げ: ${speaking ? 'ON' : 'OFF'}`,
+              ].join(' ／ ');
+              return (
+                <SettingsSection
+                  title={type.title}
+                  description={summary}
+                  collapsible
+                  className="notification-setting-card"
+                  key={notificationTypeKey(type)}
+                  {...settingAnchor('notifications', notificationSettingKey(type))}
+                >
+                  <p>{type.description}</p>
+                  {type.ownerKind === 'applet' &&
+                    !['starting', 'running'].includes(type.ownerState) && (
+                      <p className="muted">Appletは停止中です。通知設定を編集できます。</p>
+                    )}
+                  {policy.reason && (
+                    <p role="status">{reasonTitles[policy.reason] ?? policy.reason}</p>
+                  )}
+                  <fieldset className="notification-targets">
+                    <legend>通知先</legend>
+                    <div className="settings-choice-grid">
+                      {type.allowedTargets.map((target) => (
+                        <SettingsChoice
+                          key={target}
+                          label={targetTitles[target]}
+                          ariaLabel={type.title + 'の' + targetTitles[target]}
+                          checked={policy.selectedTargets.includes(target)}
+                          disabled={type.requiredTargets.includes(target)}
+                          description={
+                            type.requiredTargets.includes(target) ? 'この通知では必須' : undefined
+                          }
+                          onChange={(on) =>
+                            change(type, {
+                              targets: on
+                                ? [...policy.selectedTargets, target]
+                                : policy.selectedTargets.filter((t) => t !== target),
+                            })
+                          }
+                        />
+                      ))}
+                      <SettingsChoice
+                        label="読み上げ"
+                        description="タイトルと本文を音声で通知"
+                        ariaLabel={type.title + 'を読み上げる'}
+                        checked={speaking}
+                        onChange={(speak) => change(type, { speak })}
+                      />
+                    </div>
+                    <label className="notification-center-only">
+                      <SettingsInput
+                        type="checkbox"
+                        aria-label={type.title + 'の通知センターのみ'}
+                        checked={!policy.selectedTargets.length && !speaking}
+                        disabled={!!type.requiredTargets.length}
+                        onChange={(e) => {
+                          if (e.target.checked) change(type, { targets: [], speak: false });
+                        }}
+                      />
+                      通知センターのみ
+                    </label>
+                  </fieldset>
+                  {speaking && (!auxiliary?.configured || !effective.voice) && (
+                    <p className="notification-target-hint">
+                      読み上げには接続先・モデル・声の設定が必要です。
+                      <button onClick={() => select('tts')}>読み上げ設定を開く</button>
+                    </p>
+                  )}
+                  {type.lifetimePolicy === 'userDuration' ? (
+                    <SettingsField
+                      title="自動消去までの秒数"
+                      description="1〜86,400秒。空欄なら閉じるまで表示します。"
+                    >
+                      <SettingsInput
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={type.title + 'の表示時間'}
+                        placeholder="閉じるまで表示"
+                        value={
+                          row?.durationSeconds === undefined
+                            ? (type.defaultDurationSeconds ?? '')
+                            : (row.durationSeconds ?? '')
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          change(type, {
+                            durationSeconds: (value === ''
+                              ? null
+                              : /^\d+$/.test(value)
+                                ? Number(value)
+                                : value) as number | null,
+                          });
+                        }}
+                      />
+                    </SettingsField>
+                  ) : (
+                    <p className="muted">
+                      {type.lifetimePolicy === 'condition'
+                        ? '問題が解消するまで表示します。'
+                        : '閉じるまで表示します。'}
+                    </p>
+                  )}
+                </SettingsSection>
+              );
+            })}
+          </SettingsSection>
+        );
+      })}
       <SettingsSection
         title="通知の表示時間について"
         description="通知先ごとの動作の違いを確認できます。"

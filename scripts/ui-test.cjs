@@ -79,7 +79,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     await page.getByRole('button', { name: '一般', exact: true }).click();
-    await page.getByRole('switch', { name: '閉じるとトレイに常駐' }).waitFor();
+    await page.getByRole('switch', { name: '閉じるとトレイに収納' }).waitFor();
     await page.screenshot({ path: path.join(profile, 'settings-general.png') });
     await shell.getByRole('button', { name: 'Applet', exact: true }).click();
     await page

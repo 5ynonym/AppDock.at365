@@ -24,7 +24,7 @@ TTS状態は`queued → generating → waitingPlayback → playing → completed
 
 ## Gmailの移行
 
-Gmail 0.11.0は`notificationTypes`に`new-mail`（新着メール）を宣言し、旧`notifications.show`から`publish/end`へ移行する。最低ホスト版は0.42.0。既定はWindows通知、10秒、永続履歴。表示先・時間・種類別ON/OFF・読み上げはホストの共通通知設定で解決し、読み上げの既定OFFを維持する。
+Gmail 0.11.0は`notificationTypes`に`new-mail`（新着メール）を宣言し、旧`notifications.show`から`publish/end`へ移行する。最低ホスト版は0.42.0。既定はWindows通知、10秒、永続履歴。表示先・時間・読み上げはホストの共通通知設定で解決し、読み上げの既定OFFを維持する。
 
 既存のGmailの`notifications`設定は発行スイッチとして保持し、過去のOFFを勝手にONへ移行しない。通知音のアカウント別ON/OFFは従来どおり独立。`notificationDetails`は表示・読み上げ本文だけに適用し、永続履歴はアカウント名・送信元・件名を含まない汎用要約にする。本文は基盤の上限に収める。
 

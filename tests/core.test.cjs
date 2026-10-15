@@ -174,12 +174,12 @@ test('watcher reloads external changes and retains last valid state on invalid e
   });
   const changed = new Promise((resolve) => store.once('changed', resolve));
   const config = defaults();
-  config.host.theme = 'light';
+  config.host.theme = 'dark';
   fs.writeFileSync(file, JSON.stringify(config));
   await changed;
   fs.writeFileSync(file, '{broken');
   await new Promise((r) => setTimeout(r, 500));
-  assert.equal(store.value.host.theme, 'light');
+  assert.equal(store.value.host.theme, 'dark');
   assert.ok(report);
 });
 test('RPC handles UTF-8, bidirectional requests and method errors', async () => {

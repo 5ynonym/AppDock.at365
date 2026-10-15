@@ -163,10 +163,13 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     checks.push('voice selection and speed save without automatic speech');
     await select('通知');
     const model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
-    const type = model.content.auxiliary.notificationTypes.find(
-      (t) => t.canDisable && !t.requiredTargets.length,
-    );
+    const type = model.content.auxiliary.notificationTypes.find((t) => !t.requiredTargets.length);
     assert(type);
+    await page
+      .locator('.notification-setting-card')
+      .filter({ has: page.getByRole('heading', { name: type.title, exact: true }) })
+      .locator(':scope > summary')
+      .click();
     const speak = page.getByLabel(type.title + 'を読み上げる', { exact: true });
     await speak.check();
     await settleSettings(page);

@@ -1,6 +1,6 @@
 # 通知基盤とShell表示
 
-通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別ON/OFFと、通知全体の声・速度の上書きを定義する。
+通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別の読み上げON/OFFと、通知全体の声・速度の上書きを定義する。
 
 通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 
@@ -20,38 +20,38 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 バナー・デスクトップ通知・通知センターは共通のレベル配色を使う。`info`はライトでは白背景・濃い文字・アプリの緑（`#217a65`）、ダークでは暗い背景（`#191f23`）・明るい文字・明るい緑（`#7ce1c5`）を使う。緑は枠のポイント・レベル表示・主要操作へ添える。`warning`は黄系、`error`は赤系を維持し、明暗テーマに合わせて文字の明度を調整する。レベル名も表示し、色だけに意味を依存させない。Windows通知の外観はOS、追加Shellの外観はそのShellが管理する。
 
-種類別の「既定に戻す」ボタンは設けない。通知先・表示時間・読み上げ・ON/OFFは個別に即時保存する。未指定項目の既定値継承と、既存の保存値は維持する。
+種類別の「既定に戻す」ボタンは設けない。通知先・表示時間・読み上げは個別に即時保存する。未指定項目の既定値継承と、既存の保存値は維持する。
 
-本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。有効な間はバナーを必須とし、通知全体はOFFにできる。OFFでもログを残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
+本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。ログも残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
 
-確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。有効な間はバナー必須。通知全体のOFFは選べる。同じ状態の間は閉じる・期限切れ・OFF後に再表示せず、ログと設定画面で確認できる。現在は旧PC専用データの残存検出を接続する。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
+確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。現在は旧PC専用データの残存検出を接続する。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。旧設定の移行・削除処理は行わない。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。旧設定の移行・削除処理は行わない。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
 
-「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。OFF状態はスイッチで表し、「この種類の通知はオフです」という重複説明は表示しない。Applet共通設定による停止や定義変更の説明は残す。
+「設定 → 通知」はpage.settingsの共通即時保存を使う。通知そのもののOFFは設けず、種類ごとの通知先・表示時間・読み上げを共有settings.jsonのnotificationPreferences.overridesに保存する。targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。各種類のカードは既定で折りたたみ、見出しに現在の通知先・表示時間・読み上げON/OFFを表示する。
 
-検証して即時保存したオフは既存activeをwithdrawn、再オンで過去通知を再送しない。表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。画面の通知先はbanner/desktop/windowsと読み上げを選択できる。視覚的な表示先は従来のtargets、読み上げはspeakに保存する。「通知センターのみ」はtargets:[]かつspeak:falseで、選択時に両方を一度に反映する。targets:[]かつspeak:trueは読み上げとセンターの履歴だけを利用する。
+表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。画面の通知先はbanner/desktop/windowsと読み上げを選択できる。視覚的な表示先は従来のtargets、読み上げはspeakに保存する。「通知センターのみ」はtargets:[]かつspeak:falseで、選択時に両方を一度に反映する。targets:[]かつspeak:trueは読み上げとセンターの履歴だけを利用する。
 
 TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービスへ接続する。種類別dedupeでも上限50件はApplet全体で共有する。発行頻度はAppletごとにバースト20件、毎秒10件補充で、endは除外。API署名・manifest例は[種類指定Applet API](extensions.md#種類指定通知api)。
 
 ### 通知種類の制約
 
-登録側は表示先と無効化可否を独立して指定する。必須の表示先は`allowedTargets`と`defaultTargets`にも含める。
+登録側は許可先・既定先・必須先を指定する。必須の表示先は`allowedTargets`と`defaultTargets`にも含める。
 
 | 登録定義 | 動作 |
 | --- | --- |
-| `requiredTargets:['banner']` | 通知が有効な間はバナーを必ず含める。バナーの解除とセンターのみへの変更を拒否する |
+| `requiredTargets:['banner']` | バナーを必ず含める。バナーの解除とセンターのみへの変更を拒否する |
 | `requiredTargets:[]` | 許可された表示先をすべて外してセンターのみへ変更できる |
-| `canDisable:true` | 通知全体のON/OFFを許可する。OFF中は必須先も含めて配送しない |
-| `canDisable:false` | 本体通知だけが指定可能。`defaultEnabled:true`と空でない`disabledControlReason`が必要。必須先の有無とは独立し、通知全体のOFFを拒否する |
 
-エラー通知は`requiredTargets:['banner']`と`canDisable:true`の組合せ。OFF不可の本体通知が必要なら`canDisable:false`を別途選ぶ。Appletにも必須先を宣言できるが、種類全体のOFFとApplet共通の許可は尊重する。通知の寿命や閉じる操作は`lifetimePolicy`の別の契約で、バナー必須だけでは常時表示を意味しない。
+エラー・警告・インフォメーション通知は`requiredTargets:['banner']`を使う。Appletにも必須先を宣言できる。通知の寿命や閉じる操作は`lifetimePolicy`の別の契約で、バナー必須だけでは常時表示を意味しない。
 
-設定UIは必須先をチェック済みで編集不可にし、理由を表示する。設定更新APIからの必須先解除も検証で拒否する。旧設定・外部受信に必須先がなくても実効方針に補い、読み込みだけでは保存しない。UIでその種類を編集するときは必須先を補完し、OFF不可の種類に旧`enabled:false`があれば`true`へ整えて保存する。これにより読み上げや表示時間の変更が古い制約違反値に妨げられない。
+設定UIは必須先をチェック済みで編集不可にし、理由を表示する。設定更新APIからの必須先解除も検証で拒否する。旧設定・外部受信に必須先がなくても実効方針に補い、読み込みだけでは保存しない。UIでその種類を編集するときは必須先を補完して保存する。これにより読み上げや表示時間の変更が古い制約違反値に妨げられない。
+
+旧`host.notifications`と種類別`enabled`は読込時に破棄し、旧OFF値で通知を抑止しない。公開設定・ON/OFFコマンドも削除する。manifestの旧`defaultEnabled`・`canDisable`・`disabledControlReason`は互換読込だけを残し、実効定義には含めない。読込だけでファイルを書き換えず、次の通常保存で不要項目がなくなる。実行世代・発行元停止・不整合な通知先を検査する内部方針`NotificationPolicy.enabled`と抑止理由は維持する。
 
 ## インフォメーション通知
 
-本体の操作結果は「インフォメーション通知」へ集約する。通知設定では警告通知の直下に配置し、既定はON・バナーのみ・6秒・読み上げOFF。有効な間はバナー必須で、通知全体のOFFは選べる。更新確認、Codex連携、明示保存、Webアカウント、読み上げ受付・停止、既存のコマンド実行結果を接続する。通常の即時保存や入力途中の説明へ通知を増やさない。下側の汎用toastと更新結果表示を撤去し、更新中の進捗・キャンセルは残す。[設計と移行範囲](information-notifications-design.md)を参照する。
+本体の操作結果は「インフォメーション通知」へ集約する。通知設定では警告通知の直下に配置し、既定はON・バナーのみ・6秒・読み上げOFF。バナーは必須で、通知全体のOFFは設けない。更新確認、Codex連携、明示保存、Webアカウント、読み上げ受付・停止、既存のコマンド実行結果を接続する。通常の即時保存や入力途中の説明へ通知を増やさない。下側の汎用toastと更新結果表示を撤去し、更新中の進捗・キャンセルは残す。[設計と移行範囲](information-notifications-design.md)を参照する。
 
 ## 履歴
 

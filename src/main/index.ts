@@ -2615,7 +2615,7 @@ async function initialize() {
         primary: true,
         run: async () => {
           showWindow();
-          await navigation.navigate('settings', 'general');
+          await navigation.navigate('logs');
         },
       },
     ],

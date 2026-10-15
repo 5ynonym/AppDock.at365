@@ -571,7 +571,6 @@ export function createHostApi(
             ))
         )
           throw new Error('このAppletの登録済みコマンドを指定してください。');
-        if (!settings.value.host.notifications) return null;
         const service = typedNotifications?.();
         if (!service) throw Error('通知基盤は準備中です。');
         const owner = { ownerKind: 'applet' as const, ownerId: id };

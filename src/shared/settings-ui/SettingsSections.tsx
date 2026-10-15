@@ -10,7 +10,7 @@ export function SettingsSection({
   collapsible = false,
   ...props
 }: {
-  title: string;
+  title?: string;
   description?: ReactNode;
   children: ReactNode;
   collapsible?: boolean;
@@ -34,9 +34,9 @@ export function SettingsSection({
     <section
       {...props}
       className={`settings-section ${props.className ?? ''}`}
-      aria-labelledby={id}
+      aria-labelledby={title ? id : undefined}
     >
-      <header>{heading}</header>
+      {title && <header>{heading}</header>}
       <div className="settings-section-content">{children}</div>
     </section>
   );

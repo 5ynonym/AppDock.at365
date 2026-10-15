@@ -381,7 +381,7 @@ body,
   border-radius: 0;
   border-bottom: 1px solid var(--border);
   margin: 0;
-  padding: 22px 0;
+  padding: 0;
 }
 .notification-settings .settings-section-content > .notification-setting-card:last-child {
   border-bottom: 0;

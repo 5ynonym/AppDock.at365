@@ -103,7 +103,7 @@ async function close() {
     await toggle('スタートアップに登録').click();
     await save();
     assert.equal((await service.read()).registered, true);
-    await toggle('閉じるとトレイに常駐').click();
+    await toggle('閉じるとトレイに収納').click();
     await category('リボン').click();
     await category('一般').click();
     assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'true');

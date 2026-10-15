@@ -61,12 +61,12 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
   ],
   appearance: [
+    ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
     ...shellRegions.map(({ id, title }): [string, string, string] => [
       'shellProviders.' + id,
       title + 'のShell',
       '領域ごとにShellを指定します。利用できない場合はDefault Shellを使います。無効なAppletの割り当ても保持します。',
     ]),
-    ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
   ],
   general: [
     [
@@ -85,15 +85,14 @@ const hostItems: Record<string, [string, string, string?][]> = {
       '次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。',
     ],
     ['launch', '現在の起動状態', '状態を確認 管理者として再起動'],
-    ['closeToTray', '閉じるとトレイに常駐', 'ウィンドウを閉じた後もAppletを動かします。'],
+    ['closeToTray', '閉じるとトレイに収納', 'ウィンドウを閉じた後もAppletを動かします。'],
     [
       'hardwareAcceleration',
       'ハードウェアアクセラレーション',
       'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
     ],
-    ['startMinimized', 'トレイから起動', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
+    ['startMinimized', '起動時にトレイに収納', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
     ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
-    ['legacyLocalData', '旧PC専用データ', '同期 旧保存領域 整理 対象 パス バックアップ 再確認'],
   ],
   tts: [
     ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],
@@ -108,7 +107,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['preview', '試聴と停止', 'テキストを入力して読み上げ'],
   ],
   notifications: [
-    ['notifications', 'Appletからの通知を許可', '種類別設定・通知先・表示時間・読み上げ'],
     ['speech.voice', '通知の声', '共通の読み上げ設定を継承 または上書き'],
     ['speech.speed', '通知の読み上げ速度', '共通の読み上げ設定を継承 または上書き'],
     ['speech.preview', '通知の読み上げを試聴', '試聴と停止'],
@@ -339,7 +337,7 @@ export function settingsPaths(
     case 'ai':
       return [['ai']];
     case 'notifications':
-      return [['host', 'notifications'], ['notificationPreferences']];
+      return [['notificationPreferences']];
     case 'general':
       return generalKeys.map((k) => ['host', k]);
     case 'tray':

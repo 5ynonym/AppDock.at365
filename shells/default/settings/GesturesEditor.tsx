@@ -11,6 +11,7 @@ import {
   type GestureBinding,
 } from '../../../src/shared/gestures';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
+import { SettingsField } from '../../../src/shared/settings-ui/SettingsSections';
 import { CommandBindingList } from '../../../src/shared/settings-ui/CommandBindingList';
 import { CommandBindingToolbar } from '../../../src/shared/settings-ui/CommandBindingToolbar';
 import { GestureBindingDialog } from './GestureBindingDialog';
@@ -87,20 +88,19 @@ export function GesturesEditor({
         setStatusFilter={setStatusFilter}
         onOrder={() => setOrderOpen(true)}
       >
-        <div className="gesture-settings-card">
-          <div className="gesture-settings-state" {...settingAnchor('gestures', 'enabled')}>
-            <div>
-              <strong>{hostSettingItem('gestures', 'enabled').title}</strong>
-              <p>右ボタンを押しながら、移動・クリック・ホイール・キーで操作。</p>
-            </div>
-            <Toggle
-              label={hostSettingItem('gestures', 'enabled').title}
-              checked={gestures.enabled}
-              onChange={(enabled) => change({ enabled })}
-            />
-          </div>
-          <GestureOptions gestures={gestures} change={change} />
-        </div>
+        <SettingsField
+          className="gesture-settings-toggle"
+          title={hostSettingItem('gestures', 'enabled').title}
+          description="右ボタンを押しながら、移動・クリック・ホイール・キーで操作。"
+          {...settingAnchor('gestures', 'enabled')}
+        >
+          <Toggle
+            label={hostSettingItem('gestures', 'enabled').title}
+            checked={gestures.enabled}
+            onChange={(enabled) => change({ enabled })}
+          />
+        </SettingsField>
+        <GestureOptions gestures={gestures} change={change} />
       </CommandBindingToolbar>
       {!gestures.enabled && (
         <p className="settings-help">

@@ -7,6 +7,7 @@ import {
 } from '../../../src/shared/settings-ui/SettingsInput';
 import { useEffect, useState } from 'react';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
+import { SettingsSection } from '../../../src/shared/settings-ui/SettingsSections';
 import type { GestureSettings } from '../../../src/shared/gestures';
 function Names({
   itemKey,
@@ -49,11 +50,13 @@ export function GestureOptions({
   change(patch: Partial<GestureSettings>): void;
 }) {
   return (
-    <details className="gesture-options" {...settingAnchor('gestures', 'options')}>
-      <summary>
-        {hostSettingItem('gestures', 'options').title}{' '}
-        <small>{hostSettingItem('gestures', 'options').description}</small>
-      </summary>
+    <SettingsSection
+      collapsible
+      className="gesture-settings-section"
+      title={hostSettingItem('gestures', 'options').title}
+      description={hostSettingItem('gestures', 'options').description}
+      {...settingAnchor('gestures', 'options')}
+    >
       <p className="settings-help">
         一時停止はトレイから切り替えられます。何も操作せず右ボタンを離すと、通常の右クリックになります。
       </p>
@@ -123,6 +126,6 @@ export function GestureOptions({
           />
         </label>
       </div>
-    </details>
+    </SettingsSection>
   );
 }

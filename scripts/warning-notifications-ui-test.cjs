@@ -93,7 +93,7 @@ async function warnings() {
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 async function general() {
   await ui.getByRole('button', { name: '一般', exact: true }).click();
-  await ui.getByRole('heading', { name: '旧PC専用データ', exact: true }).waitFor();
+  await ui.getByRole('heading', { name: 'ウィンドウ', exact: true }).waitFor();
 }
 function removeFixture(target) {
   const absolute = path.resolve(target);
@@ -150,46 +150,38 @@ async function main() {
   ).page
     .getByRole('button', { name: '詳細を見る', exact: true })
     .click();
-  await ui.getByRole('heading', { name: '旧PC専用データ', exact: true }).waitFor();
-  const headings = await (
-    await settingsPage(host)
-  )
-    .locator('.settings-section > header > h2')
-    .allTextContents();
-  assert.deepEqual(headings, ['起動とウィンドウ', '設定ファイル', '旧PC専用データ']);
-  const list = ui.getByRole('list', { name: '旧PC専用データの対象' });
-  for (const target of targets) assert((await list.innerText()).includes(target));
-  assert.equal(await ui.getByRole('button', { name: '削除', exact: true }).count(), 0);
-  await ui.getByRole('button', { name: '再確認', exact: true }).click();
+  await until(async () => (await snapshot()).navigation.route === 'logs', 'warning opens logs');
   const diagnostics = (await snapshot()).logs.filter((l) => l.source === 'storage');
   for (const target of targets)
     assert(diagnostics.some((l) => l.level === 'warning' && l.message.includes(target)));
   assert(!JSON.stringify(diagnostics).includes('PRIVATE-FIXTURE'));
-  await ui.getByRole('heading', { name: '旧PC専用データ', exact: true }).scrollIntoViewIfNeeded();
-  await (await settingsPage(host)).screenshot({ path: path.join(profile, 'legacy-details.png') });
+  await host.evaluate(() => window.dock.navigate('settings'));
+  await general();
+  assert.equal(await ui.getByRole('heading', { name: '旧PC専用データ', exact: true }).count(), 0);
   assert.deepEqual(
     protectedFiles.map((f) => hash(path.join(profile, f))),
     before,
   );
   checks.push(
-    'real warning action opens general details; exact paths in UI/log, no inline banner, fixture data unchanged',
+    'real warning action opens logs; exact paths in log, no legacy settings section, fixture data unchanged',
   );
   await (
     await notificationSurface()
   ).page
     .getByRole('button', { name: '旧保存領域の確認が必要ですを閉じる', exact: true })
     .click();
-  await ui.getByRole('button', { name: '再確認', exact: true }).click();
+  await pause(2300);
   await ui.getByRole('button', { name: '通知', exact: true }).click();
   const notificationCards = (await settingsPage(host)).locator('.notification-setting-card');
   assert.deepEqual(
     await Promise.all(
       [0, 1].map((index) =>
-        notificationCards.nth(index).locator('.settings-field-label strong').first().innerText(),
+        notificationCards.nth(index).locator(':scope > summary > h2').innerText(),
       ),
     ),
     ['エラー通知', '警告通知'],
   );
+  for (const card of await notificationCards.all()) await card.locator(':scope > summary').click();
   for (const type of ['エラー通知', '警告通知'])
     assert.equal(
       await ui.getByRole('textbox', { name: type + 'の表示時間', exact: true }).inputValue(),
@@ -198,17 +190,18 @@ async function main() {
   await (
     await settingsPage(host)
   ).screenshot({ path: path.join(profile, 'notification-defaults.png') });
-  const warningToggle = ui.getByRole('switch', { name: '警告通知を通知', exact: true });
-  await warningToggle.click();
-  await settleSettings(host);
+  assert.equal(await ui.getByRole('switch', { name: '警告通知を通知', exact: true }).count(), 0);
   assert.equal(
-    JSON.parse(fs.readFileSync(settingsFile)).notificationPreferences.overrides.find(
-      (o) => o.ownerId === 'warnings',
-    ).enabled,
-    false,
+    await ui.getByLabel('警告通知の通知センターのみ', { exact: true }).isDisabled(),
+    true,
   );
-  await warningToggle.click();
+  await ui.getByRole('textbox', { name: '警告通知の表示時間', exact: true }).fill('12');
   await settleSettings(host);
+  const preference = JSON.parse(
+    fs.readFileSync(settingsFile),
+  ).notificationPreferences.overrides.find((o) => o.ownerId === 'warnings');
+  assert.equal(preference.durationSeconds, 12);
+  assert.equal('enabled' in preference, false);
   await general();
   await pause(2300);
   assert.equal((await warnings()).length, 0);
@@ -217,20 +210,24 @@ async function main() {
     diagnostics.length,
   );
   checks.push(
-    'warning preference saves immediately; dismissal, page navigation and OFF/ON do not replay or repeat logs',
+    'warning preference saves immediately; dismissal, page navigation and preference edits do not replay or repeat logs',
   );
   // Adding another fixed target while dismissed updates details/logs without replay.
   const extra = path.join(profile, '.appdock/storage');
   targets.push(extra);
   fs.mkdirSync(extra, { recursive: true });
-  await ui.getByRole('button', { name: '再確認', exact: true }).click();
-  await until(async () => (await list.innerText()).includes(extra), 'new target details');
+  await pause(2300);
+  await until(
+    async () =>
+      (await snapshot()).logs.some((l) => l.source === 'storage' && l.message.includes(extra)),
+    'new target log',
+  );
   assert.equal((await warnings()).length, 0);
   assert((await snapshot()).logs.some((l) => l.source === 'storage' && l.message.includes(extra)));
   checks.push('new target stays visible and logged while the original episode remains dismissed');
   for (const target of targets) removeFixture(target);
-  await ui.getByRole('button', { name: '再確認', exact: true }).click();
-  await ui.getByText('整理対象の旧PC専用データはありません。', { exact: true }).waitFor();
+  await pause(2300);
+  await until(async () => !(await snapshot()).legacyLocalData, 'legacy resolved');
   assert.equal((await snapshot()).legacyLocalData, false);
   assert.equal(hash(path.join(profile, protectedFiles[0])), before[0]);
   assert.equal(hash(path.join(profile, protectedFiles[1])), before[1]);

@@ -15,6 +15,13 @@
   min-width: 0;
   background: var(--panel);
 }
+.gesture-settings-section {
+  margin-bottom: 24px;
+}
+.gesture-settings-toggle {
+  margin-bottom: 20px;
+  border-bottom: 0;
+}
 .settings-section > header,
 .settings-section > summary {
   padding: 20px 22px;

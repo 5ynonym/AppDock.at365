@@ -50,7 +50,6 @@ LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命
 | キー | 値 | 適用タイミング |
 | --- | --- | --- |
 | theme | dark/light/system | immediate |
-| notifications | boolean | immediate |
 | closeToTray | boolean | nextClose |
 | startMinimized | boolean | nextStart |
 

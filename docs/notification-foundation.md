@@ -23,11 +23,11 @@ NotificationSurfaceHostはバナーと独自デスクトップ通知で同じ公
 
 ## 通知種類と設定
 
-本体・Appletが安定したtypeId、名前、説明、既定レベル、許可する表示先、既定の寿命、無効化可否を宣言する。Appletの所有者と起動世代は本体が決定し、別所有者の通知や操作を偽装できない。`requiredTargets`による必須先と`canDisable`によるOFF可否は独立する。OFF不可は本体だけが理由と初期ONを伴って宣言できる。Appletも必須先は宣言できるが、種類全体とApplet共通のOFFは尊重する。[通知種類の制約](notifications.md#通知種類の制約)を正本とする。
+本体・Appletが安定したtypeId、名前、説明、既定レベル、許可する表示先、既定の寿命を宣言する。Appletの所有者と起動世代は本体が決定し、別所有者の通知や操作を偽装できない。`requiredTargets`で必須先を指定し、通知全体のOFFは設けない。[通知種類の制約](notifications.md#通知種類の制約)を正本とする。
 
-設定ページの「通知」は導入済み・停止中のAppletも含む種類を一覧表示する。オン・オフ、複数の通知先、表示時間を変更できる。targets:[]は通知センターのみ。時間の空欄は明示的manual、有限秒数はtimed、発行元の条件で終わるconditionには時間を設定できない。必須種類の無効化や必須表示先の解除は拒否する。
+設定ページの「通知」は導入済み・停止中のAppletも含む種類を一覧表示する。複数の通知先、表示時間、読み上げを変更できる。targets:[]は通知センターのみ。時間の空欄は明示的manual、有限秒数はtimed、発行元の条件で終わるconditionには時間を設定できない。必須表示先の解除は拒否する。
 
-notificationPreferences.overridesをsettings.jsonへ保存する。ownerKind/ownerId/typeIdの組で識別し、省略項目は種類の既定値を継承する。未導入・削除済み種類の上書きを受信しても保持する。Applet通知の親スイッチhost.notificationsは維持する。入力途中や保存失敗値は配送方針へ適用せず、正常保存・外部受信した値だけを使う。設定変更はアクティブ通知にも反映し、終了済み履歴や期限切れ通知を復活させない。
+notificationPreferences.overridesをsettings.jsonへ保存する。ownerKind/ownerId/typeIdの組で識別し、省略項目は種類の既定値を継承する。未導入・削除済み種類の上書きを受信しても保持する。旧host.notificationsと種類別enabledは互換読込で破棄する。入力途中や保存失敗値は配送方針へ適用せず、正常保存・外部受信した値だけを使う。設定変更はアクティブ通知にも反映し、終了済み履歴や期限切れ通知を復活させない。
 
 ## 状態、操作と履歴
 

@@ -190,7 +190,7 @@ test('switch commands share persistence, preserve no-ops, and private switches s
   await assert.rejects(f.run('privateFeature.toggle'), { code: 'NOT_FOUND' });
   f.commands.execute(f.applet.id + '.settings.privateFeature.toggle', {}, false);
   assert.equal(f.settings.value.extensions[f.applet.id].settings.privateFeature, true);
-  assert.ok(hostCommands.some((c) => c.id === 'appdock.settings.notifications.toggle'));
+  assert.equal(hostCommands.some((c) => c.id.startsWith('appdock.settings.notifications.')), false);
   assert.equal(generatedSettingCommands(f.applet.id, f.applet.settings, true).length, 4);
 });
 test('writes and switches require both permissions and current running/public state', async (t) => {

@@ -101,11 +101,12 @@ test('warnings have independent preferences and safe history; details stay in lo
   assert.equal(f.logs.length, 4);
   f.prefs({ enabled: true });
   episode.update(warning);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
   const errors = new ErrorReporter({ notifications: () => f.typed, log() {} });
   f.prefs({ enabled: false });
   errors.report({ ...warning, eventId: 'failure' });
-  assert.equal(f.active()[0].ownerId, 'errors');
+  assert(f.active().some((n) => n.ownerId === 'errors'));
+  assert(f.active().some((n) => n.ownerId === 'warnings'));
 });
 test('content changes keep ID and expiry; expiry and dismissal suppress until resolution and recurrence', async (t) => {
   const f = fixture(t),
@@ -137,7 +138,7 @@ test('content changes keep ID and expiry; expiry and dismissal suppress until re
   assert.equal(f.active().length, 0);
   assert.equal(f.publications.length, 2);
 });
-test('initially disabled episodes do not replay on reenable; resolution affects only its own warning', (t) => {
+test('obsolete OFF values do not suppress warnings; resolution affects only its own warning', (t) => {
   const f = fixture(t),
     a = f.reporter.episode(),
     b = f.reporter.episode();
@@ -145,7 +146,7 @@ test('initially disabled episodes do not replay on reenable; resolution affects 
   a.update(warning);
   f.prefs({ enabled: true });
   a.update(warning);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
   b.update({ ...warning, eventId: 'independent' });
   a.resolve();
   assert.equal(f.active().length, 1);

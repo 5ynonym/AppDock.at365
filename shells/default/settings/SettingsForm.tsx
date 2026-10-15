@@ -1,5 +1,4 @@
 import { hostSettingItem } from '../../../src/shared/settings-catalog';
-import { legacyLocalDataInstructions } from '../../../src/shared/legacy-local-data';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings, ExtensionSnapshot, HostSnapshot } from '../../../src/shared/contracts';
@@ -167,108 +166,121 @@ export function SettingsForm({
           </SettingsSection>
         )}
         {category === 'appearance' && (
-          <SettingsSection
-            title="ワークスペースの表示"
-            description="テーマと、各領域を描画するShellを選びます。"
-          >
-            <h4>Shell</h4>
-            {shellRegions.map(({ id, title }) => {
-              const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
-              const candidates = extensions.filter(
-                (e) => e.id !== defaultShellId && shellView(e.shell, id),
-              );
-              const state = aux.shellRegions?.regions.find((r) => r.region === id);
-              const name = (provider: string | null | undefined) =>
-                provider === defaultShellId
-                  ? 'Default Shell'
-                  : (extensions.find((e) => e.id === provider)?.displayName ??
-                    provider ??
-                    '未生成');
-              return (
-                <SettingRow key={id} pageId={category} itemKey={'shellProviders.' + id}>
-                  <div className="shell-region-controls">
-                    <select
-                      aria-label={title + 'のShell'}
-                      value={configured}
-                      disabled={busy}
-                      onChange={(e) =>
-                        edit({
-                          ...settings,
-                          host: {
-                            ...settings.host,
-                            shellProviders: {
-                              ...settings.host.shellProviders,
-                              [id]: e.target.value,
+          <>
+            <SettingsSection>
+              <SettingRow pageId={category} itemKey="theme">
+                <select
+                  aria-label="テーマ"
+                  value={settings.host.theme}
+                  onChange={(e) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        theme: e.target.value as Settings['host']['theme'],
+                      },
+                    })
+                  }
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="system">System</option>
+                </select>
+              </SettingRow>
+            </SettingsSection>
+            <SettingsSection
+              title="ワークスペースの表示"
+              description="各領域を描画するShellを選びます。"
+            >
+              {shellRegions.map(({ id, title }) => {
+                const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
+                const candidates = extensions.filter(
+                  (e) => e.id !== defaultShellId && shellView(e.shell, id),
+                );
+                const state = aux.shellRegions?.regions.find((r) => r.region === id);
+                const name = (provider: string | null | undefined) =>
+                  provider === defaultShellId
+                    ? 'Default Shell'
+                    : (extensions.find((e) => e.id === provider)?.displayName ??
+                      provider ??
+                      '未生成');
+                return (
+                  <SettingRow key={id} pageId={category} itemKey={'shellProviders.' + id}>
+                    <div className="shell-region-controls">
+                      <select
+                        aria-label={title + 'のShell'}
+                        value={configured}
+                        disabled={busy}
+                        onChange={(e) =>
+                          edit({
+                            ...settings,
+                            host: {
+                              ...settings.host,
+                              shellProviders: {
+                                ...settings.host.shellProviders,
+                                [id]: e.target.value,
+                              },
                             },
-                          },
-                        })
-                      }
-                    >
-                      <option value={defaultShellId}>Default Shell（常時有効）</option>
-                      {configured !== defaultShellId &&
-                        !candidates.some((e) => e.id === configured) && (
-                          <option value={configured}>{configured}（未導入・領域未提供）</option>
-                        )}
-                      {candidates.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.displayName}
-                          {!e.enabled ? '（無効）' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="muted">
-                      使用先: {name(state?.boundProvider ?? state?.resolvedProvider)}
-                      {state?.pendingProvider ? ' ／適用待ち: ' + name(state.pendingProvider) : ''}
-                    </p>
-                    {state?.reason && (
-                      <>
-                        <p role="status">{state.reason}</p>
-                        <button
-                          disabled={busy}
-                          onClick={() => void invoke('retryShellRegion', [id])}
-                        >
-                          この領域を再試行
-                        </button>
-                        <p className="muted">
-                          workerの再起動が必要な場合は、このAppletの他の領域も再接続します。
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </SettingRow>
-              );
-            })}
-            <SettingRow pageId={category} itemKey="theme">
-              <select
-                aria-label="テーマ"
-                value={settings.host.theme}
-                onChange={(e) =>
-                  edit({
-                    ...settings,
-                    host: {
-                      ...settings.host,
-                      theme: e.target.value as Settings['host']['theme'],
-                    },
-                  })
-                }
-              >
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-                <option value="system">System</option>
-              </select>
-            </SettingRow>
-          </SettingsSection>
+                          })
+                        }
+                      >
+                        <option value={defaultShellId}>Default Shell（常時有効）</option>
+                        {configured !== defaultShellId &&
+                          !candidates.some((e) => e.id === configured) && (
+                            <option value={configured}>{configured}（未導入・領域未提供）</option>
+                          )}
+                        {candidates.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.displayName}
+                            {!e.enabled ? '（無効）' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="muted">
+                        使用先: {name(state?.boundProvider ?? state?.resolvedProvider)}
+                        {state?.pendingProvider
+                          ? ' ／適用待ち: ' + name(state.pendingProvider)
+                          : ''}
+                      </p>
+                      {state?.reason && (
+                        <>
+                          <p role="status">{state.reason}</p>
+                          <button
+                            disabled={busy}
+                            onClick={() => void invoke('retryShellRegion', [id])}
+                          >
+                            この領域を再試行
+                          </button>
+                          <p className="muted">
+                            workerの再起動が必要な場合は、このAppletの他の領域も再接続します。
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </SettingRow>
+                );
+              })}
+            </SettingsSection>
+          </>
         )}
 
         {category === 'general' && (
           <>
+            <SettingsSection title="ウィンドウ">
+              {(['closeToTray', 'startMinimized', 'hardwareAcceleration'] as const).map((key) => (
+                <SettingRow key={key} pageId={category} itemKey={key}>
+                  <Toggle
+                    label={hostSettingItem(category, key).title}
+                    checked={settings.host[key]}
+                    onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
+                  />
+                </SettingRow>
+              ))}
+            </SettingsSection>
             <SettingsSection
-              title="起動とウィンドウ"
-              description="Windowsへのサインイン時や、ウィンドウを閉じたときの動作を設定します。"
+              title="スタートアップ"
+              description="Windowsへのサインイン時や、AppDockを起動したときの動作を設定します。"
             >
-              <SettingRow pageId={category} itemKey="permissions">
-                <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
-              </SettingRow>
               <SettingRow pageId={category} itemKey="startAtLogon">
                 <Toggle
                   label="スタートアップに登録"
@@ -319,15 +331,15 @@ export function SettingsForm({
                   起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。設定は変更時に保存されます。
                 </p>
               )}
-              {(['closeToTray', 'hardwareAcceleration', 'startMinimized'] as const).map((key) => (
-                <SettingRow key={key} pageId={category} itemKey={key}>
-                  <Toggle
-                    label={hostSettingItem(category, key).title}
-                    checked={settings.host[key]}
-                    onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
-                  />
-                </SettingRow>
-              ))}
+            </SettingsSection>
+            <SettingsSection
+              title="Applet・MCPからの操作"
+              description={hostSettingItem(category, 'permissions').description}
+              {...settingAnchor(category, 'permissions')}
+            >
+              <div className="settings-actions">
+                <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
+              </div>
             </SettingsSection>
             <SettingsSection
               title="設定ファイル"
@@ -364,44 +376,6 @@ export function SettingsForm({
                   </button>
                   <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
                     保存先を開く
-                  </button>
-                </div>
-              </div>
-            </SettingsSection>
-            <SettingsSection
-              title="旧PC専用データ"
-              description="通知を閉じたりオフにした後も、同期前に整理する対象を確認できます。"
-            >
-              <div {...settingAnchor(category, 'legacyLocalData')}>
-                {aux.legacyLocalData?.scanFailed && (
-                  <p role="alert">
-                    一部の旧保存先を確認できません。アクセス権と保存先を確認してください。表示中の対象には前回検出した場所を含みます。
-                  </p>
-                )}
-                {aux.legacyLocalData?.targets.length ? (
-                  <>
-                    <p>旧PC専用データを{aux.legacyLocalData.targets.length}か所検出しました。</p>
-                    <ul aria-label="旧PC専用データの対象">
-                      {aux.legacyLocalData.targets.map((target) => (
-                        <li key={target}>
-                          <code style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
-                            {target}
-                          </code>
-                        </li>
-                      ))}
-                    </ul>
-                    <p>{legacyLocalDataInstructions}</p>
-                    <p>空のフォルダーも対象です。トレイに常駐したままでは完全終了になりません。</p>
-                  </>
-                ) : !aux.legacyLocalData?.scanFailed ? (
-                  <p>整理対象の旧PC専用データはありません。</p>
-                ) : null}
-                <div className="button-row">
-                  <button onClick={() => void run(() => invoke('refreshLegacyLocalData'))}>
-                    再確認
-                  </button>
-                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
-                    配置フォルダーを開く
                   </button>
                 </div>
               </div>

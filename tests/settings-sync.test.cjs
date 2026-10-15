@@ -27,14 +27,14 @@ test('received settings retain dirty revision, reject partial JSON and recover a
   store.watch(() => {});
   const old = store.revision,
     remote = defaults();
-  remote.host.theme = 'light';
+  remote.host.theme = 'dark';
   fs.writeFileSync(file, '{broken');
   await until(() => store.syncError);
-  assert.equal(store.value.host.theme, 'dark');
+  assert.equal(store.value.host.theme, 'light');
   const raw = JSON.stringify(remote);
   fs.writeFileSync(file + '.incoming', raw);
   fs.renameSync(file + '.incoming', file);
-  await until(() => store.value.host.theme === 'light');
+  await until(() => store.value.host.theme === 'dark');
   assert.equal(fs.readFileSync(file, 'utf8'), raw);
   assert.throws(() => store.save(defaults(), old), /別の場所/);
   assert.equal(store.syncError, undefined);

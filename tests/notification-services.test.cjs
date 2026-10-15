@@ -166,7 +166,7 @@ test('legacy API uses declared generated kind while retaining null, silence, glo
   captured = undefined;
   value.host.notifications = false;
   assert.equal(await api(e, 'host.notifications.show', { title: 'T', body: 'B' }), null);
-  assert.equal(captured, undefined);
+  assert.equal(captured.type, 'appdock.legacy');
   await assert.rejects(
     api(e, 'host.notifications.show', { title: 'T', body: 'B', command: 'foreign.open' }),
     /登録済み/,

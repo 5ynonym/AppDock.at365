@@ -89,7 +89,7 @@ ready期限は10秒。読込失敗・renderer終了/応答不能では同じCont
 
 ## 設定の公開契約
 
-一般設定の`SettingsPageAuxiliary.settingsHealth`は、再起動待ちの理由、設定障害の安全な要約、バックアップ継続状態、復元可否、処理中の状態だけを追加投影する。Default Shellは「設定ファイル」欄を表示し、再起動・バックアップ復元・保存先表示を既存のopaque actionで呼ぶ。JSON本文、バックアップ一覧、通知内部の履歴は追加投影しない。通知をOFFにしてもこの状態と操作は利用できる。
+一般設定の`SettingsPageAuxiliary.settingsHealth`は、再起動待ちの理由、設定障害の安全な要約、バックアップ継続状態、復元可否、処理中の状態だけを追加投影する。Default Shellは「設定ファイル」欄を表示し、再起動・バックアップ復元・保存先表示を既存のopaque actionで呼ぶ。JSON本文、バックアップ一覧、通知内部の履歴は追加投影しない。通知を閉じたあともこの状態と操作は利用できる。
 
 `page.settings` は `SettingsPageModel` と `SettingsPageAction` を使用する。全体ページ（full）とApplet詳細（applet）は同じSettingsPageSession・Default Shell本文を共用し、fullだけが左インデックスを表示する。選択ページの値、項目定義、表示に必要な補助モデル、発行済みの不透明な操作IDだけを渡す。全Settings・HostSnapshotを公開しない。
 

@@ -4,7 +4,6 @@ export interface HostSettings {
   shellProviders?: Record<string, string>;
   theme: 'dark' | 'light' | 'system';
   closeToTray: boolean;
-  notifications: boolean;
   startMinimized: boolean;
   startAtLogon: boolean;
   runAsAdministrator: boolean;

@@ -186,11 +186,7 @@ export class TypedNotifications {
       this.service.list();
       const catalog = notificationCatalog(this.options.applets()),
         settings = this.options.settings();
-      const fingerprint = JSON.stringify([
-        catalog,
-        settings.notificationPreferences,
-        settings.host.notifications,
-      ]);
+      const fingerprint = JSON.stringify([catalog, settings.notificationPreferences]);
       const changed = fingerprint !== this.fingerprint;
       this.fingerprint = fingerprint;
       for (const [id, binding] of [...this.bindings]) {

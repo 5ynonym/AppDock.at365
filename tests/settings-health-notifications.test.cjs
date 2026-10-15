@@ -152,15 +152,15 @@ test('one settings episode updates causes without resetting expiry or speaking t
   f.refresh();
   assert.equal(f.active().length, 1);
 });
-test('disabled error episodes stay suppressed after reenable while settings recovery state remains', (t) => {
+test('obsolete OFF preferences do not suppress error episodes or recovery state', (t) => {
   const f = fixture(t);
   f.disable('errors', false);
   f.health.set('read', 'read-invalid');
   f.refresh();
   assert.equal(f.logs.length, 1);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
   f.disable('errors', true);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
   assert(f.health.has('read'));
   f.health.clear('read');
   f.refresh();
@@ -169,9 +169,9 @@ test('disabled error episodes stay suppressed after reenable while settings reco
   assert.equal(f.active().length, 1);
   f.disable('errors', false);
   f.disable('errors', true);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
 });
-test('restart required resolves on revert and respects disable for the whole mismatch episode', (t) => {
+test('restart required resolves on revert and ignores obsolete OFF preferences', (t) => {
   const f = fixture(t);
   const type = notificationCatalog([]).find((i) => i.ownerId === 'settings');
   assert.equal(notificationSpeechEnabled(type, f.settings), false);
@@ -184,7 +184,7 @@ test('restart required resolves on revert and respects disable for the whole mis
   f.disable('settings', false);
   f.restart(true);
   f.disable('settings', true);
-  assert.equal(f.active().length, 0);
+  assert.equal(f.active().length, 1);
   f.restart(false);
   f.restart(true);
   assert.equal(f.active().length, 1);

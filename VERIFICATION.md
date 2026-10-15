@@ -2247,3 +2247,32 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 旧通知設定欄除去の9ファイルをレビュー。製品・試験の最終入力hashと実装時ログhash、固定EXE/GUI成功結果を照合し、変更なし。型検査・ビルド・関連51件・固定EXE GUI8群を再利用する。保存設定の移行は追加しない。
 - 不足していた本体標準回帰を追加実行。dev.bat run build:test-extensionsが終了0、その後dev.bat exec node --test tests/*.test.cjsが **498/498成功、終了0**。成功済みの本体/Updaterビルドは再実行せず、fixtureは今回再生成して検証した。製品ソース/依存/発行物は不変のため版更新・再発行は不要。
 - 正本は `.artifacts/commit-validation-legacy-notifications-20261016/` の完全ログ・入力/ログhash・再利用判定・stage tree/commit照合。変更範囲は本体の通知カタログ、回帰/GUI試験、文書、0.49.0の版。Gmail repoは変更しない。ローカルコミットのみでpush・公開・実利用先配置は行わない。
+
+## 2026-10-16: 設定画面の配置・折りたたみと既定テーマ（0.49.2）
+
+- 表示は見出しなしのテーマカード→ワークスペース一覧（冒頭のShell見出しを撤去）。一般はウィンドウ→スタートアップ→Applet・MCPからの操作→設定ファイル。閉じる操作を「閉じるとトレイに収納」、起動時を「起動時にトレイに収納」へ変更し、ハードウェアアクセラレーションはウィンドウ内に保持した。旧PC専用データ欄・検索項目は撤去し、警告の詳細ボタンを本体ログへ接続。データの削除・移行は行わない。
+- 通知は受け取り方→読み上げ→提供元グループの順。受け取り方と各通知種類は初期状態で閉じた共通カードにする。TTS接続先の文言と、ジェスチャーの閉じた共通カード・内部の動作設定カードを整備。検索によるカードの自動展開と即時保存を維持する。新規テーマはlight、host.notificationsとgestures.enabledは既存のtrueを確認して保持。保存済みの明示値は変更しない。
+- 発行前レビュー1回を実施。削除した旧データ欄への誘導、通知説明、ドキュメント、関連GUIの旧見出し/折りたたみ前提を整合。共通カードの余白と重複見出しも修正し、型検査・ビルド・ソースGUIを再確認した。設定キー・保存ファイル・公開APIの追加削除はなく、診断表示の撤去なのでパッチ更新0.49.1→0.49.2。レビュー記録は `.artifacts/settings-layout-validation-20261016/review.json`。
+- 型検査・本体/Default Shellビルド成功。core/settings-page/settings-editing/settings-commands/gestures/legacy-local-data/notification-policyの関連回帰 **62/62成功**。新規Light既定値によりwatcher fixtureの書き込みが元値と同じになったため、実際に異なるDarkを書き込むよう修正。全標準回帰、実Windows起動登録/UAC、物理ジェスチャー、実サービス通知は今回未実行。
+- 既存publish.batが終了0。固定lockfileの供給網検査、.NETホスト/InputHost/Updater、TS/Shell、portable梱包を維持。本体EXE **144201873 bytes**、SHA256 `3b0f1e4f355422dc0e9e512682ce1edca302530419e9f0a39ba06baab17cd4ac`。update.jsonの0.49.2・size/hashと一致。未変更Applet、全体ZIP、commit/push/GitHub公開/実利用deployは対象外。
+- 固定EXEコピーの隔離GUI **17群成功**。設定配置5群は `.artifacts/settings-layout-1792096753958/result.json`（見出し・順序・文言・折りたたみ・新規既定値/明示値保持・即時保存・検索展開）。警告4群は `.artifacts/warning-notifications-ui-1792096768518/result.json`（ログ導線・対象ログ・抑止・再発・fixtureデータ保持）。通知8群は `.artifacts/notification-settings-1792097027159/result.json`（実Node/.NET通知API・種類別/親スイッチ・期限・入力拒否・検索・両テーマ・再起動/履歴）。3コピーのhashと最終EXEが一致し、各試験の正常終了を確認。ネイティブSettings Shellの画像も目視した。
+- 制限内の原子的renameはEPERM、Electron起動は失敗、publishの供給網検査は停滞したため中断。同一処理を通常ユーザー権限で再実行して成功。GUI試験側は起動/描画待機、検索欄のcombobox role、開閉で要素集合が変わるlocatorを修正。Dark画像の初期値依存も見つけたため、fixtureにDarkを明示して両テーマを再確認。初回失敗ログは保持し、成功の証拠として使わない。発行後の追加変更は通知GUIランナーだけで製品入力/EXEは不変、再発行不要。
+- 証跡は `.artifacts/settings-layout-validation-20261016/validation.json`、入力一覧/各SHA256、完全ログ、レビュー、成果物hash。開始HEADは `0e133ab4996b79b8efa1a9820ef74156934eaf61`（main）。前後照合で製品入力・固定依存の不変を確認。ソース検証後は版とGUIランナーだけ、発行後はGUIランナーだけの変更を記録した。
+- 後片付け: 今回作成した編集用スクリプト2本を削除。設定配置の成功はsource2/portable1で保持範囲内。通知と警告はportable4件ずつで、最古は既存legacy-notification-removal/warning-implementationの再利用証跡のため保護し、他3件も保持。失敗/状態不明profile・今回の再利用資料・固定出力を保持し、既存テストprofileの削除は0件。
+
+## 2026-10-16 通知OFF設定の撤去・設定見出しの要約・ジェスチャー配置（0.50.0）
+
+- 通知種類ごとの有効スイッチとApplet共通の通知許可を撤去。host.notifications、notificationPreferences.overrides[].enabled、通知ON/OFF生成コマンド、manifestのdefaultEnabled/canDisable/disabledControlReasonを現行契約から除去した。旧キーは互換読込で破棄し、旧false値で新規/既存通知を抑止しない。読込だけのファイル書換えは行わず、通常保存時に不要キーがなくなる。停止Applet・世代変更・不整合な通知先の内部抑止とNotificationPolicy.enabledは維持する。
+- バナー必須のエラー・警告・情報通知は、バナー解除と通知センターのみを引き続き拒否する。各種類は既定で折りたたみ、見出しに現在の通知先・表示時間・読み上げON/OFFを表示する。編集すると要約も更新される。マウスジェスチャーは独立した有効トグルと、既定で閉じた共通カードの「動作設定」に分離した。
+- 設定削除を含むため0.49.2から0.50.0へマイナー更新。発行前レビューで通知定義・互換読込・内部抑止・必須先・設定API・表示を確認し、公開テーマ定義の既定値もlightへ統一した。旧dark既定値と旧OFF動作に依存していた回帰fixtureを新仕様へ更新。型検査と標準dev.bat run testは **498/498成功**。更新した.NET API検証用AppletもReleaseビルド成功。
+- 既存publish.batで本体単一EXEを発行。終了0、ProductVersion **0.50.0**、**144193021 bytes**、SHA256 `b8c7a2e60f0097a613cd84c258f1f77f762e966868437904e361316090074323`。update.jsonの版/size/hashと一致。
+- 固定EXEコピーの隔離GUI **31群成功**。設定配置5群: settings-layout-1792098806434、通知8群: notification-settings-1792098833665、警告4群: warning-notifications-ui-1792098882489、情報通知9群: information-notifications-ui-1792098916696、Applet API5群: applet-api-portable-1792099190607。全result.jsonを.artifacts配下に保存。コピーhash一致、実Node/.NET発行・センターのみ・期限/手動寿命・不正入力拒否・必須バナー・検索展開・設定と履歴の再起動保持・隔離MCP経由のAPI/権限を確認。Light/Darkとジェスチャーの画像を目視した。
+- 制限環境の.NET試験ビルド、EXE起動、依存検査は失敗/停滞し、同じ処理を通常ユーザー実行して成功。API GUIランナーの既存AI権限数・ページ見出し・遷移直後の描画待機を修正し、失敗時の画像取得が本来のエラーを隠さないようにした。発行後の変更はこの試験ランナーと文書だけで製品入力は不変。修正後のAPI GUI全体を同一EXEで再実行し成功。初回失敗ログは保持し、成功扱いにはしない。
+- 入力一覧/hash・fixtureバイナリhash・各コマンド/ログhash・発行前レビュー・EXE照合の正本: `.artifacts/notification-always-enabled-20261016/validation.json`。全体テストから発行・GUIまでの製品入力の一致を確認。実Gmail認証/受信、物理Windows通知クリックは今回対象外。commit/push/外部公開/実利用先deployなし。
+- 後片付け: 今回の編集用一時スクリプト6本を削除。各方式の直近成功3回と、過去のwarning/commit-warning/notification-colors/legacy-notification-removal検証から参照する再利用証跡を保持し、テストprofileの削除は0件。失敗/不明profileと固定ビルド出力も保持。今回の試験プロセス終了を確認した。
+
+## 2026-10-16 設定画面・通知設定変更のコミット確認（0.50.0）
+
+- 今回のレイアウト/既定値変更、通知OFF設定と不要な制御項目の撤去、見出しの現在値表示、ジェスチャー配置、関連文書/試験の65ファイルをコミット対象としてレビューした。実装完了時の作業一覧と一致し、別作業の差分なし。
+- `.artifacts/notification-always-enabled-20261016/validation.json`の入力一覧、各成功ログ、5つの固定EXE GUI結果、.NET fixtureバイナリ、最終EXEとupdate.jsonのSHA256を現在値と照合し、差異0。型検査・標準498件・固定EXE GUI31群・.NET fixtureビルド・publishの成功を再利用した。新たな製品修正や再試験の必要なし。版は0.50.0と既発行物を維持する。
+- コミット時の照合・stage tree・commit/tree・作業ツリー状態は `.artifacts/commit-validation-settings-notifications-20261016/` に記録する。検証記録の追記だけを検証後の文書差分として扱う。push・外部公開・実利用先deployは行わない。新規テストprofileの生成なし、以前の成功証跡を再利用資料として保持。

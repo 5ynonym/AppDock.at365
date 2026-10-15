@@ -78,7 +78,7 @@ test('catalog order, mandatory banners, six second lifetime, speech off and lega
   assert.deepEqual(info.defaultTargets, ['banner']);
   assert.equal(info.defaultDurationSeconds, 6);
 });
-test('completed event is delivered once, expires, remains off without replay and can be explicitly repeated', (t) => {
+test('completed event is delivered once, expires, ignores obsolete OFF values and can be explicitly repeated', (t) => {
   const f = fixture(t);
   f.reporter.report('test', '保存', '保存しました。', 'one');
   f.reporter.report('test', '保存', '保存しました。', 'one');
@@ -96,9 +96,9 @@ test('completed event is delivered once, expires, remains off without replay and
   f.settings.notificationPreferences.overrides[0].enabled = true;
   f.typed.reconcile();
   f.reporter.report('test', '保存', '保存しました。', 'two');
-  assert.equal(f.active().length, 0);
-  f.reporter.report('test', '保存', '保存しました。', 'three');
   assert.equal(f.active().length, 1);
+  f.reporter.report('test', '保存', '保存しました。', 'three');
+  assert.equal(f.active().length, 2);
 });
 test('notification and logging failures cannot change operation results or leak raw failures', () => {
   const logs = [];

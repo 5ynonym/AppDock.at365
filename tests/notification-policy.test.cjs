@@ -33,11 +33,14 @@ test('typed Applets expose only declared notifications while legacy-only Applets
     { id: 'empty', notificationTypes: [] },
   ].map((a) => ({ ...a, displayName: a.id, state: 'running', capabilities: ['notifications'] }));
   const kinds = p.notificationCatalog(applets).filter((t) => t.ownerKind === 'applet');
-  assert.deepEqual(kinds.map((t) => [t.ownerId, t.typeId]), [
-    ['typed', 'message'],
-    ['legacy', 'appdock.legacy'],
-    ['empty', 'appdock.legacy'],
-  ]);
+  assert.deepEqual(
+    kinds.map((t) => [t.ownerId, t.typeId]),
+    [
+      ['typed', 'message'],
+      ['legacy', 'appdock.legacy'],
+      ['empty', 'appdock.legacy'],
+    ],
+  );
 });
 function setup(t, definitions = [definition()]) {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-policy-unit-'));
@@ -113,17 +116,10 @@ const content = (extra) => ({
   dedupeKey: 'episode',
   ...extra,
 });
-test('declarations reject identity duplication, Applet mandatory claims, invalid defaults and fields', () => {
+test('declarations reject identity duplication, invalid defaults and fields', () => {
   assert.equal(p.parseNotificationTypes([definition()]).length, 1);
   for (const value of [
     [definition(), definition()],
-    [
-      definition({
-        canDisable: false,
-        requiredTargets: ['banner'],
-        disabledControlReason: 'Mandatory',
-      }),
-    ],
     [definition({ defaultTargets: ['desktop'], allowedTargets: ['banner'] })],
     [definition({ levels: ['info', 'info'] })],
     [definition({ defaultDurationSeconds: 0 })],
@@ -210,7 +206,7 @@ test('mandatory condition is enforced for UI saves and externally received overr
   assert.deepEqual(resolved.lifetime, { type: 'condition' });
   assert.equal(resolved.dismissible, false);
 });
-test('required banner and disabling are independent registration policies', () => {
+test('obsolete disabling declarations and preferences cannot bypass required banners', () => {
   for (const canDisable of [true, false]) {
     for (const requiredTargets of [[], ['banner']]) {
       const [declared] = p.parseNotificationTypes(
@@ -243,7 +239,7 @@ test('required banner and disabling are independent registration policies', () =
         ],
       };
       const policy = p.resolveNotificationPolicy(type, settings);
-      assert.equal(policy.enabled, !canDisable);
+      assert.equal(policy.enabled, true);
       assert.deepEqual(policy.selectedTargets, requiredTargets);
     }
   }
@@ -274,7 +270,7 @@ test('error banner is required even for older center-only preferences; explicit 
     ],
   };
   assert.doesNotThrow(() => p.validateNotificationPreferenceChanges(disabled, original, [type]));
-  assert.equal(p.resolveNotificationPolicy(type, disabled).enabled, false);
+  assert.equal(p.resolveNotificationPolicy(type, disabled).enabled, true);
 });
 
 test('all declared targets are available without silently adding a banner', () => {
@@ -309,24 +305,33 @@ test('typed dedupe isolates kinds but shares the owner quota', (t) => {
     a.notificationId,
   );
 });
-test('turning off withdraws active and suppresses new events without content history; on does not replay', (t) => {
+test('old OFF fields are discarded and cannot suppress active or new notifications', (t) => {
   const f = setup(t);
-  const a = f.typed.publish(owner, 'message', content(), 'run1');
+  const first = f.typed.publish(owner, 'message', content(), 'run1');
   f.prefs([row({ enabled: false })]);
-  assert.equal(f.service.list()[0].status, 'withdrawn');
-  assert.equal(f.service.list()[0].endReason, 'type-disabled');
-  const count = f.history.list().length;
+  f.global(false);
+  assert.equal(f.service.list()[0].status, 'active');
   assert.equal(
-    f.typed.publish(owner, 'message', content({ title: 'Suppressed private' }), 'run1').status,
-    'suppressed',
-  );
-  assert.equal(f.history.list().length, count);
-  f.prefs([]);
-  assert.equal(f.service.list().filter((i) => i.status === 'active').length, 0);
-  assert.notEqual(
     f.typed.publish(owner, 'message', content(), 'run1').notificationId,
-    a.notificationId,
+    first.notificationId,
   );
+  const old = createDefaultSettings();
+  old.host.notifications = false;
+  old.notificationPreferences = { overrides: [row({ enabled: false, targets: [] })] };
+  const parsed = parseSettings(old);
+  assert.equal('notifications' in parsed.host, false);
+  assert.equal('enabled' in parsed.notificationPreferences.overrides[0], false);
+  assert.equal(
+    p.resolveNotificationPolicy({ ...definition({ defaultEnabled: false }), ...owner }, parsed)
+      .enabled,
+    true,
+  );
+  assert.deepEqual(p.resolveNotificationPolicy({ ...definition(), ...owner }, parsed).targets, []);
+  const [declared] = p.parseNotificationTypes([
+    definition({ defaultEnabled: false, canDisable: true }),
+  ]);
+  assert.equal('defaultEnabled' in declared, false);
+  assert.equal('canDisable' in declared, false);
 });
 test('duration change affects new episodes, ordinary updates preserve deadline, explicit restart uses new policy', (t) => {
   const f = setup(t);
@@ -372,7 +377,7 @@ test('route changes preserve active ID and deadline including Windows and center
   assert.equal(f.service.list()[0].expiresAt, due);
   assert.deepEqual(f.service.list()[0].targets, []);
 });
-test('Applet global gate does not disable host updates, stopped generation cannot resolve or replay actions', async (t) => {
+test('stopped generation cannot resolve or replay actions; host updates remain available', async (t) => {
   const f = setup(t);
   let sideEffects = 0;
   f.prefs([row({ durationSeconds: null })]);
@@ -393,7 +398,7 @@ test('Applet global gate does not disable host updates, stopped generation canno
     'run1',
   );
   const item = f.service.list().find((i) => i.id === a.notificationId);
-  f.global(false);
+  f.stop();
   assert.equal(f.service.list().find((i) => i.id === item.id).status, 'withdrawn');
   assert.equal(f.typed.policy({ ownerKind: 'host', ownerId: 'updates' }, 'applied').enabled, true);
   await assert.rejects(
@@ -406,8 +411,8 @@ test('Applet global gate does not disable host updates, stopped generation canno
     }),
   );
   assert.equal(sideEffects, 0);
-  f.global(true);
-  const b = f.typed.publish(owner, 'message', content(), 'run1');
+  f.restart();
+  const b = f.typed.publish(owner, 'message', content(), 'run2');
   f.stop();
   f.restart();
   assert.throws(() => f.typed.end(owner, b.notificationId, 'run1'));

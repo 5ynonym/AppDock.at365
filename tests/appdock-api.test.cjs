@@ -103,7 +103,7 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   );
   f.grant({ read: true });
   assert.equal(
-    (await f.call('commands.execute', { id: 'appdock.settings.notifications.off' })).error.code,
+    (await f.call('commands.execute', { id: 'appdock.settings.closeToTray.off' })).error.code,
     'EXECUTION_DISABLED',
   );
   f.grant({});
@@ -135,7 +135,7 @@ test('Both transports share revision, dryRun, atomic validation, and settings pe
   const revision = f.api.call('settings.get').revision;
   const request = {
     id: 'appdock.settings.update',
-    args: { expectedRevision: revision, changes: { notifications: false } },
+    args: { expectedRevision: revision, changes: { closeToTray: false } },
   };
   assert.equal((await f.call('commands.execute', request)).error.code, 'WRITE_DISABLED');
   f.grant({ read: true, execute: true, write: true });
@@ -146,7 +146,7 @@ test('Both transports share revision, dryRun, atomic validation, and settings pe
   );
   assert.equal(f.api.call('settings.get').revision, revision);
   assert.equal((await f.call('commands.execute', request)).ok, true);
-  assert.equal(f.api.call('settings.get').values.notifications, false);
+  assert.equal(f.api.call('settings.get').values.closeToTray, false);
   assert.equal((await f.call('commands.execute', request)).error.code, 'REVISION_CONFLICT');
   assert.equal(
     (await f.call('commands.execute', { id: 'appdock.tray.update', args: {} })).error.code,
@@ -182,7 +182,7 @@ test('MCP -> Applet -> synchronous settings works while asynchronous reentry and
   ];
   f.options.execute = async () => {
     assert.equal(
-      (await f.call('commands.execute', { id: 'appdock.settings.notifications.off' })).ok,
+      (await f.call('commands.execute', { id: 'appdock.settings.closeToTray.off' })).ok,
       true,
     );
     assert.equal((await f.call('commands.execute', { id: 'other.run' })).error.code, 'BUSY');
@@ -196,7 +196,7 @@ test('MCP -> Applet -> synchronous settings works while asynchronous reentry and
     );
   };
   await f.api.call('commands.execute', { id: 'test.caller.run' });
-  assert.equal(f.store.value.host.notifications, false);
+  assert.equal(f.store.value.host.closeToTray, false);
 });
 test('Legacy self-setting uses shared validation and revision while keeping private keys and startup behavior', (t) => {
   const f = setup(t);

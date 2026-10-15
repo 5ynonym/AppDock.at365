@@ -74,10 +74,12 @@ for (const [kind, id] of Object.entries(ids)) {
       path.join(folder, 'index.cjs'),
       "exports.activate=async c=>{const id='" +
         id +
-        "';c.commands.register(id+'.publish','Publish',async()=>c.storage.set('result',await c.notifications.publish({typeId:'message',title:'Node notification',body:'Node body',historyText:{title:'Safe node',body:'Safe'},dedupeKey:'episode',actions:[{key:'act',label:'Node action',command:id+'.action'}]})));c.commands.register(id+'.action','Action',async()=>c.storage.set('acted',true));c.commands.register(id+'.policy','Policy',async()=>c.storage.set('policy',await c.notifications.getPolicy('message')));c.notifications.onChanged(async()=>c.storage.set('changed',true));c.commands.register(id+'.bad','Bad',async()=>{let rejects=0;for(const input of [{typeId:'missing',title:'Bad',body:'Bad'},{typeId:'message',title:'Bad',body:'Bad',targets:['windows']},{typeId:'message',title:'Bad',body:'Bad',actions:[{key:'foreign',label:'Foreign',command:'fixture.notifications.native.action'}]}])try{await c.notifications.publish(input)}catch{rejects++}await c.storage.set('rejected',rejects)});c.commands.register(id+'.foreign','Foreign',async()=>{const foreign=require('node:fs').readFileSync(require('node:path').join(__dirname,'foreign.txt'),'utf8');let denied=false;try{await c.notifications.end(foreign)}catch{denied=true}await c.storage.set('foreignDenied',denied)});};",
+        "';c.commands.register(id+'.publish','Publish',async()=>c.storage.set('result',await c.notifications.publish({typeId:'message',title:'Node notification',body:'Node body',historyText:{title:'Safe node',body:'Safe'},dedupeKey:'episode',restartTimer:true,actions:[{key:'act',label:'Node action',command:id+'.action'}]})));c.commands.register(id+'.action','Action',async()=>c.storage.set('acted',true));c.commands.register(id+'.policy','Policy',async()=>c.storage.set('policy',await c.notifications.getPolicy('message')));c.notifications.onChanged(async()=>c.storage.set('changed',true));c.commands.register(id+'.bad','Bad',async()=>{let rejects=0;for(const input of [{typeId:'missing',title:'Bad',body:'Bad'},{typeId:'message',title:'Bad',body:'Bad',targets:['windows']},{typeId:'message',title:'Bad',body:'Bad',actions:[{key:'foreign',label:'Foreign',command:'fixture.notifications.native.action'}]}])try{await c.notifications.publish(input)}catch{rejects++}await c.storage.set('rejected',rejects)});c.commands.register(id+'.foreign','Foreign',async()=>{const foreign=require('node:fs').readFileSync(require('node:path').join(__dirname,'foreign.txt'),'utf8');let denied=false;try{await c.notifications.end(foreign)}catch{denied=true}await c.storage.set('foreignDenied',denied)});};",
     );
 }
 const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
+// Exercise both themes independently of the product's initial theme.
+initial.host.theme = 'dark';
 initial.host.hardwareAcceleration = false;
 initial.globalShortcutCommands = [];
 for (const [kind, id] of Object.entries(ids))
@@ -86,7 +88,12 @@ initial.notificationPreferences = {
   overrides: [
     { ownerKind: 'applet', ownerId: 'not.installed', typeId: 'retained', enabled: false },
     // Command-result banners must not crowd the Applet notices under test out of the viewport.
-    { ownerKind: 'host', ownerId: 'information', typeId: 'operation-completed', enabled: false },
+    {
+      ownerKind: 'host',
+      ownerId: 'information',
+      typeId: 'operation-completed',
+      durationSeconds: 1,
+    },
   ],
 };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
@@ -185,6 +192,12 @@ async function settingsPage() {
     .getByRole('button', { name: '通知', exact: true })
     .click();
   await p.getByRole('heading', { name: '通知', level: 1, exact: true }).waitFor();
+  for (const card of await p.locator('.notification-setting-card').all())
+    if (!(await card.evaluate((e) => e.open))) await card.locator(':scope > summary').click();
+  const delivery = p
+    .locator('details')
+    .filter({ has: p.getByRole('heading', { name: '通知の受け取り方', exact: true }) });
+  if (!(await delivery.evaluate((e) => e.open))) await delivery.locator(':scope > summary').click();
   return p;
 }
 async function save(p) {
@@ -230,7 +243,8 @@ async function close() {
       await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
       0,
     );
-    await p.getByRole('switch', { name: 'Stopped noticeを通知', exact: true }).waitFor();
+    await p.getByRole('heading', { name: 'Stopped notice', exact: true }).waitFor();
+    assert.equal(await p.getByRole('switch', { name: /noticeを通知$/ }).count(), 0);
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     assert.equal(
@@ -256,22 +270,24 @@ async function close() {
     const nativeId = storage(ids.native, 'result').notificationId;
     checks.push('real Node and .NET API publish accepted banners; owned command actions execute');
     p = await settingsPage();
-    await p.getByRole('switch', { name: 'Node noticeを通知', exact: true }).click();
+    await p.getByLabel('Node noticeの通知センターのみ', { exact: true }).check();
     await save(p);
     await command(ids.node + '.publish');
-    assert.equal(storage(ids.node, 'result').reason, 'type-disabled');
+    assert.equal(storage(ids.node, 'result').status, 'accepted');
     b = await banner();
     await until(
       async () => !(await b.getByRole('button', { name: 'Node action', exact: true }).count()),
-      'disabled banner ended',
+      'center-only banner withdrawn',
     );
     const nativeRegions = await b
       .getByRole('region', { name: 'Native notification', exact: true })
       .count();
     assert.equal(nativeRegions, 1);
-    checks.push('immediate off withdraws active and suppresses new without disabling other owners');
+    checks.push(
+      'center-only keeps notifications accepted without banners and preserves other owners',
+    );
     p = await settingsPage();
-    await p.getByRole('switch', { name: 'Node noticeを通知', exact: true }).click();
+    await p.getByLabel('Node noticeのバナー', { exact: true }).check();
     await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('5');
     await save(p);
     b = await banner();
@@ -337,18 +353,16 @@ async function close() {
     );
     await p.getByLabel('Native noticeの表示時間', { exact: true }).fill('');
     await save(p);
-    await p.getByRole('switch', { name: 'Appletからの通知を許可', exact: true }).click();
-    await save(p);
-    await command(ids.native + '.publish');
-    assert.equal(storage(ids.native, 'result').reason, 'applet-disabled');
-    await p.getByRole('switch', { name: 'Appletからの通知を許可', exact: true }).click();
-    await save(p);
+    assert.equal(
+      await p.getByRole('switch', { name: 'Appletからの通知を許可', exact: true }).count(),
+      0,
+    );
     await command(ids.native + '.publish');
     assert.equal(storage(ids.native, 'result').status, 'accepted');
     await until(() => storage(ids.native, 'changed') === true, 'native policy event');
     await until(() => storage(ids.node, 'changed') === true, 'node policy event');
     checks.push(
-      'invalid form remains local and never persists; global gate and policy subscriptions work for both SDKs',
+      'invalid form remains local and never persists; notifications remain accepted and policy subscriptions work for both SDKs',
     );
     await p.getByLabel('設定を検索', { exact: true }).fill('Stopped notice');
     await p.getByRole('option').filter({ hasText: 'Stopped notice' }).click();
@@ -362,7 +376,7 @@ async function close() {
     await p.getByLabel('設定を検索', { exact: true }).fill('');
     const nodeCard = p
       .locator('.notification-setting-card')
-      .filter({ has: p.getByRole('switch', { name: 'Node noticeを通知', exact: true }) });
+      .filter({ has: p.getByRole('heading', { name: 'Node notice', exact: true }) });
     assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
     await nodeCard.getByLabel('Node noticeの表示時間', { exact: true }).fill('12');
     await save(p);
