@@ -366,10 +366,6 @@ body,
   color: var(--muted);
   font-size: 12px;
 }
-.notification-card-footer {
-  justify-content: flex-end;
-  margin-top: 12px;
-}
 .notification-setting-card .settings-field {
   padding-top: 0;
 }

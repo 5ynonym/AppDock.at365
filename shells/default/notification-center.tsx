@@ -300,7 +300,7 @@ function App() {
               />
               <strong>{i.title}</strong>
               {!i.read && <span className="unread-mark">未読</span>}
-              <span>{levels[i.level]}</span>
+              <span className="center-card-level">{levels[i.level]}</span>
             </div>
             <p className="notification-body">{i.body}</p>
             <p className="muted">

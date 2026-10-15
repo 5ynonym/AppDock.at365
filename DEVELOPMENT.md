@@ -247,6 +247,8 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 ## 通知設定の回帰
 
+レベル別配色は`scripts/notification-colors-ui-test.cjs [固定EXE]`で確認する。実Node/.NETの登録時レベル、発行時の上書き、明暗テーマのバナー・デスクトップ・通知センター、文字/主要ボタンのコントラスト、既定復帰ボタンの不在と個別設定の即時保存を検証する。
+
 種類宣言・設定・寿命・所有者の共通回帰はtests/notification-policy.test.cjs。scripts/notification-settings-ui-test.cjs [固定EXE]は実Node/.NETの新APIとDefault Shellの通知設定、親スイッチ、保存/抑制/期限/再起動を検証します。標準testは専用.NET fixtureもRelease buildします。旧Appletの既存APIはscripts/applet-api-ui-test.cjs [固定EXE]で確認します。即時保存はscripts/settings-shell-ui-test.cjs [固定EXE]で確認します。実装契約と次回範囲は[通知設計](docs/notification-foundation.md)を参照してください。
 
 通知センターの回帰はtests/notification-center.test.cjs、実Node/.NET・更新結果・ページング・再起動・追加Shell復旧はscripts/notification-center-ui-test.cjs [固定EXE]。共有bridgeと既存通知操作ロックを使います。独自デスクトップの回帰はtests/notification-delivery.test.cjsとscripts/notification-desktop-ui-test.cjs [固定EXE]。実Node/.NET・独立Window・focus・抑制・Shell復旧・最後の表示先を外した解放を確認します。InputHostの専用queryモードに通知内容や入力hookを渡しません。次回はWindows表示先と旧show APIを基盤へ接続します。

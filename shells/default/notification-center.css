@@ -1,4 +1,5 @@
 @import './logs.css';
+@import './notification-levels.css';
 .notification-center {
   height: 100vh;
   display: flex;
@@ -44,13 +45,10 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--panel);
-  border-left: 3px solid var(--blue);
+  border-left: 3px solid var(--notification-accent);
 }
-.center-card.level-warning {
-  border-left-color: #d6a252;
-}
-.center-card.level-error {
-  border-left-color: #e37583;
+.center-card-level {
+  color: var(--notification-accent);
 }
 .center-card-heading strong {
   flex: 1;

@@ -87,24 +87,22 @@ export function NotificationSettings({
     ['queued', 'generating', 'waitingPlayback', 'playing'].includes(j.state),
   );
   const overrides = settings.notificationPreferences?.overrides ?? [];
-  const change = (type: NotificationTypeEntry, patch?: Partial<NotificationPreference>) => {
+  const change = (type: NotificationTypeEntry, patch: Partial<NotificationPreference>) => {
     const key = notificationTypeKey(type),
       current = overrides.find((r) => notificationTypeKey(r) === key);
     const next = overrides.filter((r) => notificationTypeKey(r) !== key);
-    if (patch) {
-      const updated: NotificationPreference = {
-        ownerKind: type.ownerKind,
-        ownerId: type.ownerId,
-        typeId: type.typeId,
-        ...current,
-        ...patch,
-      };
-      // Keep edits valid when an older saved preference lacks newly required controls.
-      if (!type.canDisable) updated.enabled = true;
-      if (updated.targets && type.requiredTargets.length)
-        updated.targets = [...new Set([...updated.targets, ...type.requiredTargets])];
-      next.push(updated);
-    }
+    const updated: NotificationPreference = {
+      ownerKind: type.ownerKind,
+      ownerId: type.ownerId,
+      typeId: type.typeId,
+      ...current,
+      ...patch,
+    };
+    // Keep edits valid when an older saved preference lacks newly required controls.
+    if (!type.canDisable) updated.enabled = true;
+    if (updated.targets && type.requiredTargets.length)
+      updated.targets = [...new Set([...updated.targets, ...type.requiredTargets])];
+    next.push(updated);
     editor.edit({
       ...settings,
       notificationPreferences: { ...settings.notificationPreferences, overrides: next },
@@ -254,11 +252,6 @@ export function NotificationSettings({
                         : '閉じるまで表示します。'}
                     </p>
                   )}
-                  <div className="settings-actions notification-card-footer">
-                    <button disabled={!row} onClick={() => change(type)}>
-                      既定に戻す
-                    </button>
-                  </div>
                 </article>
               );
             })}

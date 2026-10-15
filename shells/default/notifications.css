@@ -1,3 +1,4 @@
+@import './notification-levels.css';
 :root {
   font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
   color: #eff0f5;
@@ -7,7 +8,7 @@
   --border: #6b536d;
   --muted: #c5c2ce;
   --button: #393441;
-  --primary: #9468ef;
+  --primary: #7651c4;
 }
 :root[data-theme='light'] {
   color: #242334;
@@ -41,6 +42,7 @@ body {
 .notification-card {
   flex-shrink: 0;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--notification-accent);
   border-radius: 12px;
   background: var(--card);
   padding: 14px 16px;
@@ -49,10 +51,10 @@ body {
   align-items: center;
   gap: 16px;
 }
-.level-info {
-  --border: #6e8bbd;
+.notification-card.level-warning {
+  --border: #c59744;
 }
-.level-error {
+.notification-card.level-error {
   --border: #cb646a;
 }
 .notification-copy {
@@ -62,7 +64,7 @@ body {
 .notification-level {
   display: block;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--notification-accent);
   margin-bottom: 4px;
 }
 .notification-copy strong {
@@ -140,4 +142,6 @@ button:focus-visible {
   }
 }
 
-.desktop-lane .notification-actions { max-width:100%; }
+.desktop-lane .notification-actions {
+  max-width: 100%;
+}

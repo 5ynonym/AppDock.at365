@@ -246,6 +246,8 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 
 ## 種類指定通知API
 
+登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップ・通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
+
 最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、Applet共通スイッチと種類別設定を適用します。安全な汎用要約だけを履歴へ保存します。
 
 ```json

@@ -222,7 +222,10 @@ async function close() {
   try {
     await launch();
     let p = await settingsPage();
-    assert.equal(await p.getByRole('switch', { name: '旧方式の通知を通知', exact: true }).count(), 0);
+    assert.equal(
+      await p.getByRole('switch', { name: '旧方式の通知を通知', exact: true }).count(),
+      0,
+    );
     assert.equal(
       await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
       0,
@@ -360,15 +363,16 @@ async function close() {
     const nodeCard = p
       .locator('.notification-setting-card')
       .filter({ has: p.getByRole('switch', { name: 'Node noticeを通知', exact: true }) });
-    await nodeCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
+    assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
+    await nodeCard.getByLabel('Node noticeの表示時間', { exact: true }).fill('12');
     await save(p);
     assert.equal(
-      saved().notificationPreferences.overrides.some((r) => r.ownerId === ids.node),
-      false,
+      saved().notificationPreferences.overrides.find((r) => r.ownerId === ids.node).durationSeconds,
+      12,
     );
     await host.evaluate((id) => window.dock.toggleExtension(id, true), ids.node);
     await command(ids.node + '.policy');
-    assert.equal(storage(ids.node, 'policy').durationSeconds, 60);
+    assert.equal(storage(ids.node, 'policy').durationSeconds, 12);
     p = await settingsPage();
     await p.screenshot({ path: path.join(profile, 'notifications-dark.png') });
     await p
@@ -381,13 +385,13 @@ async function close() {
     await p.waitForFunction(() => document.documentElement.dataset.theme === 'light');
     await p.screenshot({ path: path.join(profile, 'notifications-light.png') });
     checks.push(
-      'search reaches a stable kind anchor, per-kind reset preserves others, restart uses defaults, both themes render',
+      'search reaches a stable kind anchor, reset buttons are absent, individual edits preserve other kinds, both themes render',
     );
     await close();
     await launch();
     p = await settingsPage();
     assert.equal(await p.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(), '');
-    assert.equal(await p.getByLabel('Node noticeの表示時間', { exact: true }).inputValue(), '60');
+    assert.equal(await p.getByLabel('Node noticeの表示時間', { exact: true }).inputValue(), '12');
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
     await p.getByText('not.installed / retained', { exact: true }).waitFor();
     const historyFile = path.join(profile, 'data/notifications/history.json');

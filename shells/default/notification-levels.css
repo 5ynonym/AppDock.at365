@@ -1,0 +1,39 @@
+/* Shared by banner, desktop and notification-center cards for every owner. */
+.level-info {
+  color-scheme: dark;
+  --card: #191f23;
+  --panel: #191f23;
+  --text: #eff0f5;
+  --muted: #b1c2bc;
+  --border: #46665c;
+  --button: #243b37;
+  --primary: #217a65;
+  --accent: #7ce1c5;
+  --accent-soft: #243b37;
+  --notification-accent: #7ce1c5;
+  color: var(--text);
+}
+:root[data-theme='light'] .level-info {
+  color-scheme: light;
+  --card: #fff;
+  --panel: #fff;
+  --text: #242939;
+  --muted: #53665f;
+  --border: #9cc5b7;
+  --button: #eef6f2;
+  --accent: #217a65;
+  --accent-soft: #e1f3ec;
+  --notification-accent: #217a65;
+}
+.level-warning {
+  --notification-accent: #d6a252;
+}
+.level-error {
+  --notification-accent: #e37583;
+}
+:root[data-theme='light'] .level-warning {
+  --notification-accent: #886218;
+}
+:root[data-theme='light'] .level-error {
+  --notification-accent: #b63c49;
+}
