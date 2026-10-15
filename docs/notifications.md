@@ -20,7 +20,7 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。有効な間はバナー必須。通知全体のOFFは選べる。同じ状態の間は閉じる・期限切れ・OFF後に再表示せず、ログと設定画面で確認できる。現在は旧PC専用データの残存検出を接続する。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。旧設定の移行・削除処理は行わない。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
 
 「設定 → 通知」はpage.settingsの共通即時保存を使う。host.notificationsは「Appletからの通知を許可」として旧showと新APIの親スイッチになり、本体の通知を止めない。種類単位の上書きは共有settings.jsonのnotificationPreferences.overridesに置く。enabled/targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。OFF状態はスイッチで表し、「この種類の通知はオフです」という重複説明は表示しない。Applet共通設定による停止や定義変更の説明は残す。
 

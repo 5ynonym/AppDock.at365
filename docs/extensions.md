@@ -246,7 +246,7 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 
 ## 種類指定通知API
 
-最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。本体0.32.0では旧ShowAsync/notifications.showも本体生成の予約種類appdock.legacyへ接続します。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、Applet共通スイッチと種類別設定を適用します。安全な汎用要約だけを履歴へ保存します。
+最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、Applet共通スイッチと種類別設定を適用します。安全な汎用要約だけを履歴へ保存します。
 
 ```json
 {

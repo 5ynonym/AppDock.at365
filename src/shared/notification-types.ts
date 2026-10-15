@@ -340,7 +340,9 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
     },
     ...applets.flatMap((a) =>
       [
-        ...(a.capabilities?.includes('notifications') ? [legacyNotificationType] : []),
+        ...(a.capabilities?.includes('notifications') && !a.notificationTypes?.length
+          ? [legacyNotificationType]
+          : []),
         ...(a.notificationTypes ?? []),
       ].map((t) => ({
         ...t,

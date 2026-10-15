@@ -2214,3 +2214,20 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - ソースGUI（warning-notifications-ui-1792086899847）と、3回起動の描画試験（hardware-acceleration-1792086926409）が成功。エラー/警告の順序、両方の表示時間空欄、一般設定の3区分の順序、欠落項目での実Electron GPU OFF、明示ON/OFFの即時保存と再起動時反映、GPU compositingの無効化を確認した。ネイティブShell画像も目視した。
 - 同じ未公開0.47.0の追加修正として既存publish.batで再発行し終了0。本体単一EXEは **144191025 bytes**、SHA256 `6e9fe06ced0c752380af44a5d8499de57cf79e4b1f8262a815caf4b51dd1cb0a`。update.jsonのsize/hash/版と一致し、内蔵Default Shellも0.47.0。新しい固定EXEの隔離GUI4群も成功（warning-notifications-ui-1792087191545）。コピーhash、通知の寿命・詳細・設定保存・配置・データ保持・解消/再発・正常終了を確認した。
 - 発行前レビュー・再利用/再実行の判定・438入力hash・完全なコマンド結果とログhash・発行物・stage tree/commit照合の正本は `.artifacts/commit-validation-warning-20261016/`。前回の警告実装と今回の修正の28ファイルをコミット対象とし、別作業のdocs/development-workflow.mdの音声通知リンク修正は除外。未変更Appletの発行、全体ZIP、push、GitHub公開、実利用先配置は行わない。実利用の設定・旧データは操作していない。
+
+## 2026-10-16: 新方式Appletの不要な旧通知設定欄を除去（0.49.0）
+
+- 通知種類宣言済みのAppletには宣言済み種類だけを公開し、自動生成の「旧方式の通知」を付けない。Gmailは既にnew-mailとpublish/endを使用しているためGmail repoの修正・再発行は不要。未宣言/空配列の旧API専用Appletは従来の予約種類を維持する。種類宣言済みAppletは旧showではなくpublishを使用する契約を文書へ明記した。
+- 指定に従い設定の移行・削除・変換コードは追加しない。保存済みの未知種類を保持する既存動作は維持するため、旧上書き設定がある場合は「現在利用できない種類」に残り、通常の削除操作で整理できる。
+- 設定項目の削除により本体0.48.0→0.49.0へ更新。発行前レビューと試験修正の再レビューは `.artifacts/legacy-notification-removal-20261016/review.md`。発行阻害指摘なし。型検査・本体/Default Shellビルド・通知方針/サービス/基盤/配送/読み上げ/設定ページの関連回帰 **51/51成功**。
+- 既存publish.batは終了0。単一EXE **144204938 bytes**、SHA256 `6783905784007e56b84755313b51dd50eb5a188eaf0694dd4513668ca7f3b4d9`。update.jsonの0.49.0/size/hashと一致、内蔵Default Shellも0.49.0。未変更Appletの発行・全体ZIP・commit/push/公開/実利用先deployは行わない。
+- 固定EXEの隔離GUI **8群成功**（`.artifacts/notification-settings-1792091059251/result.json`、コピーhash一致）。旧方式スイッチの不在、実Node/.NETの新API発行と所有操作、即時OFF/ON、期限/手動寿命、不正引数/他所有者拒否、親スイッチ、設定検索/初期化、再起動/履歴、両テーマを確認。ネイティブSettings Shellのdark/light画像も目視した。実Gmail認証/受信と物理Windows通知クリックは今回対象外。
+- GUI初回～3回目の再試験は期限試験で失敗。描画前の不在を期限切れと見なす待機を修正し、表示先の準備を発行前へ移動、短時間fixtureを5秒・手動維持確認を5.6秒へ変更した。さらに直近で追加されたコマンド結果の情報バナーが表示枠を占めることを確認し、隔離fixture内だけ本体情報通知をOFFにして成功。失敗ログとprofileを保持し、部分成功を全体成功として扱わない。製品EXEへの追加変更はない。
+- 制限環境の固定依存同期は供給網検査待機で中断。通常ユーザーで同じ同期が成功し、固定lockfile/待機/依存検査は維持した。以後のビルド・試験・発行は通常ユーザー実行。検証開始HEAD `bf2519ef6fe87c9006c36da3fe657160983a6986`、入力hashと最終差分、完全ログhash/コマンド/終了コード/環境/成果物は `.artifacts/legacy-notification-removal-20261016/validation.json` 等。ソース回帰後の入力変更はGUI試験スクリプトだけで、製品入力は不変。型検査・ビルド・51件は最終製品へ適用できる。標準全回帰は未実行。
+- 後片付け: 調査用debug.cjsのみ削除。今回の方式の確認済み成功profileは1件のため古い成功分の削除対象なし。4件の失敗profileとログを保持する。固定ビルド出力と他作業資料は保持する。
+
+## 2026-10-16: 0.49.0のコミット前検証
+
+- 旧通知設定欄除去の9ファイルをレビュー。製品・試験の最終入力hashと実装時ログhash、固定EXE/GUI成功結果を照合し、変更なし。型検査・ビルド・関連51件・固定EXE GUI8群を再利用する。保存設定の移行は追加しない。
+- 不足していた本体標準回帰を追加実行。dev.bat run build:test-extensionsが終了0、その後dev.bat exec node --test tests/*.test.cjsが **498/498成功、終了0**。成功済みの本体/Updaterビルドは再実行せず、fixtureは今回再生成して検証した。製品ソース/依存/発行物は不変のため版更新・再発行は不要。
+- 正本は `.artifacts/commit-validation-legacy-notifications-20261016/` の完全ログ・入力/ログhash・再利用判定・stage tree/commit照合。変更範囲は本体の通知カタログ、回帰/GUI試験、文書、0.49.0の版。Gmail repoは変更しない。ローカルコミットのみでpush・公開・実利用先配置は行わない。

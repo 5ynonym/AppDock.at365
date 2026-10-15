@@ -85,6 +85,8 @@ for (const [kind, id] of Object.entries(ids))
 initial.notificationPreferences = {
   overrides: [
     { ownerKind: 'applet', ownerId: 'not.installed', typeId: 'retained', enabled: false },
+    // Command-result banners must not crowd the Applet notices under test out of the viewport.
+    { ownerKind: 'host', ownerId: 'information', typeId: 'operation-completed', enabled: false },
   ],
 };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
@@ -220,6 +222,7 @@ async function close() {
   try {
     await launch();
     let p = await settingsPage();
+    assert.equal(await p.getByRole('switch', { name: '旧方式の通知を通知', exact: true }).count(), 0);
     assert.equal(
       await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
       0,
@@ -266,10 +269,11 @@ async function close() {
     checks.push('immediate off withdraws active and suppresses new without disabling other owners');
     p = await settingsPage();
     await p.getByRole('switch', { name: 'Node noticeを通知', exact: true }).click();
-    await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('1');
+    await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('5');
     await save(p);
-    await command(ids.node + '.publish');
     b = await banner();
+    await command(ids.node + '.publish');
+    await b.getByRole('button', { name: 'Node action', exact: true }).waitFor();
     await until(
       async () => !(await b.getByRole('button', { name: 'Node action', exact: true }).count()),
       'timed expiry',
@@ -277,12 +281,12 @@ async function close() {
     p = await settingsPage();
     await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('');
     await save(p);
+    b = await banner();
     await command(ids.node + '.publish');
     await command(ids.node + '.policy');
     assert.equal(storage(ids.node, 'policy').lifetime.type, 'manual');
-    b = await banner();
     await b.getByRole('button', { name: 'Node action', exact: true }).waitFor();
-    await new Promise((r) => setTimeout(r, 1600));
+    await new Promise((r) => setTimeout(r, 5600));
     assert.equal(await b.getByRole('button', { name: 'Node action', exact: true }).count(), 1);
     checks.push(
       'positive seconds expire; explicit empty duration is manual and survives former deadline',

@@ -55,7 +55,7 @@ Windows通知とは別の、トレイ付近の非アクティブWindowに通知�
 
 Windows adapterは起動準備後に有効となる。通知IDからTag/Groupを作り、同じ通知の内容更新は同じOS履歴項目を置き換える。既読や操作中の表示更新だけで再通知しない。OSのcloseや配送成功をresolved扱いにしない。Windowsのポップアップ表示時間・表示可否はOSが管理し、共通寿命の間は通知センターで確認・操作できる。通知の終了・所有者停止では該当OS項目を撤去する。終了時にはcallbackを解放し、OS履歴の残存とは区別する。
 
-ポータブル単一EXEの起動引数・profileを照合する専用URIで通知センターや所有者の許可されたコマンドへ接続する。ランダムcallbackを使い、世代・所有者・終了後の操作を拒否する。旧API通知は本体生成の予約typeId appdock.legacyへ集約し、「旧方式の通知」として設定できる。従来のsilent・クリックコマンド・nullと親スイッチの挙動を保持し、Appletによる予約種類の宣言を拒否する。更新のお知らせはhost/updates/available、既定Windows・manual・silentとして共通基盤へ移した。
+ポータブル単一EXEの起動引数・profileを照合する専用URIで通知センターや所有者の許可されたコマンドへ接続する。ランダムcallbackを使い、世代・所有者・終了後の操作を拒否する。通知種類未宣言のAppletの旧API通知は本体生成の予約typeId appdock.legacyへ集約し、「旧方式の通知」として設定できる。従来のsilent・クリックコマンド・nullと親スイッチの挙動を保持し、Appletによる予約種類の宣言を拒否する。更新のお知らせはhost/updates/available、既定Windows・manual・silentとして共通基盤へ移した。
 
 ## 設定の即時保存と削除した構造
 
