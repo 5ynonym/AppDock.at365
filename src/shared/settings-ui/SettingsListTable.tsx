@@ -102,6 +102,7 @@ export function SettingsListTable({
         <table aria-label={definition.title}>
           <thead>
             <tr>
+              {view.showIndex && <th>{definition.itemTitle ?? '項目'}</th>}
               {view.columns.map((key) => (
                 <th key={key}>{fields.find((field) => field.key === key)!.title}</th>
               ))}
@@ -111,11 +112,17 @@ export function SettingsListTable({
           </thead>
           <tbody>
             {entries.map((entry, index) => {
-              const name = display(entry, view.titleKey);
+              const name = view.showIndex
+                ? `${definition.itemTitle ?? '項目'}${index + 1}`
+                : display(entry, view.titleKey);
               return (
                 <tr key={view.idKey ? String(entry[view.idKey]) : index} data-list-index={index}>
+                  {view.showIndex && <td className="settings-list-index">{index + 1}</td>}
                   {view.columns.map((key) => (
-                    <td key={key}>
+                    <td
+                      key={key}
+                      className={key === view.titleKey ? 'settings-list-primary' : undefined}
+                    >
                       {key === view.titleKey ? (
                         <div className="settings-list-title">
                           {view.iconKey &&
@@ -131,7 +138,7 @@ export function SettingsListTable({
                               />
                             )}
                           <div>
-                            <strong>{name}</strong>
+                            <strong>{display(entry, key) || '未設定'}</strong>
                             {view.descriptionKey && (
                               <small>{display(entry, view.descriptionKey)}</small>
                             )}
@@ -188,7 +195,9 @@ export function SettingsListTable({
             {!entries.length && (
               <tr>
                 <td
-                  colSpan={view.columns.length + (view.enabledKey ? 2 : 1)}
+                  colSpan={
+                    view.columns.length + (view.enabledKey ? 2 : 1) + (view.showIndex ? 1 : 0)
+                  }
                   className="settings-list-empty"
                 >
                   登録がありません。「{definition.itemTitle ?? '項目'}を追加」から登録できます。

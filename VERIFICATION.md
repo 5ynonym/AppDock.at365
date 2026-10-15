@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-16: 共通ダイアログのフォーカス余白とモニター一覧のコミット確認
+
+- 利用者画像で入力欄の左のフォーカス枠が切れることを確認。共通`SettingsDialog`のスクロール本文のpaddingを四辺6pxに統一し、outline 2px＋offset 3pxを確保した。モニター一覧への対応と同じ変更の仕上げとして0.46.0で再publish。明暗1280/700幅で実際に入力へfocusし、左右の枠が本文のクリップ範囲に収まるassertと画像確認を追加した。
+- [レビュー](.artifacts/commit-validation-monitor-list-20261016/review.md)と[試験単位の再利用判定](.artifacts/commit-validation-monitor-list-20261016/reuse.json)を保存。前回実装時との製品差分はCSSのみで、型検査・実装時15件とApplet回帰8群/RPC/native smokeを再利用。最後の本体標準回帰から変更された生成JSの参照関係と、動的読込/外部入力の影響を確定できない試験を抽出し、60ファイル432件を新規実行して成功。再利用53件と合わせて**本体485/485、fail/skip 0**。
+- 最終固定EXEで[モニターGUI7群](../Applet.WallpaperSlideshow.at365/.artifacts/monitor-list-ui-1792077765049/result.json)、[Web一覧7群](.artifacts/web-list-ui-1792077777646/result.json)、[AI16群](.artifacts/ai-ui-1792077790674/result.json)が終了0。フォーカス枠・64フォルダーのスクロール・固定フッターと既存保存操作を確認。フォルダー選択応答のstubはsource GUI、固定EXEは手入力、AIはローカルfixture。実壁紙は操作していない。
+- publish終了0。EXE/FileVersion/ProductVersion/package/asar/Default Shell/feedは0.46.0。**144,205,410 bytes / SHA256 ea55bce902705dc45acdc82288b884d1d4c3e6ea94c36f61eca418a8d8683416**。3つの固定コピー、feed size/hash、asarのout全166ファイルを照合。Applet0.4.8の配布物とZIPは前回から同じhashで再発行なし。[今回の検証証跡](.artifacts/commit-validation-monitor-list-20261016/validation.json)へ入力/fixture/ログ・stage tree/commitを記録する。
+- 両repoの今回の変更だけをコミット対象とした。失敗/旧画像・再利用資料・今回の証跡は保持。push・Release・実利用先deploy・全体ZIPは未実施。
+
+## 2026-10-16: WallpaperSlideshowのモニター一覧対応（0.46.0）
+
+- 共通一覧へ任意の`list.showIndex`を追加。モニター番号を表示し、編集・削除・並べ替えの対象名にも使う。共通編集フォームに`DirectoryListInput`を追加し、フォルダー追加/選択/削除、既存の64件上限を保持。旧JSON文字列の一覧を配列として競合比較し、旧Folder/数値Modeは編集した登録だけOK時に正規化する。未知の項目・別の登録・取消時の保存形式は保持する。
+- 型検査・ビルド・変更箇所の整形・diff検査が終了0。設定宣言/保存/競合/Shell境界の関連**15/15、fail/skip 0**。後続の変更は共通フォームのスクロールとGUI試験のみで、単体試験の対象ロジックは同じため再利用。本体の全標準回帰、未変更Appletの全回帰は実施していない。
+- [発行前レビュー](.artifacts/monitor-list-20261015/review.md)で保存契約・番号の非永続化・最低版を確認。64フォルダーの画像でfieldsetの内容がフッターへ重なる問題を発見し、スクロールdivと入力無効化用fieldsetを分離。本文とフッターの境界assertを追加し、型/ビルドとsource GUI7群を再確認、同版を再発行した。
+- 最終固定EXEで[モニターGUI7群](../Applet.WallpaperSlideshow.at365/.artifacts/monitor-list-ui-1792076415525/result.json)、[Web一覧7群](.artifacts/web-list-ui-1792076427538/result.json)、[AI16群](.artifacts/ai-ui-1792076440085/result.json)が終了0。旧形式の取消/移行、登録単位の保存、追加/順序/削除/競合、明暗1280/700、詳細設定入口、64件の本文スクロールと固定フッターを確認。最終画像を目視。フォルダー選択/取消の共通API経路は[source GUI](../Applet.WallpaperSlideshow.at365/.artifacts/monitor-list-ui-1792076265412/result.json)でnative dialog応答をstub、固定EXEでは手入力を使用。実壁紙は変更せず、実Appletを無効に保った。AIはローカルfixture。
+- 最終publish終了0。EXE/package/asar/Default Shell/feed/FileVersion/ProductVersionは0.46.0。**144,198,099 bytes / SHA256 2601dd4ca71288c7e27f9c7ae72f6ddd6de118ec161bca9d31ced3adadc88718**。3つのGUIの固定EXE・feed size/hash・asar内out全166ファイルを照合。[検証証跡](.artifacts/monitor-list-20261015/validation.json)へ両repoの入力、コマンド別ログhash、Applet ZIP・固定資産を保存。
+- 版更新後の固定依存installで整合を回復し、依存版/lockfileは変更なし。portableのPlaywright inspector接続timeoutは通常起動＋CDPへ変更。64件試験の外部設定反映待ち不足も修正した。途中の失敗/旧発行画像は保持し、成功扱いせず最終結果を上記へ限定。今回の参照資料・再利用資料を保持。未コミット、push・Release・実利用先deploy・全体ZIPは未実施。
+
 ## 2026-10-15: 並べ替え共通化と実行順アイコンのコミット確認（0.45.2）
 
 - ショートカット／ジェスチャー共通の`CommandBindingToolbar`で「実行順…」を既存`ListIcon(order)`と共通アイコンボタンへ変更。読み上げ用の名前、対象別tooltip、既存の開く操作を保持。今回までの並べ替え共通化を含めてレビューし、未解決指摘なし。同じ変更の仕上げとして0.45.2を再publishした。

@@ -24,6 +24,7 @@ test('declarative lists validate columns, nested paths and option sources', () =
     { enabledKey: 'url' },
     { idKey: 'enabled' },
     { titleKey: 'missing' },
+    { showIndex: 'yes' },
   ]) {
     const item = structuredClone(manifest.settings[0]);
     Object.assign(item.list, patch);
@@ -43,6 +44,43 @@ test('declarative lists validate columns, nested paths and option sources', () =
   assert.deepEqual(next.when.appletIds, ['test.page']);
   assert.equal(next.private, 'retained');
   validateSettingValue(fields[1], [next]);
+});
+
+test('numbered monitor lists migrate legacy rows on edit and still reject conflicting saves', (t) => {
+  const manifest = require('../../Applet.WallpaperSlideshow.at365/extension.json');
+  const definition = parseSettingDefinitions(manifest.settings).find(
+    (field) => field.key === 'monitors',
+  );
+  assert.equal(definition.list.showIndex, true);
+  const rows = [{ Folder: 'C:/Images', Mode: 4, PaddingBottom: 40, private: 'keep' }];
+  const next = rows.map((row) => normalizeObject(row, definition.fields));
+  assert.deepEqual(next[0].Folders, ['C:/Images']);
+  assert.equal(next[0].Mode, 'Tile');
+  assert.equal(next[0].Folder, undefined);
+  assert.equal(next[0].private, 'keep');
+  validateSettingValue(definition, next);
+  const root = path.resolve('.artifacts/list-unit');
+  fs.mkdirSync(root, { recursive: true });
+  const store = new SettingsStore(
+    path.join(fs.mkdtempSync(path.join(root, 'legacy-')), 'settings.json'),
+  );
+  store.load();
+  t.after(() => store.close());
+  const settings = structuredClone(store.value);
+  settings.extensions[manifest.id] = {
+    enabled: false,
+    settings: { monitors: JSON.stringify(rows), private: 'unchanged' },
+  };
+  store.save(settings, store.revision);
+  const commands = new SettingsCommands({
+    settings: store,
+    applets: () => [],
+    save: (v, r) => store.save(v, r),
+  });
+  commands.replaceOwnList(manifest, 'monitors', next, rows);
+  assert.deepEqual(store.value.extensions[manifest.id].settings.monitors, next);
+  assert.equal(store.value.extensions[manifest.id].settings.private, 'unchanged');
+  assert.throws(() => commands.replaceOwnList(manifest, 'monitors', [], rows), /変更/);
 });
 test('grouped list saves preserve other settings and reject stale or undeclared edits', (t) => {
   const root = path.resolve('.artifacts/list-unit');

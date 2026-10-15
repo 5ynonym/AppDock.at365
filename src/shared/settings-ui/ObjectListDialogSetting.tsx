@@ -6,6 +6,7 @@ import { SettingsOrderDialog } from './SettingsOrderDialog';
 import { SettingsDialog } from './SettingsModal';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { SettingsListTable, ListIcon, settingsListText } from './SettingsListTable';
+import { DirectoryListInput } from './DirectoryListInput';
 
 export function ObjectListDialogSetting({
   definition,
@@ -24,6 +25,8 @@ export function ObjectListDialogSetting({
     loadError = '';
   try {
     entries = readObjectList(value ?? definition.default ?? []);
+    for (const entry of entries)
+      for (const field of definition.fields ?? []) objectFieldValue(entry, field);
   } catch {
     loadError = '保存された一覧を読み取れません。JSON設定を確認してください。';
   }
@@ -54,7 +57,7 @@ export function ObjectListDialogSetting({
   const immediate = (next: Record<string, unknown>[]) =>
     void commit(next, entries).catch((e) => setError(String(e.message ?? e)));
   const open = (kind: 'edit' | 'delete' | 'order', index = -1) => {
-    const draft = structuredClone(index < 0 ? normalizeObject({}, fields) : entries[index]);
+    const draft = structuredClone(normalizeObject(index < 0 ? {} : entries[index], fields));
     if (index < 0 && view.idKey) draft[view.idKey] = crypto.randomUUID();
     if (index < 0)
       for (const field of fields)
@@ -68,10 +71,12 @@ export function ObjectListDialogSetting({
     });
   };
   const update = (field: SettingDefinition, next: unknown) => {
-    if (!dialog) return;
-    const draft = structuredClone(dialog.draft);
-    setObjectField(draft, field, next);
-    setDialog({ ...dialog, draft });
+    setDialog((current) => {
+      if (!current || current.kind !== 'edit') return current;
+      const draft = structuredClone(current.draft);
+      setObjectField(draft, field, next);
+      return { ...current, draft };
+    });
   };
   if (loadError) return <p role="alert">{loadError}</p>;
   return (
@@ -120,10 +125,14 @@ export function ObjectListDialogSetting({
           listLabel={definition.title + 'の表示順'}
           items={dialog.before.map((entry, index) => ({
             id: String(index),
-            title: settingsListText(definition, entry, view.titleKey, options),
-            description: view.descriptionKey
-              ? settingsListText(definition, entry, view.descriptionKey, options)
-              : undefined,
+            title: view.showIndex
+              ? `${definition.itemTitle ?? '項目'}${index + 1}`
+              : settingsListText(definition, entry, view.titleKey, options),
+            description: view.showIndex
+              ? settingsListText(definition, entry, view.titleKey, options)
+              : view.descriptionKey
+                ? settingsListText(definition, entry, view.descriptionKey, options)
+                : undefined,
           }))}
           onClose={() => setDialog(null)}
           onApply={(ordered) =>
@@ -136,7 +145,7 @@ export function ObjectListDialogSetting({
       )}
       {dialog && dialog.kind !== 'order' && (
         <SettingsDialog
-          title={`${definition.itemTitle ?? '項目'}を${dialog.kind === 'delete' ? '削除' : dialog.index < 0 ? '追加' : '編集'}`}
+          title={`${definition.itemTitle ?? '項目'}${view.showIndex && dialog.index >= 0 ? dialog.index + 1 : ''}を${dialog.kind === 'delete' ? '削除' : dialog.index < 0 ? '追加' : '編集'}`}
           onClose={() => setDialog(null)}
           applyLabel={dialog.kind === 'delete' ? '削除' : 'OK'}
           onApply={async () => {
@@ -161,11 +170,12 @@ export function ObjectListDialogSetting({
                 const current = objectFieldValue(dialog.draft, field),
                   choices = options[field.key] ?? field.options ?? [];
                 return (
-                  <label key={field.key} className="settings-list-editor-field">
-                    {field.title}
+                  <div key={field.key} className="settings-list-editor-field">
+                    <span>{field.title}</span>
                     {field.type === 'boolean' ? (
                       <input
                         type="checkbox"
+                        aria-label={field.title}
                         checked={Boolean(current)}
                         onChange={(e) => update(field, e.target.checked)}
                       />
@@ -186,6 +196,12 @@ export function ObjectListDialogSetting({
                           </option>
                         ))}
                       </select>
+                    ) : field.type === 'string-list' && field.format === 'directory' ? (
+                      <DirectoryListInput
+                        label={field.title}
+                        value={(current as string[]) ?? []}
+                        onChange={(next) => update(field, next)}
+                      />
                     ) : field.type === 'string-list' ? (
                       <SettingsTextarea
                         aria-label={field.title}
@@ -202,6 +218,9 @@ export function ObjectListDialogSetting({
                       <SettingsInput
                         aria-label={field.title}
                         type={field.type === 'number' ? 'number' : 'text'}
+                        min={field.minimum}
+                        max={field.maximum}
+                        step={field.step ?? 'any'}
                         value={String(current ?? '')}
                         onChange={(e) =>
                           update(
@@ -212,7 +231,7 @@ export function ObjectListDialogSetting({
                       />
                     )}
                     {field.description && <small>{field.description}</small>}
-                  </label>
+                  </div>
                 );
               })
           )}

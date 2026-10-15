@@ -108,6 +108,8 @@ Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ
 
 `columns`は既存フィールドから1～4列、`titleKey`は主情報、`descriptionKey`はその下の補足。selectの値はラベルで表示する。`enabledKey`はbooleanフィールドのトグル。`idKey`は編集欄に出さず、新規登録時だけUUIDを生成する。`iconKey`は行画像のdata PNG/JPEG/WebP文字列を参照する。`confirmDelete`省略時は即時削除で、ショートカットの既存契約を維持する。
 
+AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出しとした1始まりの番号列を追加する。編集・削除・並べ替えの対象名も`itemTitle`と番号で表示する。モニターのように配列位置が割り当て先を表す設定に使い、番号を永続IDとして保存しない。`string-list`の`format: directory`は共通のフォルダー追加・選択・削除入力を使う。旧JSON文字列の一覧と`aliases`・`numericOptions`を読み、編集した登録だけをOKで正規化して保存する。取消では旧形式を含む保存値を変更しない。
+
 フィールドの`propertyPath`は最大3階層の保存パス（例:`["when", "scope"]`）。prototype系キーは禁止。未知の保存項目は保持する。selectの`optionSource: "web-profiles"`は同じAppletの共通プロフィール名簿だけを選択肢に使い、capabilityを必要とする。空の名簿ではAppletの管理画面で枠を追加してから選択する。
 
 本体の保存操作は表示中Appletの宣言済み一覧だけを受け付け、開いた時点の一覧と現在値を照合する。変更があればダイアログへ競合を返す。正常時は最新設定へその一覧だけを合成し、共通SettingsCommandsで検証・保存する。任意のApplet向けSettingsPage操作は公開しない。

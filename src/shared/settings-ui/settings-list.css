@@ -42,13 +42,17 @@
 .settings-list tbody tr:last-child td {
   border-bottom: 0;
 }
-.settings-list td:first-child {
+.settings-list td.settings-list-primary {
   width: 50%;
   min-width: 170px;
 }
 .settings-list th,
-.settings-list td:not(:first-child) {
+.settings-list td:not(.settings-list-primary) {
   white-space: nowrap;
+}
+.settings-list-index {
+  width: 1%;
+  color: var(--muted);
 }
 .settings-list small {
   display: block;

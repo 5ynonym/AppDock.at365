@@ -102,6 +102,7 @@ export interface SettingDefinition {
     idKey?: string;
     iconKey?: string;
     confirmDelete?: boolean;
+    showIndex?: boolean;
   };
   /** Nested storage path for an object-list field; never a JavaScript expression. */
   propertyPath?: string[];

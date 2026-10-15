@@ -153,9 +153,11 @@ export function SettingsDialog({
           ×
         </button>
       </header>
-      <fieldset className="settings-dialog-body" disabled={pending}>
-        {children}
-      </fieldset>
+      <div className="settings-dialog-body">
+        <fieldset className="settings-dialog-fields" disabled={pending}>
+          {children}
+        </fieldset>
+      </div>
       {error && (
         <p className="shortcut-dialog-error" role="alert">
           {error}

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readObjectList } from '../../shared/object-list';
 import type {
   ExtensionSnapshot,
   Settings,
@@ -80,7 +81,7 @@ export class SettingsCommands {
     if (!field) throw Error('一覧設定の宣言がありません。');
     const current =
       this.options.settings.value.extensions[owner.id]?.settings[field.key] ?? field.default ?? [];
-    if (JSON.stringify(current) !== JSON.stringify(before))
+    if (JSON.stringify(readObjectList(current)) !== JSON.stringify(readObjectList(before)))
       throw Error('一覧が別の場所で変更されました。閉じて開き直してください。');
     this.setOwnSetting(owner, field.key, value);
   }

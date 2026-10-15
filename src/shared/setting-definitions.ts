@@ -52,7 +52,11 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
     }
     if (definition.list?.idKey) {
       const ids = items.map((item) => item[definition.list!.idKey!]);
-      if (ids.some((id) => typeof id !== 'string' || !id.trim() || id.length > 100) || new Set(ids).size !== ids.length) fail();
+      if (
+        ids.some((id) => typeof id !== 'string' || !id.trim() || id.length > 100) ||
+        new Set(ids).size !== ids.length
+      )
+        fail();
     }
     for (const item of items)
       for (const field of definition.fields ?? []) {
@@ -233,7 +237,8 @@ export function parseSettingDefinitions(
         (list.enabledKey !== undefined && !has(list.enabledKey, 'boolean')) ||
         (list.idKey !== undefined && !has(list.idKey, 'string')) ||
         (list.iconKey !== undefined && !safeKey(list.iconKey)) ||
-        (list.confirmDelete !== undefined && typeof list.confirmDelete !== 'boolean')
+        (list.confirmDelete !== undefined && typeof list.confirmDelete !== 'boolean') ||
+        (list.showIndex !== undefined && typeof list.showIndex !== 'boolean')
       )
         throw Error('一覧の表示列・識別子・操作定義を確認してください。');
     }
