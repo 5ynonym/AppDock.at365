@@ -41,6 +41,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  legacyLocalData?: import('./legacy-local-data').LegacyLocalDataState;
   settingsHealth?: {
     restartRequired: boolean;
     reasons: string[];

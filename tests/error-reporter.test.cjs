@@ -60,6 +60,7 @@ test('shared error type uses AppDock preferences and logs once even when disable
   const f = setup(t),
     type = notificationCatalog([]).find((n) => n.ownerId === 'errors');
   assert.equal(type.title, 'エラー通知');
+  assert.equal(type.defaultDurationSeconds, null);
   assert.deepEqual(type.defaultTargets, ['banner', 'desktop']);
   assert.deepEqual(type.requiredTargets, ['banner']);
   assert.equal(type.canDisable, true);
@@ -70,6 +71,7 @@ test('shared error type uses AppDock preferences and logs once even when disable
   assert.equal(f.published.length, 1);
   const first = f.service.list().find((n) => n.typeId === owner.typeId);
   assert.equal(first.level, 'error');
+  assert.equal(first.expiresAt, undefined);
   assert.deepEqual(first.targets, ['banner', 'desktop']);
   assert.match(first.body, /AI_OUTPUT_LIMIT/);
   f.prefs({ targets: ['banner'], durationSeconds: 20 });

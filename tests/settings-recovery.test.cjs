@@ -192,7 +192,9 @@ test('startup recovery cancel/reload never creates defaults; a selected valid JS
   fs.writeFileSync(f.file, '{bad');
   assert.throws(() => f.store.load());
   const external = path.join(f.root, 'external.json');
-  write(external, defaults());
+  const selected = defaults();
+  selected.host.hardwareAcceleration = true;
+  write(external, selected);
   let step = 0,
     confirms = 0;
   const result = await recoverSettingsAtStartup(f.store, {

@@ -2175,3 +2175,23 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 全体ZIP試験の待機上限を60秒へ変更し、接続失敗時にCDPを解放。現行のsettings-aware-pageを利用し、内蔵Default Shellの正常起動と外部Applet全一覧を個別に検査する。失敗時にも接続済みの専用AppDockへ終了を依頼する。
 - 修正後の同一ZIP試験は成功。ZIP全収録ファイルのsize/SHA256、本体EXEとの一致、6Appletの版/初期無効/エラーなし、内蔵Shell、更新設定の既定値と正常終了を確認。証跡 `.artifacts/release-0.46.0-20261016-02/bundle-ui-retry2.json` と `all-in-one-retry2.log`。各Appletのソース回帰は同フォルダーの `source-reuse.json` に入力・ログhashの再利用判定を保存。
 - 製品ソースは変更せず、修正はRelease試験のみ。公開前にコミットして新しいPrepareを実行する。GitHub公開と公開後検証の最終結果は、新しいRelease planを正本とする。
+
+## 2026-10-16: 共通警告通知と旧PC専用データの詳細（0.47.0）
+
+- [設計](docs/warning-notifications-design.md)を作成し、共通WarningReporter、独立した「警告通知」の設定、旧PC専用データの固定範囲検出、一般設定の対象フルパスと整理手順、通知の「詳細を見る」、warningログを実装。rendererの独自エラーバナーを除去。通知を閉じる・期限切れ・OFF後の同状態の再発行を抑止し、解消・再発と原因/対象変更の診断を分けた。
+- 削除ボタンは追加しない判断とした。旧ログイン・認証・Applet状態を完全終了後に確認・バックアップして手動で整理する。検出は固定パスのlstatのみ。旧ファイルの内容、認証、JSON本文は収集せず、共有素材・名簿・現在のPC専用rootは対象外。検査不能は未検出扱いにせず既知対象を保持する。
+- 発行前レビューは `.artifacts/warning-implementation-20261016/review.md`。通知accessor障害時の反復ログを指摘し、同episodeの配信再試行を止める修正と回帰を追加。検査不能/ENOENTの区別を追加検証。残る発行阻害指摘なし。警告通知の設定項目追加のため本体と内蔵Default Shellを0.47.0へ更新。未変更Appletの版・発行物は変更していない。
+- 最終build/typecheck成功。関連16ファイルの回帰 **101/101成功**。warning-reporter、legacy-local-data、error-reporter、settings-health-notifications、notification-policy/foundation/routing/services/speech/center/delivery、settings-page/editing/sync、ui-presentation、shell-boundariesを実行。全標準回帰、実Windows toastクリック、実サービス認証・同期・実利用データ削除は今回対象外。
+- 初回の制限環境では既存同期5件が設定renameのEPERM、Electron画面試験が起動拒否で失敗。同じ範囲を通常ユーザー権限で実行すると99/99とソースGUI4群が成功。最終の追加2試験を含む101件も成功した。版更新後の固定lockfile同期は制限環境で供給網検査が進まず中断し、通常ユーザーで成功。検査無効化・依存更新・管理者昇格による回避はしていない。失敗/中断ログを保持。
+- 既存publish.batが終了0。本体単一EXE **144202118 bytes**、SHA256 `8621fcb77a446d0364daabc3105412773f913a412d8dc1b04fa799edc64b94f3`。update.jsonの版・size/hashと一致し、内蔵Default Shellも0.47.0。通常publishの範囲とし、未変更Applet再発行・全体ZIP・GitHub公開・実利用先deployは行っていない。
+- 固定EXEの隔離GUI4群成功（`.artifacts/warning-notifications-ui-1792085698415/result.json`、コピーhashは発行EXEと一致）。実通知ボタンから一般設定へ移動、3対象のフルパス、独自バナー不在、警告設定の即時保存、閉じる/画面往復/OFF→ON後の抑止、対象追加時のログ更新、ポーリングでの解消/再発、正常終了を確認。削除したのはスクリプト生成・検証済み境界内のfixtureだけ。共有素材/名簿と旧credential fixtureの不変を確認し、ネイティブSettings Shell画像を目視した。ソースGUIの成功profileは `warning-notifications-ui-1792085303432`。
+- 証跡・コマンド/終了コード/ログhash・環境・発行物は `.artifacts/warning-implementation-20261016/`。Node24.21.0/pnpm12.10.1/Electron44.6.0/.NET SDK10.0.402、LUNA Windows x64。最終試験前後および発行後の431入力hash一致。lockfile/toolchainは維持。文書リンク137件中、既存READMEの未配置WindowMoverへのリンク1件だけが欠落し、新規リンクの欠落なし。
+- 開始HEADは `d74c92e3bb8db9f21fb0ae6a2026f095bae40b63`。終了確認時にHEADが `fb326beabc70802ec08e49e4a6fbf3ea73c07582` へ進んだことを検出（AGENTS.mdの今回の共通警告指示1行のみのcommit）。この作業ではgit commitを実行していない。別途変更された `docs/development-workflow.md` の音声通知リンク修正にも触れていない。通常ユーザーのGit確認で差分検査成功、製品/試験431入力の不変を再照合した。制限環境の一時的なオブジェクト読み取り失敗はGit修復で回避していない。製品の実装・設計・試験は作業ツリーに残す。
+
+## 2026-10-16: 0.47.0の初期値・表示順・一般設定配置の追加修正とコミット
+
+- 利用者指定で通知設定をエラー→警告の順とし、両方の既定の表示時間をnull（空欄・閉じるまで）へ変更。保存済みの明示した秒数は保持する。一般設定の本文・検索項目を起動とウィンドウ→設定ファイル→旧PC専用データの順へ変更。closeToTrayの既定trueを保持し、hardwareAccelerationの新規/欠落時の既定をfalseへ統一した。明示true/falseと他の初期値は維持する。設定例・README・通知の現行仕様と設計を整合。
+- 型検査成功。標準dev.bat testはbuild/updater/test-extensionsが成功し493件中492成功、復旧fixtureの旧初期ON依存1件だけが失敗した。選択したJSONへONを明示するfixtureに直し、復旧13/13成功後、標準回帰のテスト部分全体を再実行し **493/493成功**。失敗コマンドの部分成功を全体成功へ読み替えていない。前回101件は共有初期値変更前のため代用せず、今回の493件を正本とする。ビルド・型検査後の差分は当該fixtureと文書だけで、関連入力を照合した。
+- ソースGUI（warning-notifications-ui-1792086899847）と、3回起動の描画試験（hardware-acceleration-1792086926409）が成功。エラー/警告の順序、両方の表示時間空欄、一般設定の3区分の順序、欠落項目での実Electron GPU OFF、明示ON/OFFの即時保存と再起動時反映、GPU compositingの無効化を確認した。ネイティブShell画像も目視した。
+- 同じ未公開0.47.0の追加修正として既存publish.batで再発行し終了0。本体単一EXEは **144191025 bytes**、SHA256 `6e9fe06ced0c752380af44a5d8499de57cf79e4b1f8262a815caf4b51dd1cb0a`。update.jsonのsize/hash/版と一致し、内蔵Default Shellも0.47.0。新しい固定EXEの隔離GUI4群も成功（warning-notifications-ui-1792087191545）。コピーhash、通知の寿命・詳細・設定保存・配置・データ保持・解消/再発・正常終了を確認した。
+- 発行前レビュー・再利用/再実行の判定・438入力hash・完全なコマンド結果とログhash・発行物・stage tree/commit照合の正本は `.artifacts/commit-validation-warning-20261016/`。前回の警告実装と今回の修正の28ファイルをコミット対象とし、別作業のdocs/development-workflow.mdの音声通知リンク修正は除外。未変更Appletの発行、全体ZIP、push、GitHub公開、実利用先配置は行わない。実利用の設定・旧データは操作していない。

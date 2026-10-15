@@ -69,7 +69,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
   ],
   general: [
-    ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
     [
       'permissions',
       'Applet・MCPからの操作',
@@ -93,6 +92,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
     ],
     ['startMinimized', 'トレイから起動', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
+    ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
+    ['legacyLocalData', '旧PC専用データ', '同期 旧保存領域 整理 対象 パス バックアップ 再確認'],
   ],
   tts: [
     ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],

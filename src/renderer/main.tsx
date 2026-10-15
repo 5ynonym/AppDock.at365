@@ -117,6 +117,7 @@ function App() {
     if (nav.appletId) setSelected(nav.appletId);
     if (nav.section === 'profile') setProfileRequest((v) => v + 1);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
+    if (nav.section === 'general') setGeneralRequest((v) => v + 1);
   }, [snapshot?.navigation]);
   const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
   const openingRestoredPage = useRef(false);
@@ -131,6 +132,7 @@ function App() {
   const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
+  const [generalRequest, setGeneralRequest] = useState(0);
   const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -194,6 +196,9 @@ function App() {
   useEffect(() => {
     if (ribbonRequest) editor.selectPage('ribbon');
   }, [ribbonRequest]);
+  useEffect(() => {
+    if (generalRequest) editor.selectPage('general');
+  }, [generalRequest]);
   useEffect(() => {
     if (webAccountsRequest) editor.selectPage('web-accounts');
   }, [webAccountsRequest]);
@@ -524,11 +529,6 @@ function App() {
             <button onClick={() => void action(() => window.dock.retryShell())}>
               Shellを再試行
             </button>
-          </div>
-        )}
-        {snapshot?.legacyLocalData && (
-          <div className="error-banner" role="alert">
-            旧保存領域にPC専用データが残っています。同期する前にAppDockを終了して旧データを整理してください。自動移行・削除は行いません。
           </div>
         )}
         {error && (

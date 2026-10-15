@@ -32,7 +32,7 @@ export const createDefaultSettings = (): Settings => ({
     startMinimized: false,
     startAtLogon: false,
     runAsAdministrator: false,
-    hardwareAcceleration: true,
+    hardwareAcceleration: false,
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
   },
@@ -70,7 +70,7 @@ export function parseSettings(value: unknown): Settings {
   const shellProviders = parseShellProviders(value.host);
   const { shellProvider: legacyShellProvider, ...host } = value.host;
   const hardwareAcceleration =
-    value.host.hardwareAcceleration === undefined ? true : value.host.hardwareAcceleration;
+    value.host.hardwareAcceleration === undefined ? false : value.host.hardwareAcceleration;
   if (typeof hardwareAcceleration !== 'boolean')
     throw new Error('host.hardwareAcceleration は true / false です。');
   const startAtLogon = value.host.startAtLogon ?? false;

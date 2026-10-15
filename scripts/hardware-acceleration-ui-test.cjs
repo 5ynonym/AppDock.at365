@@ -55,6 +55,20 @@ async function close() {
 (async () => {
   try {
     let page = await launch();
+    assert.equal(await enabled(), false);
+    assert.equal(
+      await page
+        .getByRole('switch', { name: 'ハードウェアアクセラレーション', exact: true })
+        .getAttribute('aria-checked'),
+      'false',
+    );
+    const offFeatures = await application.evaluate(({ app }) => app.getGPUFeatureStatus());
+    assert.match(offFeatures.gpu_compositing, /^disabled/);
+    await save(page, true);
+    assert.equal(await enabled(), false); // Saving leaves the current process unchanged.
+    await page.screenshot({ path: path.join(profile, 'hardware-acceleration-on-pending.png') });
+    await close();
+    page = await launch();
     assert.equal(await enabled(), true);
     assert.equal(
       await page
@@ -63,36 +77,22 @@ async function close() {
       'true',
     );
     await save(page, false);
-    assert.equal(await enabled(), true); // Saving leaves the current process unchanged.
-    await page.screenshot({ path: path.join(profile, 'hardware-acceleration-off.png') });
+    assert.equal(await enabled(), true);
     await close();
     page = await launch();
     assert.equal(await enabled(), false);
-    const offFeatures = await application.evaluate(({ app }) => app.getGPUFeatureStatus());
-    assert.match(offFeatures.gpu_compositing, /^disabled/);
     assert.equal(
       await page
         .getByRole('switch', { name: 'ハードウェアアクセラレーション', exact: true })
         .getAttribute('aria-checked'),
       'false',
     );
-    await save(page, true);
-    assert.equal(await enabled(), false);
-    await close();
-    page = await launch();
-    assert.equal(await enabled(), true);
-    assert.equal(
-      await page
-        .getByRole('switch', { name: 'ハードウェアアクセラレーション', exact: true })
-        .getAttribute('aria-checked'),
-      'true',
-    );
     console.log(
       JSON.stringify({
         ok: true,
         profile,
         checks:
-          'legacy default on, UI off/on persistence, restart required, actual Electron acceleration and GPU compositing disabled',
+          'default off for missing setting, explicit on/off persistence, restart required, actual Electron acceleration and GPU compositing disabled',
         offFeatures,
       }),
     );

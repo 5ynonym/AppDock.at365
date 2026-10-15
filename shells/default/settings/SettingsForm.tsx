@@ -1,4 +1,5 @@
 import { hostSettingItem } from '../../../src/shared/settings-catalog';
+import { legacyLocalDataInstructions } from '../../../src/shared/legacy-local-data';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings, ExtensionSnapshot, HostSnapshot } from '../../../src/shared/contracts';
@@ -262,45 +263,6 @@ export function SettingsForm({
         {category === 'general' && (
           <>
             <SettingsSection
-              title="設定ファイル"
-              description="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
-            >
-              <div {...settingAnchor(category, 'settingsFile')}>
-                {!aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired && (
-                  <p>設定は正常です。</p>
-                )}
-                {aux.settingsHealth?.recovered && (
-                  <p>最後の正常な設定で動作しています。共有ファイルは変更していません。</p>
-                )}
-                {aux.settingsHealth?.reasons.map((reason) => (
-                  <p key={reason}>{reason}</p>
-                ))}
-                {[...new Set(aux.settingsHealth?.errors)].map((reason) => (
-                  <p role="alert" key={reason}>
-                    {reason}
-                  </p>
-                ))}
-                {!!aux.settingsHealth?.errors.length && <p>原因を確認して再起動してください。</p>}
-                <div className="button-row">
-                  <button
-                    disabled={busy || aux.settingsHealth?.busy}
-                    onClick={() => void run(() => invoke('restart'))}
-                  >
-                    再起動
-                  </button>
-                  <button
-                    disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
-                    onClick={() => void run(() => invoke('restoreSettingsBackup'))}
-                  >
-                    バックアップで復元
-                  </button>
-                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
-                    保存先を開く
-                  </button>
-                </div>
-              </div>
-            </SettingsSection>
-            <SettingsSection
               title="起動とウィンドウ"
               description="Windowsへのサインイン時や、ウィンドウを閉じたときの動作を設定します。"
             >
@@ -366,6 +328,83 @@ export function SettingsForm({
                   />
                 </SettingRow>
               ))}
+            </SettingsSection>
+            <SettingsSection
+              title="設定ファイル"
+              description="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
+            >
+              <div {...settingAnchor(category, 'settingsFile')}>
+                {!aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired && (
+                  <p>設定は正常です。</p>
+                )}
+                {aux.settingsHealth?.recovered && (
+                  <p>最後の正常な設定で動作しています。共有ファイルは変更していません。</p>
+                )}
+                {aux.settingsHealth?.reasons.map((reason) => (
+                  <p key={reason}>{reason}</p>
+                ))}
+                {[...new Set(aux.settingsHealth?.errors)].map((reason) => (
+                  <p role="alert" key={reason}>
+                    {reason}
+                  </p>
+                ))}
+                {!!aux.settingsHealth?.errors.length && <p>原因を確認して再起動してください。</p>}
+                <div className="button-row">
+                  <button
+                    disabled={busy || aux.settingsHealth?.busy}
+                    onClick={() => void run(() => invoke('restart'))}
+                  >
+                    再起動
+                  </button>
+                  <button
+                    disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
+                    onClick={() => void run(() => invoke('restoreSettingsBackup'))}
+                  >
+                    バックアップで復元
+                  </button>
+                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
+                    保存先を開く
+                  </button>
+                </div>
+              </div>
+            </SettingsSection>
+            <SettingsSection
+              title="旧PC専用データ"
+              description="通知を閉じたりオフにした後も、同期前に整理する対象を確認できます。"
+            >
+              <div {...settingAnchor(category, 'legacyLocalData')}>
+                {aux.legacyLocalData?.scanFailed && (
+                  <p role="alert">
+                    一部の旧保存先を確認できません。アクセス権と保存先を確認してください。表示中の対象には前回検出した場所を含みます。
+                  </p>
+                )}
+                {aux.legacyLocalData?.targets.length ? (
+                  <>
+                    <p>旧PC専用データを{aux.legacyLocalData.targets.length}か所検出しました。</p>
+                    <ul aria-label="旧PC専用データの対象">
+                      {aux.legacyLocalData.targets.map((target) => (
+                        <li key={target}>
+                          <code style={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
+                            {target}
+                          </code>
+                        </li>
+                      ))}
+                    </ul>
+                    <p>{legacyLocalDataInstructions}</p>
+                    <p>空のフォルダーも対象です。トレイに常駐したままでは完全終了になりません。</p>
+                  </>
+                ) : !aux.legacyLocalData?.scanFailed ? (
+                  <p>整理対象の旧PC専用データはありません。</p>
+                ) : null}
+                <div className="button-row">
+                  <button onClick={() => void run(() => invoke('refreshLegacyLocalData'))}>
+                    再確認
+                  </button>
+                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
+                    配置フォルダーを開く
+                  </button>
+                </div>
+              </div>
             </SettingsSection>
           </>
         )}

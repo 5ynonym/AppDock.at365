@@ -5,7 +5,7 @@
     "closeToTray": true,
     "notifications": true,
     "startMinimized": false,
-    "hardwareAcceleration": true,
+    "hardwareAcceleration": false,
     "trayClickCommand": "appdock.open",
     "trayDoubleClickCommand": null,
     "shellProviders": {}

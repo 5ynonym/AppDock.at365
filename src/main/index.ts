@@ -124,6 +124,8 @@ import { AiService } from './core/ai-service';
 import { AiSecrets } from './core/ai-secrets';
 import { AiSettingsController } from './core/ai-settings';
 import { ErrorReporter } from './core/error-reporter';
+import { WarningReporter } from './core/warning-reporter';
+import { LegacyLocalDataMonitor, inspectLegacyLocalData } from './core/legacy-local-data';
 import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
@@ -419,6 +421,11 @@ const errors = new ErrorReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('error', source, message),
 });
+const warnings = new WarningReporter({
+  notifications: () => (quitting ? undefined : typedNotifications),
+  log: (source, message) => log.write('warning', source, message),
+});
+let legacyLocalData: LegacyLocalDataMonitor | undefined;
 const ai = new AiService({
   settings: () => settings.value.ai ?? defaultAiSettings(),
   key: (c) => aiSecrets.key(c),
@@ -863,13 +870,7 @@ function snapshot(): HostSnapshot {
     },
     dataDirectory,
     sharedDirectory,
-    legacyLocalData:
-      dataDirectory !== sharedDirectory &&
-      [sharedDirectory, path.join(baseDirectory, '.appdock')].some((directory) =>
-        ['chromium', 'web-accounts', 'storage', 'secrets', 'web-applets/sessions'].some((p) =>
-          fs.existsSync(path.join(directory, p)),
-        ),
-      ),
+    legacyLocalData: !!legacyLocalData?.snapshot().targets.length,
     dark: nativeTheme.shouldUseDarkColors,
     avatarUrl: avatarFile() ? `appdock://host/avatar.png?v=${avatarSignature()}` : null,
   };
@@ -1073,6 +1074,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'general')
     return {
       launch: host.launch,
+      legacyLocalData: legacyLocalData?.snapshot(),
       settingsHealth: {
         restartRequired: settingsRestartRequired(),
         reasons: settingsRestartRequired() ? [settingsRestartReason] : [],
@@ -1286,6 +1288,7 @@ function settingsPageActions(
     };
     actions.restoreSettingsBackup = restoreSettingsBackup;
     actions.openSettingsDirectory = settingsRecoveryUi.openDirectory;
+    actions.refreshLegacyLocalData = async () => legacyLocalData?.refresh();
     actions.refreshLaunchState = async () => {
       const result = await launch.refresh();
       if (
@@ -2536,6 +2539,23 @@ async function initialize() {
     ],
   });
   settingsHealthNotifications.refresh();
+  legacyLocalData = new LegacyLocalDataMonitor({
+    inspect: () => inspectLegacyLocalData(baseDirectory, sharedDirectory, dataDirectory),
+    warnings,
+    changed,
+    actions: [
+      {
+        key: 'details',
+        label: '詳細を見る',
+        primary: true,
+        run: async () => {
+          showWindow();
+          await navigation.navigate('settings', 'general');
+        },
+      },
+    ],
+  });
+  legacyLocalData.start();
   notificationSpeech?.reconcile();
   automation = new AutomationService({
     localDirectory: dataDirectory,
@@ -2810,6 +2830,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   settingsHealthNotifications?.dispose();
+  legacyLocalData?.dispose();
   notificationBanner?.dispose();
   notificationDesktop?.dispose();
   notificationWindows?.dispose();

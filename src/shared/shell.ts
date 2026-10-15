@@ -152,7 +152,7 @@ export interface ShellStatus {
 export type NavigationState = {
   route: string;
   request: number;
-  section?: 'profile' | 'ribbon';
+  section?: 'profile' | 'ribbon' | 'general';
   appletId?: string;
 };
 

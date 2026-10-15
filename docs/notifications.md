@@ -16,7 +16,9 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 ## 通知種類と設定
 
-本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知10秒、読み上げOFF。有効な間はバナーを必須とし、通知全体はOFFにできる。OFFでもログを残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
+本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。有効な間はバナーを必須とし、通知全体はOFFにできる。OFFでもログを残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
+
+確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。必須先はなく、センターのみと通知全体のOFFを選べる。同じ状態の間は閉じる・期限切れ・OFF後に再表示せず、ログと設定画面で確認できる。現在は旧PC専用データの残存検出を接続する。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
 notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要で、canDisable:falseを自己宣言できない。notifications capabilityを持つAppletには予約ID appdock.legacyの「旧方式の通知」を本体が生成する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、任意の無効化・表示先・時間指定が可能。
 

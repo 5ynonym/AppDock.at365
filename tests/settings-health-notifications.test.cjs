@@ -124,6 +124,12 @@ test('read errors wait two seconds, transient writes stay silent and startup fai
 });
 test('one settings episode updates causes without resetting expiry or speaking twice; expiration never resurrects it', (t) => {
   const f = fixture(t);
+  f.settings.notificationPreferences.overrides.push({
+    ownerKind: 'host',
+    ownerId: 'errors',
+    typeId: 'operation-failed',
+    durationSeconds: 10,
+  });
   f.health.set('save', 'save-failed');
   f.refresh();
   const first = f.active()[0];

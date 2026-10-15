@@ -19,7 +19,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
     ...original.host,
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
-    hardwareAcceleration: true,
+    hardwareAcceleration: false,
     shellProviders: {},
     startAtLogon: false,
     runAsAdministrator: false,
@@ -29,12 +29,15 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   assert.equal(result.profile.avatar, null);
   assert.equal(original.shortcuts, undefined);
 });
-test('hardware acceleration defaults on for legacy profiles, preserves explicit off and rejects invalid values', () => {
+test('general defaults keep close-to-tray on and acceleration off while preserving explicit values', () => {
   const settings = createDefaultSettings();
-  assert.equal(settings.host.hardwareAcceleration, true);
+  assert.equal(settings.host.closeToTray, true);
+  assert.equal(settings.host.hardwareAcceleration, false);
   delete settings.host.hardwareAcceleration;
-  assert.equal(parseSettings(settings).host.hardwareAcceleration, true);
+  assert.equal(parseSettings(settings).host.hardwareAcceleration, false);
   assert.equal(settings.host.hardwareAcceleration, undefined);
+  settings.host.hardwareAcceleration = true;
+  assert.equal(parseSettings(settings).host.hardwareAcceleration, true);
   settings.host.hardwareAcceleration = false;
   assert.equal(parseSettings(settings).host.hardwareAcceleration, false);
   for (const invalid of [null, 0, 1, 'false', {}, []])
