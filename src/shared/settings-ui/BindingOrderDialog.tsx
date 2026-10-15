@@ -1,5 +1,5 @@
-import { useId, useRef, useState } from 'react';
-import { SettingsModal } from './SettingsModal';
+import { useRef, useState } from 'react';
+import { OrderDialogFrame } from './OrderDialogFrame';
 import type { UiCommand } from '../commands';
 export function BindingOrderDialog<R extends { id: string; command: string; enabled: boolean }>({
   bindings,
@@ -40,7 +40,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   const [over, setOver] = useState<string | null>(null);
   const dragged = useRef<string | null>(null);
   const selector = useRef<HTMLSelectElement>(null);
-  const id = useId();
   const originalGroups = new Map(groupRows(original));
   const changed = groups.filter(
     ([name, group]) =>
@@ -57,27 +56,28 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
     setError('');
   };
   return (
-    <SettingsModal
+    <OrderDialogFrame
+      title={title}
+      eyebrow="アプリ全体の割り当て"
       className="shortcut-order-dialog"
-      labelledBy={`${id}-title`}
+      closeLabel="実行順の編集をキャンセル"
       onClose={onClose}
       onReady={setReady}
       onError={setError}
       initialFocus="select"
+      error={error}
+      footer={changed ? changed + '種類の順序を変更' : '適用すると設定に反映されます'}
+      applyLabel="適用"
+      applyDisabled={!changed || !ready}
+      onApply={() => {
+        try {
+          onApply(ordered, original);
+          onClose();
+        } catch (reason) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+        }
+      }}
     >
-      <header>
-        <div>
-          <small>アプリ全体の割り当て</small>
-          <h2 id={`${id}-title`}>{title}</h2>
-        </div>
-        <button
-          className="shortcut-dialog-close"
-          aria-label="実行順の編集をキャンセル"
-          onClick={onClose}
-        >
-          ×
-        </button>
-      </header>
       <label className="shortcut-order-key">
         {inputName}
         <select
@@ -196,31 +196,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       <div className="shortcut-order-notice" role="status">
         {notice || 'ドラッグ・上下ボタンで並べ替えられます。'}
       </div>
-      {error && (
-        <p className="shortcut-dialog-error" role="alert">
-          {error}
-        </p>
-      )}
-      <footer>
-        <small>{changed ? `${changed}種類の順序を変更` : '適用すると設定に反映されます'}</small>
-        <div>
-          <button onClick={onClose}>キャンセル</button>
-          <button
-            className="primary"
-            disabled={!changed || !ready}
-            onClick={() => {
-              try {
-                onApply(ordered, original);
-                onClose();
-              } catch (reason) {
-                setError(reason instanceof Error ? reason.message : String(reason));
-              }
-            }}
-          >
-            適用
-          </button>
-        </div>
-      </footer>
-    </SettingsModal>
+    </OrderDialogFrame>
   );
 }

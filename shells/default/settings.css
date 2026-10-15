@@ -587,9 +587,6 @@ pre.ai-preview-result {
   display: grid;
   gap: 9px;
 }
-.ai-order-dialog .shortcut-order-list {
-  margin: 0;
-}
 @container settings-page (max-width: 540px) {
   .ai-connection-table .applet-shortcut-overview th,
   .ai-connection-table .applet-shortcut-overview td {

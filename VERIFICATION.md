@@ -1,5 +1,34 @@
 # 検証記録
 
+## 2026-10-15: 並べ替え共通化と実行順アイコンのコミット確認（0.45.2）
+
+- ショートカット／ジェスチャー共通の`CommandBindingToolbar`で「実行順…」を既存`ListIcon(order)`と共通アイコンボタンへ変更。読み上げ用の名前、対象別tooltip、既存の開く操作を保持。今回までの並べ替え共通化を含めてレビューし、未解決指摘なし。同じ変更の仕上げとして0.45.2を再publishした。
+- 型検査・ビルド・変更TSXの整形・diff検査が成功。標準回帰は**484/484**を確認。以前の成功ログ・試験ソース・依存・ツール・生成mainコードを照合して451件を再利用し、UIソースを走査するShell境界1件と再生成したnative/updaterを使用する4ファイル32件を新規実行、fail/skip 0。[入力比較・結果](.artifacts/commit-validation-order-dialog-20261015/validation.json)と[レビュー](.artifacts/commit-validation-order-dialog-20261015/review.md)に根拠を記録。
+- 新しい固定EXEで[ショートカット8群](.artifacts/shortcuts-ui-1792072650204/result.json)、[ジェスチャーUI8項目](.artifacts/gestures-ui-1792072743842/result.json)、[Web一覧7群](.artifacts/web-list-ui-1792072792924/result.json)、[AI16群](.artifacts/ai-ui-1792072826650/result.json)が終了0。両アイコンからダイアログを開き、ツールバー画像を目視確認。既存の並べ替え・保存・競合・取消・テーマ・狭幅の回帰も成功。ジェスチャーは物理入力省略の明示を含むUI試験、AIはローカルfixtureである。
+- publish終了0。package・EXEのFileVersion/ProductVersion・asar・Default Shell・feedは0.45.2。最終EXEは**144,206,273 bytes / SHA256 89c01d506448316826cde330574619218698af24cf3e61fac8b16f835c263941**。4つのGUIの固定コピー、feed size/hash、asar内out全166ファイルの一致を確認。
+- 変更16ファイルをコミット対象とした。再利用資料と今回の検証資料・失敗/不明資料は保持。未変更Appletの再発行、全体ZIP、実利用先deploy・push・Releaseは実施していない。任意の外部Shellの実機確認は未実施。
+
+## 2026-10-15: 実行順と表示順の共通テンプレート（0.45.2）
+
+- `OrderDialogFrame`を追加し、ショートカット／ジェスチャーの`BindingOrderDialog`と表示順の`SettingsOrderDialog`で外枠・見出し・本文・エラー・操作欄を共有。実行順側の幅760px、余白24px（狭幅18px）、テーマ色・行表示を採用。対象選択・条件説明・複数グループ・同期適用と、表示順側の非同期保存・失敗時保持は各Controllerへ残す。仕様は[共通テンプレート](docs/settings-list-editing.md#shellで並べ替えを再利用する)。
+- 型検査・ビルド・整形・diff検査が成功。保存/順序の関連34件が成功し、その後のCSS・試験画像採取・版だけの変更は単体対象へ影響しないため再利用。[レビュー](.artifacts/order-frame-review.md)と[入力/成果物照合](.artifacts/order-frame-validation.json)にログ・入力hash・再利用理由を記録。全標準回帰と無関係Appletの再発行は実施していない。
+- 最終固定EXEで[ショートカット8群](.artifacts/shortcuts-ui-1792071734090/result.json)、[ジェスチャーUI8項目](.artifacts/gestures-ui-1792071812381/result.json)、[Web一覧7群](.artifacts/web-list-ui-1792071834728/result.json)、[AI16群](.artifacts/ai-ui-1792071847655/result.json)が終了0。ジェスチャーは`APPDOCK_GESTURE_UI_ONLY=1`で物理入力を省略した旨を含む8項目。AIはローカルfixture。任意の外部Shell自体の実機確認は未実施。
+- 並べ替え/対象切替/取消/フォーカス復帰/外部競合/失敗時の順序保持、明暗・狭幅、22件の一覧でも固定フッターが見えることを確認。各Shell内のdialog画像を目視し、ジェスチャー・ショートカット・初期ショートカットの枠/余白/色の一致を確認。
+- レビューでfieldsetのflex制約による長一覧スクロール不良を修正。さらに発行物の画像で本文clipによるフォーカス枠欠けを修正して同版を再発行し、4種類のGUIを再実行。旧試験の親Window画像はShell本文を含まず、テーマもUI状態に再上書きされていたため、dialog locatorでの採取と実際のhostテーマ保存/反映待ちへ変更。初回失敗/旧EXE資料は保持する。
+- 最終publish終了0。EXE/FileVersion/ProductVersion/package/asar/Default Shell/feedは0.45.2。**144,200,797 bytes / SHA256 ca3474068a2fcaa2827dfedbbaeeb4ec7ae31c266a258b944859637ef1512dee**。4つのGUIの固定コピーと最終EXE、feed size/hash、asar内out全166ファイルの一致を確認。
+- 今回の編集専用一時スクリプトを削除。既存テスト資料は再利用参照または実行方式/稼働照合が未確定のため保持し、失敗・不明資料も削除していない。本体publishまで完了、未コミット。実利用先deploy・push・Release・全体ZIP作成は未実施。
+
+
+## 2026-10-15: 設定の並べ替えダイアログ共通化（0.45.1）
+
+- `SettingsOrderDialog`を共有settings-uiへ追加し、AIサーバーと宣言型object-list（登録サイト・初期ショートカット）から使用。既存AIの行スタイル、番号、説明、ドラッグハンドル、上下ボタン、Alt＋↑↓、移動案内を共用。選択肢の名前は一覧と同じラベルを使用する。Default Shell専用CSSへの依存を共通CSSへ移動。再利用契約は[一覧UI仕様](docs/settings-list-editing.md#shellで並べ替えを再利用する)へ記載。
+- [発行前レビュー](.artifacts/order-dialog-review.md)で保存中のドラッグ拒否と表示ラベルの統一を確認・修正し、最終ソースの型検査・ビルド・関連10件・整形検査が終了0。既存の設定値、保存形式、競合判定、APIは変更せず、パッチ更新0.45.1。全標準回帰、無関係Appletの再発行は行っていない。
+- [固定EXEのWeb一覧GUI6群](.artifacts/web-list-ui-1792070542551/result.json)と[AI GUI16群](.artifacts/ai-ui-1792070555261/result.json)が終了0。設定/詳細の両入口、OK保存、取消、キーボード/ドラッグ、フォーカス復帰、既存競合検出、明暗、狭幅を確認。登録サイトと初期ショートカットの画像を目視確認。狭幅はCDPの720pxエミュレーション。AIはローカルfixtureで、実LLMは未使用。任意の外部Shell自体の実機検証は未実施。
+- `publish.bat`終了0。package、EXEのFileVersion/ProductVersion、asar、Default Shell、feedは0.45.1。EXE **144,195,150 bytes / SHA256 8cd63682da6ab7fd28fb839a5789d10f652ef821d993b79861fec5edd6455e71**。両GUIの固定コピー、feedのhash/size、asar内のout全166ファイルが一致。[照合資料](.artifacts/order-dialog-validation.json)に424入力とWebApplet8資産のhash、基点commit、実行ログを保存。
+- 制限環境でElectron起動とpnpmの固定依存検証が失敗したため、同じコマンドを通常権限で再実行し成功。依存版・lockfile・公開後待機を変更していない。編集用一時スクリプトを削除。Web一覧の成功履歴は実行方式ごとに3回以内。旧AI資料は再利用参照または実行方式を確認できないため保持し、失敗/不明資料も削除していない。
+- 本体publishまで完了。未コミット。実利用先deploy・push・Release・全体ZIP作成は未実施。
+
+
 ## 2026-10-15: WebApplet分離・一覧設定のコミット前確認
 
 - 対象はmain `d3bb01e`以降の動的ページ/独立WebApplet/宣言型一覧の差分と新Applet repo。実装時の本体530・Applet21入力ファイル、成功ログ、EXEと配布Applet全8ファイルを照合し一致。型検査、本体68件、Applet2件・配置6件、固定EXE一覧5群/Web動作4群、発行win-unpacked動的4群を再利用した。照合と今回の結果は[コミット検証](.artifacts/commit-validation-webapplet-20261015/validation.json)と同所`reuse.json`を参照。

@@ -121,6 +121,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     .locator(`[data-order-binding="${a}"] .shortcut-order-handle`)
     .dragTo(orderPanel.locator(`[data-order-binding="${b}"]`));
   assert.deepEqual(await orderIds(), [a, b]);
+  await orderPanel.screenshot({ path: path.join(profile, 'gesture-order.png') });
   await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('key:Ctrl+A');
   assert.equal((await orderIds()).length, 1);
   await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-left');
@@ -144,6 +145,10 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   checks.push(
     'separate order panel / full gesture group / drag, arrows and Alt+arrows / key selection retains pending order / unrelated shortcut bindings unchanged',
   );
+  await page.locator('.command-shortcut-summary').screenshot({ path: path.join(profile, 'gesture-order-button.png') });
+  await page.getByRole('button', { name: '実行順…', exact: true }).click();
+  await orderPanel.getByRole('heading', { name: 'ジェスチャーの実行順', exact: true }).waitFor();
+  await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
 
   await filter.fill('test.gestures.a');
   await page.locator(`[data-binding-id="${a}"] .applet-shortcut-edit`).click();

@@ -152,7 +152,18 @@ async function closeDialog(page) {
     await until(async () => (await own()).items.length === 2, 'host add');
     await page.getByRole('button', { name: '登録サイトを並べ替え', exact: true }).click();
     d = page.getByRole('dialog');
-    await d.getByRole('button', { name: '2番目を上へ' }).click();
+    assert.equal(await d.locator('.shortcut-order-row').count(), 2);
+    assert.equal(await d.locator('.shortcut-order-row').first().evaluate(el => getComputedStyle(el).display), 'flex');
+    assert.equal(await d.locator('ol').evaluate(el => getComputedStyle(el).listStyleType), 'none');
+    await d.getByLabel('設定から編集の順番をドラッグで変更').press('Alt+ArrowDown');
+    assert.match(await d.getByRole('status').innerText(), /2番目に移動/);
+    assert.equal((await own()).items[0].name, '設定から編集');
+    await d.press('Escape');
+    assert.equal(await page.getByRole('button', { name: '登録サイトを並べ替え', exact: true }).evaluate(el => el === document.activeElement), true);
+    await page.getByRole('button', { name: '登録サイトを並べ替え', exact: true }).click();
+    d = page.getByRole('dialog');
+    await d.screenshot({ path: path.join(profile, 'site-order.png') });
+    await d.getByRole('button', { name: '追加サイトを上へ' }).click();
     await d.getByRole('button', { name: 'OK', exact: true }).click();
     await until(async () => (await own()).items[0].name === '追加サイト', 'order');
     await page.getByRole('button', { name: '追加サイトを削除', exact: true }).click();
@@ -186,6 +197,35 @@ async function closeDialog(page) {
     assert.equal(await d.getByLabel('名前', { exact: true }).inputValue(), '上書き禁止');
     await closeDialog(page);
     checks.push('conflicting external update rejected; input retained');
+    const shortcutOrder = (await own()).shortcutDefaults.map(entry => entry.id);
+    await page.getByRole('button', { name: '初期ショートカットを並べ替え', exact: true }).click();
+    d = page.getByRole('dialog');
+    const firstTitle = await d.locator('.shortcut-order-command strong').first().innerText();
+    await d.locator('.shortcut-order-handle').first().dragTo(d.locator('.shortcut-order-row').nth(1));
+    assert.equal(await d.locator('.shortcut-order-command strong').nth(1).innerText(), firstTitle);
+    assert.deepEqual((await own()).shortcutDefaults.map(entry => entry.id), shortcutOrder);
+    await closeDialog(page);
+    const shortcutsBeforeConflict = structuredClone((await own()).shortcutDefaults);
+    await page.getByRole('button', { name: '初期ショートカットを並べ替え', exact: true }).click();
+    d = page.getByRole('dialog');
+    await d.locator('.shortcut-order-handle').first().press('Alt+ArrowDown');
+    const localOrder = await d.locator('[data-order-id]').evaluateAll(rows => rows.map(row => row.dataset.orderId));
+    await host.evaluate(async owner => {
+      const snapshot = await window.dock.snapshot();
+      snapshot.settings.value.extensions[owner].settings.shortcutDefaults.reverse();
+      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+    }, owner);
+    await d.getByRole('button', { name: 'OK', exact: true }).click();
+    await d.getByRole('alert').waitFor();
+    assert.deepEqual(await d.locator('[data-order-id]').evaluateAll(rows => rows.map(row => row.dataset.orderId)), localOrder);
+    assert.deepEqual((await own()).shortcutDefaults, [...shortcutsBeforeConflict].reverse());
+    await closeDialog(page);
+    await host.evaluate(async ({ owner, rows }) => {
+      const snapshot = await window.dock.snapshot();
+      snapshot.settings.value.extensions[owner].settings.shortcutDefaults = rows;
+      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+    }, { owner, rows: shortcutsBeforeConflict });
+    checks.push('order save failure retains local order and external settings; cancellation remains available');
     for (const theme of ['light', 'dark']) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -197,11 +237,20 @@ async function closeDialog(page) {
         'theme',
       );
       await page.screenshot({ path: path.join(profile, 'settings-' + theme + '.png') });
+      await page.getByRole('button', { name: '初期ショートカットを並べ替え', exact: true }).click();
+      await page.getByRole('dialog').screenshot({ path: path.join(profile, 'shortcut-order-' + theme + '.png') });
+      await closeDialog(page);
     }
     if (browser) {
       const session = await page.context().newCDPSession(page);
       await session.send('Emulation.setDeviceMetricsOverride', { width: 720, height: 760, deviceScaleFactor: 1, mobile: false });
       await page.screenshot({ path: path.join(profile, 'settings-narrow.png') });
+      await page.getByRole('button', { name: '初期ショートカットを並べ替え', exact: true }).click();
+      d = page.getByRole('dialog');
+      await d.screenshot({ path: path.join(profile, 'shortcut-order-narrow.png') });
+      assert(await d.evaluate(el => el.scrollWidth <= el.clientWidth));
+      assert(await d.getByRole('button', { name: 'OK', exact: true }).isVisible());
+      await closeDialog(page);
       await session.send('Emulation.clearDeviceMetricsOverride');
       await session.detach();
     } else {
@@ -221,6 +270,10 @@ async function closeDialog(page) {
     assert.equal(await page.getByRole('dialog').getByLabel('名前', { exact: true }).inputValue(), '外部更新');
     await closeDialog(page);
     checks.push('Applet detail settings shares list and edit dialog');
+    await page.getByRole('button', { name: '初期ショートカットを並べ替え', exact: true }).click();
+    assert.equal(await page.getByRole('dialog').locator('.shortcut-order-row').count(), 4);
+    await closeDialog(page);
+    checks.push('shared order dialog: styled rows, handles, keyboard, drag, cancellation, focus return, both themes, narrow layout, detail entry');
     await command(owner + '.manage');
     await until(
       async () => await table(ui, '登録サイト').getByText('外部更新', { exact: true }).count(),

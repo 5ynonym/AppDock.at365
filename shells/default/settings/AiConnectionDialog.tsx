@@ -8,6 +8,7 @@ import {
   type AiModel,
 } from '../../../src/shared/ai';
 import { SettingsInput, SettingsUrlInput } from '../../../src/shared/settings-ui/SettingsInput';
+import { SettingsOrderDialog } from '../../../src/shared/settings-ui/SettingsOrderDialog';
 import { SettingsDialog } from '../../../src/shared/settings-ui/SettingsModal';
 import {
   SettingsSection,
@@ -380,99 +381,17 @@ export function AiConnectionOrderDialog({
   invoke: AiInvoke;
   onClose(): void;
 }) {
-  const [original] = useState(() => connections.map((c) => c.id));
-  const [rows, setRows] = useState(connections),
-    [over, setOver] = useState(''),
-    [notice, setNotice] = useState('');
-  const dragged = useRef('');
-  const move = (from: string, to: string) => {
-    const next = [...rows],
-      source = next.findIndex((c) => c.id === from),
-      target = next.findIndex((c) => c.id === to);
-    if (source < 0 || target < 0 || source === target) return;
-    const [row] = next.splice(source, 1);
-    next.splice(target, 0, row);
-    setRows(next);
-    setNotice(`${row.name}を${target + 1}番目に移動しました。`);
-  };
   return (
-    <SettingsDialog
+    <SettingsOrderDialog
       title="AIサーバーの並べ替え"
-      description="ドラッグ、上下ボタン、またはAlt＋↑↓で移動できます。"
+      listLabel="AIサーバーの表示順"
+      items={connections.map((connection) => ({
+        id: connection.id,
+        title: connection.name,
+        description: connection.baseUrl,
+      }))}
       onClose={onClose}
-      onApply={() => invoke('aiOrderConnections', [original, rows.map((c) => c.id)])}
-      className="ai-order-dialog"
-    >
-      <ol className="shortcut-order-list" aria-label="AIサーバーの表示順">
-        {rows.map((c, index) => (
-          <li
-            key={c.id}
-            data-ai-order={c.id}
-            className={`shortcut-order-row${over === c.id ? ' drop-target' : ''}`}
-            onDragOver={(e) => {
-              if (dragged.current && dragged.current !== c.id) {
-                e.preventDefault();
-                setOver(c.id);
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              move(dragged.current, c.id);
-              dragged.current = '';
-              setOver('');
-            }}
-          >
-            <button
-              className="shortcut-order-handle"
-              draggable
-              data-initial-focus={index === 0 || undefined}
-              aria-label={`${c.name}の順番をドラッグで変更`}
-              onDragStart={(e) => {
-                dragged.current = c.id;
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', c.id);
-              }}
-              onDragEnd={() => {
-                dragged.current = '';
-                setOver('');
-              }}
-              onKeyDown={(e) => {
-                if (e.altKey && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
-                  e.preventDefault();
-                  const target = rows[index + (e.key === 'ArrowUp' ? -1 : 1)];
-                  if (target) move(c.id, target.id);
-                }
-              }}
-            >
-              ⠿
-            </button>
-            <span className="shortcut-order-number">{index + 1}</span>
-            <div className="shortcut-order-command">
-              <strong>{c.name}</strong>
-              <small>{c.baseUrl}</small>
-            </div>
-            <div className="shortcut-order-moves">
-              <button
-                aria-label={`${c.name}を上へ`}
-                disabled={!index}
-                onClick={() => move(c.id, rows[index - 1].id)}
-              >
-                ↑
-              </button>
-              <button
-                aria-label={`${c.name}を下へ`}
-                disabled={index === rows.length - 1}
-                onClick={() => move(c.id, rows[index + 1].id)}
-              >
-                ↓
-              </button>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <p role="status" className="shortcut-order-notice">
-        {notice || 'OKで一覧の表示順を保存します。'}
-      </p>
-    </SettingsDialog>
+      onApply={(ordered, original) => invoke('aiOrderConnections', [original, ordered])}
+    />
   );
 }

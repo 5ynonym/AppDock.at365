@@ -3,6 +3,20 @@ import type { SettingDefinition, SettingOption } from '../contracts';
 import { objectFieldValue } from '../object-list';
 import './settings-list.css';
 
+export function settingsListText(
+  definition: SettingDefinition,
+  entry: Record<string, unknown>,
+  key: string,
+  options: Record<string, SettingOption[]> = {},
+) {
+  const field = definition.fields!.find((field) => field.key === key)!;
+  const value = objectFieldValue(entry, field);
+  return (
+    (options[key] ?? field.options)?.find((option) => option.value === value)?.label ??
+    (Array.isArray(value) ? value.join('、') : String(value ?? ''))
+  );
+}
+
 export function ListIcon({ kind }: { kind: 'edit' | 'delete' | 'order' | 'open' }) {
   return (
     <svg
@@ -56,14 +70,8 @@ export function SettingsListTable({
 }) {
   const view = definition.list!;
   const fields = definition.fields ?? [];
-  const display = (entry: Record<string, unknown>, key: string) => {
-    const field = fields.find((field) => field.key === key)!;
-    const value = objectFieldValue(entry, field);
-    return (
-      (options[key] ?? field.options)?.find((option) => option.value === value)?.label ??
-      (Array.isArray(value) ? value.join('、') : String(value ?? ''))
-    );
-  };
+  const display = (entry: Record<string, unknown>, key: string) =>
+    settingsListText(definition, entry, key, options);
   return (
     <div className="settings-list">
       <div className="settings-list-toolbar">

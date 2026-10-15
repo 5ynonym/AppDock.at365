@@ -6,6 +6,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   const panel = page.locator('.shortcut-order-dialog');
   const filter = page.getByLabel('ショートカットのコマンドを検索');
   const openTop = () => page.getByRole('button', { name: '実行順…', exact: true }).click();
+  await page.locator('.command-shortcut-summary').screenshot({ path: path.join(profile, 'shortcut-order-button.png') });
   const order = () =>
     panel
       .locator('[data-order-binding]')
@@ -150,18 +151,31 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await write(original);
   await openTop();
   await choose('Ctrl+F8');
+  const setTheme = async theme => {
+    await page.evaluate(async theme => {
+      const snapshot = await window.dock.snapshot();
+      snapshot.settings.value.host.theme = theme;
+      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+    }, theme);
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      if (await panel.evaluate((el, theme) => el.ownerDocument.documentElement.dataset.theme === theme, theme)) return;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw Error('Order dialog theme did not update');
+  };
   for (const theme of ['dark', 'light']) {
-    await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
+    await setTheme(theme);
     for (const width of [1280, 900, 700]) {
       await page.setViewportSize({ width, height: 760 });
       const bounds = await panel.boundingBox();
       assert(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.height <= 760);
       assert(await panel.evaluate((el) => el.scrollWidth <= el.clientWidth + 1));
-      await page.screenshot({ path: path.join(profile, `${theme}-${width}-shortcut-order.png`) });
+      await panel.screenshot({ path: path.join(profile, `${theme}-${width}-shortcut-order.png`) });
     }
   }
   await page.setViewportSize({ width: 1280, height: 840 });
-  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  await setTheme('dark');
   await cancel();
   await write([
     ...original,
@@ -175,7 +189,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   );
   const footer = await panel.locator('footer').boundingBox();
   assert(footer.y + footer.height <= 540, 'long groups keep apply/cancel visible');
-  await page.screenshot({ path: path.join(profile, 'shortcut-order-long.png') });
+  await panel.screenshot({ path: path.join(profile, 'shortcut-order-long.png') });
   await cancel();
   await page.setViewportSize({ width: 1280, height: 840 });
   await write([]);

@@ -1,4 +1,5 @@
 import { SettingsInput } from './SettingsInput';
+import { ListIcon } from './SettingsListTable';
 import type { ReactNode } from 'react';
 export function CommandBindingToolbar({
   inputName,
@@ -53,8 +54,14 @@ export function CommandBindingToolbar({
         <span role="status">
           {visibleCount} / {count} コマンドを表示
         </span>
-        <button className="text-button shortcut-order-open" onClick={onOrder}>
-          実行順…
+        <button
+          type="button"
+          className="settings-list-icon shortcut-order-open"
+          aria-label="実行順…"
+          title={`${inputName}の実行順`}
+          onClick={onOrder}
+        >
+          <ListIcon kind="order" />
         </button>
         {(filter || statusFilter !== 'all') && (
           <button

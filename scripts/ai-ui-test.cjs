@@ -436,7 +436,7 @@ async function errorNoticeFor(caller) {
     dialog = page.getByRole('dialog');
     await dialog
       .getByLabel('mcpの順番をドラッグで変更')
-      .dragTo(dialog.locator('[data-ai-order="preview"]'));
+      .dragTo(dialog.locator('[data-order-id="preview"]'));
     assert.deepEqual(
       (await snapshot()).settings.value.ai.connections.map((c) => c.id),
       ['preview', 'sdk', 'mcp'],
