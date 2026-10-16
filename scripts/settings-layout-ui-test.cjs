@@ -172,8 +172,8 @@ async function save(p) {
             '.notification-settings > .settings-section > summary > h2, .notification-settings > .settings-section > header > h2',
           )
           .allTextContents()
-      ).slice(0, 3),
-      ['通知の受け取り方', '通知の読み上げ', 'AppDock'],
+      ).slice(0, 4),
+      ['通知の受け取り方', '読み上げ', 'MCP Event', 'AppDock'],
     );
     const notices = p.locator('.notification-setting-card');
     assert.ok((await notices.count()) >= 3);

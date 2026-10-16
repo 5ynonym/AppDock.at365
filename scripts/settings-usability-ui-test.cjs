@@ -189,7 +189,11 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     assert.deepEqual((await row()).targets, []);
     assert.equal((await row()).speak, false);
     checks.push('speech is a destination; center-only clears visual and speech targets atomically');
-    await page.locator('summary').filter({ hasText: '通知の読み上げ' }).click();
+    await page
+      .locator('.settings-section')
+      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
+      .locator(':scope > summary')
+      .click();
     await page.getByLabel('通知の速度に共通設定を使う').uncheck();
     await settleSettings(page);
     await page.getByLabel('通知用の読み上げ速度').fill('1.2');
@@ -199,8 +203,30 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, undefined);
     checks.push('notification speech settings inherit independently');
-    await select('MCP・Codex連携');
-    await page.locator('summary').filter({ hasText: '登録先と接続の詳細' }).click();
+    await page
+      .locator('.settings-section')
+      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
+      .getByRole('button', { name: '設定を開く', exact: true })
+      .click();
+    await page.getByRole('heading', { name: '読み上げ', exact: true, level: 1 }).waitFor();
+    await select('通知');
+    const events = page
+      .locator('.settings-section')
+      .filter({ has: page.getByRole('heading', { name: 'MCP Event', exact: true }) });
+    await events.locator(':scope > summary').click();
+    await events.getByRole('button', { name: '設定を開く', exact: true }).click();
+    await page.getByRole('heading', { name: 'MCP・Codex連携', exact: true, level: 1 }).waitFor();
+    assert.equal(
+      await page
+        .getByRole('region', { name: '接続の状態', exact: true })
+        .getByRole('button', { name: '操作の許可を開く', exact: true })
+        .count(),
+      1,
+    );
+    checks.push(
+      'notification links open TTS/MCP settings and permissions remain in connection status',
+    );
+    await page.locator('summary').filter({ hasText: '登録先や接続の詳細' }).click();
     await page.getByLabel('Codexの設定ファイル', { exact: true }).fill(config);
     await page.getByRole('button', { name: '設定先を変更', exact: true }).click();
     const automation = () =>
@@ -213,11 +239,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     assert(fs.readFileSync(config, 'utf8').startsWith('# fixture\n'));
     await page.getByRole('button', { name: 'このPC内の接続テスト', exact: true }).click();
     await until(
-      () =>
-        page
-          .locator('.settings-feedback [role="status"]')
-          .textContent()
-          .then((s) => !s.includes('処理しています') && s.length > 0),
+      async () =>
+        (await snapshot()).logs.some((entry) =>
+          entry.message.includes('AppDock内の疎通に成功しました。'),
+        ),
       'connection test',
     );
     assert.equal(await page.getByRole('alert').count(), 0);

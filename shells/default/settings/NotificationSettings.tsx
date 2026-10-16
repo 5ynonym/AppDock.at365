@@ -14,6 +14,7 @@ import {
 } from '../../../src/shared/notification-types';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { SettingsInput } from '../../../src/shared/settings-ui/SettingsInput';
+import { SettingsCombobox } from '../../../src/shared/settings-ui/SettingsCombobox';
 import { Toggle } from '../../../src/shared/settings-ui/Toggle';
 import {
   SettingsSection,
@@ -114,21 +115,35 @@ export function NotificationSettings({
     <div className="settings-sections notification-settings">
       <SettingsSection
         title="通知の受け取り方"
+        description="種類ごとに通知先を組み合わせて設定できます。"
         collapsible
-        description="種類ごとに通知先を組み合わせられます。必須の通知先がない種類は、通知センターだけに残すこともできます。"
       >
+        <p>全ての通知は、通知センターで確認できます。</p>
+        <p>バナーは、画面上部に表示されます。</p>
+        <p>デスクトップ通知は、タスクトレイ付近に表示されます。</p>
         <p>
-          通知は通知センターで確認できます。バナー・デスクトップ通知・Windows通知・読み上げを組み合わせて、受け取り方を選んでください。バナー必須の通知は「通知センターのみ」に変更できません。
+          Windows通知は、Windowsが表示・持続時間などを管理するため、自動消去までの秒数の設定は反映されません。
+        </p>
+        <p>読み上げには接続先・モデル・声の設定が必要です。</p>
+        <p>
+          MCP Eventは、ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。
+          使用するには、Secure MCP
+          Tunnel等を使用して、ChatGPTからプラグインとしてAppDockを使用するための連携が必要です。
         </p>
       </SettingsSection>
       <SettingsSection
-        title="通知の読み上げ"
-        description={`現在の声: ${effective.voice || '未設定'} ／ 速度: ${effective.speed}倍。通常は共通の読み上げ設定を使います。`}
+        title="読み上げ"
+        description={`現在の声: ${effective.voice || '未設定'} ／ 速度: ${effective.speed}倍`}
         collapsible
       >
-        <p>
-          通知先に「読み上げ」を選んだ種類に適用します。タイトルと本文は共通設定のTTSサーバーへ送信されます。
-        </p>
+        <SettingsField
+          title="読み上げ設定"
+          description="通知のタイトルと本文は共通設定のTTSサーバーへ送信されます。接続先・モデル・声を設定してください。"
+        >
+          <div className="settings-actions">
+            <button onClick={() => select('tts')}>設定を開く</button>
+          </div>
+        </SettingsField>
         <SettingsField
           title="声"
           description="共通の声を使うか、通知だけ別の声に変更できます。"
@@ -148,20 +163,12 @@ export function NotificationSettings({
           </div>
           {speech.voice !== undefined || voiceOverride ? (
             <>
-              <SettingsInput
-                aria-label="通知用のボイスID"
+              <SettingsCombobox
+                label="通知用のボイスID"
                 value={speech.voice ?? ''}
-                onChange={(e) => changeSpeech('voice', e.target.value)}
-                list="notification-voices"
-                placeholder="通知用のボイスID"
+                onChange={(value) => changeSpeech('voice', value)}
+                options={voices}
               />
-              <datalist id="notification-voices">
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </datalist>
               <div className="settings-actions">
                 <button
                   disabled={busy || pending}
@@ -228,7 +235,6 @@ export function NotificationSettings({
           >
             試聴を停止
           </button>
-          <button onClick={() => select('tts')}>読み上げ設定を開く</button>
         </div>
         {auxiliary?.jobs.slice(-1).map((j) => (
           <p key={j.jobId} role="status">
@@ -247,6 +253,17 @@ export function NotificationSettings({
           </p>
         ))}
         <SettingsFeedback busy={pending} error={error} />
+      </SettingsSection>
+      <SettingsSection
+        title="MCP Event"
+        description="ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。"
+        collapsible
+      >
+        <SettingsField title="MCP連携設定" description="MCP連携を有効化する必要があります。">
+          <div className="settings-actions">
+            <button onClick={() => select('codex')}>設定を開く</button>
+          </div>
+        </SettingsField>
       </SettingsSection>
       {owners.map((owner) => {
         const rows = types.filter((t) => ownerGroup(t) === owner);
@@ -302,8 +319,7 @@ export function NotificationSettings({
                   {policy.reason && (
                     <p role="status">{reasonTitles[policy.reason] ?? policy.reason}</p>
                   )}
-                  <fieldset className="notification-targets">
-                    <legend>通知先</legend>
+                  <fieldset className="notification-targets" aria-label="通知先">
                     <div className="settings-choice-grid">
                       {type.allowedTargets.map((target) => (
                         <SettingsChoice
@@ -353,11 +369,6 @@ export function NotificationSettings({
                       通知センターのみ
                     </label>
                   </fieldset>
-                  {eventSending && (
-                    <p className="muted">
-                      MCP連携の有効化、ChatGPTから届く接続経路、dotでの監視登録が必要です。AppDockが動作中に発生した新しい通知を送ります。
-                    </p>
-                  )}
                   {speaking && (!auxiliary?.configured || !effective.voice) && (
                     <p className="notification-target-hint">
                       読み上げには接続先・モデル・声の設定が必要です。
@@ -404,15 +415,12 @@ export function NotificationSettings({
           </SettingsSection>
         );
       })}
-      <SettingsSection
-        title="通知の表示時間について"
-        description="通知先ごとの動作の違いを確認できます。"
-        collapsible
-      >
+      <SettingsSection title="通知の表示時間について" collapsible>
         <p>表示時間の変更は次の通知から反映されます。現在表示中の通知の期限は変わりません。</p>
         <p>
-          Windows通知の表示時間・消去はWindowsが管理します。ここで指定する時間は通知センターで操作できる期間です。通知によってはクリックで直接開きます。
+          Windows通知は、Windowsが表示・持続時間などを管理するため、自動消去までの秒数の設定は反映されません。
         </p>
+        <p>Windows通知でも、ここで指定する表示時間は通知センターで操作できる期間に反映されます。</p>
       </SettingsSection>
       {!!unknown.length && (
         <SettingsSection

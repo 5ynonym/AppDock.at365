@@ -922,7 +922,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-${theme}-${width}.png`) });
-        await page.getByText('登録先と接続の詳細', { exact: true }).click();
+        await page.getByText('登録先や接続の詳細', { exact: true }).click();
         await page
           .getByRole('button', { name: '認証情報を再発行', exact: true })
           .scrollIntoViewIfNeeded();
@@ -931,7 +931,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
           true,
         );
         await page.screenshot({ path: path.join(profile, `codex-details-${theme}-${width}.png`) });
-        await page.getByText('登録先と接続の詳細', { exact: true }).click();
+        await page.getByText('登録先や接続の詳細', { exact: true }).click();
         await page.locator('.settings-body').evaluate((el) => {
           el.scrollTop = 0;
         });

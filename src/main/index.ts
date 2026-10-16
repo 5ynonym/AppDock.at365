@@ -413,6 +413,16 @@ const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-key.json'), {
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
 });
+let notificationVoiceListRevision = 0;
+let notificationVoiceListSignature = '';
+function notificationVoicesRevision() {
+  const signature = JSON.stringify(settings.value.tts ?? defaultTtsSettings());
+  if (signature !== notificationVoiceListSignature) {
+    notificationVoiceListSignature = signature;
+    notificationVoiceListRevision++;
+  }
+  return notificationVoiceListRevision;
+}
 const ttsOwner = (id?: string) =>
   id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp';
 const tts = new TtsService({
@@ -1154,7 +1164,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           defaultSpeed: settings.value.tts?.defaultSpeed ?? 1,
         },
         configured: !!settings.value.tts?.baseUrl && !!settings.value.tts?.model,
-        voiceListRevision: settings.revision,
+        voiceListRevision: notificationVoicesRevision(),
         jobs: [...notificationPreviewJobs].flatMap((id) => {
           try {
             return [tts.get('notification-preview', id)];
@@ -1314,6 +1324,7 @@ function settingsPageActions(
   if (page.id === 'tts') {
     actions.ttsSetKey = async ([value]) => {
       ttsSecrets.set(settings.value.tts?.baseUrl ?? '', value);
+      notificationVoiceListRevision++;
       notificationSpeech?.reconcile(true);
       tts.reconcile(true);
       changed();

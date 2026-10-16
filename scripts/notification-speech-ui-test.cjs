@@ -52,7 +52,14 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     server = http.createServer(async (req, res) => {
       if (req.url === '/v1/audio/voices') {
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ voices: [{ id: 'notice', name: 'Notice' }] }));
+        res.end(
+          JSON.stringify({
+            voices: [
+              { id: 'notice', name: 'Notice' },
+              { id: 'second', name: 'Second voice' },
+            ],
+          }),
+        );
         return;
       }
       let raw = '';
@@ -173,10 +180,100 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await new Promise((r) => setTimeout(r, 400));
     assert.equal(requests.length, 0);
     checks.push('default OFF');
-    await page.locator('summary').filter({ hasText: '通知の読み上げ' }).click();
+    await page
+      .locator('.settings-section')
+      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
+      .locator(':scope > summary')
+      .click();
     await page.getByLabel('通知の声に共通設定を使う').uncheck();
     await settleSettings(page);
-    await page.getByLabel('通知用のボイスID').fill('notice');
+    const voice = page.getByRole('combobox', { name: '通知用のボイスID', exact: true });
+    const toggle = page.getByRole('button', { name: '通知用のボイスIDの候補を表示', exact: true });
+    assert.equal(await toggle.isDisabled(), true);
+    await voice.fill('custom-voice');
+    await settleSettings(page);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+        .speech.voice,
+      'custom-voice',
+    );
+    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
+    await until(async () => !(await toggle.isDisabled()), 'voice catalog');
+    await toggle.click();
+    const list = page.getByRole('listbox', { name: '通知用のボイスIDの候補', exact: true });
+    assert.equal(await list.getByRole('option').count(), 2);
+    await list.getByRole('option', { name: 'second Second voice', exact: true }).click();
+    await settleSettings(page);
+    assert.equal(await voice.inputValue(), 'second');
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+        .speech.voice,
+      'second',
+    );
+    await voice.fill('not');
+    await voice.press('ArrowDown');
+    await voice.press('Enter');
+    await settleSettings(page);
+    assert.equal(await voice.inputValue(), 'notice');
+    await toggle.click();
+    await voice.press('Escape');
+    assert.equal(await voice.getAttribute('aria-expanded'), 'false');
+    assert.equal(await voice.inputValue(), 'notice');
+    await toggle.click();
+    await voice.press('ArrowUp');
+    await voice.press('Enter');
+    await settleSettings(page);
+    assert.equal(await voice.inputValue(), 'second');
+    await voice.fill('notice');
+    await voice.press('Tab');
+    assert.equal(await voice.getAttribute('aria-expanded'), 'false');
+    for (const theme of ['light', 'dark']) {
+      await host.evaluate(async (theme) => {
+        const s = await window.dock.snapshot();
+        await window.dock.saveSettings(
+          { ...s.settings.value, host: { ...s.settings.value.host, theme } },
+          s.settings.revision,
+        );
+      }, theme);
+      await until(
+        () => page.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
+        'theme',
+      );
+      for (const width of [1280, 760]) {
+        await inspect(
+          mainPort,
+          electronExpression +
+            `.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).setSize(${width}, 850)`,
+        );
+        await toggle.click();
+        await list.waitFor();
+        const bounds = await page.evaluate(() => {
+          const input = document.querySelector('[aria-label="通知用のボイスID"]');
+          const list = document.querySelector(
+            '[role="listbox"][aria-label="通知用のボイスIDの候補"]',
+          );
+          const i = input.getBoundingClientRect(),
+            l = list.getBoundingClientRect();
+          return {
+            aligned: Math.abs(i.left - l.left) < 2 && Math.abs(i.width - l.width) < 2,
+            separate: l.top >= i.bottom || l.bottom <= i.top,
+            inside: l.left >= 0 && l.top >= 0 && l.right <= innerWidth && l.bottom <= innerHeight,
+            overlap: [
+              ...document.querySelectorAll('.notification-settings .settings-actions'),
+            ].some((actions) => {
+              const a = actions.getBoundingClientRect();
+              return a.height && a.top < i.bottom && a.bottom > i.top;
+            }),
+          };
+        });
+        assert.deepEqual(bounds, { aligned: true, separate: true, inside: true, overlap: false });
+        await page.screenshot({ path: path.join(profile, `voices-${theme}-${width}.png`) });
+        await voice.press('Escape');
+      }
+    }
+    checks.push(
+      'editable voice suggestions: manual/click/keyboard saves, Escape/Tab, light/dark 1280/760 aligned popup and no action-row overlap',
+    );
     await settleSettings(page);
     await page.getByLabel('通知の速度に共通設定を使う').uncheck();
     await settleSettings(page);
@@ -320,6 +417,21 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         'real server Japanese notification completed at 1.4 in ' + (Date.now() - start) + 'ms',
       );
     }
+    await page.getByLabel('通知の声に共通設定を使う').uncheck();
+    await settleSettings(page);
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...s.settings.value, tts: { ...s.settings.value.tts, model: 'fixture-updated' } },
+        s.settings.revision,
+      );
+    });
+    await until(() => toggle.isDisabled(), 'TTS change invalidates cached voices');
+    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
+    await until(async () => !(await toggle.isDisabled()), 'voices reload after TTS change');
+    checks.push(
+      'TTS configuration change invalidates the voice catalog; unrelated voice/speed/theme saves retain it',
+    );
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     fs.writeFileSync(path.join(profile, 'process.log'), output);
     success = true;

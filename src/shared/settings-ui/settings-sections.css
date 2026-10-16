@@ -173,6 +173,52 @@
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+  padding: 8px 0;
+}
+.settings-combobox {
+  position: relative;
+  min-width: 0;
+}
+.settings-combobox > input {
+  width: 100%;
+  min-width: 0;
+  padding-right: 42px;
+}
+.settings-section .settings-combobox-toggle {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  width: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.settings-combobox-options {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 4px;
+  overflow: auto;
+  box-sizing: border-box;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow);
+}
+.settings-combobox-options > [role='option'] {
+  padding: 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.settings-combobox-options > [role='option']:is(:hover, [aria-selected='true']) {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.settings-combobox-options small {
+  display: block;
+  color: var(--muted);
 }
 .settings-section button:not(.toggle) {
   min-height: 34px;

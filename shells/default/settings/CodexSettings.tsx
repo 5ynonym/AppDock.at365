@@ -167,11 +167,20 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             </button>
           </div>
         )}
+        <SettingsField
+          title="操作できる範囲"
+          description="AppletとMCPの許可を別々に設定できます。"
+          {...settingAnchor('codex', 'permissions')}
+        >
+          <div className="settings-actions">
+            <button onClick={onOpenPermissions}>操作の許可を開く</button>
+          </div>
+        </SettingsField>
         <SettingsFeedback error={error || state.error || state.registrationError} busy={busy} />
       </SettingsSection>
       <SettingsSection
         title="Codexへ登録"
-        description="このAppDockの接続情報をCodexの設定に追加します。"
+        description="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
         {...settingAnchor('codex', 'registration')}
       >
         <div className="settings-actions">
@@ -196,15 +205,6 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         <p>
           接続テストはAppDock内の疎通確認です。最終接続日時はCodex以外のMCPクライアントも含みます。Codexでの操作や別端末からの疎通は、それぞれのクライアントで確認してください。
         </p>
-        <SettingsField
-          title="操作できる範囲"
-          description="AppletとMCPの許可を別々に設定できます。"
-          {...settingAnchor('codex', 'permissions')}
-        >
-          <div className="settings-actions">
-            <button onClick={onOpenPermissions}>操作の許可を開く</button>
-          </div>
-        </SettingsField>
       </SettingsSection>
       <SettingsSection
         title="ネットワークからの接続"
@@ -282,7 +282,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="登録先と接続の詳細"
+        title="登録先や接続の詳細"
         description="設定ファイル・登録名・ポートの変更や、登録の解除ができます。"
         collapsible
         {...settingAnchor('codex', 'connection')}

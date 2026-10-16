@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-17: 未コミット設定UIのレビューと通知ボイス候補の位置修正（0.55.1）
+
+- main上の利用者の未コミット4ファイル（版・Codex連携・通知画面・共通操作欄）をレビュー。通知の案内・カード名・TTS/MCPへのリンク・操作許可リンクの移動・余白を保持し、共通操作欄の`height:100%`を除去。通知先fieldsetの見出し非表示は維持し、`aria-label`でグループ名を補完。TTSへ通知のタイトル/本文を送信する説明と、Windows通知の表示時間とセンターの操作期間の違いを補足した。[レビュー](.artifacts/settings-review-20261017/review.md)に対象・指摘と対応を記録。発行を妨げる未解決指摘なし。
+- 通知ボイスのnative datalistを、共通`SettingsInput`に基づく編集可能な`SettingsCombobox`へ変更。同じ設定Surfaceのtop layerへ候補を表示し、入力欄の左端・幅に合わせ、下の空きが少ないときは上に開く。直接入力、ID/名前の絞り込み、クリック、上下/Enter、Escape/Tabを維持。通知以外のdatalistは変更していない。
+- GUIで、ボイスを1回保存するだけでも取得一覧が消える既存問題を確認。全設定revisionでの無効化を、TTS設定とTTS APIキー変更時の無効化へ限定した。取得中に接続設定が変わった場合の旧応答破棄を維持。通知の声/速度・テーマ変更では一覧を保持し、TTS設定変更後は再取得することを確認した。保存項目・保存ファイル・公開schemaの追加削除なし。既存の未コミット版更新`0.55.0→0.55.1`を再利用し、重ねて版を増やしていない。
+- 型検査・ビルド終了0。関連7ファイルの回帰**69/69、fail/skip 0**。最初の制限環境ではローカルHTTPのEACCESが発生し、同じ試験を通常ユーザー権限で成功確認。後続のindex変更は通知ボイス一覧revisionだけで、回帰が直接importするcore/sharedモジュールは未変更。影響する実index/設定投影は下記の最終固定EXE GUIで確認した。既存GUIの見出し・順序を新画面へ合わせ、旧インライン接続結果の期待を現在の共通通知ログでの確認へ修正した。
+- `publish.bat`終了0。制限環境のpnpmスタックオーバーフローはログを保持し、同じpublish.batを通常ユーザー権限で成功確認。固定lockfile・依存版・供給網検査は変更していない。発行先`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144,219,692 bytes / SHA256 `6dce14ca330ec7005f06b038ae1f4ba0a5bd2f642491a4298982f8bf00ea415c`**。package/feed/EXE FileVersion/ProductVersionは0.55.1、feed size/hashと隔離コピーのhashが一致。
+- 最終固定EXEで[通知読み上げ12群](.artifacts/notification-speech-ui-1792179915985/result.json)、[設定使いやすさ8群](.artifacts/settings-usability-1792179931695/result.json)、[レイアウト6群](.artifacts/settings-layout-1792179946780/result.json)が終了0。明暗テーマ・1280/760幅で候補の幅/位置/非重複、直接入力/クリック/キーボードの保存、一覧保持/無効化、TTS/MCPリンク、独立した声/速度継承、隔離Codex登録/接続テスト/解除、8画面の横はみ出しなし、折りたたみ/検索/即時保存を確認。最終EXEの明暗候補画像を表示確認した。
+- [検証一覧](.artifacts/settings-review-20261017/validation.json)にソース入力・ログ・EXE/feedのhashとGUI結果を保存。初期の制限環境失敗、候補一覧消失の再現、古いGUI期待による失敗も保持。旧テストの利用プロセスを制限環境のCIMで照合できなかったため、過去の成功分・再利用資料・失敗記録・固定出力を保全して削除0件。全標準回帰、実スピーカー、実Google/dot、別PC/DPIでの操作は未確認。未変更Appletの発行・全体ZIP作成・commit・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-17: 音の再生ON/OFFのコミット確認（0.55.0）
 
 - 利用者のコミット・プッシュ依頼に基づき、今回の22ファイルと影響先を再レビュー。追加の製品修正なし。必要範囲は本体の型検査/ビルド・標準回帰、共通音声/一般設定の固定EXE GUI、発行物の版/size/hash照合とした。GitHubのfetch先端とAQUAのmainは開始HEAD `b7ff2355d2ecf79a1dce09cebe7d4ebdaf0f3d6d`に一致した。
