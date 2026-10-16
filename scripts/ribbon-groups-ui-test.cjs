@@ -92,7 +92,7 @@ fs.writeFileSync(
 settings.extensions['fixture.ribbon-dotnet'] = { enabled: true, settings: {} };
 settings.ribbon = {
   custom: { preserved: true },
-  order: ['group:persistent', 'group:temporary', 'settings'],
+  order: ['group:persistent', 'group:temporary', 'settings', 'page:missing:root'],
   hidden: [],
   bottom: ['theme', 'profile'],
   separators: [],
@@ -102,16 +102,25 @@ settings.ribbon = {
       title: 'Persistent',
       icon: 'folder',
       expansion: 'persistent',
-      children: ['home', 'page:fixture.ribbon:main'],
+      children: ['home', 'page:fixture.ribbon:main', 'page:missing:child'],
     },
     {
       id: 'group:temporary',
       title: 'Temporary',
       icon: 'mail',
       expansion: 'temporary',
-      children: ['logs', ...pages.slice(1).map((p) => 'page:fixture.ribbon:' + p.id)],
+      children: [
+        'logs',
+        'extensions',
+        'notifications',
+        ...pages.slice(1).map((p) => 'page:fixture.ribbon:' + p.id),
+      ],
     },
   ],
+  itemOverrides: {
+    'page:missing:root': { title: 'Missing root' },
+    'page:missing:child': { lastKnownTitle: 'Missing child' },
+  },
 };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
@@ -252,12 +261,38 @@ async function launch() {
       'Node and .NET badge API; 99+ and raw accessible count; collapsed aggregate dot; separate local expansion state',
     );
 
+    const positions = () =>
+      rail.locator('[data-ribbon-id]').evaluateAll((elements) =>
+        elements.map((element) => ({
+          id: element.dataset.ribbonId,
+          y: element.getBoundingClientRect().y,
+          height: element.getBoundingClientRect().height,
+        })),
+      );
+    const closedPositions = await positions();
     let flyout = await openTemporary();
     await flyout.locator('.ribbon-flyout-row button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',
       'temporary expanded accessibility',
     );
+    assert.deepEqual(
+      await positions(),
+      closedPositions,
+      'opening a temporary group must not move rail buttons',
+    );
+    assert.equal(await flyout.locator('.ribbon-flyout-heading').count(), 0);
+    assert.equal(await flyout.getByRole('button', { name: 'グループを閉じる' }).count(), 0);
+    const aligned = async () => {
+      const anchor = (await flyout.evaluate(() => window.appdockOverlay.connect())).snapshot.content
+        .anchor;
+      const child = await flyout
+        .locator('.ribbon-flyout-row [data-ribbon-id]')
+        .first()
+        .boundingBox();
+      return Math.abs(child.y + child.height / 2 - (anchor.y + anchor.height / 2)) < 1;
+    };
+    await until(aligned, 'popup button aligns vertically with source group');
     const geometry = await flyout
       .locator('.ribbon-flyout-row button')
       .evaluateAll((buttons) => buttons.map((b) => b.getBoundingClientRect().y));
@@ -288,6 +323,24 @@ async function launch() {
       await rail.evaluate(() => document.activeElement.dataset.ribbonId),
       'group:temporary',
     );
+    const fullChildren = (await snapshot()).settings.value.ribbon.groups.find(
+      (g) => g.id === 'group:temporary',
+    ).children;
+    const replaceChildren = (children) =>
+      host.evaluate(async (children) => {
+        const s = await window.dock.snapshot();
+        s.settings.value.ribbon.groups.find((g) => g.id === 'group:temporary').children = children;
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      }, children);
+    await replaceChildren(['logs']);
+    flyout = await openTemporary();
+    await flyout.locator('[data-ribbon-id="logs"]').waitFor();
+    await until(aligned, 'single button aligns');
+    assert.equal(await flyout.getByRole('button', { name: /へスクロール/ }).count(), 0);
+    await flyout.screenshot({ path: path.join(profile, 'temporary-single.png') });
+    await closingAction(flyout.keyboard.press('Escape'));
+    await until(() => flyout.isClosed(), 'single panel closes');
+    await replaceChildren(fullChildren);
     flyout = await openTemporary();
     const originalRoute = (await snapshot()).navigation.route;
     await closingAction(flyout.mouse.click(5, 5));
@@ -381,19 +434,90 @@ async function launch() {
       .locator('.settings-categories')
       .getByRole('button', { name: 'リボン', exact: true })
       .click();
+    const settingRow = (id) => page.locator(`[data-ribbon-setting="${id}"]`);
+    const controls = await page
+      .locator('.ribbon-row-controls')
+      .evaluateAll((rows) =>
+        rows.map((row) => [...row.children].map((child) => child.getBoundingClientRect().x)),
+      );
+    assert(controls.length > 4);
+    for (const row of controls)
+      assert.deepEqual(row, controls[0], 'all action slots align across root and child rows');
+    assert.equal(await settingRow('home').locator('.settings-list-icon svg').count(), 1);
+    assert.equal(await settingRow('home').locator('.ribbon-action-placeholder').count(), 1);
+    await page.getByRole('button', { name: 'ホームを編集', exact: true }).click();
+    await page.getByLabel('ボタン名', { exact: true }).fill('My home');
+    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => r.itemOverrides.home?.title === 'My home' && r.itemOverrides.home.iconOnly);
+    await until(
+      async () => (await button('home').getAttribute('aria-label')) === 'My home',
+      'custom accessible name',
+    );
+    assert.equal(await button('home').locator('.rail-label').count(), 0);
+    await page.getByRole('button', { name: 'My homeを編集', exact: true }).click();
+    await page.getByLabel('ボタン名', { exact: true }).fill('');
+    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).uncheck();
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => !r.itemOverrides.home?.title && r.itemOverrides.home?.iconOnly === false);
+    for (const [id, title] of [
+      ['page:missing:root', 'Missing root'],
+      ['page:missing:child', 'Missing child'],
+    ]) {
+      await page.getByRole('button', { name: `${title}を設定から削除`, exact: true }).click();
+      await page
+        .getByRole('dialog', { name: 'リボン項目を設定から削除' })
+        .getByRole('button', { name: '削除', exact: true })
+        .click();
+      await saved((r) => !JSON.stringify(r).includes(id));
+      assert.equal(await settingRow(id).count(), 0);
+    }
     await page.getByRole('button', { name: '上寄せにグループを追加', exact: true }).click();
     await page.getByLabel('グループ名', { exact: true }).fill('Created group');
     await page.getByLabel('展開方法', { exact: true }).selectOption('temporary');
+    const gaps = await page
+      .locator('.ribbon-edit-fields > label')
+      .evaluateAll((labels) =>
+        labels
+          .slice(1)
+          .map(
+            (label, i) =>
+              label.getBoundingClientRect().top - labels[i].getBoundingClientRect().bottom,
+          ),
+      );
+    assert(gaps.every((gap) => gap >= 20));
+    const checkboxGeometry = await page.locator('.ribbon-icon-only').evaluate((label) => {
+      const checkbox = label.querySelector('input').getBoundingClientRect();
+      return { width: checkbox.width, left: checkbox.left - label.getBoundingClientRect().left };
+    });
+    assert(
+      checkboxGeometry.width < 24 && checkboxGeometry.left < 2,
+      'compact checkbox at start of label',
+    );
+    await page.screenshot({ path: path.join(profile, 'group-dialog.png') });
     await page.getByRole('button', { name: '追加', exact: true }).click();
     const newLayout = await saved((r) => r.groups.find((g) => g.title === 'Created group'));
     const createdId = newLayout.id;
     await page.getByLabel('ホームの配置', { exact: true }).selectOption(createdId);
     await saved((r) => r.groups.find((g) => g.id === createdId)?.children.includes('home'));
     await page.getByRole('button', { name: 'Created groupを編集', exact: true }).click();
+    await page.getByLabel('グループ名', { exact: true }).fill('');
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => r.groups.find((g) => g.id === createdId)?.title === '');
+    await until(
+      async () => (await button(createdId).getAttribute('aria-label')) === 'グループ',
+      'empty group retains accessible fallback',
+    );
+    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
+    await settingRow(createdId)
+      .getByRole('button', { name: 'グループを編集', exact: true })
+      .click();
     await page.getByLabel('グループ名', { exact: true }).fill('Renamed group');
+    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
     await page.getByLabel('展開方法', { exact: true }).selectOption('persistent');
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => r.groups.find((g) => g.id === createdId)?.title === 'Renamed group');
+    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
     await page.getByLabel('Renamed groupの配置', { exact: true }).selectOption('bottom');
     await saved((r) => r.bottom.includes(createdId));
     await page.getByRole('button', { name: 'Renamed groupのグループを解除', exact: true }).click();
@@ -406,6 +530,9 @@ async function launch() {
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     checks.push(
       'Settings dialog add/edit; immediate persisted membership and placement; ungroup returns child with inherited bottom placement',
+    );
+    checks.push(
+      'Popup alignment and stable rail positions; overflow-only controls; aligned shared action icons; aliases, icon-only, blank group names, missing root/child removal and spacious dialog',
     );
     await app.close();
     app = undefined;

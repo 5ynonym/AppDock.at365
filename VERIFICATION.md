@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-16: リボンUI調整のコミット確認（0.53.0）
+
+- 今回の26ファイルを[再レビュー](.artifacts/commit-validation-ribbon-ui-20261016/review.md)。追加の製品修正なし。実装時のソース498入力、完全ログ、生成物180ファイル、EXE/feedと環境を照合し、型検査・ビルド・9ファイル69件・固定EXEのsmokeを再利用した。
+- 既存Node/.NET fixtureをビルド。RibbonBadge DLLのhash変更を初回照合で検出したため、その失敗ログを保持し、影響しない69件と、このDLLを使うGUIを分けて判定した。旧／新DLLのinformational versionはGit基点299cfec／87c3068。未実行の標準回帰71ファイル**462/462**を追加し、再利用と合わせて**80ファイル531/531、fail/skip 0**。生成入力553件は追加回帰前後で一致。
+- 同じ0.53.0の固定EXEと更新後の試験DLLで[リボンGUI7群](.artifacts/ribbon-groups-ui-1792138094884/result.json)を再実行して成功。499入力は最終GUI後にも一致。EXE/feedのSHA256は実装時と同じで、版更新・再発行なし。
+- [検証一覧](.artifacts/commit-validation-ribbon-ui-20261016/validation.json)と同所reuse.jsonに試験単位の再利用判断、入力・生成物・ログ・成果物hash、stage tree/commit照合を記録。GitHub/AQUAの両mainは開始時87c3068。利用者のコミット・プッシュ依頼に従って対象差分だけを保存し、両リモート先端を照合する。Release・実利用先deployは行わない。
+- 今回のGUI成功資料はportable1件追加で直近3件内。再利用資料、初回照合失敗、固定出力を保持し、削除0件。実Google受信・物理的な複数DPI・未変更Appletの全回帰は未実施。
+
+## 2026-10-16: リボンのポップアップ・編集UI・名前保持（0.53.0）
+
+- 開始時に作業ツリーcleanを確認し、`origin/main`を`87c306817dfbff573855400a7733cd2e0e11edea`までfast-forwardでpullしてから実装。一時パネルの見出しと閉じるボタンを撤去し、子ボタンの縦中央を元のグループへ揃えた。幅不足時だけ左右スクロール操作を表示し、リボン内の子コンテナは持続型だけに限定して開閉時の位置ずれを解消した。
+- 共通一覧と同じ編集／削除SVGと同幅の操作枠、未導入項目の確認付き削除、グループ／通常ボタンのアイコンのみ表示、空グループ名、通常ボタンの別名を実装。登録元のID・名前・実行先は維持。未導入項目には保存済みの別名、登録名、IDの順で表示し、実際のリボン編集保存時に参照中のApplet登録名を保持する。記録のない過去の名前は復元しない。停止中・再導入済みの項目は削除不可。
+- [発行前レビュー](.artifacts/ribbon-ui-polish-20261016/review.md)で要件・保存互換・外部API・設定同期・同値更新・名前保持上限を確認。共通input幅指定を受けたcheckboxの位置を修正し、全子が無効な場合のEscape用フォーカスも補完した。画面画像で項目間余白とcheckboxを確認。未解決指摘なし。`groups[].iconOnly`と`itemOverrides`の追加により**0.52.0→0.53.0**、新規保存ファイルなし。
+- 型検査・ビルド・関連回帰**69/69、fail/skip 0**成功。source／固定EXEの[リボンGUI各7群](.artifacts/ribbon-groups-ui-1792137261486/result.json)と固定EXEのsmokeが終了0。子ボタンの縦中央差1 CSS px以下、開閉前後のリボン矩形一致、操作列位置、幅不足／不要時、共通アイコン、ダイアログ項目間20px以上、別名／空欄／アイコンのみ、保存名付き未導入のルートと子の削除、既存Node/.NETバッジ、持続型再起動復元を確認した。
+- `publish.bat`終了0。package・EXE FileVersion/ProductVersion・asar・Default Shell・feedは**0.53.0**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144,227,837 bytes / SHA256 `14cec5d4b446c06758480c9cd531a8924533cd124da00f0905c47a815743336f`**。GUIとsmokeの隔離コピー、feed size/hashが一致。ビルド出力180ファイルも収録内容と一致。
+- [検証一覧](.artifacts/ribbon-ui-polish-20261016/validation.json)にコマンド・日時・終了コード、入力499件・fixture・ログ・生成物・環境・成果物hashを記録。最終回帰前と発行後の全入力一致を確認。pull/version変更後に固定lockfileで依存状態を更新し、依存の版変更なし。初期の制限環境EPERMと旧fixtureの失敗ログを保持し、通常ユーザー権限での最終回帰・修正済みGUI成功と区別した。
+- 今回の成功資料はsource3回／portable1回／smoke1回を保持。以前の再利用資料、実行方式不明の旧成功資料、失敗記録、固定出力も保持し、削除0件。CIMプロセス一覧の取得は制限環境で拒否されたため整理の根拠に使っていない。無関係な全標準回帰・未変更Appletの全回帰、実Google受信・物理的な複数DPIは未確認。変更は未ステージ・未コミットで保持し、push・Release・実利用先deploy・全体ZIPは実施していない。
+
 ## 2026-10-16: MCP Eventsのコミット確認（0.52.0）
 
 - コミット対象18ファイルを再レビュー。MCP Eventsだけを選択した場合にも折りたたみ見出しが「通知センターのみ」になっていたため、読み上げとの併用も含めて実際の選択を表示するよう修正し、既存GUIで確認を追加した。他の製品修正はなく、同じ変更の仕上げとして0.52.0を再発行した。[レビュー](.artifacts/commit-validation-mcp-events-20261016/review.md)を参照。

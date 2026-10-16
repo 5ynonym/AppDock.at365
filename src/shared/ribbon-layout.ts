@@ -31,6 +31,15 @@ export const ribbonPlacement = (layout: RibbonLayout, id: string): RibbonPlaceme
   layout.bottom.includes(ribbonParent(layout, id)?.id ?? id) ? 'bottom' : 'top';
 export const ribbonVisible = (layout: RibbonLayout, id: string) =>
   !layout.hidden.includes(id) && !layout.hidden.includes(ribbonParent(layout, id)?.id ?? id);
+export function ribbonPresentation(layout: RibbonLayout, item: RibbonItem) {
+  const override = layout.itemOverrides?.[item.id];
+  return {
+    title: item.group ? item.group.title || 'グループ' : override?.title || item.title,
+    iconOnly: item.group
+      ? !!item.group.iconOnly || !item.group.title
+      : (override?.iconOnly ?? item.id === 'profile'),
+  };
+}
 export const ribbonRoots = (layout: RibbonLayout, items: RibbonItem[]) =>
   orderRibbon(items, layout.order).filter((i) => !ribbonParent(layout, i.id));
 /** Includes retained IDs at their saved positions, then newly discovered root items. */
@@ -50,6 +59,7 @@ export function ribbonRetainedIds(layout: RibbonLayout, items: RibbonItem[]) {
       ...layout.hidden,
       ...layout.bottom,
       ...(layout.groups ?? []).flatMap((g) => g.children),
+      ...Object.keys(layout.itemOverrides ?? {}),
     ]),
   ].filter((id) => !known.has(id));
 }
@@ -71,6 +81,7 @@ export function editRibbon(
       'expansion',
       'parentId',
       'beforeId',
+      'iconOnly',
     ])
   )
     invalid();
@@ -126,6 +137,34 @@ export function editRibbon(
         setPlacement(op.id, p);
       }
     }
+  } else if (op.kind === 'updateItem') {
+    if (
+      !exact(op, ['kind', 'id', 'changes']) ||
+      !exact(op.changes, ['title', 'iconOnly']) ||
+      !Object.keys(op.changes).length ||
+      validGroupId(op.id) ||
+      validSeparatorId(op.id)
+    )
+      invalid();
+    known(op.id, true);
+    next.itemOverrides = {
+      ...next.itemOverrides,
+      [op.id]: { ...next.itemOverrides?.[op.id], ...op.changes },
+    };
+  } else if (op.kind === 'removeMissing') {
+    if (
+      !exact(op, ['kind', 'id']) ||
+      items.some((item) => item.id === op.id) ||
+      validGroupId(op.id) ||
+      validSeparatorId(op.id)
+    )
+      invalid();
+    known(op.id, true);
+    next.order = next.order.filter((id) => id !== op.id);
+    next.hidden = next.hidden.filter((id) => id !== op.id);
+    next.bottom = next.bottom.filter((id) => id !== op.id);
+    for (const g of next.groups) g.children = g.children.filter((id) => id !== op.id);
+    if (next.itemOverrides) delete next.itemOverrides[op.id];
   } else if (op.kind === 'reorder' || op.kind === 'reorderChildren') {
     const child = op.kind === 'reorderChildren';
     if (
@@ -171,7 +210,7 @@ export function editRibbon(
     next.hidden = next.hidden.filter((id) => id !== op.id);
   } else if (op.kind === 'addGroup') {
     if (
-      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement']) ||
+      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement', 'iconOnly']) ||
       !validGroupId(op.id) ||
       next.groups.some((g) => g.id === op.id)
     )
@@ -184,12 +223,13 @@ export function editRibbon(
       icon: op.icon,
       expansion: op.expansion,
       children: [],
+      ...(op.iconOnly !== undefined ? { iconOnly: op.iconOnly } : {}),
     });
     setPlacement(op.id, p);
   } else if (op.kind === 'updateGroup') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'icon', 'expansion']) ||
+      !exact(op.changes, ['title', 'icon', 'expansion', 'iconOnly']) ||
       !Object.keys(op.changes).length
     )
       invalid();
@@ -243,6 +283,22 @@ export function editRibbon(
     if (!exact(op, ['kind'])) invalid();
     return defaultRibbon();
   } else invalid();
+  // Keep names for configured Applet pages without pinning a live source's display name.
+  // Reads and no-op edits do not write metadata; explicit removal only removes its target.
+  if (op.kind !== 'removeMissing' && JSON.stringify(next) !== JSON.stringify(layout)) {
+    const retained = new Set(ribbonRetainedIds(next, []));
+    for (const item of items) {
+      if (!item.extensionId || !retained.has(item.id)) continue;
+      const lastKnownTitle = item.title
+        .replace(/[\x00-\x1f\x7f]/g, '')
+        .trim()
+        .slice(0, 80);
+      if (!lastKnownTitle) continue;
+      next.itemOverrides ??= {};
+      if (!next.itemOverrides[item.id] && Object.keys(next.itemOverrides).length >= 500) continue;
+      next.itemOverrides[item.id] = { ...next.itemOverrides[item.id], lastKnownTitle };
+    }
+  }
   try {
     return parseRibbon(next);
   } catch (e) {

@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { visibleRibbonItems, type RibbonItem } from '../../shared/applet-pages';
-import { ribbonRoots, ribbonPlacement } from '../../shared/ribbon-layout';
+import { ribbonRoots, ribbonPlacement, ribbonPresentation } from '../../shared/ribbon-layout';
 import { ribbonBadgeView, type RibbonBadge, type RibbonAnchor } from '../../shared/ribbon';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/shell';
@@ -92,6 +92,7 @@ export class UiPresentation {
     this.actions.set('ribbon.configure', { route: 'settings', section: 'ribbon' });
     const catalog = visibleRibbonItems(applets, settings.ribbon.separators, settings.ribbon.groups);
     const project = (item: RibbonItem): RibbonView['items'][number] => {
+      const appearance = ribbonPresentation(settings.ribbon, item);
       const actionId = `ribbon.${item.id}`;
       const provider = applets.find((e) => e.id === item.extensionId);
       const page = provider?.pages?.find((p) => p.id === item.pageId);
@@ -118,8 +119,11 @@ export class UiPresentation {
       return {
         id: item.id,
         kind: item.kind ?? 'button',
-        title: item.title,
-        tooltip: item.id === 'profile' ? settings.profile.name : item.title,
+        title: appearance.title,
+        tooltip:
+          item.id === 'profile' && !settings.ribbon.itemOverrides?.profile?.title
+            ? settings.profile.name
+            : appearance.title,
         placement: ribbonPlacement(settings.ribbon, item.id),
         selected: route === item.id,
         enabled,
@@ -132,7 +136,10 @@ export class UiPresentation {
           : {}),
         ...(item.kind === 'separator' ? {} : { actionId }),
         ...(schemaVersion === 2
-          ? { badge: ribbonBadgeView(this.options.badge?.(item.id) ?? null) }
+          ? {
+              badge: ribbonBadgeView(this.options.badge?.(item.id) ?? null),
+              iconOnly: appearance.iconOnly,
+            }
           : {}),
         icon:
           item.id === 'profile'

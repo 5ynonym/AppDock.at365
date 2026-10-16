@@ -122,6 +122,7 @@ export interface RibbonView {
     expanded?: boolean;
     children?: RibbonView['items'];
     childCount?: number;
+    iconOnly?: boolean;
   }[];
 }
 export interface UiActionRequest {

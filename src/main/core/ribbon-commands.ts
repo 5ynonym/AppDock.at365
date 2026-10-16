@@ -10,6 +10,7 @@ import {
   ribbonPlacement,
   ribbonVisible,
   ribbonRetainedIds,
+  ribbonPresentation,
 } from '../../shared/ribbon-layout';
 import { ribbonGroupIcons } from '../../shared/ribbon';
 
@@ -28,16 +29,16 @@ const idSchema = {
   description: 'ribbon.getで取得したリボンID。コマンドIDではありません。',
 };
 const placementSchema = { type: 'string', enum: ['top', 'bottom'] };
-const operation = (kind: string, properties: Record<string, unknown>) => ({
+const operation = (kind: string, properties: Record<string, unknown>, optional: string[] = []) => ({
   type: 'object',
   properties: { kind: { const: kind }, ...properties },
-  required: ['kind', ...Object.keys(properties)],
+  required: ['kind', ...Object.keys(properties).filter((key) => !optional.includes(key))],
   additionalProperties: false,
 });
 // Limit external reads to the documented fields, retaining extra local fields on save.
 const layoutOf = (settings: Settings): Layout => {
-  const { order, hidden, bottom, separators, groups = [] } = settings.ribbon;
-  return structuredClone({ order, hidden, bottom, separators, groups });
+  const { order, hidden, bottom, separators, groups = [], itemOverrides = {} } = settings.ribbon;
+  return structuredClone({ order, hidden, bottom, separators, groups, itemOverrides });
 };
 export class RibbonCommands {
   constructor(
@@ -98,13 +99,31 @@ export class RibbonCommands {
                     placement: placementSchema,
                   }),
                   operation('removeSeparator', { id: idSchema }),
-                  operation('addGroup', {
+                  operation('removeMissing', { id: idSchema }),
+                  operation('updateItem', {
                     id: idSchema,
-                    title: { type: 'string', minLength: 1, maxLength: 80 },
-                    icon: { enum: ribbonGroupIcons },
-                    expansion: { enum: ['persistent', 'temporary'] },
-                    placement: placementSchema,
+                    changes: {
+                      type: 'object',
+                      minProperties: 1,
+                      additionalProperties: false,
+                      properties: {
+                        title: { type: 'string', maxLength: 80 },
+                        iconOnly: { type: 'boolean' },
+                      },
+                    },
                   }),
+                  operation(
+                    'addGroup',
+                    {
+                      id: idSchema,
+                      title: { type: 'string', maxLength: 80 },
+                      icon: { enum: ribbonGroupIcons },
+                      expansion: { enum: ['persistent', 'temporary'] },
+                      placement: placementSchema,
+                      iconOnly: { type: 'boolean' },
+                    },
+                    ['iconOnly'],
+                  ),
                   operation('updateGroup', {
                     id: idSchema,
                     changes: {
@@ -112,9 +131,10 @@ export class RibbonCommands {
                       minProperties: 1,
                       additionalProperties: false,
                       properties: {
-                        title: { type: 'string', minLength: 1, maxLength: 80 },
+                        title: { type: 'string', maxLength: 80 },
                         icon: { enum: ribbonGroupIcons },
                         expansion: { enum: ['persistent', 'temporary'] },
+                        iconOnly: { type: 'boolean' },
                       },
                     },
                   }),
@@ -161,7 +181,7 @@ export class RibbonCommands {
       const visible = !layout.hidden.includes(item.id);
       return {
         id: item.id,
-        title: item.title,
+        title: ribbonPresentation(layout, item).title,
         kind: item.kind ?? (item.extensionId ? 'page' : 'builtin'),
         appletId: item.extensionId ?? null,
         pageId: item.pageId ?? null,

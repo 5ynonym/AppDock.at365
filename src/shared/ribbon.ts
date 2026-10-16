@@ -13,7 +13,14 @@ export interface RibbonGroup {
   title: string;
   icon: (typeof ribbonGroupIcons)[number];
   expansion: 'persistent' | 'temporary';
+  iconOnly?: boolean;
   children: string[];
+}
+export interface RibbonItemOverride {
+  title?: string;
+  iconOnly?: boolean;
+  /** Registration name remembered when saving a ribbon edit; used only if the source disappears. */
+  lastKnownTitle?: string;
 }
 export interface RibbonLayout {
   order: string[];
@@ -21,6 +28,7 @@ export interface RibbonLayout {
   bottom: string[];
   separators: string[];
   groups?: RibbonGroup[];
+  itemOverrides?: Record<string, RibbonItemOverride>;
 }
 export type RibbonBadgeTarget = { pageId: string } | { collectionKey: string; itemId: string };
 export type RibbonBadge =

@@ -30,7 +30,7 @@ export function RibbonIcon({
       ) : (
         item.icon.text || <Icon name={item.icon.name as IconName} size={21} />
       )}
-      {!item.icon.text && <span className="rail-label">{item.title}</span>}
+      {!(item.iconOnly ?? !!item.icon.text) && <span className="rail-label">{item.title}</span>}
       {item.badge && (
         <span aria-hidden="true" className={`ribbon-badge ${item.badge.kind}`}>
           {item.badge.text}

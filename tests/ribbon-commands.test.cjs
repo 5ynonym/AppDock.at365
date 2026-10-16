@@ -57,6 +57,38 @@ function fixture(t) {
 }
 const update = (id, changes) => ({ kind: 'update', id, changes });
 
+test('appearance edits preserve source identity and missing removal rechecks the current catalog', async (t) => {
+  const f = fixture(t);
+  await f.edit([
+    {
+      kind: 'updateItem',
+      id: 'page:sample:main',
+      changes: { title: 'Personal name', iconOnly: true },
+    },
+  ]);
+  assert.equal(f.get().items.find((i) => i.id === 'page:sample:main').title, 'Personal name');
+  assert.equal(f.applets[0].pages[0].title, 'Sample page');
+  assert.equal(f.get().layout.itemOverrides['page:sample:main'].lastKnownTitle, 'Sample page');
+  await assert.rejects(f.edit([{ kind: 'removeMissing', id: 'page:sample:main' }]));
+  const source = f.applets.pop();
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  const dry = await f.edit([{ kind: 'removeMissing', id: 'page:sample:main' }], { dryRun: true });
+  assert.deepEqual(dry.retainedIds, []);
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  f.applets.push(source);
+  await assert.rejects(
+    f.edit([
+      { kind: 'updateItem', id: 'home', changes: { title: 'Must not save' } },
+      { kind: 'removeMissing', id: 'page:sample:main' },
+    ]),
+  );
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  f.applets.pop();
+  await f.edit([{ kind: 'removeMissing', id: 'page:sample:main' }]);
+  assert.deepEqual(f.get().retainedIds, []);
+  assert.equal(f.get().layout.itemOverrides['page:sample:main'], undefined);
+});
+
 test('group operations stay atomic with shared revisions and expose parent placement without opening pages', async (t) => {
   const f = fixture(t);
   const ops = [
@@ -128,7 +160,8 @@ test('ribbon atomic edit, dry run, disabled page visibility, placement and unrel
   for (const key of ['host', 'extensions', 'keybindings', 'gestures', 'appletOrder'])
     assert.deepEqual(f.settings.value[key], before[key]);
   await f.edit([{ kind: 'removeSeparator', id: 'separator:test' }]);
-  for (const values of Object.values(f.get().layout)) assert.ok(!values.includes('separator:test'));
+  for (const key of ['order', 'hidden', 'bottom', 'separators'])
+    assert.ok(!f.get().layout[key].includes('separator:test'));
 });
 test('reorder includes hidden and disabled items and preserves other group and retained ids', async (t) => {
   const f = fixture(t),

@@ -12,25 +12,6 @@
   padding: 6px;
   width: max-content;
 }
-.ribbon-flyout-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-left: 8px;
-  min-width: 0;
-}
-.ribbon-flyout-heading strong {
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ribbon-flyout-heading button {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-}
 .ribbon-flyout-controls {
   display: flex;
   min-width: 0;
@@ -53,9 +34,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
   width: 76px;
-  min-height: 56px;
+  min-height: 44px;
   flex-shrink: 0;
   border-radius: 8px;
   padding: 6px;

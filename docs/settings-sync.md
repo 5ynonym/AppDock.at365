@@ -4,7 +4,7 @@
 
 ## 保存先
 
-リボンのグループ定義と所属は共有`settings.json`、持続型の開閉はPC専用rootの`ribbon-state.json`へ分離する。一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-groups-badges-design.md#pc専用の開閉状態)を参照する。
+リボンのグループ定義・所属・表示名・アイコンのみ表示は共有`settings.json`、持続型の開閉はPC専用rootの`ribbon-state.json`へ分離する。一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-groups-badges-design.md#pc専用の開閉状態)を参照する。
 
 MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は共有settings.jsonの通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 

@@ -279,7 +279,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
-取得結果のlayoutはorder/hidden/bottom/separators/groups、itemsはid/title/kind（builtin/page/separator/group）/appletId/pageId/parentId/placement/visible/enabled/displayedです。placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
+取得結果のlayoutはorder/hidden/bottom/separators/groups/itemOverrides、itemsはid/title/kind（builtin/page/separator/group）/appletId/pageId/parentId/placement/visible/enabled/displayedです。titleはリボンの実効表示名、placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは配置・所属・表示設定に保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
 
 ```json
 {
@@ -301,14 +301,18 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 | reorder | placement, ids | 指定配置のトップレベル全itemsを希望順で指定。非表示・無効ページ・区切り線も含み、retainedIdsは含めない。別配置と子の順序を保持 |
 | addSeparator | id, placement | 一意のseparator:stable-idを追加。英小文字/数字で開始し、その後は英小文字/数字/ハイフン、接尾部80文字まで。指定配置のトップレベル末尾へ |
 | removeSeparator | id | 登録済み区切り線だけを削除し、トップレベルと子の参照も削除 |
-| addGroup | id, title, icon, expansion, placement | 空のグループを指定配置のトップレベルへ追加。expansionはpersistent/temporary |
-| updateGroup | id, changes | title/icon/expansionの指定分を変更 |
+| addGroup | id, title, icon, expansion, placement, 任意iconOnly | 空のグループを指定配置のトップレベルへ追加。expansionはpersistent/temporary。titleは空欄可 |
+| updateGroup | id, changes | title/icon/expansion/iconOnlyの指定分を変更 |
+| updateItem | id, changes | 通常ボタンのtitle/iconOnlyの指定分を変更。titleはリボン内の別名、空欄で登録元名へ戻す。現在itemsにある通常ボタンか保持中の未導入ページIDが対象 |
+| removeMissing | id | 登録元のない保持項目を配置・非表示・所属・表示設定から削除。登録元が現在存在する項目（停止中を含む）は拒否 |
 | moveItem | id, parentId, beforeId, 任意placement | parentIdはgroup IDかnull。beforeIdは同じ所属内の挿入先かnull（末尾）。トップレベル時だけplacementが必須 |
 | reorderChildren | id, ids | 未導入・非表示も含む指定グループの全childrenを並べ替える |
 | ungroup | id | 子を元の親位置へ戻し、配置と実効非表示を継承。Appletは削除しない |
-| reset | なし | グループと未導入項目の保存配置も含め初期化。order/hidden/separators/groupsは空、bottomはtheme/profile |
+| reset | なし | グループと未導入項目の保存配置・表示設定も含め初期化。order/hidden/separators/groupsは空、itemOverridesは空オブジェクト、bottomはtheme/profile |
 
 operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、ID配列550件、グループ50件・区切り線50件、明示配置全体の葉500件まで。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
+
+表示名は前後空白除去後0〜80文字で制御文字不可、iconOnlyはbooleanです。itemOverridesは通常ボタンIDごとの`{title?, iconOnly?, lastKnownTitle?}`を最大500件保持します。lastKnownTitleは編集保存時の登録名で、未導入項目の名前表示に使い、updateItemの指定対象にはしません。読取り・同値編集で名前記録を更新せず、枠が埋まっている場合は新規の名前記録を省略します。空の別名は保存せず登録元名を使用し、グループ名が空の場合は実リボンのラベルを省いてアクセシブル名に「グループ」を使用します。ID・登録元の名前・実行先は変更しません。
 
 revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未確定入力は上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
 

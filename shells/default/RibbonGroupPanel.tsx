@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { RibbonGroupModel, OverlayAction, ShellOverlayApi } from '../../src/shared/overlays';
 import { RibbonIcon, ribbonLabel } from './RibbonButton';
 
@@ -13,25 +13,48 @@ export function RibbonGroupPanel({
 }) {
   const panel = useRef<HTMLDivElement>(null),
     row = useRef<HTMLDivElement>(null);
-  const [scroll, setScroll] = useState({ left: false, right: false });
+  const [scroll, setScroll] = useState({ left: false, right: false, overflow: false });
+  const [top, setTop] = useState(0);
   const { anchor, title, items } = model.content;
   const left = Math.min(anchor.x + anchor.width + 8, Math.max(8, innerWidth - 120));
-  const top = Math.max(8, Math.min(anchor.y, innerHeight - 112));
+  const maxWidth = Math.max(100, innerWidth - left - 8);
   const close = () => act({ id: model.id, type: 'dismiss' });
   const update = () => {
     const r = row.current;
-    if (r)
+    if (r) {
+      const style = getComputedStyle(r);
+      const naturalWidth =
+        [...r.children].reduce((sum, child) => sum + child.getBoundingClientRect().width, 0) +
+        Math.max(0, r.children.length - 1) * parseFloat(style.columnGap) +
+        parseFloat(style.paddingLeft) +
+        parseFloat(style.paddingRight);
       setScroll({
         left: r.scrollLeft > 1,
         right: r.scrollLeft + r.clientWidth < r.scrollWidth - 1,
+        overflow: naturalWidth > maxWidth - 14 + 1,
       });
+      const p = panel.current,
+        first = r.querySelector<HTMLElement>('[data-ribbon-id]');
+      if (p && first) {
+        const rect = p.getBoundingClientRect(),
+          button = first.getBoundingClientRect();
+        const desired = anchor.y + anchor.height / 2 - (button.y - rect.y + button.height / 2);
+        setTop(Math.max(8, Math.min(desired, innerHeight - rect.height - 8)));
+      }
+    }
   };
-  useEffect(() => {
-    panel.current?.querySelector<HTMLButtonElement>('[data-ribbon-id]:not(:disabled)')?.focus();
+  useLayoutEffect(() => {
     const observer = new ResizeObserver(update);
     if (row.current) observer.observe(row.current);
+    if (panel.current) observer.observe(panel.current);
     update();
     return () => observer.disconnect();
+  }, [model.id, anchor.x, anchor.y, anchor.height, maxWidth, items]);
+  useLayoutEffect(() => {
+    const first = panel.current?.querySelector<HTMLButtonElement>(
+      '[data-ribbon-id]:not(:disabled)',
+    );
+    (first ?? panel.current)?.focus();
   }, [model.id]);
   return (
     <div
@@ -60,27 +83,24 @@ export function RibbonGroupPanel({
       <div
         ref={panel}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-label={title}
         className="ribbon-flyout"
-        style={{ left, top, maxWidth: Math.max(100, innerWidth - left - 8) }}
+        style={{ left, top, maxWidth }}
       >
-        <div className="ribbon-flyout-heading">
-          <strong>{title}</strong>
-          <button aria-label="グループを閉じる" onClick={close}>
-            ×
-          </button>
-        </div>
         <div className="ribbon-flyout-controls">
-          <button
-            aria-label="左へスクロール"
-            disabled={!scroll.left}
-            onClick={() => {
-              row.current?.scrollBy({ left: -180 });
-            }}
-          >
-            ‹
-          </button>
+          {scroll.overflow && (
+            <button
+              aria-label="左へスクロール"
+              disabled={!scroll.left}
+              onClick={() => {
+                row.current?.scrollBy({ left: -180 });
+              }}
+            >
+              ‹
+            </button>
+          )}
           <div
             ref={row}
             className="ribbon-flyout-row"
@@ -122,6 +142,7 @@ export function RibbonGroupPanel({
                 <button
                   key={item.id}
                   data-ribbon-id={item.id}
+                  style={{ height: anchor.height }}
                   disabled={!item.enabled}
                   className={item.selected ? 'active' : ''}
                   aria-label={ribbonLabel(item)}
@@ -144,15 +165,17 @@ export function RibbonGroupPanel({
               ),
             )}
           </div>
-          <button
-            aria-label="右へスクロール"
-            disabled={!scroll.right}
-            onClick={() => {
-              row.current?.scrollBy({ left: 180 });
-            }}
-          >
-            ›
-          </button>
+          {scroll.overflow && (
+            <button
+              aria-label="右へスクロール"
+              disabled={!scroll.right}
+              onClick={() => {
+                row.current?.scrollBy({ left: 180 });
+              }}
+            >
+              ›
+            </button>
+          )}
         </div>
       </div>
     </div>

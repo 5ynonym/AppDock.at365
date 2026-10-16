@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'),
   path = require('node:path');
 const { defaultRibbon, parseRibbon, ribbonItems } = require('../out/main/shared/applet-pages');
-const { editRibbon } = require('../out/main/shared/ribbon-layout');
+const { editRibbon, ribbonPresentation } = require('../out/main/shared/ribbon-layout');
 const { parseRibbonBadge, ribbonBadgeView } = require('../out/main/shared/ribbon');
 const { RibbonState } = require('../out/main/main/core/ribbon-state');
 const { RibbonBadges } = require('../out/main/main/core/ribbon-badges');
@@ -19,6 +19,106 @@ const group = (id = 'group:one', children = [], expansion = 'persistent') => ({
 });
 const edit = (layout, operation) =>
   editRibbon(layout, ribbonItems([], layout.separators, layout.groups), operation);
+
+test('configured source names survive disappearance and do not override live names or custom labels', () => {
+  const source = { id: 'remembered', pages: [{ id: 'main', title: 'Original name' }] };
+  const id = 'page:remembered:main';
+  let items = ribbonItems([source]);
+  let layout = editRibbon(defaultRibbon(), items, {
+    kind: 'update',
+    id,
+    changes: { visible: false },
+  });
+  assert.equal(layout.itemOverrides[id].lastKnownTitle, 'Original name');
+  layout = parseRibbon(JSON.parse(JSON.stringify(layout)));
+  assert.equal(layout.itemOverrides[id].lastKnownTitle, 'Original name');
+  source.pages[0].title = 'Current name';
+  items = ribbonItems([source]);
+  assert.equal(
+    ribbonPresentation(
+      layout,
+      items.find((i) => i.id === id),
+    ).title,
+    'Current name',
+  );
+  const unchanged = editRibbon(layout, items, { kind: 'update', id, changes: { visible: false } });
+  assert.deepEqual(unchanged, layout, 'no-op does not write a name cache');
+  layout = editRibbon(layout, items, { kind: 'updateItem', id, changes: { title: 'My label' } });
+  assert.equal(layout.itemOverrides[id].lastKnownTitle, 'Current name');
+  const missing = { id, title: layout.itemOverrides[id].lastKnownTitle };
+  assert.equal(ribbonPresentation(layout, missing).title, 'My label');
+  layout = editRibbon(layout, ribbonItems([]), { kind: 'updateItem', id, changes: { title: '' } });
+  assert.equal(ribbonPresentation(layout, missing).title, 'Current name');
+  layout = editRibbon(layout, ribbonItems([]), { kind: 'removeMissing', id });
+  assert.equal(layout.itemOverrides[id], undefined);
+  assert.throws(() =>
+    parseRibbon({ ...layout, itemOverrides: { [id]: { lastKnownTitle: 'bad\nname' } } }),
+  );
+});
+
+test('blank group names and display overrides preserve source identities and validate presentation fields', () => {
+  let layout = edit(defaultRibbon(), {
+    kind: 'addGroup',
+    id: 'group:empty',
+    title: '  ',
+    icon: 'folder',
+    expansion: 'temporary',
+    iconOnly: true,
+    placement: 'top',
+  });
+  assert.equal(layout.groups[0].title, '');
+  layout = edit(layout, {
+    kind: 'updateItem',
+    id: 'home',
+    changes: { title: '  Custom home  ', iconOnly: true },
+  });
+  assert.deepEqual(layout.itemOverrides.home, { title: 'Custom home', iconOnly: true });
+  assert.equal(ribbonItems([]).find((i) => i.id === 'home').title, 'ホーム');
+  layout = edit(layout, { kind: 'updateItem', id: 'home', changes: { title: '' } });
+  assert.deepEqual(layout.itemOverrides.home, { iconOnly: true });
+  for (const changes of [
+    { title: 'x'.repeat(81) },
+    { title: 'bad\nname' },
+    { iconOnly: 'yes' },
+    { other: true },
+  ])
+    assert.throws(() => edit(layout, { kind: 'updateItem', id: 'home', changes }));
+  assert.throws(() =>
+    edit(layout, { kind: 'updateItem', id: 'group:empty', changes: { title: 'no' } }),
+  );
+  assert.throws(() =>
+    parseRibbon({ ...layout, itemOverrides: { 'group:empty': { iconOnly: true } } }),
+  );
+  assert.throws(() =>
+    parseRibbon({ ...layout, groups: [{ ...layout.groups[0], iconOnly: 'true' }] }),
+  );
+});
+
+test('remove missing item clears every placement and override while refusing live or unknown entries', () => {
+  const root = 'page:missing:root',
+    child = 'page:missing:child',
+    only = 'page:missing:override';
+  let layout = parseRibbon({
+    ...defaultRibbon(),
+    order: [root, 'group:one'],
+    hidden: [root, child],
+    bottom: [root],
+    groups: [group('group:one', [child, 'home'])],
+    itemOverrides: {
+      [root]: { title: 'Root' },
+      [child]: { iconOnly: true },
+      [only]: { title: 'Only' },
+    },
+  });
+  for (const id of [root, child, only]) layout = edit(layout, { kind: 'removeMissing', id });
+  assert.deepEqual(layout.order, ['group:one']);
+  assert.deepEqual(layout.groups[0].children, ['home']);
+  assert.deepEqual(layout.hidden, []);
+  assert.deepEqual(layout.bottom, []);
+  assert.deepEqual(layout.itemOverrides, {});
+  for (const id of ['home', 'group:one', 'page:absent:unknown'])
+    assert.throws(() => edit(layout, { kind: 'removeMissing', id }));
+});
 
 test('old layouts migrate in memory; duplicate ownership, nesting, dangling groups and excess values fail', () => {
   const legacy = { order: [], hidden: [], bottom: [], separators: [] };

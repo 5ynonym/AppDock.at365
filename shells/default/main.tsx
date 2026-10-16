@@ -119,7 +119,7 @@ function App() {
               {item.expanded ? '−' : '+'}
             </span>
           </button>
-          {item.expanded && (
+          {item.expansion === 'persistent' && item.expanded && (
             <div
               id={`children-${item.id}`}
               role="group"

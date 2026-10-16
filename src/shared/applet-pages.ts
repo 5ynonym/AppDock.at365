@@ -1,5 +1,5 @@
 import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
-import { ribbonGroupIcons, type RibbonGroup } from './ribbon';
+import { ribbonGroupIcons, type RibbonGroup, type RibbonItemOverride } from './ribbon';
 
 export type PageDisplay = 'page' | 'window';
 export interface AppletPageDefinition {
@@ -52,6 +52,7 @@ export const defaultRibbon = () => ({
   bottom: ['theme', 'profile'],
   separators: [] as string[],
   groups: [] as RibbonGroup[],
+  itemOverrides: {} as Record<string, RibbonItemOverride>,
 });
 
 export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinition[] {
@@ -125,7 +126,7 @@ export function ribbonItems(
     })),
     ...groups.map((group): RibbonItem => ({
       id: group.id,
-      title: group.title,
+      title: group.title || 'グループ',
       icon: group.icon,
       kind: 'group',
       group,
@@ -171,6 +172,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
         bottom: rawRibbon.bottom === undefined ? [] : rawRibbon.bottom,
         separators: rawRibbon.separators === undefined ? [] : rawRibbon.separators,
         groups: rawRibbon.groups === undefined ? [] : rawRibbon.groups,
+        itemOverrides: rawRibbon.itemOverrides === undefined ? {} : rawRibbon.itemOverrides,
       }
     : rawRibbon;
   if (
@@ -202,14 +204,16 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
   for (const g of groups) {
     if (
       !object(g) ||
-      Object.keys(g).some((k) => !['id', 'title', 'icon', 'expansion', 'children'].includes(k)) ||
+      Object.keys(g).some(
+        (k) => !['id', 'title', 'icon', 'expansion', 'children', 'iconOnly'].includes(k),
+      ) ||
       !validGroupId(g.id) ||
       groupIds.has(g.id) ||
       typeof g.title !== 'string' ||
-      !g.title.trim() ||
       g.title.trim().length > 80 ||
       /[\x00-\x1f\x7f]/.test(g.title) ||
       !ribbonGroupIcons.includes(g.icon) ||
+      (g.iconOnly !== undefined && typeof g.iconOnly !== 'boolean') ||
       !['persistent', 'temporary'].includes(g.expansion) ||
       !Array.isArray(g.children) ||
       g.children.length > 500 ||
@@ -239,5 +243,35 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
   )
     throw Error('グループの子は1つの所属先だけに置き、グループをトップレベルへ配置してください。');
   ribbon.groups = groups.map((g) => ({ ...g, title: g.title.trim(), children: [...g.children] }));
+  if (!object(ribbon.itemOverrides) || Object.keys(ribbon.itemOverrides).length > 500)
+    throw Error('リボンの表示設定は500件以下のオブジェクトです。');
+  const overrides: Record<string, RibbonItemOverride> = {};
+  for (const [id, value] of Object.entries(ribbon.itemOverrides)) {
+    if (
+      !validRibbonId(id) ||
+      validGroupId(id) ||
+      validSeparatorId(id) ||
+      !object(value) ||
+      Object.keys(value).some((key) => !['title', 'iconOnly', 'lastKnownTitle'].includes(key)) ||
+      ['title', 'lastKnownTitle'].some(
+        (key) =>
+          value[key] !== undefined &&
+          (typeof value[key] !== 'string' ||
+            (value[key] as string).trim().length > 80 ||
+            /[\x00-\x1f\x7f]/.test(value[key] as string)),
+      ) ||
+      (value.iconOnly !== undefined && typeof value.iconOnly !== 'boolean')
+    )
+      throw Error('リボンのボタン名・アイコンのみ表示を確認してください。');
+    const title = (value.title as string | undefined)?.trim();
+    const lastKnownTitle = (value.lastKnownTitle as string | undefined)?.trim();
+    if (title || lastKnownTitle || value.iconOnly !== undefined)
+      overrides[id] = {
+        ...(title ? { title } : {}),
+        ...(lastKnownTitle ? { lastKnownTitle } : {}),
+        ...(value.iconOnly !== undefined ? { iconOnly: value.iconOnly as boolean } : {}),
+      };
+  }
+  ribbon.itemOverrides = overrides;
   return ribbon as unknown as Settings['ribbon'];
 }

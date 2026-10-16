@@ -60,6 +60,26 @@ test('full presentation preserves order, placement, selected route and opaque as
   assert.ok(f.ui.get().revision > a.revision);
   assert.equal(f.settings.schemaVersion, 1);
 });
+
+test('ribbon aliases and icon-only are presentation settings, preserving actions and accessible fallback names', async () => {
+  const f = fixture();
+  f.settings.ribbon.itemOverrides = { 'page:test.page:main': { title: 'Inbox', iconOnly: true } };
+  const view = f.ui.get();
+  const item = view.items.find((i) => i.id === 'page:test.page:main');
+  assert.equal(item.title, 'Inbox');
+  assert.equal(item.iconOnly, true);
+  await f.ui.invoke({ epoch: view.epoch, requestId: 'alias', actionId: item.actionId }, 'fixture');
+  assert.deepEqual(f.executions, ['test.page.open']);
+  assert.equal(f.applets[0].pages[0].title, 'Page');
+  assert.equal(f.ui.get(() => true, 1).items.find((i) => i.id === item.id).iconOnly, undefined);
+  f.settings.ribbon.order = ['group:blank'];
+  f.settings.ribbon.groups = [
+    { id: 'group:blank', title: '', icon: 'folder', expansion: 'persistent', children: ['home'] },
+  ];
+  const blank = f.ui.get().items.find((i) => i.id === 'group:blank');
+  assert.equal(blank.title, 'グループ');
+  assert.equal(blank.iconOnly, true);
+});
 test('two readers share host revision; denied projections cannot change commands or navigation', () => {
   const f = fixture(),
     a = f.ui.get(),

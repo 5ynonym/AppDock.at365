@@ -2124,6 +2124,47 @@ summary {
 .ribbon-setting-row label > span {
   overflow-wrap: anywhere;
 }
+.ribbon-row-controls {
+  display: grid;
+  grid-template-columns: 100px repeat(4, 34px);
+  gap: 8px;
+  align-items: center;
+  flex: none;
+  margin-left: auto;
+}
+.ribbon-row-controls > button,
+.ribbon-action-placeholder {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+.ribbon-edit-fields {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.ribbon-edit-fields > label {
+  display: grid;
+  gap: 8px;
+}
+.ribbon-edit-fields input:not([type='checkbox']),
+.ribbon-edit-fields select {
+  width: 100%;
+  min-width: 0;
+}
+.ribbon-edit-fields > .ribbon-icon-only {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ribbon-edit-fields .ribbon-icon-only input {
+  width: auto;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.ribbon-edit-fields p {
+  margin: 0;
+}
 @media (max-width: 900px) {
   .ribbon-setting-row {
     flex-wrap: wrap;

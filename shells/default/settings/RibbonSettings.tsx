@@ -7,6 +7,7 @@ import {
   ribbonRoots,
   ribbonRetainedIds,
   editRibbon,
+  ribbonPresentation,
 } from '../../../src/shared/ribbon-layout';
 import {
   ribbonGroupIcons,
@@ -15,7 +16,7 @@ import {
 } from '../../../src/shared/ribbon';
 import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
 import { SettingsDialog } from '../../../src/shared/settings-ui/SettingsModal';
-import { Icon } from '../../../src/shared/ui-icons';
+import { ListIcon } from '../../../src/shared/settings-ui/SettingsListTable';
 
 export function RibbonSettings({
   settings,
@@ -37,13 +38,24 @@ export function RibbonSettings({
     placement: RibbonPlacement;
     before: string;
   }>();
-  const [confirmation, setConfirmation] = useState<{ group?: RibbonGroup; before: string }>();
+  const [itemDialog, setItemDialog] = useState<{
+    id: string;
+    title: string;
+    originalTitle: string;
+    iconOnly: boolean;
+    before: string;
+  }>();
+  const [confirmation, setConfirmation] = useState<{
+    group?: RibbonGroup;
+    missing?: { id: string; title: string };
+    before: string;
+  }>();
   const catalog = ribbonItems(extensions, layout.separators, groups);
   const items = [
     ...catalog,
     ...ribbonRetainedIds(layout, catalog).map((id) => ({
       id,
-      title: id,
+      title: layout.itemOverrides?.[id]?.lastKnownTitle || id,
       icon: 'extensions' as const,
     })),
   ];
@@ -119,7 +131,8 @@ export function RibbonSettings({
       placement,
       before: JSON.stringify(layout),
     });
-  const row = (item: RibbonItem, index: number, siblings: RibbonItem[]) => {
+  const row = (entry: RibbonItem, index: number, siblings: RibbonItem[]) => {
+    const item = { ...entry, ...ribbonPresentation(layout, entry) };
     const parent = ribbonParent(layout, item.id);
     const missing = !catalog.some((value) => value.id === item.id);
     return (
@@ -171,69 +184,104 @@ export function RibbonSettings({
               </small>
             </span>
           </label>
-          <select
-            aria-label={`${item.title}の配置`}
-            disabled={pending}
-            value={parent?.id ?? ribbonPlacement(layout, item.id)}
-            onChange={(e) =>
-              e.target.value.startsWith('group:')
-                ? moveTo(item.id, e.target.value)
-                : moveTo(item.id, null, e.target.value as RibbonPlacement)
-            }
-          >
-            <option value="top">上寄せ</option>
-            <option value="bottom">下寄せ</option>
-            {item.kind !== 'group' &&
-              groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.title}
-                </option>
-              ))}
-          </select>
-          <button
-            aria-label={`${item.title}を上へ`}
-            disabled={pending || index === 0}
-            onClick={() => move(item.id, siblings[index - 1].id)}
-          >
-            ↑
-          </button>
-          <button
-            aria-label={`${item.title}を下へ`}
-            disabled={pending || index === siblings.length - 1}
-            onClick={() => move(item.id, siblings[index + 1].id)}
-          >
-            ↓
-          </button>
-          {item.kind === 'separator' && (
-            <button
-              className="text-button"
+          <div className="ribbon-row-controls">
+            <select
+              aria-label={`${item.title}の配置`}
               disabled={pending}
-              aria-label={`${item.title}を削除`}
-              onClick={() => run({ kind: 'removeSeparator', id: item.id })}
+              value={parent?.id ?? ribbonPlacement(layout, item.id)}
+              onChange={(e) =>
+                e.target.value.startsWith('group:')
+                  ? moveTo(item.id, e.target.value)
+                  : moveTo(item.id, null, e.target.value as RibbonPlacement)
+              }
             >
-              削除
+              <option value="top">上寄せ</option>
+              <option value="bottom">下寄せ</option>
+              {item.kind !== 'group' &&
+                groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.title || 'グループ'}
+                  </option>
+                ))}
+            </select>
+            <button
+              aria-label={`${item.title}を上へ`}
+              disabled={pending || index === 0}
+              onClick={() => move(item.id, siblings[index - 1].id)}
+            >
+              ↑
             </button>
-          )}
-          {item.group && (
-            <>
+            <button
+              aria-label={`${item.title}を下へ`}
+              disabled={pending || index === siblings.length - 1}
+              onClick={() => move(item.id, siblings[index + 1].id)}
+            >
+              ↓
+            </button>
+            {item.kind !== 'separator' ? (
               <button
+                className="settings-list-icon"
+                title="編集"
                 disabled={pending}
                 aria-label={`${item.title}を編集`}
-                onClick={() => open(item.group, ribbonPlacement(layout, item.id))}
+                onClick={() =>
+                  item.group
+                    ? open(item.group, ribbonPlacement(layout, item.id))
+                    : setItemDialog({
+                        id: item.id,
+                        title: layout.itemOverrides?.[item.id]?.title ?? '',
+                        originalTitle: entry.title,
+                        iconOnly: item.iconOnly,
+                        before: JSON.stringify(layout),
+                      })
+                }
               >
-                編集
+                <ListIcon kind="edit" />
               </button>
+            ) : (
+              <span className="ribbon-action-placeholder" aria-hidden="true" />
+            )}
+            {item.kind === 'separator' ? (
               <button
+                className="settings-list-icon settings-list-delete"
+                title="削除"
+                disabled={pending}
+                aria-label={`${item.title}を削除`}
+                onClick={() => run({ kind: 'removeSeparator', id: item.id })}
+              >
+                <ListIcon kind="delete" />
+              </button>
+            ) : item.group ? (
+              <button
+                className="settings-list-icon settings-list-delete"
+                title="グループを解除"
                 disabled={pending}
                 aria-label={`${item.title}のグループを解除`}
                 onClick={() =>
                   setConfirmation({ group: item.group, before: JSON.stringify(layout) })
                 }
               >
-                解除
+                <ListIcon kind="delete" />
               </button>
-            </>
-          )}
+            ) : missing ? (
+              <button
+                className="settings-list-icon settings-list-delete"
+                title="設定から削除"
+                disabled={pending}
+                aria-label={`${item.title}を設定から削除`}
+                onClick={() =>
+                  setConfirmation({
+                    missing: { id: item.id, title: item.title },
+                    before: JSON.stringify(layout),
+                  })
+                }
+              >
+                <ListIcon kind="delete" />
+              </button>
+            ) : (
+              <span className="ribbon-action-placeholder" aria-hidden="true" />
+            )}
+          </div>
         </div>
         {item.group && (
           <div
@@ -330,23 +378,35 @@ export function RibbonSettings({
       </button>
       {confirmation && (
         <SettingsDialog
-          title={confirmation.group ? 'グループを解除' : 'リボンを初期状態に戻す'}
+          title={
+            confirmation.group
+              ? 'グループを解除'
+              : confirmation.missing
+                ? 'リボン項目を設定から削除'
+                : 'リボンを初期状態に戻す'
+          }
           onClose={() => setConfirmation(undefined)}
-          applyLabel={confirmation.group ? '解除' : '初期状態に戻す'}
+          applyLabel={
+            confirmation.group ? '解除' : confirmation.missing ? '削除' : '初期状態に戻す'
+          }
           onApply={async () => {
             if (confirmation.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてからやり直してください。');
             await apply(
               confirmation.group
                 ? { kind: 'ungroup', id: confirmation.group.id }
-                : { kind: 'reset' },
+                : confirmation.missing
+                  ? { kind: 'removeMissing', id: confirmation.missing.id }
+                  : { kind: 'reset' },
             );
           }}
         >
           <p>
             {confirmation.group
-              ? `「${confirmation.group.title}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
-              : 'グループ・セパレーターと、未導入の項目も含む保存済み配置を初期化します。Appletの設定や有効状態は変わりません。'}
+              ? `「${confirmation.group.title || 'グループ'}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
+              : confirmation.missing
+                ? `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`
+                : 'グループ・セパレーターと、未導入の項目も含む保存済み配置・表示名を初期化します。Appletの設定や有効状態は変わりません。'}
           </p>
         </SettingsDialog>
       )}
@@ -354,82 +414,147 @@ export function RibbonSettings({
         <SettingsDialog
           title={dialog.adding ? 'リボングループを追加' : 'リボングループを編集'}
           onClose={() => setDialog(undefined)}
-          valid={!!dialog.group.title.trim() && dialog.group.title.trim().length <= 80}
+          valid={dialog.group.title.trim().length <= 80}
           applyLabel={dialog.adding ? '追加' : '適用'}
           footer="確定するとすぐに反映・保存されます。"
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
-            const { id, title, icon, expansion } = dialog.group;
+            const { id, title, icon, expansion, iconOnly = false } = dialog.group;
             await apply(
               dialog.adding
-                ? { kind: 'addGroup', id, title, icon, expansion, placement: dialog.placement }
-                : { kind: 'updateGroup', id, changes: { title, icon, expansion } },
+                ? {
+                    kind: 'addGroup',
+                    id,
+                    title,
+                    icon,
+                    expansion,
+                    iconOnly,
+                    placement: dialog.placement,
+                  }
+                : { kind: 'updateGroup', id, changes: { title, icon, expansion, iconOnly } },
             );
           }}
         >
-          <label>
-            グループ名
-            <input
-              data-initial-focus
-              value={dialog.group.title}
-              maxLength={80}
-              onChange={(e) =>
-                setDialog({ ...dialog, group: { ...dialog.group, title: e.target.value } })
-              }
-            />
-          </label>
-          <label>
-            アイコン
-            <select
-              aria-label="グループのアイコン"
-              value={dialog.group.icon}
-              onChange={(e) =>
-                setDialog({
-                  ...dialog,
-                  group: { ...dialog.group, icon: e.target.value as RibbonGroup['icon'] },
-                })
-              }
-            >
-              {ribbonGroupIcons.map((icon) => (
-                <option key={icon} value={icon}>
-                  {
+          <div className="ribbon-edit-fields">
+            <label>
+              グループ名
+              <input
+                data-initial-focus
+                value={dialog.group.title}
+                maxLength={80}
+                placeholder="空欄ならアイコンだけを表示"
+                onChange={(e) =>
+                  setDialog({ ...dialog, group: { ...dialog.group, title: e.target.value } })
+                }
+              />
+            </label>
+            <label>
+              アイコン
+              <select
+                aria-label="グループのアイコン"
+                value={dialog.group.icon}
+                onChange={(e) =>
+                  setDialog({
+                    ...dialog,
+                    group: { ...dialog.group, icon: e.target.value as RibbonGroup['icon'] },
+                  })
+                }
+              >
+                {ribbonGroupIcons.map((icon) => (
+                  <option key={icon} value={icon}>
                     {
-                      folder: 'フォルダー',
-                      mail: 'メール',
-                      clock: '時計',
-                      image: '画像',
-                      extensions: 'アプレット',
-                      settings: '設定',
-                      bell: '通知',
-                    }[icon]
-                  }
-                </option>
-              ))}
-            </select>
-            <Icon name={dialog.group.icon} />
-          </label>
-          <label>
-            展開方法
-            <select
-              aria-label="展開方法"
-              value={dialog.group.expansion}
-              onChange={(e) =>
-                setDialog({
-                  ...dialog,
-                  group: { ...dialog.group, expansion: e.target.value as RibbonGroup['expansion'] },
-                })
-              }
-            >
-              <option value="persistent">持続的</option>
-              <option value="temporary">一時的</option>
-            </select>
-          </label>
-          <p className="muted">
-            {dialog.group.expansion === 'persistent'
-              ? 'リボン内に展開します。開閉状態はこのPCで再起動後も保持します。'
-              : '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。'}
-          </p>
+                      {
+                        folder: 'フォルダー',
+                        mail: 'メール',
+                        clock: '時計',
+                        image: '画像',
+                        extensions: 'アプレット',
+                        settings: '設定',
+                        bell: '通知',
+                      }[icon]
+                    }
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ribbon-icon-only">
+              <input
+                type="checkbox"
+                checked={!!dialog.group.iconOnly}
+                onChange={(e) =>
+                  setDialog({ ...dialog, group: { ...dialog.group, iconOnly: e.target.checked } })
+                }
+              />
+              リボンにアイコンのみを表示する
+            </label>
+            <label>
+              展開方法
+              <select
+                aria-label="展開方法"
+                value={dialog.group.expansion}
+                onChange={(e) =>
+                  setDialog({
+                    ...dialog,
+                    group: {
+                      ...dialog.group,
+                      expansion: e.target.value as RibbonGroup['expansion'],
+                    },
+                  })
+                }
+              >
+                <option value="persistent">持続的</option>
+                <option value="temporary">一時的</option>
+              </select>
+            </label>
+            <p className="muted">
+              {dialog.group.expansion === 'persistent'
+                ? 'リボン内に展開します。開閉状態はこのPCで再起動後も保持します。'
+                : '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。'}
+            </p>
+          </div>
+        </SettingsDialog>
+      )}
+      {itemDialog && (
+        <SettingsDialog
+          title="リボンボタンを編集"
+          applyLabel="適用"
+          valid={itemDialog.title.trim().length <= 80}
+          footer="確定するとすぐに反映・保存されます。"
+          onClose={() => setItemDialog(undefined)}
+          onApply={async () => {
+            if (itemDialog.before !== JSON.stringify(layout))
+              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+            await apply({
+              kind: 'updateItem',
+              id: itemDialog.id,
+              changes: { title: itemDialog.title, iconOnly: itemDialog.iconOnly },
+            });
+          }}
+        >
+          <div className="ribbon-edit-fields">
+            <label>
+              ボタン名
+              <input
+                data-initial-focus
+                maxLength={80}
+                value={itemDialog.title}
+                placeholder={itemDialog.originalTitle}
+                onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
+              />
+            </label>
+            <p className="muted">
+              空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。
+            </p>
+            <label className="ribbon-icon-only">
+              <input
+                type="checkbox"
+                checked={itemDialog.iconOnly}
+                onChange={(e) => setItemDialog({ ...itemDialog, iconOnly: e.target.checked })}
+              />
+              リボンにアイコンのみを表示する
+            </label>
+          </div>
         </SettingsDialog>
       )}
     </section>

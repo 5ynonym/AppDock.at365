@@ -367,7 +367,10 @@ export function settingsPaths(
         'bindings',
       ].map((key) => ['gestures', key]);
     case 'ribbon':
-      return ['order', 'hidden', 'bottom', 'separators', 'groups'].map((k) => ['ribbon', k]);
+      return ['order', 'hidden', 'bottom', 'separators', 'groups', 'itemOverrides'].map((k) => [
+        'ribbon',
+        k,
+      ]);
     case 'profile':
       return [
         ['profile', 'name'],
