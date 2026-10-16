@@ -42,6 +42,7 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
     hidden: [],
     bottom: ['theme', 'profile'],
     separators: [],
+    groups: [],
   });
   settings.ribbon = { order: ['page:test.pages:main', 'home'], hidden: ['settings'] };
   settings.extensions['test.pages'] = {
@@ -78,7 +79,7 @@ test('Ribbon separators and lower placement validate and survive save', () => {
     bottom: ['profile', id],
     separators: [id],
   };
-  assert.deepEqual(parseSettings(settings).ribbon, settings.ribbon);
+  assert.deepEqual(parseSettings(settings).ribbon, { ...settings.ribbon, groups: [] });
   const ordered = orderRibbon(ribbonItems([manifest], [id]), settings.ribbon.order);
   assert.equal(ordered[1].kind, 'separator');
   assert.equal(ordered[1].id, id);

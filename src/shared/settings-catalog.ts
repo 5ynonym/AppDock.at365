@@ -91,7 +91,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'ハードウェアアクセラレーション',
       'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
     ],
-    ['startMinimized', '起動時にトレイに収納', '次の起動時はウィンドウを表示せず、トレイに常駐します。'],
+    [
+      'startMinimized',
+      '起動時にトレイに収納',
+      '次の起動時はウィンドウを表示せず、トレイに常駐します。',
+    ],
     ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
   ],
   tts: [
@@ -111,7 +115,13 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['speech.speed', '通知の読み上げ速度', '共通の読み上げ設定を継承 または上書き'],
     ['speech.preview', '通知の読み上げを試聴', '試聴と停止'],
   ],
-  ribbon: [['ribbon', 'リボン', '表示 配置 並べ替え 上部 下部 セパレーター']],
+  ribbon: [
+    [
+      'ribbon',
+      'リボン',
+      '表示 配置 並べ替え 上部 下部 セパレーター グループ 展開 折りたたみ バッジ',
+    ],
+  ],
   tray: [
     ['trayClickCommand', 'トレイクリックのコマンド', 'シングルクリック'],
     ['trayDoubleClickCommand', 'トレイダブルクリックのコマンド', 'ダブルクリック'],
@@ -357,7 +367,7 @@ export function settingsPaths(
         'bindings',
       ].map((key) => ['gestures', key]);
     case 'ribbon':
-      return ['order', 'hidden', 'bottom', 'separators'].map((k) => ['ribbon', k]);
+      return ['order', 'hidden', 'bottom', 'separators', 'groups'].map((k) => ['ribbon', k]);
     case 'profile':
       return [
         ['profile', 'name'],

@@ -11,7 +11,7 @@ export interface CommandPaletteRequest {
 }
 export type CommandPaletteResult =
   { status: 'selected' | 'executed'; commandId: string } | { status: 'cancelled'; reason: string };
-export interface OverlayModel {
+export interface CommandPaletteModel {
   schemaVersion: 1;
   id: string;
   contextId: 'primary';
@@ -28,7 +28,24 @@ export interface OverlayModel {
     error: string;
   };
 }
+export interface RibbonGroupModel {
+  schemaVersion: 1;
+  id: string;
+  contextId: 'primary';
+  kind: 'ribbon-group';
+  revision: number;
+  dark: boolean;
+  modal: true;
+  content: {
+    groupId: string;
+    title: string;
+    anchor: import('./ribbon').RibbonAnchor;
+    items: import('./shell').RibbonView['items'];
+  };
+}
+export type OverlayModel = CommandPaletteModel | RibbonGroupModel;
 export type OverlayAction =
+  | { id: string; type: 'ribbonChoose'; actionId: string; requestId: string }
   | { id: string; type: 'dismiss' }
   | { id: string; type: 'choose'; commandId: string }
   | { id: string; type: 'togglePin'; commandId: string }
@@ -37,5 +54,6 @@ export interface ShellOverlayApi extends ShellAppletApi {
   connect(): Promise<{ sessionId: string; providerAppletId: string; snapshot: OverlayModel }>;
   ready(sessionId: string): Promise<void>;
   act(action: OverlayAction): Promise<void>;
+  asset(id: string): Promise<{ dataUrl: string }>;
   onChanged(callback: (model: OverlayModel) => void): () => void;
 }

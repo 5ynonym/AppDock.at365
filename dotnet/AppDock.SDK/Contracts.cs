@@ -16,6 +16,7 @@ public interface IExtensionContext
     IAppDockService AppDock => throw new NotSupportedException("AppDock operations require AppDock 0.26.36 or later.");
     ICommandService Commands { get; }
     ITrayService Tray { get; }
+    IRibbonService Ribbon => throw new NotSupportedException("Ribbon badges require AppDock 0.51.0 or later.");
     ISettingsService Settings { get; }
     INotificationService Notifications { get; }
     IUiService Ui { get; }

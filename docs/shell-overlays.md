@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`page.logs`・`page.home`・`page.settings`・`page.notifications`、`notification.banner`・`notification.desktop`です。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
+公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`page.logs`・`page.home`・`page.settings`・`page.notifications`、`notification.banner`・`notification.desktop`です。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -35,6 +35,8 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
 
 ## 本体と描画の分担
+
+`overlay.ribbon-group`は一時グループの横1行パネルを担当する独立領域。`RibbonGroupSession`が内容と寿命を持ち、パレットと同じ1つのモーダル枠を共有する。snapshotの`kind: "ribbon-group"`、`content.groupId/title/anchor/items`を描画し、`ribbonChoose`（id/actionId/requestId）または`dismiss`（id）を送る。`asset(id)`はモデルの画像だけを返す。背景は透明でも全面で入力を受け、外側クリックを消費する。対象設定・route・リボン提供元・Window位置／寸法／フォーカスが変われば閉じる。詳細は[グループ仕様](ribbon-groups-badges-design.md)。
 
 | 部分                         | 責務                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------ |

@@ -119,7 +119,10 @@ export const appDockOperations = {
       'リボンの描画モデル・選択状態・操作IDを取得します。編集用ribbon.getとは独立したepoch/revisionです。',
     inputSchema: {
       type: 'object',
-      properties: { contextId: { type: 'string', enum: ['primary'] } },
+      properties: {
+        contextId: { type: 'string', enum: ['primary'] },
+        schemaVersion: { type: 'integer', enum: [1, 2] },
+      },
       additionalProperties: false,
     },
     annotations: {

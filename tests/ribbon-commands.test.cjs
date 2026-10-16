@@ -56,6 +56,41 @@ function fixture(t) {
   return { settings, options, permissions, applets, api, get, edit };
 }
 const update = (id, changes) => ({ kind: 'update', id, changes });
+
+test('group operations stay atomic with shared revisions and expose parent placement without opening pages', async (t) => {
+  const f = fixture(t);
+  const ops = [
+    {
+      kind: 'addGroup',
+      id: 'group:work',
+      title: 'Work',
+      icon: 'folder',
+      expansion: 'temporary',
+      placement: 'bottom',
+    },
+    { kind: 'moveItem', id: 'home', parentId: 'group:work', beforeId: null },
+    { kind: 'moveItem', id: 'page:sample:main', parentId: 'group:work', beforeId: 'home' },
+  ];
+  const before = JSON.stringify(f.settings.value);
+  const dry = await f.edit(ops, { dryRun: true });
+  assert.equal(JSON.stringify(f.settings.value), before);
+  assert.deepEqual(dry.layout.groups[0].children, ['page:sample:main', 'home']);
+  await f.edit(ops);
+  const page = f.get().items.find((i) => i.id === 'page:sample:main');
+  assert.equal(page.parentId, 'group:work');
+  assert.equal(page.placement, 'bottom');
+  assert.equal(page.displayed, false);
+  await assert.rejects(
+    f.edit([
+      { kind: 'updateGroup', id: 'group:work', changes: { title: 'Changed' } },
+      { kind: 'reorderChildren', id: 'group:work', ids: ['home'] },
+    ]),
+  );
+  assert.equal(f.get().layout.groups[0].title, 'Work');
+  await f.edit([{ kind: 'ungroup', id: 'group:work' }]);
+  assert.deepEqual(f.get().layout.groups, []);
+  assert(f.get().layout.bottom.includes('home'));
+});
 test('ribbon read exposes scoped metadata and retains disabled and missing pages', (t) => {
   const f = fixture(t),
     s = structuredClone(f.settings.value);

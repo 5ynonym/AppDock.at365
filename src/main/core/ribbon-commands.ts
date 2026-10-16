@@ -1,15 +1,17 @@
 import type { Settings, SettingsSnapshot, ExtensionSnapshot } from '../../shared/contracts';
-import {
-  defaultRibbon,
-  parseRibbon,
-  ribbonItems,
-  orderRibbon,
-  validRibbonId,
-  validSeparatorId,
-} from '../../shared/applet-pages';
+import { ribbonItems, orderRibbon } from '../../shared/applet-pages';
 import type { SettingsStore } from './settings';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import type { AutomationCommand } from './automation-commands';
+import {
+  editRibbon,
+  RibbonLayoutError,
+  ribbonParent,
+  ribbonPlacement,
+  ribbonVisible,
+  ribbonRetainedIds,
+} from '../../shared/ribbon-layout';
+import { ribbonGroupIcons } from '../../shared/ribbon';
 
 type Layout = Settings['ribbon'];
 const commandId = 'appdock.ribbon.update';
@@ -34,8 +36,8 @@ const operation = (kind: string, properties: Record<string, unknown>) => ({
 });
 // Limit external reads to the documented fields, retaining extra local fields on save.
 const layoutOf = (settings: Settings): Layout => {
-  const { order, hidden, bottom, separators } = settings.ribbon;
-  return structuredClone({ order, hidden, bottom, separators });
+  const { order, hidden, bottom, separators, groups = [] } = settings.ribbon;
+  return structuredClone({ order, hidden, bottom, separators, groups });
 };
 export class RibbonCommands {
   constructor(
@@ -81,7 +83,7 @@ export class RibbonCommands {
                     ids: {
                       type: 'array',
                       items: idSchema,
-                      maxItems: 500,
+                      maxItems: 550,
                       uniqueItems: true,
                       description:
                         '指定配置の全itemsのID。非表示/無効Appletも含む。retainedIdsは含めない。',
@@ -96,6 +98,43 @@ export class RibbonCommands {
                     placement: placementSchema,
                   }),
                   operation('removeSeparator', { id: idSchema }),
+                  operation('addGroup', {
+                    id: idSchema,
+                    title: { type: 'string', minLength: 1, maxLength: 80 },
+                    icon: { enum: ribbonGroupIcons },
+                    expansion: { enum: ['persistent', 'temporary'] },
+                    placement: placementSchema,
+                  }),
+                  operation('updateGroup', {
+                    id: idSchema,
+                    changes: {
+                      type: 'object',
+                      minProperties: 1,
+                      additionalProperties: false,
+                      properties: {
+                        title: { type: 'string', minLength: 1, maxLength: 80 },
+                        icon: { enum: ribbonGroupIcons },
+                        expansion: { enum: ['persistent', 'temporary'] },
+                      },
+                    },
+                  }),
+                  operation('ungroup', { id: idSchema }),
+                  operation('reorderChildren', {
+                    id: idSchema,
+                    ids: { type: 'array', maxItems: 500, uniqueItems: true, items: idSchema },
+                  }),
+                  {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['kind', 'id', 'parentId', 'beforeId'],
+                    properties: {
+                      kind: { const: 'moveItem' },
+                      id: idSchema,
+                      parentId: { anyOf: [idSchema, { type: 'null' }] },
+                      beforeId: { anyOf: [idSchema, { type: 'null' }] },
+                      placement: placementSchema,
+                    },
+                  },
                   operation('reset', {}),
                 ],
               },
@@ -109,7 +148,7 @@ export class RibbonCommands {
   }
   private catalog(layout: Layout) {
     return orderRibbon(
-      ribbonItems(this.options.ribbonApplets?.() ?? [], layout.separators),
+      ribbonItems(this.options.ribbonApplets?.() ?? [], layout.separators, layout.groups),
       layout.order,
     );
   }
@@ -123,21 +162,20 @@ export class RibbonCommands {
       return {
         id: item.id,
         title: item.title,
-        kind: item.kind === 'separator' ? 'separator' : item.extensionId ? 'page' : 'builtin',
+        kind: item.kind ?? (item.extensionId ? 'page' : 'builtin'),
         appletId: item.extensionId ?? null,
         pageId: item.pageId ?? null,
-        placement: layout.bottom.includes(item.id) ? 'bottom' : 'top',
+        parentId: ribbonParent(layout, item.id)?.id ?? null,
+        placement: ribbonPlacement(layout, item.id),
         visible,
         enabled,
-        displayed: visible && enabled,
+        displayed: ribbonVisible(layout, item.id) && enabled,
       };
     });
     return {
       layout,
       items,
-      retainedIds: [...new Set([...layout.order, ...layout.hidden, ...layout.bottom])].filter(
-        (id) => !items.some((i) => i.id === id),
-      ),
+      retainedIds: ribbonRetainedIds(layout, this.catalog(layout)),
     };
   }
   get() {
@@ -146,10 +184,6 @@ export class RibbonCommands {
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
     };
-  }
-  private ordered(layout: Layout, ids: string[]) {
-    const known = new Set(this.catalog(layout).map((i) => i.id));
-    return [...ids, ...layout.order.filter((id) => !known.has(id))];
   }
   execute(args: unknown) {
     if (
@@ -168,89 +202,12 @@ export class RibbonCommands {
     try {
       for (const op of args.operations) {
         if (!object(op)) throw invalid();
-        const items = this.catalog(next),
-          ids = items.map((i) => i.id),
-          placement = (id: string) => (next.bottom.includes(id) ? 'bottom' : 'top');
-        if (op.kind === 'update') {
-          if (
-            !exact(op, ['kind', 'id', 'changes']) ||
-            !validRibbonId(op.id) ||
-            !exact(op.changes, ['visible', 'placement']) ||
-            !Object.keys(op.changes).length
-          )
-            throw invalid();
-          if (!ids.includes(op.id))
-            throw new SettingsCommandError(
-              'NOT_FOUND',
-              '現在登録されているリボン項目ではありません。',
-            );
-          const c = op.changes;
-          if (
-            (c.visible !== undefined && typeof c.visible !== 'boolean') ||
-            (c.placement !== undefined && !['top', 'bottom'].includes(c.placement as string))
-          )
-            throw invalid();
-          if (c.visible !== undefined && c.visible === next.hidden.includes(op.id))
-            next.hidden = [
-              ...next.hidden.filter((id) => id !== op.id),
-              ...(c.visible ? [] : [op.id]),
-            ];
-          if (c.placement !== undefined && c.placement !== placement(op.id)) {
-            next.order = this.ordered(next, [...ids.filter((id) => id !== op.id), op.id]);
-            next.bottom = [
-              ...next.bottom.filter((id) => id !== op.id),
-              ...(c.placement === 'bottom' ? [op.id] : []),
-            ];
-          }
-        } else if (op.kind === 'reorder') {
-          if (
-            !exact(op, ['kind', 'placement', 'ids']) ||
-            !['top', 'bottom'].includes(op.placement as string) ||
-            !Array.isArray(op.ids) ||
-            op.ids.length > 500 ||
-            op.ids.some((id) => !validRibbonId(id))
-          )
-            throw invalid();
-          const group = ids.filter((id) => placement(id) === op.placement),
-            ordered = op.ids as string[];
-          if (
-            group.length !== ordered.length ||
-            new Set(ordered).size !== ordered.length ||
-            ordered.some((id) => !group.includes(id))
-          )
-            throw invalid();
-          if (JSON.stringify(group) !== JSON.stringify(ordered)) {
-            let index = 0;
-            next.order = this.ordered(
-              next,
-              ids.map((id) => (placement(id) === op.placement ? ordered[index++] : id)),
-            );
-          }
-        } else if (op.kind === 'addSeparator') {
-          if (
-            !exact(op, ['kind', 'id', 'placement']) ||
-            !validSeparatorId(op.id) ||
-            !['top', 'bottom'].includes(op.placement as string) ||
-            next.separators.includes(op.id)
-          )
-            throw invalid();
-          next.order = this.ordered(next, [...ids, op.id]);
-          next.separators.push(op.id);
-          if (op.placement === 'bottom') next.bottom.push(op.id);
-        } else if (op.kind === 'removeSeparator') {
-          if (!exact(op, ['kind', 'id']) || !validSeparatorId(op.id)) throw invalid();
-          if (!next.separators.includes(op.id))
-            throw new SettingsCommandError('NOT_FOUND', '指定された区切り線がありません。');
-          for (const key of ['order', 'hidden', 'bottom', 'separators'] as const)
-            next[key] = next[key].filter((id) => id !== op.id);
-        } else if (op.kind === 'reset') {
-          if (!exact(op, ['kind'])) throw invalid();
-          next = defaultRibbon();
-        } else throw invalid();
-        next = parseRibbon(next);
+        next = editRibbon(next, this.catalog(next), op);
       }
     } catch (error) {
       if (error instanceof SettingsCommandError) throw error;
+      if (error instanceof RibbonLayoutError)
+        throw new SettingsCommandError(error.code, error.message);
       throw invalid();
     }
     const changed = JSON.stringify(before) !== JSON.stringify(next);

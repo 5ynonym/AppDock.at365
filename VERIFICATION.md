@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-16: リボングループ・展開方式・登録元バッジ（0.51.0）
+
+- 1階層のグループを追加し、持続型はリボン内へ展開してPC専用`ribbon-state.json`へ開閉を保存、一時型は右方向の横1行パネルへ展開する。選択・外側クリック・Escape・画面遷移・アンカー変更等で閉じる。設定の追加/編集/所属/並べ替え/解除と外部編集を共通処理へ接続し、旧配置・未導入ID・未知の追加項目を保持する。
+- 登録元のNode/.NETへ`ribbon-badges` capabilityと共通APIを追加。数値/点、99+、親の点、runtime世代・停止・無効化・削除時の回収を確認。外部APIはschema 1を既定として維持し、schema 2を明示選択できる。未対応Shellはリボン領域だけDefault Shellへ戻る。
+- 発行前[レビュー](.artifacts/ribbon-implementation-20261016/review.md)でGUIのダイアログ受付、設定投影と競合比較、同位置移動のno-op、Overlayの領域別retryを修正した。修正後の型検査・ビルド・本体標準回帰**510/510、fail/skip 0**が成功。Gmail標準回帰**25/25**も成功。依存の版・lockfileは不変。
+- 新グループGUIはsourceと固定EXEで各6群成功。Node/.NET実プロセスのバッジ、キーボード/横スクロール/外側クリック非透過、設定追加・編集・移動・解除、追加フィールド保持、再起動後の復元を確認。明暗テーマのパネルと設定を画像確認した。sourceの暗色fixtureの設定パス誤りを試験側で修正し、固定EXEでは暗色適用もassertした。既存パレットGUI7群と固定EXE標準smokeも成功。
+- `publish.bat`終了0。設定と保存ファイル追加のため本体は0.51.0。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144,205,456 bytes / SHA256 7ec2de32a2c8c553e38a78f8f89b05b8de0edfd32c48100e56564b504d9d32ce**。EXE版・package・Default Shell・feedが一致。隔離コピー2つのhashと、asar/外部Shellに含むビルド済み177ファイルを照合した。
+- [検証一覧・ログhash](.artifacts/ribbon-implementation-20261016/validation.json)、[最終入力hash](.artifacts/ribbon-implementation-20261016/inputs-after.json)、[実行環境](.artifacts/ribbon-implementation-20261016/environment.json)、[固定EXE GUI](.artifacts/ribbon-groups-ui-1792131950607/result.json)を保存。本体開始HEADは`299cfec95cef4833e18042ba854cf975a497059e`。最終単体試験後の変更は暗色GUI試験の設定パス/待機だけで、固定EXE試験を再実行した。製品入力は不変なので単体回帰を再利用する。コミットのtree/入力照合は[コミット証跡](.artifacts/commit-validation-ribbon-20261016/validation.json)へ記録する。
+- 制限環境での.NET/Electron/一部回帰の実行失敗は通常ユーザー権限で切り分け、成功結果を上記へ記録。旧設定期待値とGUI fixtureのmanifest/登録/selector誤りは試験側を更新し、修正前の失敗記録も保持。製品指摘の未解決なし。実Google受信、複数の物理DPI/画面は未確認で、未変更Appletの全GUIは再実行していない。
+- 整理: 今回のグループ成功資料はsource3件/portable1件、パレットsource1件、smoke1件を保持。失敗・再利用資料・固定ビルド出力も保持し、削除0件。GitHub Release・実利用先deploy・全体ZIP作成は行っていない。
+
 ## 2026-10-16: 通知配色のコミット確認
 
 - 今回の15ファイルを再レビューし、追加の製品修正なし。実装時の465入力・完全ログ・実.NET fixture・0.49.1のEXE/feedをSHA256で照合し一致。型検査/ビルド、関連82件、配色GUI各4群（source/固定EXE）、固定EXE通知設定GUI8群を再利用した。

@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | `ribbon` | ナビゲーションとコマンドのリボン | ShellHost |
 | `overlay.command-palette` | コマンド実行・選択パレット | OverlayHost |
+| `overlay.ribbon-group` | 一時展開するリボングループ | OverlayHost |
 | `page.home` | ホーム本文 | ShellPageHost |
 | `page.logs` | 全体・Applet詳細・WebApplet管理のログ本文 | ShellPageHost |
 | `page.notifications` | 通知センター本文 | ShellPageHost |
@@ -28,6 +29,8 @@
 同じ領域を使う表示文脈には同じ割り当てを適用する。例えば全体ログとApplet詳細ログを別々のShellにする設定は追加しない。ログ対象や設定対象のApplet IDと、描画提供元のApplet IDを混同しない。
 
 領域ID・表示名・対応契約は本体の共通カタログにまとめる。Appletは既存の`shell.views`で提供領域を宣言し、`shell.ui`は従来どおりリボンの別名として扱う。領域の同一性を画面の名前やHTMLファイル名で判定しない。
+
+現行カタログは上記9領域。旧`host.shellProvider`の一括指定は従来8領域だけへ移行し、新しい`overlay.ribbon-group`はDefault Shellを使う。リボン提供元は`shell.ribbonSchemaVersion: 2`が必要で、旧schemaの指定は保持したままリボン領域だけDefault Shellへ戻す。対応済みの他領域は継続する。
 
 | 領域 | 保存された指定 | AとBが稼働中 | Aを無効化した後 |
 | --- | --- | --- | --- |

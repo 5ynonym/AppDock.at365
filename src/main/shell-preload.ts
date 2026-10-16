@@ -20,6 +20,7 @@ const api: ShellApi = {
   get: () => ipcRenderer.invoke('shell:get'),
   asset: (id) => ipcRenderer.invoke('shell:asset', id),
   invoke: (request) => ipcRenderer.invoke('shell:invoke', request),
+  invalidateAnchor: () => ipcRenderer.invoke('shell:invalidateAnchor'),
   onChanged: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, snapshot: RibbonView) => callback(snapshot);
     ipcRenderer.on('shell:changed', handler);

@@ -1,0 +1,251 @@
+import {
+  orderRibbon,
+  parseRibbon,
+  validGroupId,
+  validRibbonId,
+  validSeparatorId,
+  defaultRibbon,
+  type RibbonItem,
+} from './applet-pages';
+import type { RibbonLayout, RibbonPlacement, RibbonGroup } from './ribbon';
+
+export class RibbonLayoutError extends Error {
+  constructor(
+    readonly code: 'INVALID_ARGUMENT' | 'NOT_FOUND',
+    message = 'リボンの操作・ID・配置・順序を確認してください。',
+  ) {
+    super(message);
+  }
+}
+const invalid = (): never => {
+  throw new RibbonLayoutError('INVALID_ARGUMENT');
+};
+const exact = (v: unknown, keys: string[]): v is Record<string, any> =>
+  !!v &&
+  typeof v === 'object' &&
+  !Array.isArray(v) &&
+  Object.keys(v).every((k) => keys.includes(k));
+export const ribbonParent = (layout: RibbonLayout, id: string) =>
+  (layout.groups ?? []).find((g) => g.children.includes(id));
+export const ribbonPlacement = (layout: RibbonLayout, id: string): RibbonPlacement =>
+  layout.bottom.includes(ribbonParent(layout, id)?.id ?? id) ? 'bottom' : 'top';
+export const ribbonVisible = (layout: RibbonLayout, id: string) =>
+  !layout.hidden.includes(id) && !layout.hidden.includes(ribbonParent(layout, id)?.id ?? id);
+export const ribbonRoots = (layout: RibbonLayout, items: RibbonItem[]) =>
+  orderRibbon(items, layout.order).filter((i) => !ribbonParent(layout, i.id));
+/** Includes retained IDs at their saved positions, then newly discovered root items. */
+export function ribbonRootIds(layout: RibbonLayout, items: RibbonItem[]) {
+  return [
+    ...layout.order,
+    ...ribbonRoots(layout, items)
+      .map((i) => i.id)
+      .filter((id) => !layout.order.includes(id)),
+  ];
+}
+export function ribbonRetainedIds(layout: RibbonLayout, items: RibbonItem[]) {
+  const known = new Set(items.map((i) => i.id));
+  return [
+    ...new Set([
+      ...layout.order,
+      ...layout.hidden,
+      ...layout.bottom,
+      ...(layout.groups ?? []).flatMap((g) => g.children),
+    ]),
+  ].filter((id) => !known.has(id));
+}
+/** Both the settings renderer and external edits use these ownership/order rules. */
+export function editRibbon(
+  layout: RibbonLayout,
+  items: RibbonItem[],
+  operation: unknown,
+): RibbonLayout {
+  if (
+    !exact(operation, [
+      'kind',
+      'id',
+      'changes',
+      'placement',
+      'ids',
+      'title',
+      'icon',
+      'expansion',
+      'parentId',
+      'beforeId',
+    ])
+  )
+    invalid();
+  const op = operation as Record<string, any>;
+  const next = structuredClone(layout);
+  next.groups ??= [];
+  const roots = () => ribbonRootIds(next, items);
+  const group = (id: unknown): RibbonGroup => {
+    const g = next.groups!.find((g) => g.id === id);
+    if (!g) throw new RibbonLayoutError('NOT_FOUND', '指定されたグループがありません。');
+    return g;
+  };
+  const known = (id: unknown, retained = false) => {
+    if (!validRibbonId(id)) invalid();
+    if (
+      !items.some((i) => i.id === id) &&
+      !next.groups!.some((g) => g.id === id) &&
+      !(retained && ribbonRetainedIds(next, items).includes(id as string))
+    )
+      throw new RibbonLayoutError('NOT_FOUND', '現在登録されているリボン項目ではありません。');
+  };
+  const placement = (v: unknown): RibbonPlacement => {
+    if (v !== 'top' && v !== 'bottom') invalid();
+    return v as RibbonPlacement;
+  };
+  const setPlacement = (id: string, p: RibbonPlacement) => {
+    next.bottom = [...next.bottom.filter((x) => x !== id), ...(p === 'bottom' ? [id] : [])];
+  };
+  const remove = (id: string) => {
+    next.order = roots().filter((x) => x !== id);
+    for (const g of next.groups!) g.children = g.children.filter((x) => x !== id);
+    next.bottom = next.bottom.filter((x) => x !== id);
+  };
+  if (op.kind === 'update') {
+    if (
+      !exact(op, ['kind', 'id', 'changes']) ||
+      !exact(op.changes, ['visible', 'placement']) ||
+      !Object.keys(op.changes).length
+    )
+      invalid();
+    known(op.id);
+    const c = op.changes;
+    if (c.visible !== undefined) {
+      if (typeof c.visible !== 'boolean') invalid();
+      if (c.visible === next.hidden.includes(op.id))
+        next.hidden = [...next.hidden.filter((x) => x !== op.id), ...(!c.visible ? [op.id] : [])];
+    }
+    if (c.placement !== undefined) {
+      const p = placement(c.placement);
+      if (ribbonParent(next, op.id)) invalid();
+      if (ribbonPlacement(next, op.id) !== p) {
+        next.order = [...roots().filter((x) => x !== op.id), op.id];
+        setPlacement(op.id, p);
+      }
+    }
+  } else if (op.kind === 'reorder' || op.kind === 'reorderChildren') {
+    const child = op.kind === 'reorderChildren';
+    if (
+      !exact(op, child ? ['kind', 'id', 'ids'] : ['kind', 'placement', 'ids']) ||
+      !Array.isArray(op.ids) ||
+      op.ids.length > 550 ||
+      op.ids.some((id: unknown) => !validRibbonId(id)) ||
+      new Set(op.ids).size !== op.ids.length
+    )
+      invalid();
+    const p = child ? undefined : placement(op.placement);
+    const g = child ? group(op.id) : undefined;
+    const ids = g
+      ? g.children
+      : ribbonRoots(next, items)
+          .filter((i) => ribbonPlacement(next, i.id) === p)
+          .map((i) => i.id);
+    if (ids.length !== op.ids.length || op.ids.some((id: string) => !ids.includes(id))) invalid();
+    if (ids.some((id, index) => op.ids[index] !== id)) {
+      if (g) g.children = [...op.ids];
+      else {
+        let index = 0;
+        next.order = roots().map((id) => (ids.includes(id) ? op.ids[index++] : id));
+      }
+    }
+  } else if (op.kind === 'addSeparator') {
+    if (
+      !exact(op, ['kind', 'id', 'placement']) ||
+      !validSeparatorId(op.id) ||
+      next.separators.includes(op.id)
+    )
+      invalid();
+    const p = placement(op.placement);
+    next.order = [...roots(), op.id];
+    next.separators.push(op.id);
+    setPlacement(op.id, p);
+  } else if (op.kind === 'removeSeparator') {
+    if (!exact(op, ['kind', 'id']) || !validSeparatorId(op.id)) invalid();
+    if (!next.separators.includes(op.id))
+      throw new RibbonLayoutError('NOT_FOUND', '指定された区切り線がありません。');
+    remove(op.id);
+    next.separators = next.separators.filter((id) => id !== op.id);
+    next.hidden = next.hidden.filter((id) => id !== op.id);
+  } else if (op.kind === 'addGroup') {
+    if (
+      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement']) ||
+      !validGroupId(op.id) ||
+      next.groups.some((g) => g.id === op.id)
+    )
+      invalid();
+    const p = placement(op.placement);
+    next.order = [...roots(), op.id];
+    next.groups.push({
+      id: op.id,
+      title: op.title,
+      icon: op.icon,
+      expansion: op.expansion,
+      children: [],
+    });
+    setPlacement(op.id, p);
+  } else if (op.kind === 'updateGroup') {
+    if (
+      !exact(op, ['kind', 'id', 'changes']) ||
+      !exact(op.changes, ['title', 'icon', 'expansion']) ||
+      !Object.keys(op.changes).length
+    )
+      invalid();
+    Object.assign(group(op.id), op.changes);
+  } else if (op.kind === 'moveItem') {
+    if (
+      !exact(op, ['kind', 'id', 'parentId', 'beforeId', 'placement']) ||
+      (op.parentId !== null && !validGroupId(op.parentId)) ||
+      (op.beforeId !== null && !validRibbonId(op.beforeId)) ||
+      op.id === op.beforeId
+    )
+      invalid();
+    known(op.id, true);
+    const destination = op.parentId === null ? undefined : group(op.parentId);
+    if (destination && (validGroupId(op.id) || op.placement !== undefined)) invalid();
+    const p = destination ? ribbonPlacement(next, destination.id) : placement(op.placement);
+    const before = destination ? destination.children : roots();
+    if (
+      op.beforeId !== null &&
+      (!before.includes(op.beforeId) || (!destination && ribbonPlacement(next, op.beforeId) !== p))
+    )
+      invalid();
+    const sameParent = (ribbonParent(next, op.id)?.id ?? null) === op.parentId;
+    const siblings = destination ? before : before.filter((id) => ribbonPlacement(next, id) === p);
+    const desired = siblings.filter((id) => id !== op.id);
+    desired.splice(op.beforeId === null ? desired.length : desired.indexOf(op.beforeId), 0, op.id);
+    if (
+      sameParent &&
+      ribbonPlacement(next, op.id) === p &&
+      JSON.stringify(desired) === JSON.stringify(siblings)
+    )
+      return next;
+    remove(op.id);
+    const ids = destination ? destination.children : next.order;
+    ids.splice(op.beforeId === null ? ids.length : ids.indexOf(op.beforeId), 0, op.id);
+    if (!destination) setPlacement(op.id, p);
+  } else if (op.kind === 'ungroup') {
+    if (!exact(op, ['kind', 'id'])) invalid();
+    const g = group(op.id),
+      p = ribbonPlacement(next, g.id),
+      hidden = next.hidden.includes(g.id);
+    next.order = roots().flatMap((id) => (id === g.id ? g.children : [id]));
+    next.groups = next.groups.filter((v) => v.id !== g.id);
+    next.bottom = next.bottom.filter((id) => id !== g.id);
+    next.hidden = next.hidden.filter((id) => id !== g.id);
+    for (const id of g.children) {
+      setPlacement(id, p);
+      if (hidden && !next.hidden.includes(id)) next.hidden.push(id);
+    }
+  } else if (op.kind === 'reset') {
+    if (!exact(op, ['kind'])) invalid();
+    return defaultRibbon();
+  } else invalid();
+  try {
+    return parseRibbon(next);
+  } catch (e) {
+    throw new RibbonLayoutError('INVALID_ARGUMENT', String((e as Error).message));
+  }
+}

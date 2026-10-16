@@ -32,6 +32,7 @@ function provider(id, extra = {}) {
     minimumHostVersion: '0.34.0',
     shell: {
       apiVersion: 1,
+      ribbonSchemaVersion: 2,
       views: Object.fromEntries(shellRegions.map((r) => [r.id, r.id + '.html'])),
     },
     ...extra,
@@ -48,6 +49,20 @@ function fixture(extra = {}) {
   });
   return { registry, assignments, providers };
 }
+
+test('legacy ribbon providers fall back per region while compatible page and overlay assignments stay active', () => {
+  const f = fixture();
+  const external = f.providers.find((p) => p.id === 'shell.a');
+  delete external.shell.ribbonSchemaVersion;
+  f.assignments['page.logs'] = external.id;
+  f.assignments['overlay.ribbon-group'] = external.id;
+  assert.equal(f.registry.resolve('ribbon').provider.id, defaultShellId);
+  assert.match(f.registry.resolve('ribbon').reason, /対応していない/);
+  assert.equal(f.registry.resolve('page.logs').provider.id, external.id);
+  assert.equal(f.registry.resolve('overlay.ribbon-group').provider.id, external.id);
+  external.shell.ribbonSchemaVersion = 2;
+  assert.equal(f.registry.resolve('ribbon').provider.id, external.id);
+});
 test('legacy scalar migrates eight fixed regions without startup writes, while new empty map takes precedence', (t) => {
   const settings = createDefaultSettings();
   delete settings.host.shellProviders;

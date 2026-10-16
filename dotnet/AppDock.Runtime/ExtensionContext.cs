@@ -5,7 +5,7 @@ using AppDock.SDK;
 namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
-    IExtensionContext, ICommandService, ITrayService, ISettingsService, INotificationService,
+    IExtensionContext, ICommandService, ITrayService, IRibbonService, ISettingsService, INotificationService,
     IAppDockService, IShellService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
@@ -56,6 +56,9 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     }
     public ICommandService Commands => this;
     public ITrayService Tray => this;
+    public IRibbonService Ribbon => this;
+    public Task SetBadgeAsync(RibbonBadgeTarget target, RibbonBadge? badge, CancellationToken cancellationToken = default)
+        => CallAsync("host.ribbon.setBadge", new { target, badge }, cancellationToken);
     public ISettingsService Settings => this;
     public INotificationService Notifications => this;
     public IUiService Ui => this;

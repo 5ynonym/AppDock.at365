@@ -4,6 +4,8 @@
 
 ## 保存先
 
+リボンのグループ定義と所属は共有`settings.json`、持続型の開閉はPC専用rootの`ribbon-state.json`へ分離する。一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-groups-badges-design.md#pc専用の開閉状態)を参照する。
+
 共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。古いアバター参照は読み取り互換として許可するが、新規登録は`data/assets/profile`へ保存する。
 
 今後追加するAppletにもこの保存境界を適用する。同期する設定はホストSettings、登録原素材はEXE隣のApplet別assetsを使う。端末固有のStorage/Secrets/認証/生成キャッシュはホストのPC専用root内でApplet IDごとに分離する。

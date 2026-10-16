@@ -137,7 +137,11 @@ export function SettingsForm({
           />
         )}
         {category === 'ribbon' && (
-          <RibbonSettings settings={settings} extensions={extensions} onChange={edit} />
+          <RibbonSettings
+            settings={settings}
+            extensions={extensions}
+            onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
+          />
         )}
         {category === 'shortcuts' && (
           <ShortcutsEditor

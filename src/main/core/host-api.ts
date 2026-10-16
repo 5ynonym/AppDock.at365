@@ -42,6 +42,7 @@ export function createHostApi(
   typedNotifications?: () => TypedNotifications | undefined,
   shellState?: (id: string) => import('../../shared/shell').OwnShellState | undefined,
   collectionHost?: () => import('./page-collections').PageCollectionManager,
+  ribbonBadges?: import('./ribbon-badges').RibbonBadges,
 ) {
   const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -76,6 +77,41 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.ribbon.setBadge': {
+        requireCapability('ribbon-badges');
+        if (
+          !ribbonBadges ||
+          !e.runtimeSession ||
+          Object.keys(p).some((key) => !['target', 'badge'].includes(key)) ||
+          !isObject(p.target)
+        )
+          throw Error('バッジの対象ページを指定してください。');
+        const target = p.target;
+        let item: string | undefined;
+        if (Object.keys(target).length === 1 && typeof target.pageId === 'string') {
+          const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
+            (page) => page.id === target.pageId,
+          );
+          if (page) item = pageKey(id, page.id);
+        } else if (
+          Object.keys(target).length === 2 &&
+          typeof target.collectionKey === 'string' &&
+          typeof target.itemId === 'string'
+        ) {
+          const page = collectionHost?.()
+            .entries()
+            .find(
+              (page) =>
+                page.binding.owner === id &&
+                page.binding.key === target.collectionKey &&
+                page.binding.itemId === target.itemId &&
+                page.item.enabled,
+            );
+          if (page) item = pageKey(page.id, 'main');
+        }
+        if (!item) throw Error('自身が登録したページだけにバッジを設定できます。');
+        return ribbonBadges.set(id, e.runtimeSession, item, p.badge);
+      }
       case 'host.webProfiles.list':
       case 'host.webProfiles.add':
       case 'host.webProfiles.rename':

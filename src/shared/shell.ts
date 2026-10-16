@@ -5,6 +5,7 @@ export const defaultShellId = 'appdock.default-shell';
 export type ShellRegion =
   | 'ribbon'
   | 'overlay.command-palette'
+  | 'overlay.ribbon-group'
   | 'page.logs'
   | 'page.home'
   | 'page.notifications'
@@ -15,6 +16,7 @@ export type ShellRegion =
 export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'ribbon', title: 'リボン' },
   { id: 'overlay.command-palette', title: 'コマンドパレット' },
+  { id: 'overlay.ribbon-group', title: 'リボングループ' },
   { id: 'page.home', title: 'ホーム' },
   { id: 'page.logs', title: 'ログ' },
   { id: 'page.notifications', title: '通知センター' },
@@ -83,7 +85,11 @@ export function parseShellProviders(host: Record<string, unknown>): Record<strin
   }
   if (!Object.hasOwn(host, 'shellProvider') || host.shellProvider === undefined) return {};
   if (!id(host.shellProvider)) throw Error('host.shellProvider はShellのIDです。');
-  return Object.fromEntries(shellRegions.map((r) => [r.id, host.shellProvider as string]));
+  return Object.fromEntries(
+    shellRegions
+      .filter((r) => r.id !== 'overlay.ribbon-group')
+      .map((r) => [r.id, host.shellProvider as string]),
+  );
 }
 
 export function shellView(
@@ -93,7 +99,7 @@ export function shellView(
   return shell?.views?.[region] ?? (region === 'ribbon' ? shell?.ui : undefined);
 }
 export interface RibbonView {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   epoch: string;
   revision: number;
   contextId: 'primary';
@@ -102,7 +108,7 @@ export interface RibbonView {
   contextActionId: string;
   items: {
     id: string;
-    kind: 'button' | 'separator';
+    kind: 'button' | 'separator' | 'group';
     title: string;
     tooltip: string;
     placement: 'top' | 'bottom';
@@ -111,6 +117,11 @@ export interface RibbonView {
     disabledReason?: string;
     actionId?: string;
     icon: { name?: string; assetId?: string; text?: string };
+    badge?: import('./ribbon').RibbonBadgeView;
+    expansion?: 'persistent' | 'temporary';
+    expanded?: boolean;
+    children?: RibbonView['items'];
+    childCount?: number;
   }[];
 }
 export interface UiActionRequest {
@@ -118,6 +129,7 @@ export interface UiActionRequest {
   epoch: string;
   requestId: string;
   actionId: string;
+  anchor?: import('./ribbon').RibbonAnchor;
 }
 export interface ShellConnection {
   providerAppletId: string;
@@ -141,6 +153,7 @@ export interface ShellApi extends ShellAppletApi {
   get(): Promise<RibbonView>;
   asset(id: string): Promise<{ dataUrl: string }>;
   invoke(request: UiActionRequest): Promise<unknown>;
+  invalidateAnchor(): Promise<void>;
   onChanged(callback: (snapshot: RibbonView) => void): () => void;
 }
 export interface ShellStatus {

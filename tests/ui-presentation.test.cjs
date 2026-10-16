@@ -81,7 +81,8 @@ test('actions deduplicate per session, reject stale epochs and hidden actions, d
   assert.throws(() => f.ui.invoke({ ...request, actionId: 'ribbon.home' }, 'one'));
   assert.throws(() => f.ui.invoke({ ...request, epoch: 'old' }, 'one'));
   f.settings.ribbon.hidden.push('theme');
-  assert.throws(() => f.ui.invoke(request, 'one'));
+  await f.ui.invoke(request, 'one'); // A completed request remains idempotent after state changes.
+  assert.throws(() => f.ui.invoke({ ...request, requestId: 'hidden-new' }, 'one'));
   f.settings.ribbon.hidden = [];
   f.ui.disconnect('one');
   await f.ui.invoke(request, 'one');

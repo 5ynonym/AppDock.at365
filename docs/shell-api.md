@@ -19,11 +19,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
   "id": "example.shell",
   "name": "Example Shell",
   "version": "1.0.0",
-  "minimumHostVersion": "0.26.41",
+  "minimumHostVersion": "0.51.0",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
-  "shell": { "apiVersion": 1, "views": { "ribbon": "index.html" } }
+  "shell": { "apiVersion": 1, "ribbonSchemaVersion": 2, "views": { "ribbon": "index.html" } }
 }
 ```
 
@@ -33,11 +33,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 | 操作                | 引数と戻り値                                                                                                                                |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ui.ribbon.get`     | 任意`contextId: "primary"`。`schemaVersion: 1`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
+| `ui.ribbon.get`     | 任意`contextId: "primary"`と`schemaVersion: 1 | 2`（省略は1）。要求した版の`schemaVersion`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
 | `ui.assets.get`     | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。ファイルパス・任意URLは受け付けない                                                     |
 | `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する      |
 
-各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。`kind`はbutton/separator、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像1件はdata URLで1 MiB以下。構造化モデルにローカルパス・openCommand・認証情報を含めない。
+各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。schema 1の`kind`はbutton/separator、schema 2はgroupも含み、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像1件はdata URLで1 MiB以下。構造化モデルにローカルパス・openCommand・認証情報を含めない。
 
 表示用revisionは設定revisionと独立。完全snapshotを返し、設定・稼働状態・選択状態・画像等が変わったときに進む。旧`ribbon.get`は設定編集用として維持する。操作IDは返されたものをそのまま渡し、Shell側で項目IDから機能を推測しない。非表示項目や失効したepoch/context、実行時に利用できなくなった操作は拒否する。
 
@@ -46,6 +46,10 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 重複受付は最大512件、完了から2分以内。実行中の記録は期限・容量で追い出さない。Shellはホスト発行session単位、通常Appletはworker起動単位。既存MCPはstateless HTTPのため本体epoch内のMCP呼出し全体でrequestIdを共有する。全クライアントでUUIDを使い、接続し直した後の変更操作は自動再送しない。同一IDの異なる操作は拒否する。ホスト再起動・期限切れ・容量超過をまたぐexactly-once保証はない。
 
 ## 選択されたShellの公開bridge
+
+リボンを提供するShellは`minimumHostVersion: "0.51.0"`と`shell.ribbonSchemaVersion: 2`を宣言する。省略／1の提供元はリボン領域だけDefault Shellへ戻し、他領域の割り当てを維持する。ローカルbridgeは常にschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
+
+schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-groups-badges-design.md)。
 
 専用preloadはDefault Shell/Shell Applet共通の`window.appdockShell`を公開する。`window.dock`やNodeの直接アクセスは渡さない。送信元のWebContents・main frame・登録URL・現session・active状態を照合する。Shellのローカル操作権限は従来リボンと同じで、通常Applet/MCPの包括的な操作許可とは分離する。
 

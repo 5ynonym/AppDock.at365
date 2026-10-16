@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ShellOverlayApi, OverlayModel } from '../shared/overlays';
 const api: ShellOverlayApi = {
+  asset: (id) => ipcRenderer.invoke('overlay:asset', id),
   getSettings: () => ipcRenderer.invoke('overlay:getSettings'),
   onSettingsChanged: (callback) => {
     const handler = () => callback();

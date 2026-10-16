@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { OverlayAction, OverlayModel, ShellOverlayApi } from '../../src/shared/overlays';
 import { CommandPalette } from './CommandPalette';
+import { RibbonGroupPanel } from './RibbonGroupPanel';
+import './ribbon-badges.css';
+import './ribbon-group.css';
 import './overlay.css';
 import './palette.css';
 declare global {
@@ -46,6 +49,8 @@ function App() {
     void api.act(action).catch((e) => setError(String(e)));
   };
   if (!model) return null;
+  if (model.kind === 'ribbon-group')
+    return <RibbonGroupPanel model={model} act={act} asset={api.asset} />;
   const content = model.content;
   return (
     <CommandPalette

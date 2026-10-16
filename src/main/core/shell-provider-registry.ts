@@ -75,6 +75,8 @@ export class ShellProviderRegistry {
       return '提供元が未導入です。';
     if (!p.enabled) return '提供元が無効です。割り当ては保持しています。';
     if (!shellView(p.shell, region)) return 'この領域を提供していません。';
+    if (region === 'ribbon' && p.shell?.ribbonSchemaVersion !== 2)
+      return 'グループとバッジに対応していないリボンShellです。';
     if (region === 'page.settings' && !settingsShellCompatible(p))
       return '即時保存に対応していない設定Shellです。';
     if (p.state === 'error') return '提供元のworkerが停止しました。再試行してください。';

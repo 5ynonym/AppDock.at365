@@ -2109,6 +2109,29 @@ summary {
   gap: 8px;
   margin: 20px 0;
 }
+.ribbon-setting-children {
+  margin: 8px 0 8px 26px;
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  display: grid;
+  gap: 8px;
+}
+.ribbon-setting-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ribbon-setting-row label > span {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .ribbon-setting-row {
+    flex-wrap: wrap;
+  }
+  .ribbon-setting-row label {
+    min-width: 180px;
+  }
+}
 .ribbon-setting-row {
   display: flex;
   gap: 10px;

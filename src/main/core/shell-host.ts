@@ -45,6 +45,8 @@ export class ShellHost {
       shortcut(input: Electron.Input): boolean;
       execute(provider: string, command: string): Promise<unknown>;
       settings(provider: string): Record<string, unknown>;
+      openGroup?(id: string, anchor: import('../../shared/ribbon').RibbonAnchor): void;
+      invalidateAnchor?(): void;
     },
   ) {
     try {
@@ -114,7 +116,38 @@ export class ShellHost {
     ipcMain.handle('shell:invoke', (event, request) => {
       const b = binding(event);
       if (b !== this.active || !b.ready) throw Error('Shell is not active');
-      return options.ui.invoke(request, b.session);
+      return options.ui.invoke(request, b.session, undefined, {
+        openGroup: (id, anchor) => {
+          const bounds = this.bounds;
+          const zoom = b.view.webContents.getZoomFactor();
+          if (
+            !bounds ||
+            !anchor ||
+            !['x', 'y', 'width', 'height'].every((key) =>
+              Number.isFinite(anchor[key as keyof typeof anchor]),
+            ) ||
+            anchor.x < 0 ||
+            anchor.y < 0 ||
+            anchor.width < 1 ||
+            anchor.height < 1 ||
+            (anchor.x + anchor.width) * zoom > bounds.width + 1 ||
+            (anchor.y + anchor.height) * zoom > bounds.height + 1 ||
+            !options.openGroup
+          )
+            throw Error('グループボタンの位置を取得できません。');
+          const hostZoom = options.window.webContents.getZoomFactor();
+          options.openGroup(id, {
+            x: (bounds.x + anchor.x * zoom) / hostZoom,
+            y: (bounds.y + anchor.y * zoom) / hostZoom,
+            width: (anchor.width * zoom) / hostZoom,
+            height: (anchor.height * zoom) / hostZoom,
+          });
+        },
+      });
+    });
+    ipcMain.handle('shell:invalidateAnchor', (event) => {
+      const b = binding(event);
+      if (b === this.active && b.ready) options.invalidateAnchor?.();
     });
     ipcMain.handle('shell:executeCommand', (event, command) => {
       const b = binding(event);
@@ -169,12 +202,14 @@ export class ShellHost {
     )
       throw Error('Invalid Shell bounds');
     const zoom = this.options.window.webContents.getZoomFactor();
-    this.bounds = value && {
+    const next = value && {
       x: Math.round(value.x * zoom),
       y: Math.round(value.y * zoom),
       width: Math.round(value.width * zoom),
       height: Math.round(value.height * zoom),
     };
+    if (JSON.stringify(next) !== JSON.stringify(this.bounds)) this.options.invalidateAnchor?.();
+    this.bounds = next;
     this.layout();
   }
   private layout() {
@@ -330,6 +365,7 @@ export class ShellHost {
     void view.webContents.loadURL(b.url).catch(() => this.fail(b, 'Shell UI load failed'));
   }
   private close(b: Binding) {
+    this.options.invalidateAnchor?.();
     clearTimeout(b.timer);
     this.options.ui.disconnect(b.session);
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(b.view);
@@ -363,6 +399,7 @@ export class ShellHost {
       'focusHost',
       'executeCommand',
       'getSettings',
+      'invalidateAnchor',
     ])
       ipcMain.removeHandler(`shell:${method}`);
   }

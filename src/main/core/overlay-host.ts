@@ -8,11 +8,12 @@ import {
   type WebContentsView,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { shellView } from '../../shared/shell';
+import { shellView, type ShellRegion } from '../../shared/shell';
 import type { OverlayController } from './overlay-controller';
 import { createShellView } from './shell-view';
 
 type Surface = {
+  region: ShellRegion;
   view: WebContentsView;
   url: string;
   session: string;
@@ -43,27 +44,30 @@ export class OverlayHost {
       settings(provider: string): Record<string, unknown>;
       changed(): void;
       failed(message: string): void;
+      asset?(id: unknown): { dataUrl: string };
     },
   ) {
-    options.registry.observe('overlay.command-palette', () => ({
-      provider: this.surface?.provider ?? null,
-      version: this.surface?.version,
-      generation: this.surface?.generation,
-      session: this.surface?.session,
-      ready: !!this.surface?.ready,
-      visible:
-        !!this.current &&
-        this.previousRoute === options.route() &&
-        !!this.surface?.ready &&
-        !options.window.isDestroyed() &&
-        options.window.isVisible() &&
-        !options.window.isMinimized(),
-    }));
+    for (const region of ['overlay.command-palette', 'overlay.ribbon-group'] as const)
+      options.registry.observe(region, () => ({
+        provider: this.surface?.region === region ? this.surface.provider : null,
+        version: this.surface?.version,
+        generation: this.surface?.generation,
+        session: this.surface?.session,
+        ready: this.surface?.region === region && !!this.surface?.ready,
+        visible:
+          !!this.current &&
+          this.surface?.region === region &&
+          this.previousRoute === options.route() &&
+          !!this.surface?.ready &&
+          !options.window.isDestroyed() &&
+          options.window.isVisible() &&
+          !options.window.isMinimized(),
+      }));
     const bound = (event: IpcMainInvokeEvent) => {
       const s = this.surface;
       if (
         !s ||
-        !options.registry.usable('overlay.command-palette', s) ||
+        !options.registry.usable(s.region, s) ||
         !this.current ||
         this.previousRoute !== options.route() ||
         event.sender !== s.view.webContents ||
@@ -102,7 +106,16 @@ export class OverlayHost {
       return options.execute(s.provider, command);
     });
     ipcMain.handle('overlay:getSettings', (event) => options.settings(bound(event).provider));
-    options.window.on('resize', () => this.layout());
+    ipcMain.handle('overlay:asset', (event, id) => {
+      bound(event);
+      return options.asset?.(id);
+    });
+    options.window.on('resize', () => {
+      this.cancelRibbon('window-resized');
+      this.layout();
+    });
+    options.window.on('move', () => this.cancelRibbon('window-moved'));
+    options.window.on('blur', () => this.cancelRibbon('window-blurred'));
     options.window.on('hide', () => this.cancel('window-hidden'));
     options.window.on('minimize', () => this.cancel('window-minimized'));
     options.window.webContents.on('did-start-loading', () => this.cancel('owner-reloaded'));
@@ -114,6 +127,9 @@ export class OverlayHost {
   }
   get kind() {
     return this.current?.kind ?? null;
+  }
+  get sourceId() {
+    return this.current?.sourceId;
   }
   open(controller: OverlayController) {
     if (this.disposed) {
@@ -146,16 +162,21 @@ export class OverlayHost {
   cancel(reason = 'dismissed') {
     this.current?.cancel(reason);
   }
-  retry() {
-    this.options.registry.retry('overlay.command-palette');
+  cancelRibbon(reason = 'source-changed') {
+    if (this.kind === 'ribbon-group') this.cancel(reason);
+  }
+  retry(region?: ShellRegion) {
+    if (region) this.options.registry.retry(region);
+    else {
+      this.options.registry.retry('overlay.command-palette');
+      this.options.registry.retry('overlay.ribbon-group');
+    }
   }
   private present() {
     const controller = this.current;
     if (!controller) return;
-    const provider = this.options.registry.resolve(
-      'overlay.command-palette',
-      this.fallbackOnly,
-    ).provider;
+    const region = `overlay.${controller.kind}` as ShellRegion;
+    const provider = this.options.registry.resolve(region, this.fallbackOnly).provider;
     if (!provider) {
       this.cancel('unavailable');
       this.options.failed('オーバーレイを起動できません。Shellを再試行してください。');
@@ -169,6 +190,7 @@ export class OverlayHost {
       );
       view.setBackgroundColor('#00000000');
       const s: Surface = {
+        region,
         view,
         url,
         session: randomUUID(),
@@ -185,7 +207,7 @@ export class OverlayHost {
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
-      this.options.registry.fail('overlay.command-palette', provider.id, provider.version);
+      this.options.registry.fail(region, provider.id, provider.version);
       this.fallbackOnly = true;
       this.options.failed(`${provider.id}: オーバーレイを読み込めません。`);
       this.present();
@@ -193,7 +215,7 @@ export class OverlayHost {
   }
   private fail(s: Surface, reason: string) {
     if (s !== this.surface || !this.current) return;
-    this.options.registry.fail('overlay.command-palette', s.provider, s.version);
+    this.options.registry.fail(s.region, s.provider, s.version);
     this.fallbackOnly = true;
     this.closeSurface();
     this.options.failed(`${s.provider}: ${reason}`);
@@ -225,7 +247,7 @@ export class OverlayHost {
       this.cancel('owner-navigation');
       return;
     }
-    if (!this.options.registry.usable('overlay.command-palette', s)) {
+    if (!this.options.registry.usable(s.region, s)) {
       this.fallbackOnly = true;
       // Intentional disable/restart must not blacklist a healthy provider.
       this.closeSurface();
@@ -233,6 +255,7 @@ export class OverlayHost {
       return;
     }
     const model = this.current.snapshot();
+    if (!this.current || this.surface !== s) return;
     const signature = JSON.stringify(this.options.settings(s.provider));
     if (s.ready && s.settingsSignature !== signature) {
       s.settingsSignature = signature;
@@ -248,7 +271,7 @@ export class OverlayHost {
     this.disposed = true;
     this.cancel('shutdown');
     this.closeSurface();
-    for (const name of ['connect', 'ready', 'act', 'executeCommand', 'getSettings'])
+    for (const name of ['connect', 'ready', 'act', 'executeCommand', 'getSettings', 'asset'])
       ipcMain.removeHandler(`overlay:${name}`);
   }
 }

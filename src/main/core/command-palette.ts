@@ -78,7 +78,7 @@ export class CommandPaletteSession implements OverlayController {
           this.request.commandIds.includes(c.id)),
     );
   }
-  snapshot(): OverlayModel {
+  snapshot(): import('../../shared/overlays').CommandPaletteModel {
     const body = {
       dark: this.options.dark(),
       content: {
@@ -125,6 +125,7 @@ export class CommandPaletteSession implements OverlayController {
   }
   async act(action: OverlayAction) {
     if (this.closed || !action || action.id !== this.id) throw Error('Stale overlay request');
+    if (action.type === 'ribbonChoose') throw Error('Unknown overlay action');
     if (action.type === 'dismiss') {
       this.cancel('dismissed');
       return;

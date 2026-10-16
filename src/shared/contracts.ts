@@ -37,7 +37,7 @@ export interface Settings {
   trayCommands: string[];
   trayMenu?: import('./tray-menu').TrayMenuItem[];
   pinnedCommands: string[];
-  ribbon: { order: string[]; hidden: string[]; bottom: string[]; separators: string[] };
+  ribbon: import('./ribbon').RibbonLayout;
   profile: { name: string; avatar: string | null };
 }
 export interface SettingsSnapshot {
@@ -151,7 +151,12 @@ export interface ExtensionManifest {
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
   pageCollections?: import('./page-collections').PageCollectionDefinition[];
   notificationTypes?: import('./notification-types').NotificationTypeDefinition[];
-  shell?: { apiVersion: 1; ui?: string; views?: Record<string, string> };
+  shell?: {
+    apiVersion: 1;
+    ribbonSchemaVersion?: 1 | 2;
+    ui?: string;
+    views?: Record<string, string>;
+  };
   defaultGestureBindings?: import('./gestures').GestureBinding[];
   apiVersion: 1;
   id: string;

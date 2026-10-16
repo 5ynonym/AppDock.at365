@@ -1,175 +1,267 @@
-import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
-import {
-  SettingsInput,
-  SettingsTextarea,
-  numberInput,
-} from '../../../src/shared/settings-ui/SettingsInput';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../../src/shared/contracts';
+import { ribbonItems, type RibbonItem } from '../../../src/shared/applet-pages';
 import {
-  ribbonItems,
-  orderRibbon,
-  defaultRibbon,
-  type RibbonItem,
-} from '../../../src/shared/applet-pages';
+  ribbonParent,
+  ribbonPlacement,
+  ribbonRoots,
+  ribbonRetainedIds,
+  editRibbon,
+} from '../../../src/shared/ribbon-layout';
+import {
+  ribbonGroupIcons,
+  type RibbonGroup,
+  type RibbonPlacement,
+} from '../../../src/shared/ribbon';
+import { settingAnchor } from '../../../src/shared/settings-ui/setting-anchor';
+import { SettingsDialog } from '../../../src/shared/settings-ui/SettingsModal';
+import { Icon } from '../../../src/shared/ui-icons';
 
-type Placement = 'top' | 'bottom';
 export function RibbonSettings({
   settings,
   extensions,
-  onChange,
+  onEdit,
 }: {
   settings: Settings;
   extensions: ExtensionSnapshot[];
-  onChange(value: Settings): void;
+  onEdit(operation: unknown, before: Settings['ribbon']): Promise<unknown>;
 }) {
+  const layout = settings.ribbon;
+  const groups = layout.groups ?? [];
   const [dragged, setDragged] = useState<string | null>(null);
-  const items = orderRibbon(
-    ribbonItems(extensions, settings.ribbon.separators),
-    settings.ribbon.order,
-  );
-  const placement = (id: string): Placement =>
-    settings.ribbon.bottom.includes(id) ? 'bottom' : 'top';
-  const retainedOrder = (order: string[]) => [
-    ...order,
-    ...settings.ribbon.order.filter((key) => !items.some((item) => item.id === key)),
+  const [error, setError] = useState(''),
+    [pending, setPending] = useState(false);
+  const [dialog, setDialog] = useState<{
+    group: RibbonGroup;
+    adding: boolean;
+    placement: RibbonPlacement;
+    before: string;
+  }>();
+  const [confirmation, setConfirmation] = useState<{ group?: RibbonGroup; before: string }>();
+  const catalog = ribbonItems(extensions, layout.separators, groups);
+  const items = [
+    ...catalog,
+    ...ribbonRetainedIds(layout, catalog).map((id) => ({
+      id,
+      title: id,
+      icon: 'extensions' as const,
+    })),
   ];
-  const setPlacement = (id: string, next: Placement) => {
-    const order = [...items.map((item) => item.id).filter((key) => key !== id), id];
-    onChange({
-      ...settings,
-      ribbon: {
-        ...settings.ribbon,
-        order: retainedOrder(order),
-        bottom: [
-          ...settings.ribbon.bottom.filter((key) => key !== id),
-          ...(next === 'bottom' ? [id] : []),
-        ],
-      },
+  const roots = ribbonRoots(layout, items);
+  const apply = async (operation: unknown) => {
+    if (pending) return;
+    editRibbon(layout, catalog, operation);
+    setPending(true);
+    setError('');
+    try {
+      await onEdit(operation, layout);
+    } finally {
+      setPending(false);
+    }
+  };
+  const run = (operation: unknown) => {
+    void apply(operation).catch((e) => setError(String(e)));
+  };
+  const moveTo = (
+    id: string,
+    parentId: string | null,
+    placement?: RibbonPlacement,
+    beforeId?: string | null,
+  ) => {
+    const previous = ribbonParent(layout, id);
+    if (
+      parentId === null &&
+      beforeId === undefined &&
+      previous &&
+      ribbonPlacement(layout, previous.id) === placement
+    ) {
+      const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === placement);
+      beforeId = siblings[siblings.findIndex((item) => item.id === previous.id) + 1]?.id ?? null;
+    }
+    run({
+      kind: 'moveItem',
+      id,
+      parentId,
+      beforeId: beforeId ?? null,
+      ...(parentId ? {} : { placement }),
     });
   };
   const move = (id: string, target: string) => {
-    const order = items.map((item) => item.id);
-    const from = order.indexOf(id),
-      to = order.indexOf(target);
-    if (from < 0 || to < 0 || from === to) return;
-    order.splice(from, 1);
-    order.splice(to, 0, id);
-    onChange({
-      ...settings,
-      ribbon: {
-        ...settings.ribbon,
-        order: retainedOrder(order),
-        bottom: [
-          ...settings.ribbon.bottom.filter((key) => key !== id),
-          ...(placement(target) === 'bottom' ? [id] : []),
-        ],
-      },
-    });
+    if (id === target) return;
+    const parentId = ribbonParent(layout, target)?.id ?? null;
+    const placement = ribbonPlacement(layout, target);
+    const siblings = parentId
+      ? groups.find((g) => g.id === parentId)!.children
+      : roots.filter((i) => ribbonPlacement(layout, i.id) === placement).map((i) => i.id);
+    const from = siblings.indexOf(id),
+      to = siblings.indexOf(target);
+    moveTo(id, parentId, placement, from >= 0 && from < to ? (siblings[to + 1] ?? null) : target);
   };
-  const addSeparator = (next: Placement) => {
-    const id = `separator:${crypto.randomUUID()}`;
-    onChange({
-      ...settings,
-      ribbon: {
-        ...settings.ribbon,
-        separators: [...settings.ribbon.separators, id],
-        order: [...retainedOrder(items.map((item) => item.id)), id],
-        bottom: [...settings.ribbon.bottom, ...(next === 'bottom' ? [id] : [])],
-      },
-    });
+  const drop = (event: React.DragEvent, work: (id: string) => void) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const id = event.dataTransfer.getData('text/plain') || dragged;
+    if (id && items.some((item) => item.id === id)) work(id);
+    setDragged(null);
   };
-  const removeSeparator = (id: string) =>
-    onChange({
-      ...settings,
-      ribbon: {
-        order: settings.ribbon.order.filter((key) => key !== id),
-        hidden: settings.ribbon.hidden.filter((key) => key !== id),
-        bottom: settings.ribbon.bottom.filter((key) => key !== id),
-        separators: settings.ribbon.separators.filter((key) => key !== id),
-      },
+  const open = (group: RibbonGroup | undefined, placement: RibbonPlacement) =>
+    setDialog({
+      group: group
+        ? structuredClone(group)
+        : {
+            id: `group:${crypto.randomUUID()}`,
+            title: '',
+            icon: 'folder',
+            expansion: 'persistent',
+            children: [],
+          },
+      adding: !group,
+      placement,
+      before: JSON.stringify(layout),
     });
-  const row = (item: RibbonItem, index: number, group: RibbonItem[]) => (
-    <div
-      key={item.id}
-      className={`ribbon-setting-row ${item.kind === 'separator' ? 'separator-setting-row' : ''}`}
-      data-ribbon-setting={item.id}
-      draggable
-      onDragStart={(event) => {
-        setDragged(item.id);
-        event.dataTransfer.setData('text/plain', item.id);
-        event.dataTransfer.effectAllowed = 'move';
-      }}
-      onDragOver={(event) => {
-        if (dragged || event.dataTransfer.types.includes('text/plain')) event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const id = event.dataTransfer.getData('text/plain') || dragged;
-        if (id && items.some((item) => item.id === id)) move(id, item.id);
-        setDragged(null);
-      }}
-      onDragEnd={() => setDragged(null)}
-    >
-      <span className="drag-handle" aria-hidden="true">
-        ⠿
-      </span>
-      <label>
-        <SettingsInput
-          type="checkbox"
-          aria-label={`${item.title}をリボンに表示`}
-          checked={!settings.ribbon.hidden.includes(item.id)}
-          onChange={(event) =>
-            onChange({
-              ...settings,
-              ribbon: {
-                ...settings.ribbon,
-                hidden: event.target.checked
-                  ? settings.ribbon.hidden.filter((id) => id !== item.id)
-                  : [...settings.ribbon.hidden, item.id],
-              },
-            })
+  const row = (item: RibbonItem, index: number, siblings: RibbonItem[]) => {
+    const parent = ribbonParent(layout, item.id);
+    const missing = !catalog.some((value) => value.id === item.id);
+    return (
+      <div key={item.id} className="ribbon-setting-entry">
+        <div
+          className={`ribbon-setting-row ${item.kind === 'separator' ? 'separator-setting-row' : ''}`}
+          data-ribbon-setting={item.id}
+          draggable={!pending}
+          onDragStart={(event) => {
+            setDragged(item.id);
+            event.dataTransfer.setData('text/plain', item.id);
+            event.dataTransfer.effectAllowed = 'move';
+          }}
+          onDragOver={(e) => {
+            if (dragged) e.preventDefault();
+          }}
+          onDrop={(e) =>
+            drop(e, (id) =>
+              item.group && !groups.some((g) => g.id === id)
+                ? moveTo(id, item.id)
+                : move(id, item.id),
+            )
           }
-        />
-        <span>
-          {item.title}
-          <small>{item.kind === 'separator' ? '区切り線' : (item.extensionId ?? 'AppDock')}</small>
-        </span>
-      </label>
-      <select
-        aria-label={`${item.title}の配置`}
-        value={placement(item.id)}
-        onChange={(event) => setPlacement(item.id, event.target.value as Placement)}
-      >
-        <option value="top">上寄せ</option>
-        <option value="bottom">下寄せ</option>
-      </select>
-      <button
-        aria-label={`${item.title}を上へ`}
-        disabled={index === 0}
-        onClick={() => move(item.id, group[index - 1].id)}
-      >
-        ↑
-      </button>
-      <button
-        aria-label={`${item.title}を下へ`}
-        disabled={index === group.length - 1}
-        onClick={() => move(item.id, group[index + 1].id)}
-      >
-        ↓
-      </button>
-      {item.kind === 'separator' && (
-        <button
-          className="text-button"
-          aria-label={`${item.title}を削除`}
-          onClick={() => removeSeparator(item.id)}
+          onDragEnd={() => setDragged(null)}
         >
-          削除
-        </button>
-      )}
-    </div>
-  );
+          <span className="drag-handle" aria-hidden="true">
+            ⠿
+          </span>
+          <label>
+            <input
+              type="checkbox"
+              disabled={pending || missing}
+              aria-label={`${item.title}をリボンに表示`}
+              checked={!layout.hidden.includes(item.id)}
+              onChange={(e) =>
+                run({ kind: 'update', id: item.id, changes: { visible: e.target.checked } })
+              }
+            />
+            <span>
+              {item.title}
+              <small>
+                {missing
+                  ? '登録元がありません。配置を保持しています。'
+                  : item.group
+                    ? `${item.group.expansion === 'persistent' ? '持続的' : '一時的'}・${item.group.children.length}項目`
+                    : item.kind === 'separator'
+                      ? '区切り線'
+                      : (item.extensionId ?? 'AppDock')}
+              </small>
+            </span>
+          </label>
+          <select
+            aria-label={`${item.title}の配置`}
+            disabled={pending}
+            value={parent?.id ?? ribbonPlacement(layout, item.id)}
+            onChange={(e) =>
+              e.target.value.startsWith('group:')
+                ? moveTo(item.id, e.target.value)
+                : moveTo(item.id, null, e.target.value as RibbonPlacement)
+            }
+          >
+            <option value="top">上寄せ</option>
+            <option value="bottom">下寄せ</option>
+            {item.kind !== 'group' &&
+              groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.title}
+                </option>
+              ))}
+          </select>
+          <button
+            aria-label={`${item.title}を上へ`}
+            disabled={pending || index === 0}
+            onClick={() => move(item.id, siblings[index - 1].id)}
+          >
+            ↑
+          </button>
+          <button
+            aria-label={`${item.title}を下へ`}
+            disabled={pending || index === siblings.length - 1}
+            onClick={() => move(item.id, siblings[index + 1].id)}
+          >
+            ↓
+          </button>
+          {item.kind === 'separator' && (
+            <button
+              className="text-button"
+              disabled={pending}
+              aria-label={`${item.title}を削除`}
+              onClick={() => run({ kind: 'removeSeparator', id: item.id })}
+            >
+              削除
+            </button>
+          )}
+          {item.group && (
+            <>
+              <button
+                disabled={pending}
+                aria-label={`${item.title}を編集`}
+                onClick={() => open(item.group, ribbonPlacement(layout, item.id))}
+              >
+                編集
+              </button>
+              <button
+                disabled={pending}
+                aria-label={`${item.title}のグループを解除`}
+                onClick={() =>
+                  setConfirmation({ group: item.group, before: JSON.stringify(layout) })
+                }
+              >
+                解除
+              </button>
+            </>
+          )}
+        </div>
+        {item.group && (
+          <div
+            className="ribbon-setting-children"
+            role="group"
+            aria-label={`${item.title}の項目`}
+            onDragOver={(e) => {
+              if (dragged && !groups.some((g) => g.id === dragged)) e.preventDefault();
+            }}
+            onDrop={(e) => drop(e, (id) => moveTo(id, item.id))}
+          >
+            {(() => {
+              const children = item.group!.children.flatMap((id) =>
+                items.filter((i) => i.id === id),
+              );
+              return children.length ? (
+                children.map((child, i) => row(child, i, children))
+              ) : (
+                <p className="muted">
+                  ボタンの配置からこのグループを選ぶか、ここへドラッグしてください。
+                </p>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <section
       className="ribbon-settings"
@@ -179,38 +271,48 @@ export function RibbonSettings({
       <p className="muted">
         設定ボタンを非表示にしても、リボンの右クリックや「設定を開く」コマンドから戻れます。
       </p>
+      {error && <p role="alert">{error}</p>}
       {(['top', 'bottom'] as const).map((position) => {
         const title = position === 'top' ? '上寄せ' : '下寄せ';
-        const group = items.filter((item) => placement(item.id) === position);
+        const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === position);
         return (
           <section
             key={position}
             className="ribbon-placement"
             aria-label={`${title}のリボン設定`}
-            onDragOver={(event) => {
-              if (dragged || event.dataTransfer.types.includes('text/plain'))
-                event.preventDefault();
+            onDragOver={(e) => {
+              if (dragged) e.preventDefault();
             }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const id = event.dataTransfer.getData('text/plain') || dragged;
-              if (id && items.some((item) => item.id === id)) setPlacement(id, position);
-              setDragged(null);
-            }}
+            onDrop={(e) => drop(e, (id) => moveTo(id, null, position))}
           >
             <div className="ribbon-group-heading">
               <h4>{title}</h4>
-              <button
-                className="secondary"
-                disabled={settings.ribbon.separators.length >= 50}
-                onClick={() => addSeparator(position)}
-              >
-                {title}にセパレーターを追加
-              </button>
+              <div className="ribbon-setting-actions">
+                <button
+                  className="secondary"
+                  disabled={pending || groups.length >= 50}
+                  onClick={() => open(undefined, position)}
+                >
+                  {title}にグループを追加
+                </button>
+                <button
+                  className="secondary"
+                  disabled={pending || layout.separators.length >= 50}
+                  onClick={() =>
+                    run({
+                      kind: 'addSeparator',
+                      id: `separator:${crypto.randomUUID()}`,
+                      placement: position,
+                    })
+                  }
+                >
+                  {title}にセパレーターを追加
+                </button>
+              </div>
             </div>
             <div className="ribbon-setting-list">
-              {group.map((item, index) => row(item, index, group))}
-              {!group.length && (
+              {siblings.map((item, i) => row(item, i, siblings))}
+              {!siblings.length && (
                 <p className="empty">
                   ここに表示するボタンはありません。配置の選択やドラッグで移動できます。
                 </p>
@@ -221,10 +323,115 @@ export function RibbonSettings({
       })}
       <button
         className="text-button"
-        onClick={() => onChange({ ...settings, ribbon: defaultRibbon() })}
+        disabled={pending}
+        onClick={() => setConfirmation({ before: JSON.stringify(layout) })}
       >
         リボンを初期状態に戻す
       </button>
+      {confirmation && (
+        <SettingsDialog
+          title={confirmation.group ? 'グループを解除' : 'リボンを初期状態に戻す'}
+          onClose={() => setConfirmation(undefined)}
+          applyLabel={confirmation.group ? '解除' : '初期状態に戻す'}
+          onApply={async () => {
+            if (confirmation.before !== JSON.stringify(layout))
+              throw Error('リボン設定が変更されています。閉じてからやり直してください。');
+            await apply(
+              confirmation.group
+                ? { kind: 'ungroup', id: confirmation.group.id }
+                : { kind: 'reset' },
+            );
+          }}
+        >
+          <p>
+            {confirmation.group
+              ? `「${confirmation.group.title}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
+              : 'グループ・セパレーターと、未導入の項目も含む保存済み配置を初期化します。Appletの設定や有効状態は変わりません。'}
+          </p>
+        </SettingsDialog>
+      )}
+      {dialog && (
+        <SettingsDialog
+          title={dialog.adding ? 'リボングループを追加' : 'リボングループを編集'}
+          onClose={() => setDialog(undefined)}
+          valid={!!dialog.group.title.trim() && dialog.group.title.trim().length <= 80}
+          applyLabel={dialog.adding ? '追加' : '適用'}
+          footer="確定するとすぐに反映・保存されます。"
+          onApply={async () => {
+            if (dialog.before !== JSON.stringify(layout))
+              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+            const { id, title, icon, expansion } = dialog.group;
+            await apply(
+              dialog.adding
+                ? { kind: 'addGroup', id, title, icon, expansion, placement: dialog.placement }
+                : { kind: 'updateGroup', id, changes: { title, icon, expansion } },
+            );
+          }}
+        >
+          <label>
+            グループ名
+            <input
+              data-initial-focus
+              value={dialog.group.title}
+              maxLength={80}
+              onChange={(e) =>
+                setDialog({ ...dialog, group: { ...dialog.group, title: e.target.value } })
+              }
+            />
+          </label>
+          <label>
+            アイコン
+            <select
+              aria-label="グループのアイコン"
+              value={dialog.group.icon}
+              onChange={(e) =>
+                setDialog({
+                  ...dialog,
+                  group: { ...dialog.group, icon: e.target.value as RibbonGroup['icon'] },
+                })
+              }
+            >
+              {ribbonGroupIcons.map((icon) => (
+                <option key={icon} value={icon}>
+                  {
+                    {
+                      folder: 'フォルダー',
+                      mail: 'メール',
+                      clock: '時計',
+                      image: '画像',
+                      extensions: 'アプレット',
+                      settings: '設定',
+                      bell: '通知',
+                    }[icon]
+                  }
+                </option>
+              ))}
+            </select>
+            <Icon name={dialog.group.icon} />
+          </label>
+          <label>
+            展開方法
+            <select
+              aria-label="展開方法"
+              value={dialog.group.expansion}
+              onChange={(e) =>
+                setDialog({
+                  ...dialog,
+                  group: { ...dialog.group, expansion: e.target.value as RibbonGroup['expansion'] },
+                })
+              }
+            >
+              <option value="persistent">持続的</option>
+              <option value="temporary">一時的</option>
+            </select>
+          </label>
+          <p className="muted">
+            {dialog.group.expansion === 'persistent'
+              ? 'リボン内に展開します。開閉状態はこのPCで再起動後も保持します。'
+              : '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。'}
+          </p>
+        </SettingsDialog>
+      )}
     </section>
   );
 }

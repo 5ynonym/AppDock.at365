@@ -14,6 +14,12 @@ const execution = new AsyncLocalStorage<{ id?: string; invocation: NodeCommandIn
 const activeCommands = new Map<string, { session?: string; controller: AbortController }>();
 const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
+  ribbon: {
+    setBadge(
+      target: import('../shared/ribbon').RibbonBadgeTarget,
+      badge: import('../shared/ribbon').RibbonBadge,
+    ): Promise<unknown>;
+  };
   shell: {
     getState(): Promise<OwnShellState>;
     onChanged(handler: (state: OwnShellState) => unknown | Promise<unknown>): () => void;
@@ -160,6 +166,9 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         },
         images: {
           normalize: (bytes) => peer.request('host.images.normalize', { bytes }) as Promise<string>,
+        },
+        ribbon: {
+          setBadge: (target, badge) => peer.request('host.ribbon.setBadge', { target, badge }),
         },
         webAccounts: {
           start: () => peer.request('host.webAccounts.start', {}),

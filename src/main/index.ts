@@ -1,4 +1,5 @@
 import { ShellProviderRegistry } from './core/shell-provider-registry';
+import { isDeepStrictEqual } from 'node:util';
 import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { SettingsPageDefinition } from '../shared/settings-catalog';
@@ -56,6 +57,10 @@ import { PortableUpdates, type UpdateTarget } from './core/portable-updates';
 import { execFileSync } from 'node:child_process';
 import { HostLog } from './core/log';
 import { createHostApi } from './core/host-api';
+import { RibbonState } from './core/ribbon-state';
+import { RibbonBadges } from './core/ribbon-badges';
+import { RibbonGroupSession } from './core/ribbon-group-session';
+import { RibbonCommands } from './core/ribbon-commands';
 import { saveUserSettings } from './core/profile';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
@@ -255,6 +260,7 @@ let shellHost: ShellHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let shellPageHost: ShellPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
+let ribbonState: RibbonState | undefined;
 const safeShell = process.argv.includes('--safe-shell');
 const navigation = new NavigationCoordinator(
   () => changed(),
@@ -277,6 +283,13 @@ const presentation = new UiPresentation({
   navigation,
   execute: executeCommand,
   theme: toggleTheme,
+  expanded: (id) => ribbonState?.isExpanded(id) ?? false,
+  temporaryExpanded: (id) => overlayHost?.kind === 'ribbon-group' && overlayHost.sourceId === id,
+  toggleGroup: (id) => {
+    if (!ribbonState) throw Error('リボンは準備中です。');
+    ribbonState.set(id, !ribbonState.isExpanded(id));
+  },
+  badge: (id) => ribbonBadges.get(id),
 });
 async function toggleTheme() {
   commitSettings(
@@ -291,6 +304,29 @@ async function toggleTheme() {
 let tray: Tray | null = null;
 let trayClicks: TrayClickDispatcher | undefined;
 let manager: ExtensionManager;
+const ribbonBadges = new RibbonBadges(
+  (owner) => {
+    const e = manager?.items.get(owner);
+    if (
+      !e ||
+      !e.runtimeSession ||
+      !['starting', 'running'].includes(e.state) ||
+      settings.value.extensions[owner]?.enabled === false
+    )
+      return;
+    return {
+      generation: e.runtimeSession,
+      ids: new Set([
+        ...(e.manifest.pages ?? []).map((page) => `page:${owner}:${page.id}`),
+        ...(e.dynamicPages ?? []).map((page) => `page:${owner}:${page.id}`),
+        ...(pageCollections?.entries() ?? [])
+          .filter((page) => page.binding.owner === owner && page.item.enabled)
+          .map((page) => `page:${page.id}:main`),
+      ]),
+    };
+  },
+  () => changed(),
+);
 const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
 const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
@@ -504,7 +540,7 @@ const operationApi = new AppDockApi({
     'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
     'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
     'tts.stop': async (params, id) => ({ ...(await tts.stop(ttsOwner(id), params.jobId)) }),
-    'ui.ribbon.get': async (_params, id) => {
+    'ui.ribbon.get': async (params, id) => {
       const permissions = externalUiPermissions(id);
       return {
         ...presentation.get(
@@ -513,6 +549,8 @@ const operationApi = new AppDockApi({
             (!action.theme || !!permissions.write) &&
             (!action.command ||
               automationCommands(allApplets()).some((c) => c.id === action.command && c.available)),
+          params.schemaVersion === 2 ? 2 : 1,
+          false,
         ),
       };
     },
@@ -524,6 +562,10 @@ const operationApi = new AppDockApi({
         async (action) => {
           if (!externalUiPermissions(id).execute)
             throw new AutomationError('API_DISABLED', '操作が許可されていません。');
+          if (action.group) {
+            presentation.toggleGroup(action.group);
+            return { accepted: true };
+          }
           if (action.command)
             return operationApi.call('commands.execute', { id: action.command }, id);
           if (action.theme) {
@@ -1191,6 +1233,21 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  if (page.id === 'ribbon')
+    actions.editRibbon = async ([operation, before]) => {
+      const commands = new RibbonCommands({
+        settings,
+        settingsCommands,
+        ribbonApplets: allApplets,
+        save: (value, revision) => commitSettings(prepareSettings(value), revision),
+      });
+      if (!isDeepStrictEqual(commands.get().layout, before))
+        throw Error('リボン設定が変更されています。再取得してください。');
+      return commands.execute({
+        operations: [operation],
+        expectedRevision: settingsCommands.revision(),
+      });
+    };
   if (page.kind === 'applet')
     actions.replaceAppletList = async ([key, value, before]) => {
       const owner = manager.items.get(page.owner!);
@@ -1335,7 +1392,7 @@ function settingsPageActions(
       quitHost();
     };
   }
-  if (['shortcuts', 'gestures', 'ai'].includes(page.id) || page.kind === 'applet') {
+  if (['shortcuts', 'gestures', 'ai', 'ribbon'].includes(page.id) || page.kind === 'applet') {
     actions.setShortcutRecording = async ([value]) => {
       if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
       settingsRecording = value;
@@ -1515,7 +1572,8 @@ async function retryShell(region?: ShellRegion) {
       await manager.restart(id);
   }
   if (!region || region === 'ribbon') shellHost?.retry();
-  if (!region || region === 'overlay.command-palette') overlayHost?.retry();
+  if (!region || region === 'overlay.command-palette' || region === 'overlay.ribbon-group')
+    overlayHost?.retry(region);
   if (!region || region.startsWith('page.')) shellPageHost?.retry(region);
   if (!region || region === 'notification.banner') notificationBanner?.retry();
   if (!region || region === 'notification.desktop') notificationDesktop?.retry();
@@ -1758,6 +1816,20 @@ async function initialize() {
     return;
   }
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
+  ribbonState = new RibbonState(
+    path.join(dataDirectory, 'ribbon-state.json'),
+    changed,
+    () => {
+      errors.report({
+        eventId: randomUUID(),
+        source: 'ribbon',
+        title: 'リボンの開閉状態を保存・読込できません',
+        code: 'RIBBON_STATE_IO',
+        message: 'PC専用の保存先の空き容量とアクセス権を確認してください。',
+      });
+    },
+    () => (settings.value.ribbon.groups ?? []).map((group) => group.id),
+  );
   const helperPath = app.isPackaged
     ? path.join(process.resourcesPath, 'updater', 'AppDock.Updater.exe')
     : path.join(app.getAppPath(), '.artifacts', 'updater', 'AppDock.Updater.exe');
@@ -1805,6 +1877,7 @@ async function initialize() {
       () => typedNotifications,
       (id) => shellRegistry?.ownState(id),
       () => pageCollections,
+      ribbonBadges,
     ),
     log: log.write,
   });
@@ -1815,6 +1888,7 @@ async function initialize() {
     changed,
     blocked: (region) =>
       region !== 'overlay.command-palette' &&
+      region !== 'overlay.ribbon-group' &&
       region !== 'notification.desktop' &&
       !!overlayHost?.active,
   });
@@ -2018,6 +2092,7 @@ async function initialize() {
   );
   manager.on('changed', () => {
     pageCollections.reconcile();
+    ribbonBadges.reconcile();
     ai.reconcile();
     notificationSpeech?.reconcile();
     tts.reconcile();
@@ -2030,6 +2105,7 @@ async function initialize() {
   });
   settings.on('changed', () => {
     try {
+      ribbonBadges.reconcile();
       ai.reconcile();
       notificationSpeech?.reconcile();
       tts.reconcile();
@@ -2261,6 +2337,19 @@ async function initialize() {
     window,
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
+    openGroup: (id, anchor) =>
+      overlayHost?.open(
+        new RibbonGroupSession(presentation, id, anchor, () => {
+          errors.report({
+            eventId: randomUUID(),
+            source: 'ribbon',
+            title: 'リボンの操作を完了できません',
+            code: 'RIBBON_ACTION_FAILED',
+            message: 'ボタンの登録元とログを確認し、もう一度操作してください。',
+          });
+        }),
+      ),
+    invalidateAnchor: () => overlayHost?.cancelRibbon(),
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     providers: () => manager.shellProviders(),
@@ -2322,6 +2411,7 @@ async function initialize() {
     },
   });
   overlayHost = new OverlayHost({
+    asset: (id) => presentation.getAsset(id),
     window,
     preload: path.join(__dirname, 'overlay-preload.js'),
     providers: () => manager.shellProviders(),

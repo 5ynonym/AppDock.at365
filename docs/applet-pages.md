@@ -48,11 +48,17 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 
-「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーターの追加・削除、初期化を提供します。各グループの順番はorderを絞り込んで表示します。保存は既存の即時保存/revision/競合検査に従います。`ribbon:{order:string[],hidden:string[],bottom:string[],separators:string[]}`のbottomは下寄せのID、separatorsは`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。重複/不正ID/未登録セパレーターへの参照を拒否し、各配列は500件、separatorsは50件までです。ribbon全体が未指定ならテーマ/プロフィールを下寄せにします。既存order/hiddenを持つ設定はbottom/separatorsを空配列として移行し、既存の上寄せを保ちます。初期化すると新しい既定配置へ戻ります。order未指定の新しいボタンは追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
+「設定 → リボン」で表示チェック、上下配置、ドラッグ、上下ボタン、セパレーター、グループの追加・編集・解除、初期化を提供します。保存は即時保存/revision/競合検査に従います。`ribbon`の`order`はトップレベルの順序、`hidden`は非表示ID、`bottom`は下寄せID、`separators`は`separator:<stable-id>`の登録です。セパレーターも順番・非表示・配置の対象です。ID配列は550件、グループと区切り線は各50件、明示配置全体の葉は500件までです。重複・不正ID・未登録グループ/区切り線への参照を拒否します。
+
+グループは`ribbon.groups`の1階層、子の順序は`children`へ保存します。子の上下配置は親から継承し、明示配置を重複させません。持続型の開閉だけをPC専用`ribbon-state.json`へ保存します。バッジと一時パネルはメモリーのみ。完全な構造・移行・解除規則は[グループとバッジ](ribbon-groups-badges-design.md)を参照してください。
+
+`ribbon`未指定ならテーマ/プロフィールを下寄せにします。旧設定の不足する`bottom/separators/groups`は空配列として移行し、既存の配置を保ちます。初期化すると新しい既定配置へ戻ります。配置未指定の新しいボタンはトップレベルへ追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
 
 同じ配置を外部から取得・編集できます。許可と操作形式は[共通操作APIのリボン編集](automation.md#リボン編集)を参照してください。GUIとAPIは同じ検証と設定revisionを使います。
 
 ## 検証
+
+追加試験は`scripts/ribbon-groups-ui-test.cjs [固定配布EXE]`。Node/.NETからのバッジ、両展開方式、横スクロール、明暗テーマ、キーボード、外側クリック、設定編集と再起動を隔離profileで確認します。単一EXEはコピーのhashを照合し、通常起動後にCDP接続します。
 
 `scripts/applet-pages-ui-test.cjs [win-unpackedのEXE]`は隔離profile・ローカルページfixture・GmailのオフラインHTTPS fixtureを使います。画面の実幅、UI/入力/remote WebContentsの同一性、ページ/Window切替、コマンド検索、背景/最小化監視、Cookie再起動保持、リボンの保存/復帰、停止時破棄を確認します。実GmailのOAuth/実受信とは区別します。単一EXEのラッパーへElectron.launchを直接使用せず、Gmailのscripts/test-portable.cjsによる通常起動後のCDP接続を使います。
 

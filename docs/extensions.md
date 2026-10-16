@@ -6,6 +6,26 @@ Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作API
 
 認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
+## リボンバッジ
+
+`minimumHostVersion: "0.51.0"`と`ribbon-badges` capabilityを宣言する。Nodeは`context.ribbon.setBadge(target, badge)`、RPCは`host.ribbon.setBadge`へ`{ target, badge }`、.NETは`context.Ribbon.SetBadgeAsync(RibbonBadgeTarget, RibbonBadge?, token)`を使う。
+
+```typescript
+await context.ribbon.setBadge({ pageId: 'main' }, { kind: 'count', count: 12, label: '未読の新着' });
+await context.ribbon.setBadge({ collectionKey: 'items', itemId: 'saved-item-id' }, { kind: 'dot' });
+await context.ribbon.setBadge({ pageId: 'main' }, null);
+```
+
+```csharp
+await context.Ribbon.SetBadgeAsync(
+    new RibbonBadgeTarget { PageId = "main" },
+    new RibbonBadge { Kind = "count", Count = 12, Label = "未読の新着" }, token);
+```
+
+対象は自分が実際に登録した固定／動的ページ、または自分のpageCollectionsの有効項目。所有者をIDの接頭辞から推測しない。countは0以上の安全な整数、0またはnullは非表示、dotは件数なし。labelは制御文字を含まない1～120文字の説明で、件名・本文・アカウント名を渡さない。戻り値は`{ accepted: true, changed: boolean }`で、描画完了の保証ではない。
+
+値はruntime世代ごとのメモリー状態で、停止・異常終了・無効化・ページ削除で本体が消去する。同値更新は通知しない。失敗時は業務処理を継続できるよう扱い、件数を加算せず最新値を再発行する。表示規則・集約と保存モデルは[グループとバッジ](ribbon-groups-badges-design.md)を参照。
+
 ## 動的コマンドとキー送信の一覧設定
 
 `dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大100件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
