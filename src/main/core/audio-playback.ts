@@ -18,13 +18,19 @@ export class AudioPlaybackQueue {
   private active?: Entry;
   private running?: Promise<void>;
   private closed = false;
+  private enabled = true;
   constructor(
     private player: (request: AudioPlaybackRequest & { signal: AbortSignal }) => Promise<void>,
     private capacity = 48,
     private waitMs = 600000,
   ) {}
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (!enabled) this.discard();
+  }
   play(request: AudioPlaybackRequest): Promise<void> {
     if (this.closed) return Promise.reject(Error('音声再生サービスは終了しています。'));
+    if (!this.enabled) return Promise.resolve();
     if (request.signal?.aborted) return Promise.resolve();
     if (this.queue.length + (this.active ? 1 : 0) >= this.capacity)
       return Promise.reject(Error('音声の再生待ちが多すぎます。'));
@@ -76,14 +82,17 @@ export class AudioPlaybackQueue {
       }
     })();
   }
-  async close() {
-    this.closed = true;
+  private discard() {
     for (const entry of this.queue.splice(0)) {
       entry.controller.abort();
       entry.cleanup();
       entry.resolve();
     }
     this.active?.controller.abort();
+  }
+  async close() {
+    this.closed = true;
+    this.discard();
     await this.running;
   }
 }

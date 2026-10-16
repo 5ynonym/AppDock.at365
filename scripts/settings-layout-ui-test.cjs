@@ -134,6 +134,26 @@ async function save(p) {
     await save(p);
     checks.push('untitled theme card precedes workspace list; theme saves immediately');
     p = await page('general');
+    const sound = p.getByRole('switch', { name: '音の再生', exact: true });
+    assert.equal(
+      await p.locator('.settings-form').getByRole('switch').first().getAttribute('aria-label'),
+      '音の再生',
+    );
+    assert.equal(await sound.getAttribute('aria-checked'), 'true');
+    await sound.click();
+    await save(p);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.soundEnabled,
+      false,
+    );
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.soundEnabled.on'));
+    await until(
+      () => sound.getAttribute('aria-checked').then((v) => v === 'true'),
+      'command reflects in sound switch',
+    );
+    checks.push(
+      'sound switch is first in general; saves immediately and generated ON command reflects in UI',
+    );
     assert.deepEqual(
       await p.locator('.settings-form > .settings-section > header > h2').allTextContents(),
       ['ウィンドウ', 'スタートアップ', 'Applet・MCPからの操作', '設定ファイル'],

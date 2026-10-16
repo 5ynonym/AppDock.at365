@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-17: 音の再生ON/OFFのコミット確認（0.55.0）
+
+- 利用者のコミット・プッシュ依頼に基づき、今回の22ファイルと影響先を再レビュー。追加の製品修正なし。必要範囲は本体の型検査/ビルド・標準回帰、共通音声/一般設定の固定EXE GUI、発行物の版/size/hash照合とした。GitHubのfetch先端とAQUAのmainは開始HEAD `b7ff2355d2ecf79a1dce09cebe7d4ebdaf0f3d6d`に一致した。
+- 実装時の500入力・594生成物・完全ログ8本・固定EXE/隔離コピー2本・feed/実行中Shellの記録を照合し、不一致なし。型検査/ビルド・関連94/94・固定EXE2本10群・発行成功を再利用。実装時の音声GUIランナーへの版確認追加は単体試験/製品の入力に影響せず、固定EXEは追加後のランナーで成功したことを確認した。
+- 未実行分のためNode/.NET fixtureをビルドし、残り71ファイル465/465を追加。再利用分を合わせて**81ファイル559/559、fail/skip 0**。追加回帰の前後で733入力（生成本体・native・updater・試験fixture）のhashも一致。fixture再ビルドは再利用した10ファイルと固定EXE試験の入力を変更していない。製品の版更新・再発行なし。
+- [今回の再利用判定](.artifacts/commit-validation-sound-toggle-20261017/reuse.json)、[追加回帰](.artifacts/commit-validation-sound-toggle-20261017/remaining-regression.json)、同所`validation.json`へ完全ログ・コマンド/日時/終了コード・入力hash・必要範囲を記録。stage対象と作業ファイル、stage tree/commit treeの照合は`stage.json`・`commit.json`、GitHub/AQUA両mainへのpushと先端照合は`push.json`へ記録する。証跡と固定fixtureは再利用用に保持し、削除0件。
+- 本体EXEは144,222,055 bytes、SHA256 `81c3aa0f94d3c3614acd2cf3adcda1edf4bd5a5e592d08257d4ef7dac40f8c1d`を保持。実スピーカー・物理ロック/サスペンド・実Google受信は引き続き未確認。GitHub Release・実利用先deployなし。
+
+## 2026-10-17: 一般設定に共通音声のON/OFFを追加（0.55.0）
+
+- 一般ページの先頭に「音の再生」を追加。`host.soundEnabled`は既定ON、欠落時もONとして読み、明示OFF・未知の保存項目は保持する。UI・一般ページの部分JSON・同期受信・生成コマンドは既存の即時保存と設定変更イベントを共有し、起動時も最初の再生前に適用する。設定定義から`appdock.settings.soundEnabled.on/off/toggle`を生成し、既存の公開・操作許可・revision検査を維持した。
+- 共通音声FIFOでOFF時に再生中を中断・回収し、再生待ちとOFF中に届いた音を破棄する。ロック・サスペンド中の通知音保留も破棄し、読取中にOFF→ONへ戻しても古い音を再登録しない。TTS生成は継続し、再生省略で失敗通知や待機停止を起こさず完了する。ON後は新しい要求から再生。WebサイトやWindows独自の音は対象外。
+- [発行前レビュー](.artifacts/sound-toggle-20261017/review.json)を1回実施し、設定互換・検索/JSON・公開コマンド/権限・起動/同期反映・FIFO回収・保留音・TTS状態を確認。発行を妨げる指摘なし。新しい保存設定の追加につき本体0.54.1→0.55.0のマイナー更新を1回行った。
+- 型検査・本体/Default Shellビルド、関連9ファイル**84/84**と通知読み上げ10件、合計**10ファイル94/94、fail/skip 0**が成功。最初の制限環境では設定同期5件が一時ファイルrenameのEPERMで失敗し、同じ84件を通常ユーザー権限で再実行して全件成功。依存確認の制限環境での応答待ちも今回のプロセスだけを確認して停止し、同じ固定lockfile検査を通常権限で成功させた。設定・依存版・検査方針は変更していない。
+- 既存`publish.bat`が終了0で`A:\40.ARTIFACT\AppDock.at365`へ発行。本体EXE **144,222,055 bytes**、SHA256 **`81c3aa0f94d3c3614acd2cf3adcda1edf4bd5a5e592d08257d4ef7dac40f8c1d`**。feedの版/size/hash、隔離コピー2本、実行中の本体/同梱Default Shellの版0.55.0を照合して一致した。
+- 固定EXEを直列・隔離profileで試験し、共通音声4群（`.artifacts/audio-playback-ui-1792167992269/result.json`）と設定配置6群（`.artifacts/settings-layout-1792168017537/result.json`）、合計**10群成功**。保存済みOFFでの初回再生抑止、TTS/通知音/試聴の単一プレイヤー、取消と回収、生成OFF/切替による再生中/待機/ロック中保留/新規音の破棄、新しい音のみ再開、先頭トグルと即時保存・生成ONの画面反映・既存設定配置を確認。両試験は正常終了を確認し、一般ページのnative Settings Shell画像を目視した。
+- [検証一覧](.artifacts/sound-toggle-20261017/validation.json)に500入力の前後hash、完全ログとコマンド/終了コード/日時、594生成物のhash、レビュー、成果物とGUI結果を保存。84件成功後に変更したのは音声GUIランナーの実行中本体/Shell版確認だけで、製品・単体試験・依存・ビルド入力は不変。更新後のランナーで上記固定EXE試験を実行した。最後の記録追記は文書のみ。
+- テストフォルダー整理は削除0件。音声GUIのportable成功2回、設定配置のsource成功2回/portable成功3回は方式ごとの直近3回内。失敗・未完了・再利用資料も保持し、[整理一覧](.artifacts/sound-toggle-20261017/cleanup.json)へ記録。全標準回帰はコミット依頼時の不足分として未実行。実スピーカー可聴確認・物理ロック/サスペンド・実Google受信は未確認。commit/push・GitHub Release・兄弟Applet再発行・実利用先deployなし。
+
 ## 2026-10-17: ロック中通知保留のコミット確認（0.54.1）
 
 - 利用者のコミット・プッシュ依頼に基づき、今回の20ファイルと影響先を再レビュー。設定・公開API・兄弟Appletの実装変更はなく、追加修正なし。必要範囲は本体の型検査・ビルド・標準回帰と、起動時ロック・通知読み上げ/着信音・共通音声・Node/.NET通知・固定EXE起動とした。

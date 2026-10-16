@@ -270,6 +270,17 @@ export function SettingsForm({
 
         {category === 'general' && (
           <>
+            <SettingsSection>
+              <SettingRow pageId={category} itemKey="soundEnabled">
+                <Toggle
+                  label="音の再生"
+                  checked={settings.host.soundEnabled}
+                  onChange={(v) =>
+                    edit({ ...settings, host: { ...settings.host, soundEnabled: v } })
+                  }
+                />
+              </SettingRow>
+            </SettingsSection>
             <SettingsSection title="ウィンドウ">
               {(['closeToTray', 'startMinimized', 'hardwareAcceleration'] as const).map((key) => (
                 <SettingRow key={key} pageId={category} itemKey={key}>

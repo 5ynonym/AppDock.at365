@@ -70,6 +70,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   general: [
     [
+      'soundEnabled',
+      '音の再生',
+      'AppDockの読み上げ・通知音・試聴を再生します。OFFにすると再生中の音を止め、再生待ちとOFF中に届いた音を破棄します。',
+    ],
+    [
       'permissions',
       'Applet・MCPからの操作',
       '操作ごとの許可は、専用の画面でまとめて設定できます。',
@@ -208,6 +213,7 @@ export const appletCommonDescriptions = {
     '有効化・再起動からAppletを起動するまで待ちます。0で即時開始。実行中の変更は次の起動から適用します。',
 };
 const generalKeys = [
+  'soundEnabled',
   'startAtLogon',
   'runAsAdministrator',
   'closeToTray',

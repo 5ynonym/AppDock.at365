@@ -10,6 +10,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
+settings.host.soundEnabled = false;
 settings.keybindings = [];
 settings.gestures.enabled = false;
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
@@ -67,11 +68,18 @@ let child,
     child.stdout.on('data', (d) => (output += d));
     child.stderr.on('data', (d) => (output += d));
     await until(() => inspect(port, `${electronExpression}.app.isReady()`), 'host ready');
-    await until(() => inspect(port, `(async()=>{
+    await until(
+      () =>
+        inspect(
+          port,
+          `(async()=>{
       const e=${electronExpression};
       const w=e.webContents.getAllWebContents().find(w=>w.getURL().startsWith('appdock://host/'));
       return w ? w.executeJavaScript('window.dock.snapshot().then(s=>s.startupReady)') : false;
-    })()`), 'host startup complete');
+    })()`,
+        ),
+      'host startup complete',
+    );
     await inspect(
       port,
       `(()=>{
@@ -79,6 +87,8 @@ let child,
       const req=process.getBuiltinModule('module').createRequire(e.app.getAppPath()+'/package.json');
       globalThis.audioFixture={req, events:[], active:0, peak:0, errors:[], windows:0};
       const f=globalThis.audioFixture, q=req('./out/main/main/core/audio-service').audioPlayback;
+      f.version=e.app.getVersion();
+      f.shellVersion=req('./out/shells/default/extension.json').version;
       const original=q.player;
       q.player=async r=>{
         f.active++; f.peak=Math.max(f.peak,f.active); f.events.push('start');
@@ -90,6 +100,33 @@ let child,
       return true;
     })()`,
     );
+    const versions = await inspect(
+      port,
+      '({host:audioFixture.version,shell:audioFixture.shellVersion})',
+    );
+    assert.equal(versions.host, require('../package.json').version);
+    assert.equal(versions.shell, versions.host);
+    fs.writeFileSync(path.join(profile, 'versions.json'), JSON.stringify(versions, null, 2));
+    const command = (action) =>
+      inspect(
+        port,
+        `(async()=>{
+      const e=${electronExpression};
+      const w=e.webContents.getAllWebContents().find(w=>w.getURL().startsWith('appdock://host/'));
+      return w.executeJavaScript(${JSON.stringify("window.dock.executeCommand('appdock.settings.soundEnabled.")}+${JSON.stringify(action)}+"')");
+    })()`,
+      );
+    await inspect(
+      port,
+      `(async()=>{
+      const f=audioFixture,q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      await q.play({bytes:f.req('node:fs').readFileSync(${JSON.stringify(wav)}),playbackTimeoutMs:30000});
+      return true;
+    })()`,
+    );
+    assert.equal(await inspect(port, 'audioFixture.events.length'), 0);
+    checks.push('saved OFF takes effect before first playback at startup and creates no player');
+    await command('on');
     await inspect(
       port,
       `(()=>{
@@ -110,11 +147,14 @@ let child,
       );
       fs.writeFileSync(path.join(profile, 'playback-state.json'), JSON.stringify(f, null, 2));
       if (f.events.length < 6) {
-        const states = await inspect(port, `(async()=>{
+        const states = await inspect(
+          port,
+          `(async()=>{
           const e=${electronExpression};
           return Promise.all(e.webContents.getAllWebContents().filter(w=>w.getTitle()==='AppDock Audio').map(async w=>({id:w.id,loading:w.isLoading(),state:await w.executeJavaScript('(()=>{const a=document.querySelector("audio");return a?{paused:a.paused,ended:a.ended,time:a.currentTime,duration:a.duration,ready:a.readyState,error:a.error?.code}:null})()')})));
-        })()`);
-        fs.writeFileSync(path.join(profile,'player-state.json'),JSON.stringify(states,null,2));
+        })()`,
+        );
+        fs.writeFileSync(path.join(profile, 'player-state.json'), JSON.stringify(states, null, 2));
       }
       return f.events.length >= 6 && f;
     }, 'three real playbacks');
@@ -149,6 +189,65 @@ let child,
     assert.deepEqual(canceled.errors, []);
     checks.push(
       'queued cancellation creates no player; active cancellation destroys player before release',
+    );
+    await inspect(
+      port,
+      `(()=>{
+      const f=audioFixture,q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      const bytes=f.req('node:fs').readFileSync(${JSON.stringify(wav)});
+      f.mutedSettled=false;
+      Promise.all([q.play({bytes,playbackTimeoutMs:30000}),q.play({bytes,playbackTimeoutMs:30000})])
+        .then(()=>f.mutedSettled=true).catch(()=>f.errors.push('mute'));
+      const sounds=f.req('./out/main/main/core/sounds');
+      sounds.notificationSounds.setPaused(true);
+      sounds.queueSound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('locked'));
+      return true;
+    })()`,
+    );
+    await until(() => inspect(port, 'audioFixture.events.length===9'), 'active sound before OFF');
+    await command('off');
+    await until(
+      () => inspect(port, 'audioFixture.mutedSettled'),
+      'active and waiting settle after OFF',
+    );
+    await inspect(
+      port,
+      `(async()=>{
+      const f=audioFixture,q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      await q.play({bytes:f.req('node:fs').readFileSync(${JSON.stringify(wav)}),playbackTimeoutMs:30000});
+      f.req('./out/main/main/core/sounds').queueSound(${JSON.stringify(wav)},()=>true,()=>f.errors.push('muted'));
+      return true;
+    })()`,
+    );
+    await command('toggle');
+    await inspect(
+      port,
+      `audioFixture.req('./out/main/main/core/sounds').notificationSounds.setPaused(false);true`,
+    );
+    // Allow deferred file reads to expose any incorrectly retained locked sound.
+    await new Promise((r) => setTimeout(r, 250));
+    assert.equal(await inspect(port, 'audioFixture.events.length'), 10);
+    await inspect(
+      port,
+      `(async()=>{
+      const f=audioFixture,q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      await q.play({bytes:f.req('node:fs').readFileSync(${JSON.stringify(wav)}),playbackTimeoutMs:30000});
+      return true;
+    })()`,
+    );
+    const muted = await inspect(
+      port,
+      '({events:audioFixture.events,peak:audioFixture.peak,errors:audioFixture.errors})',
+    );
+    assert.equal(muted.events.length, 12);
+    assert.equal(muted.peak, 1);
+    assert.deepEqual(muted.errors, []);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.soundEnabled,
+      true,
+    );
+    checks.push(
+      'generated OFF stops active, clears waiting/locked/new sounds; toggle ON plays fresh audio only',
     );
     success = true;
   } catch (error) {

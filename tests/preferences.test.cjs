@@ -17,6 +17,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   assert.deepEqual(result.extensions, original.extensions);
   assert.deepEqual(result.host, {
     theme: 'light',
+    soundEnabled: true,
     closeToTray: false,
     startMinimized: true,
     trayClickCommand: 'appdock.open',
@@ -30,6 +31,23 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   assert.deepEqual(result.pinnedCommands, []);
   assert.equal(result.profile.avatar, null);
   assert.equal(original.shortcuts, undefined);
+});
+test('sound playback defaults on for missing settings and preserves explicit off', () => {
+  const settings = createDefaultSettings();
+  assert.equal(settings.host.soundEnabled, true);
+  delete settings.host.soundEnabled;
+  settings.host.unknownFutureSetting = 'preserved';
+  assert.equal(parseSettings(settings).host.soundEnabled, true);
+  assert.equal(settings.host.soundEnabled, undefined);
+  settings.host.soundEnabled = false;
+  const parsed = parseSettings(settings);
+  assert.equal(parsed.host.soundEnabled, false);
+  assert.equal(parsed.host.unknownFutureSetting, 'preserved');
+  for (const invalid of [null, 0, 1, 'false', {}, []])
+    assert.throws(
+      () => parseSettings({ ...settings, host: { ...settings.host, soundEnabled: invalid } }),
+      /soundEnabled/,
+    );
 });
 test('general defaults keep close-to-tray on and acceleration off while preserving explicit values', () => {
   const settings = createDefaultSettings();

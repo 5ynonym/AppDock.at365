@@ -102,6 +102,29 @@ function fixture(t) {
     setExecute: (v) => (execute = v),
   };
 }
+test('sound playback generates public ON/OFF/toggle commands with immediate persisted effects', async (t) => {
+  const f = fixture(t);
+  const schema = f.api.call('settings.getSchema').fields.soundEnabled;
+  assert.equal(schema.type, 'boolean');
+  assert.equal(schema.applies, 'immediate');
+  assert.deepEqual(schema.generateCommands, ['on', 'off', 'toggle']);
+  const catalog = f.api.call('commands.list').commands;
+  for (const action of ['off', 'off', 'on', 'toggle']) {
+    const id = 'appdock.settings.soundEnabled.' + action;
+    assert.ok(catalog.some((c) => c.id === id));
+    assert.ok(hostCommands.some((c) => c.id === id));
+    const result = await f.api.call('commands.execute', { id });
+    assert.equal(result.completion, 'settingsSaved');
+    assert.equal(f.settings.value.host.soundEnabled, action === 'on');
+    assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.soundEnabled, action === 'on');
+  }
+  f.setWrite(false);
+  await assert.rejects(() =>
+    f.api.call('commands.execute', { id: 'appdock.settings.soundEnabled.on' }),
+  );
+  assert.equal(f.settings.value.host.soundEnabled, false);
+});
+
 test('manifest accepts generated shortcut references and reserves host namespace', (t) => {
   const f = fixture(t),
     dir = path.dirname(f.settings.file);
@@ -190,7 +213,10 @@ test('switch commands share persistence, preserve no-ops, and private switches s
   await assert.rejects(f.run('privateFeature.toggle'), { code: 'NOT_FOUND' });
   f.commands.execute(f.applet.id + '.settings.privateFeature.toggle', {}, false);
   assert.equal(f.settings.value.extensions[f.applet.id].settings.privateFeature, true);
-  assert.equal(hostCommands.some((c) => c.id.startsWith('appdock.settings.notifications.')), false);
+  assert.equal(
+    hostCommands.some((c) => c.id.startsWith('appdock.settings.notifications.')),
+    false,
+  );
   assert.equal(generatedSettingCommands(f.applet.id, f.applet.settings, true).length, 4);
 });
 test('writes and switches require both permissions and current running/public state', async (t) => {

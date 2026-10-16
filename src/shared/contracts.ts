@@ -3,6 +3,7 @@ export interface HostSettings {
   shellProvider?: string;
   shellProviders?: Record<string, string>;
   theme: 'dark' | 'light' | 'system';
+  soundEnabled: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
   startAtLogon: boolean;

@@ -27,6 +27,7 @@ export const createDefaultSettings = (): Settings => ({
   host: {
     shellProviders: {},
     theme: 'light',
+    soundEnabled: true,
     closeToTray: true,
     startMinimized: false,
     startAtLogon: false,
@@ -67,6 +68,9 @@ export function parseSettings(value: unknown): Settings {
   for (const key of ['closeToTray', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
   const shellProviders = parseShellProviders(value.host);
+  const soundEnabled = value.host.soundEnabled === undefined ? true : value.host.soundEnabled;
+  if (typeof soundEnabled !== 'boolean')
+    throw new Error('host.soundEnabled は true / false です。');
   const {
     shellProvider: legacyShellProvider,
     notifications: legacyNotifications,
@@ -226,6 +230,7 @@ export function parseSettings(value: unknown): Settings {
     host: {
       ...host,
       shellProviders,
+      soundEnabled,
       trayClickCommand,
       trayDoubleClickCommand,
       hardwareAcceleration,

@@ -2,21 +2,32 @@
 export class NotificationSounds {
   private paused = false;
   private closed = false;
+  private enabled = true;
   private pending: { file: string; alive(): boolean; failed(): void }[] = [];
-  private active?: { controller: AbortController; started: boolean };
+  private active?: { controller: AbortController; started: boolean; discarded: boolean };
   constructor(
     private options: {
       read(file: string): Promise<Buffer>;
       play(bytes: Buffer, signal: AbortSignal, beforePlay: () => void): Promise<void>;
     },
   ) {}
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.pending = [];
+      if (this.active) {
+        this.active.discarded = true;
+        this.active.controller.abort();
+      }
+    }
+  }
   setPaused(paused: boolean) {
     this.paused = paused;
     if (paused) this.active?.controller.abort();
     else this.pump();
   }
   enqueue(file: string, alive: () => boolean, failed: () => void) {
-    if (this.closed || !alive()) return;
+    if (this.closed || !this.enabled || !alive()) return;
     this.pending = this.pending.filter((job) => job.alive());
     if (this.pending.length + (this.active ? 1 : 0) >= 32)
       throw Error('通知音の再生待ちが多すぎます。');
@@ -24,14 +35,14 @@ export class NotificationSounds {
     this.pump();
   }
   private pump() {
-    if (this.paused || this.closed || this.active) return;
+    if (this.paused || this.closed || !this.enabled || this.active) return;
     const job = this.pending.shift();
     if (!job) return;
     if (!job.alive()) {
       this.pump();
       return;
     }
-    const active = { controller: new AbortController(), started: false };
+    const active = { controller: new AbortController(), started: false, discarded: false };
     this.active = active;
     const watch = setInterval(() => {
       if (!job.alive()) active.controller.abort();
@@ -48,7 +59,13 @@ export class NotificationSounds {
         if (job.alive() && !active.controller.signal.aborted) job.failed();
       } finally {
         clearInterval(watch);
-        if (!active.started && active.controller.signal.aborted && job.alive() && !this.closed)
+        if (
+          !active.started &&
+          !active.discarded &&
+          active.controller.signal.aborted &&
+          job.alive() &&
+          !this.closed
+        )
           this.pending.unshift(job);
         this.active = undefined;
         this.pump();

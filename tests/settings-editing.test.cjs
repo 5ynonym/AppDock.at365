@@ -66,6 +66,20 @@ function fixture() {
     },
   };
 }
+test('general sound toggle is searchable and editable through partial JSON without losing other pages', () => {
+  const settings = createDefaultSettings();
+  const pages = settingsCatalog(applets, settings);
+  const page = pages.find((p) => p.id === 'general');
+  assert.equal(page.items[0].key, 'soundEnabled');
+  const projection = settingsProjection(settings, page, applets);
+  assert.equal(projection.host.soundEnabled, true);
+  projection.host.soundEnabled = false;
+  const saved = applySettingsJson(settings, page, applets, JSON.stringify(projection));
+  assert.equal(saved.host.soundEnabled, false);
+  assert.deepEqual(saved.tts, settings.tts);
+  assert.ok(searchSettings(pages, '音の再生').some((r) => r.key === 'soundEnabled'));
+});
+
 test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {
   const f = fixture();
   await f.act({ type: 'select-page', pageId: 'profile' });

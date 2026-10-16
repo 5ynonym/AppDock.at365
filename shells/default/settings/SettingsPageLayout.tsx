@@ -3,7 +3,7 @@ import type { SettingsPageDefinition } from '../../../src/shared/settings-catalo
 
 const descriptions: Record<string, string> = {
   appearance: 'テーマと各領域のShellを選び、ワークスペースの見た目を整えます。',
-  general: '起動時やウィンドウを閉じたときの動作を設定します。',
+  general: '音の再生や、起動時・ウィンドウを閉じたときの動作を設定します。',
   notifications: '通知の種類ごとに、表示先・表示時間・読み上げを設定します。',
   tts: 'OpenAI互換のTTSサーバーで生成した音声を、このPCで再生します。',
   ribbon:

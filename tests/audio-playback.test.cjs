@@ -113,6 +113,67 @@ function wave() {
   b.writeUInt32LE(160, 40);
   return b;
 }
+test('OFF stops active audio, drops waiting and new audio, and ON only plays fresh audio', async () => {
+  const f = controlled();
+  const first = f.queue.play(request('active'));
+  const waiting = f.queue.play(request('waiting'));
+  await turn();
+  f.queue.setEnabled(false);
+  await f.queue.play({ ...request('muted'), beforePlay: () => assert.fail('muted started') });
+  f.queue.setEnabled(true);
+  const fresh = f.queue.play(request('fresh'));
+  await Promise.all([first, waiting]);
+  await turn();
+  assert.deepEqual(f.events, ['start:active', 'end:active', 'start:fresh']);
+  // The first player's release is retained by the fixture after cancellation.
+  f.releases.pop()();
+  await fresh;
+  assert.equal(f.peak(), 1);
+  await f.queue.close();
+});
+
+test('OFF before the next microtask drops audio without constructing a player', async () => {
+  const q = new AudioPlaybackQueue(async () => assert.fail('muted player'));
+  const pending = q.play(request('pending'));
+  q.setEnabled(false);
+  await pending;
+  for (let i = 0; i < 60; i++) await q.play(request('muted'));
+  q.setEnabled(true);
+  await q.close();
+});
+
+test('muted TTS still generates and completes without claiming playback or blocking the next job', async () => {
+  const f = controlled();
+  f.queue.setEnabled(false);
+  let generated = 0;
+  const tts = new TtsService({
+    settings: () => ({
+      ...defaultTtsSettings(),
+      baseUrl: 'http://localhost/v1',
+      model: 'fixture',
+      defaultVoice: 'fixture',
+    }),
+    key: () => undefined,
+    canUse: () => true,
+    fetcher: async () => {
+      generated++;
+      return new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } });
+    },
+    play: (bytes, seconds, signal, speed, beforePlay) =>
+      f.queue.play({ bytes, signal, speed, beforePlay, playbackTimeoutMs: 1000 }),
+  });
+  const jobs = ['one', 'two'].map((requestId) => tts.speak('host', { text: 'fixture', requestId }));
+  for (let i = 0; i < 20 && jobs.some((j) => tts.get('host', j.jobId).state !== 'completed'); i++)
+    await turn();
+  assert.equal(generated, 2);
+  assert.deepEqual(
+    jobs.map((j) => tts.get('host', j.jobId).state),
+    ['completed', 'completed'],
+  );
+  assert.deepEqual(f.events, []);
+  await tts.close();
+  await f.queue.close();
+});
 test('TTS generation leaves audio free; waiting playback retains start deadline and is canceled without sound', async () => {
   const f = controlled();
   let downloaded;

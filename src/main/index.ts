@@ -226,6 +226,12 @@ if (locked) {
   }
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
+function applyAudioPlaybackSettings() {
+  const enabled = settings.value.host.soundEnabled;
+  audioPlayback.setEnabled(enabled);
+  notificationSounds.setEnabled(enabled);
+}
+applyAudioPlaybackSettings();
 let window: BrowserWindow | null = null;
 let shellRegistry: ShellProviderRegistry | undefined;
 const shellStateSent = new Map<string, string>();
@@ -2109,6 +2115,7 @@ async function initialize() {
   });
   settings.on('changed', () => {
     try {
+      applyAudioPlaybackSettings();
       ribbonBadges.reconcile();
       ai.reconcile();
       automation?.reconcileEvents();
