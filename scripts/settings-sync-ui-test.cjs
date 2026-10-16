@@ -59,7 +59,7 @@ function profile(name) {
   };
   fs.writeFileSync(path.join(base, 'settings.json'), JSON.stringify(value));
   const gmail = path.join(base, 'extensions', 'Applet.Gmail.at365');
-  fs.cpSync(path.join(root, '../Applet.Gmail.at365/publish/Applet.Gmail.at365'), gmail, {
+  fs.cpSync(path.join(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'), gmail, {
     recursive: true,
   });
   const manifest = JSON.parse(fs.readFileSync(path.join(gmail, 'extension.json'), 'utf8'));

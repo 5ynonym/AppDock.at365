@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -10,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `portable-updates-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
-fs.copyFileSync(path.join(root, 'publish/AppDock.at365.exe'), executable);
+fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), executable);
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
@@ -18,7 +19,7 @@ settings.host.startMinimized = true;
 settings.globalShortcutCommands = [];
 settings.updates = {
   ...settings.updates,
-  hostSource: path.join(root, 'publish'),
+  hostSource: path.join(getPublishDirectory(root)),
   checkHostOnStartup: true,
   checkAppletsOnStartup: true,
   startupDelaySeconds: 0,
@@ -331,7 +332,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',
     );
-    await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(root, 'publish'));
+    await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(getPublishDirectory(root)));
     await page.getByLabel('AppDockの更新元', { exact: true }).press('Enter');
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
 
@@ -396,7 +397,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     assert.notEqual(await inspect(inspectPort, 'process.pid'), combinedPid);
     assert.deepEqual(
       fs.readFileSync(executable),
-      fs.readFileSync(path.join(root, 'publish/AppDock.at365.exe')),
+      fs.readFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe')),
     );
     assert.equal(
       fs.existsSync(path.join(profile, 'extensions/appdock.dotnet-demo/obsolete.dll')),

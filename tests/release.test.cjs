@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('../scripts/publish-paths.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,13 +9,13 @@ const { createRelease, CHECKS, asset, read, save } = require('../scripts/release
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-release-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const root = path.join(directory, 'AppDock.at365');
-  const applet = path.join(directory, 'Applet.Fixture');
-  for (const repo of [root, applet]) fs.mkdirSync(path.join(repo, 'publish'), { recursive: true });
+  const root = path.join(directory, '30.PROJECT/AppDock.at365');
+  const applet = path.join(directory, '30.PROJECT/Applet.Fixture');
+  for (const repo of [root, applet]) { fs.mkdirSync(repo, { recursive: true }); fs.mkdirSync(getPublishDirectory(repo), { recursive: true }); }
   fs.mkdirSync(path.join(applet, '.git'));
   save(path.join(root, 'package.json'), { version: '1.2.3' });
   save(path.join(applet, 'extension.json'), { id: 'fixture', version: '1.0.0' });
-  fs.writeFileSync(path.join(applet, 'publish/update.zip'), 'applet fixture');
+  fs.writeFileSync(path.join(getPublishDirectory(applet), 'update.zip'), 'applet fixture');
   const notes = path.join(root, 'notes.md');
   fs.writeFileSync(notes, 'Reviewed release notes\n');
   const planPath = path.join(root, '.artifacts/plan.json');
@@ -91,12 +92,12 @@ function fixture(t) {
   };
   const release = createRelease(root, run);
   release.preflight(planPath, notes);
-  const exe = path.join(root, 'publish/AppDock.at365.exe');
-  const archive = path.join(root, 'publish/AppDock.at365-all-in-one-1.2.3.zip');
+  const exe = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
+  const archive = path.join(getPublishDirectory(root), 'AppDock.at365-all-in-one-1.2.3.zip');
   fs.writeFileSync(exe, 'host fixture');
   fs.writeFileSync(archive, 'archive fixture');
   const host = asset(exe);
-  save(path.join(root, 'publish/update.json'), {
+  save(path.join(getPublishDirectory(root), 'update.json'), {
     schemaVersion: 1,
     kind: 'host',
     id: 'host',
@@ -120,7 +121,7 @@ function fixture(t) {
           id: 'fixture',
           version: '1.0.0',
           dirty: false,
-          updateZipSha256: asset(path.join(applet, 'publish/update.zip')).sha256,
+          updateZipSha256: asset(path.join(getPublishDirectory(applet), 'update.zip')).sha256,
         },
       ],
       files: [{ path: host.name, size: host.size, sha256: host.sha256 }],
@@ -212,7 +213,7 @@ test('version update increases stable version and leaves other package data unch
 
 test('successful release preparation removes only older stable bundles in publish', (t) => {
   const { root, release, planPath, archive } = fixture(t);
-  const publish = path.join(root, 'publish');
+  const publish = path.join(getPublishDirectory(root));
   const old = ['AppDock.at365-all-in-one-0.26.2.zip', 'AppDock.at365-all-in-one-1.2.2.zip'];
   const keep = [
     'AppDock.at365-all-in-one-1.10.0.zip',
@@ -243,7 +244,7 @@ test('successful release preparation removes only older stable bundles in publis
 
 test('failed preparation or changed bundle preserves older packages', (t) => {
   const { root, release, planPath, archive } = fixture(t);
-  const old = path.join(root, 'publish/AppDock.at365-all-in-one-1.2.2.zip');
+  const old = path.join(getPublishDirectory(root), 'AppDock.at365-all-in-one-1.2.2.zip');
   fs.writeFileSync(old, 'last complete package');
   const checks = path.join(root, '.artifacts/checks.json');
   save(
@@ -261,7 +262,7 @@ test('failed preparation or changed bundle preserves older packages', (t) => {
 
 test('release cleanup refuses a redirected publish directory', (t) => {
   const { root, release, planPath } = fixture(t);
-  const publish = path.join(root, 'publish');
+  const publish = path.join(getPublishDirectory(root));
   const redirected = path.join(root, 'redirected');
   const oldName = 'AppDock.at365-all-in-one-1.2.2.zip';
   fs.writeFileSync(path.join(publish, oldName), 'keep');
@@ -291,7 +292,7 @@ test('remote retention starts only after public downloads and application update
   let badDownload = true;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.endsWith('/latest')) return Response.json({ id: 42 });
-    const file = path.join(root, 'publish', url.split('/').at(-1));
+    const file = path.join(getPublishDirectory(root), url.split('/').at(-1));
     return new Response(badDownload ? 'corrupt' : fs.readFileSync(file));
   });
   await assert.rejects(release.remote('verify', planPath, 'gh'));

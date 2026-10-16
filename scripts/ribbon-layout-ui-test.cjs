@@ -12,7 +12,7 @@ settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications
 fs.mkdirSync(profile, { recursive: true });
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 fs.cpSync(
-  path.resolve(root, '../Applet.Gmail.at365/publish/Applet.Gmail.at365'),
+  path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'),
   path.join(profile, 'extensions', 'Applet.Gmail.at365'),
   { recursive: true },
 );

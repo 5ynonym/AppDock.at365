@@ -5,6 +5,7 @@ const { build, Platform } = require('electron-builder');
 const builderRequire = createRequire(require.resolve('electron-builder'));
 const { NsisTarget } = builderRequire('app-builder-lib/out/targets/nsis/NsisTarget');
 const root = path.resolve(__dirname, '..');
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const version = builderRequire('app-builder-lib/package.json').version;
 // 26.15.3 ignores portable.script/include. Replace only its in-memory portable
 // template; do not modify node_modules or the installer targets. Recheck this
@@ -26,7 +27,10 @@ async function buildPortable(config) {
       projectDir: root,
       targets: Platform.WINDOWS.createTarget('portable', builderRequire('builder-util').Arch.x64),
       publish: 'never',
-      config,
+      config: {
+        ...config,
+        directories: { output: getPublishDirectory(root), ...config?.directories },
+      },
     });
   } finally {
     NsisTarget.prototype.computeFinalScript = original;

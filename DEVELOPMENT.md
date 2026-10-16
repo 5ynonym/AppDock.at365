@@ -1,5 +1,9 @@
 # AppDock.at365 開発ガイド
 
+## 発行・配置ファイルの保存先
+
+標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepo、`deploy.bat`は発行先から実行します。配置用ファイル・設定の保持とテンプレートの更新は[共通発行手順](docs/publishing.md)を参照してください。
+
 現在のコードを基準に、開発環境と機能別の仕様・検証への入口をまとめます。利用方法は[README](README.md)、作業規則は[AGENTS](AGENTS.md)、実測結果は[VERIFICATION](VERIFICATION.md)を参照してください。
 
 ## 文書の入口
@@ -36,7 +40,7 @@
 
 ## 開発環境・ビルド・テスト
 
-スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行した単一EXEの専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs publish/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
+スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行した単一EXEの専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
@@ -67,7 +71,7 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 .\dev.bat run test:window-state
 .\dev.bat run smoke
 .\dev.bat run dist
-.\dev.bat exec node scripts/smoke.cjs publish/AppDock.at365.exe
+.\dev.bat exec node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe
 ```
 
 Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号を変更してから `.\setup-tools.bat` を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは `.tools/node/<version>` と `.tools/pnpm/<version>` に残すので、設定を戻してsetupを実行すると切り戻せます。winget等の更新対象にはなりません。更新後は `.\dev.bat run typecheck`、`.\dev.bat test`、`.\publish.bat` で確認してください。

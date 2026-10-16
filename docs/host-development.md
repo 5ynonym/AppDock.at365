@@ -112,11 +112,11 @@ API追加のテストは、正常系に加え、capability不足、不正型／�
 
 ```powershell
 # AppDockルートで
-node scripts/smoke.cjs publish/AppDock.at365.exe
+node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe
 # 時計Appletも接続する検証
-node scripts/smoke.cjs publish/AppDock.at365.exe ../Applet.Watch.at365/publish/Applet.Watch.at365
+node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe ../../40.ARTIFACT/Applet.Watch.at365/Applet.Watch.at365
 # Applet.Watch.at365ルートで、ビルド済みホストのUIを検証
-node scripts/test-ui.cjs ../AppDock.at365/publish/win-unpacked/AppDock.at365.exe
+node scripts/test-ui.cjs ../../40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe
 ```
 
 テスト設定は専用profileへ保存します。設定保存を検証するために実利用のsettings.jsonを触らず、フック・壁紙・ロック等のOS全体に作用する処理は、そのテストに必要な範囲だけ扱います。時計のGUIテストが別AppletのOS動作まで検証するわけではありません。

@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -112,7 +113,7 @@ const checks = [];
   const launch = async () =>
     portable
       ? await (async () => {
-          const source = path.join(root, 'publish/AppDock.at365.exe'),
+          const source = path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
             executable = path.join(profile, 'AppDock.at365.exe');
           fs.copyFileSync(source, executable);
           const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');

@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 // Only generated profiles/icons are used. No production tray preference is changed.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -8,7 +9,7 @@ const { buildPortable } = require('./build-portable.cjs');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'tray-identity-' + Date.now(), '日本語 profile');
 const executable = path.join(profile, 'AppDock.at365.exe');
-const originalExe = path.join(root, 'publish/AppDock.at365.exe');
+const originalExe = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
 const updatedOutput = path.join(profile, 'update-build');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;

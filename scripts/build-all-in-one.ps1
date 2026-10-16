@@ -3,7 +3,8 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $AppletRoot) { $AppletRoot = Split-Path $taskRoot -Parent }
 $AppletRoot = [IO.Path]::GetFullPath($AppletRoot)
-$taskPublish = Join-Path $taskRoot 'publish'
+. (Join-Path $PSScriptRoot 'publish-paths.ps1')
+$taskPublish = Get-PublishDirectory $taskRoot
 $taskVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'package.json') -Raw | ConvertFrom-Json).version
 $taskHelper = Join-Path $taskRoot '.artifacts\updater\AppDock.Updater.exe'
 
@@ -70,7 +71,7 @@ foreach ($taskApplet in $taskApplets) {
     Write-Output "Publishing bundled Applet: $($taskApplet.directory.Name)"
     & $taskApplet.publisher
     if ($LASTEXITCODE -ne 0) { throw "Applet publish failed ($LASTEXITCODE): $taskRepository" }
-    $taskOutput = Join-Path $taskRepository 'publish'
+    $taskOutput = Get-PublishDirectory $taskRepository
     $taskFeed = Read-Json (Join-Path $taskOutput 'update.json')
     $taskArchive = Assert-Payload $taskFeed $taskOutput 'applet' $taskApplet.manifest.id $taskApplet.manifest.version
     $taskInstalled = Join-Path (Join-Path $taskPackage 'extensions') $taskApplet.directory.Name

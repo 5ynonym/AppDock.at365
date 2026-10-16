@@ -54,7 +54,7 @@ fs.writeFileSync(
   path.join(fixture, 'ui.js'),
   `const update = () => window.appletPage.snapshot().then(s => document.getElementById('theme').textContent = s.dark ? 'dark' : 'light'); update(); window.appletPage.onChanged(update);`,
 );
-const gmail = path.resolve(root, '../Applet.Gmail.at365/publish/Applet.Gmail.at365');
+const gmail = path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365');
 fs.cpSync(gmail, path.join(profile, 'extensions', 'Applet.Gmail.at365'), { recursive: true });
 settings.extensions['test.pages'] = { enabled: false, settings: {} };
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };

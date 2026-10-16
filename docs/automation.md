@@ -264,7 +264,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 - `dev.bat run typecheck` / `dev.bat run build`
 - `dev.bat exec node --test tests/automation.test.cjs tests/settings-commands.test.cjs tests/settings-sync.test.cjs`
-- `dev.bat exec node scripts/automation-ui-test.cjs [publish/AppDock.at365.exe]`
+- `dev.bat exec node scripts/automation-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe]`
 - APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUI生成の隔離configを実Codexで読み込み、7ツールの発見と取得/変更/再取得/復元・公開コマンド実行を確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
 
 証跡は.artifacts/automation-source-* / automation-portable-*とVERIFICATIONに記録します。ビルドをGUI検証と同時実行しません。

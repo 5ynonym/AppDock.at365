@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 // Restrict only this fixture's kernel objects to the rights available across elevation.
 // No UAC, production process, or persistent security setting is changed.
 const fs = require('node:fs');
@@ -10,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `portable-mutex-${Date.now()}`, '日本語 profile');
 fs.mkdirSync(profile, { recursive: true });
 const exe = path.join(profile, 'AppDock.at365.exe');
-fs.copyFileSync(path.join(root, 'publish/AppDock.at365.exe'), exe);
+fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), exe);
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.startMinimized = true;

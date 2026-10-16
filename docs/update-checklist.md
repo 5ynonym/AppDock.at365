@@ -8,10 +8,10 @@ package.json、各Appletのmanifest、発行物のupdate.jsonから対象版を�
 
 | 対象 | 配布元へ置くファイル | ローカル更新元の指定例 |
 | --- | --- | --- |
-| AppDock | `publish/AppDock.at365.exe` と `publish/update.json` | `A:\30.PROJECT\AppDock.at365\publish` |
-| 各Applet | そのリポジトリの `publish/update.zip` と `publish/update.json` | `A:\30.PROJECT\Applet.Watch.at365\publish` |
+| AppDock | `A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe` と `A:/40.ARTIFACT/AppDock.at365/update.json` | `A:\40.ARTIFACT\AppDock.at365` |
+| 各Applet | `A:\40.ARTIFACT\<リポジトリ名>`の`update.zip`と`update.json` | `A:\40.ARTIFACT\Applet.Watch.at365` |
 
-Appletの初回追加は、従来どおり`publish/各Applet名`の中身を配置します。更新ボタンはインストール済みAppletを対象にします。ZIPは各リポジトリで同名なので、別AppletのJSON/ZIPを混ぜないでください。
+Appletの初回追加は、各発行先の`deploy.bat`から配置します。更新ボタンはインストール済みAppletを対象にします。ZIPは各リポジトリで同名なので、別AppletのJSON/ZIPを混ぜないでください。
 
 同じバージョンを試す場合は「更新の設定 → 同じバージョンの再適用」をONにすると即時保存され、確認が終わったらOFFへ戻します。旧版への更新はできません。
 
@@ -19,7 +19,7 @@ Appletの初回追加は、従来どおり`publish/各Applet名`の中身を配�
 
 必要な配布先から順に確認できます。ファイルは同じ発行で生成した組み合わせを使い、JSONを最後に配置します。
 
-- **ローカル**: 上の`publish`フォルダーを指定します。Appletでは従来の`publish/各Applet名`も指定できますが、更新ZIPの確認ではJSON/ZIPがある親の`publish`を使います。
+- **ローカル**: 上の発行先を指定します。Appletでは配布フォルダー内のextension.jsonも指定できますが、更新ZIPの確認ではJSON/ZIPがある親の発行先を使います。
 - **UNC**: `\\server\share\AppDock`やAppletごとのフォルダーに必要な2ファイルを置き、そのパスを指定します。AppDockを実行するユーザーから読み取れることを確認します。
 - **HTTP(S)**: 同じWebフォルダーへ2ファイルを置き、`https://example.test/AppDock/update.json`または末尾が`/`のフォルダーURLを指定します。閲覧用のHTMLページではなくファイル本体が取得できるURLを使います。
 - **GitHub**: 対象リポジトリの正式なReleaseへ上の2ファイルをassetsとして添付します。AppDockの更新元はAppDockリポジトリ、Appletの更新元は各Appletのリポジトリを指定します。`github:owner/repo`またはリポジトリ/ReleaseのURLを使えます。自動生成のSource code ZIPは更新用ZIPではありません。非公開認証とプレリリースには対応しません。

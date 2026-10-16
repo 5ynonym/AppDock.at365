@@ -1,6 +1,7 @@
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { spawn } = require('node:child_process');
 const { _electron: electron } = require('playwright');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
@@ -18,7 +19,7 @@ const settings = require('../out/main/shared/settings-schema').createDefaultSett
 settings.host.notifications = false;
 const ids = ['at365.web-browser-tools', 'at365.windows-tools'];
 for (const name of ['WebBrowserTools', 'WindowsTools']) {
-  const source = path.resolve(root, `../Applet.${name}.at365/publish/Applet.${name}.at365`);
+  const source = path.join(getPublishDirectory(path.resolve(root, `../Applet.${name}.at365`)), `Applet.${name}.at365`);
   const dest = path.join(profile, 'extensions', name);
   fs.cpSync(source, dest, { recursive: true });
   const file = path.join(dest, 'extension.json'),

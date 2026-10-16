@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 // Release orchestration only. Builds and GUI checks stay in release.ps1.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -141,7 +142,7 @@ function createRelease(
     for (const item of bundle.applets) {
       assert.equal(item.dirty, false, `Uncommitted Applet: ${item.repository}`);
       assert.equal(
-        hash(path.join(path.dirname(root), item.repository, 'publish/update.zip')),
+        hash(path.join(getPublishDirectory(path.join(path.dirname(root), item.repository)), 'update.zip')),
         item.updateZipSha256,
       );
     }
@@ -149,7 +150,7 @@ function createRelease(
       'AppDock.at365.exe',
       'update.json',
       `AppDock.at365-all-in-one-${version()}.zip`,
-    ].map((name) => asset(path.join(root, 'publish', name)));
+    ].map((name) => asset(path.join(getPublishDirectory(root), name)));
     assert.equal(report.archiveSha256, plan.assets[2].sha256, 'Bundle changed after UI check');
     const hostFile = bundle.files.find((file) => file.path === 'AppDock.at365.exe');
     assert.equal(hostFile.sha256, plan.assets[0].sha256);
@@ -170,7 +171,7 @@ function createRelease(
     );
     // Only release preparation retires old bundles, after every check and asset
     // comparison has passed. Ordinary publish never creates or deletes bundles.
-    const publish = path.join(root, 'publish');
+    const publish = path.join(getPublishDirectory(root));
     const publishInfo = fs.lstatSync(publish);
     assert.ok(
       publishInfo.isDirectory() && !publishInfo.isSymbolicLink(),

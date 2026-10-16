@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('../scripts/publish-paths.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -17,8 +18,8 @@ test(
       assert.equal(path.dirname(directory), os.tmpdir());
       fs.rmSync(directory, { recursive: true, force: true });
     });
-    const host = path.join(directory, 'host');
-    const applets = path.join(directory, 'applets');
+    const host = path.join(directory, '30.PROJECT/host');
+    const applets = path.join(directory, '30.PROJECT');
     const applet = path.join(applets, 'Applet.Fixture');
     function run(exe, args, cwd = host) {
       return spawnSync(exe, args, { cwd, encoding: 'utf8', windowsHide: true, timeout: 30000 });
@@ -46,18 +47,19 @@ test(
     init(host);
     init(applet);
     fs.mkdirSync(path.join(host, 'scripts'));
-    fs.mkdirSync(path.join(host, 'publish'));
+    fs.mkdirSync(getPublishDirectory(host), { recursive: true });
     fs.mkdirSync(path.join(host, '.artifacts/updater'), { recursive: true });
     fs.copyFileSync(helper, path.join(host, '.artifacts/updater/AppDock.Updater.exe'));
     fs.copyFileSync(
       path.join(root, 'scripts/build-all-in-one.ps1'),
       path.join(host, 'scripts/build-all-in-one.ps1'),
     );
+    fs.copyFileSync(path.join(root, 'scripts/publish-paths.ps1'), path.join(host, 'scripts/publish-paths.ps1'));
     fs.writeFileSync(path.join(host, 'package.json'), JSON.stringify({ version: '1.0.0' }));
-    const exe = path.join(host, 'publish/AppDock.at365.exe');
+    const exe = path.join(getPublishDirectory(host), 'AppDock.at365.exe');
     fs.writeFileSync(exe, 'MZ-host-fixture');
     assert.equal(
-      run(helper, ['--pack', 'host', exe, '1.0.0', path.join(host, 'publish')]).status,
+      run(helper, ['--pack', 'host', exe, '1.0.0', path.join(getPublishDirectory(host))]).status,
       0,
     );
     const manifest = {
@@ -74,7 +76,7 @@ test(
     writeManifest(manifest);
     fs.writeFileSync(path.join(applet, 'payload/extension.json'), JSON.stringify(manifest));
     fs.writeFileSync(path.join(applet, 'payload/index.js'), 'exports.activate = () => {};');
-    const publisher = `@echo off\r\n"${helper}" --pack applet "%~dp0payload" unused "%~dp0publish"\r\nexit /b %errorlevel%\r\n`;
+    const publisher = `@echo off\r\nfor %%I in ("%~dp0.") do set "REPO=%%~nxI"\r\n"${helper}" --pack applet "%~dp0payload" unused "%~dp0..\\..\\40.ARTIFACT\\%REPO%"\r\nexit /b %errorlevel%\r\n`;
     fs.writeFileSync(path.join(applet, 'publish.bat'), publisher, 'ascii');
     const build = () =>
       run('powershell.exe', [
@@ -88,7 +90,7 @@ test(
       ]);
     let result = build();
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    const zip = path.join(host, 'publish/AppDock.at365-all-in-one-1.0.0.zip');
+    const zip = path.join(getPublishDirectory(host), 'AppDock.at365-all-in-one-1.0.0.zip');
     const hash = () => createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
     fs.writeFileSync(
       path.join(applet, 'payload/index.js'),
@@ -144,7 +146,7 @@ test(
     fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 19\r\n', 'ascii');
     fails(/Applet publish failed/);
     fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 0\r\n', 'ascii');
-    fs.appendFileSync(path.join(applet, 'publish/update.zip'), 'tampered');
+    fs.appendFileSync(path.join(getPublishDirectory(applet), 'update.zip'), 'tampered');
     fails(/Payload hash\/size mismatch/);
     fs.writeFileSync(path.join(applet, 'publish.bat'), publisher, 'ascii');
     writeManifest({ ...manifest, minimumHostVersion: '2.0.0' });

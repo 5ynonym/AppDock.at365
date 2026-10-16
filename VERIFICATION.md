@@ -2276,3 +2276,18 @@ Watchの時計だけを外部Appletとして移行済みです。GmailChecker、
 - 今回のレイアウト/既定値変更、通知OFF設定と不要な制御項目の撤去、見出しの現在値表示、ジェスチャー配置、関連文書/試験の65ファイルをコミット対象としてレビューした。実装完了時の作業一覧と一致し、別作業の差分なし。
 - `.artifacts/notification-always-enabled-20261016/validation.json`の入力一覧、各成功ログ、5つの固定EXE GUI結果、.NET fixtureバイナリ、最終EXEとupdate.jsonのSHA256を現在値と照合し、差異0。型検査・標準498件・固定EXE GUI31群・.NET fixtureビルド・publishの成功を再利用した。新たな製品修正や再試験の必要なし。版は0.50.0と既発行物を維持する。
 - コミット時の照合・stage tree・commit/tree・作業ツリー状態は `.artifacts/commit-validation-settings-notifications-20261016/` に記録する。検証記録の追記だけを検証後の文書差分として扱う。push・外部公開・実利用先deployは行わない。新規テストprofileの生成なし、以前の成功証跡を再利用資料として保持。
+
+## 2026-10-16 発行先の40.ARTIFACTへの移行
+
+- 発行先: `A:\40.ARTIFACT\AppDock.at365`。publish.batとビルド・更新梱包・関連検証の参照を変更。配置用正本はdeployment/へ移動し、成功後に発行先へ追加。deployは発行済み成果物を使い、既存deploy.bat・関連スクリプト・deploy.local.txtを保持する。配置先設定はハッシュ一致を確認して旧repo直下から移動。旧publishの過去成果物は保持。
+- レビュー: 発行パス・削除境界・配置の独立動作・設定保持・梱包/Release参照を確認。GmailのWeb出力ガード、配置時の再ビルド依存、試験fixtureの分離、文書参照を修正して再確認。未解決指摘なし。発行基盤のみの変更のため製品版は0.50.0を維持。
+- 検証: publish.batを2回実行し両方終了0（`.artifacts/publish-relocation-20261016/publish.log`、`.artifacts/publish-relocation-20261016/republish.log`）。7repo合計24配置用ファイルのハッシュ保持。全7repoの独立配置fixture28ケースとWebApplet専用6ケース、WebApplet単体2件、梱包/Release fixture11件、本体型検査・最終EXE隔離起動が成功。全feedの版・サイズ・SHA256、Applet ZIPの全収録ファイルと発行物を照合。
+- 発行物SHA256: `123ae11497bdc10e8da522b8fc820440d2c89510ffc36208b12790c9e2f5e76f`。共通証跡: [検証一覧](../AppDock.at365/.artifacts/publish-relocation-20261016/validation.json)、[出力照合](../AppDock.at365/.artifacts/publish-relocation-20261016/artifact-validation.json)、[再発行保持](../AppDock.at365/.artifacts/publish-relocation-20261016/republish-result.json)。
+- 制限環境のpnpm STATUS_STACK_OVERFLOWとEXE spawn失敗、fixtureのrename EPERMは通常ユーザー権限で同一処理を再実行して成功。依存版・lockfile・検証方針は維持。実利用先deploy・commit・push・外部公開は未実行。製品機能の変更がないため無関係な全回帰・実アカウント操作は実行していない。
+
+## 2026-10-16 発行先移行のコミット前確認
+
+- 実装時の入力スナップショット全7repoとログSHA256、最終発行EXE・各ZIP/feed・配置用24ファイルを照合し、型検査・ビルド・発行2回・配置・隔離起動・梱包Release fixture11件・WebApplet単体2件/配置6ケース・WebBrowserTools単体2件を再利用。製品と発行物の変更はないため再発行・版更新は不要。
+- 不足分として本体標準回帰の残り487件、Gmail22件、Watch8件、WindowsTools38件、WallpaperSlideshow標準回帰を確認。本体486件は初回で成功、実行ディレクトリに依存するnode-invocationの1件は正しいrepoディレクトリから単独再実行して成功。既存11件と合わせ本体498件・skipなし。初回コマンドの終了1は保持し、全体成功へ読み替えず試験単位で照合。
+- 通常ユーザー実行でfixtureビルドとネットワーク依存の.NET検証・Git fetchが成功。全7repoの入力と発行物を維持。失敗時の作業ディレクトリに生成された今回の試験資料は共通証跡内のinitial-cwd-artifactsへ移動して保持。
+- 共通証跡: [コミット検証](../AppDock.at365/.artifacts/commit-validation-publish-relocation-20261016/validation.json)。stage treeとcommit tree、プッシュ先mainの一致を同フォルダーへ記録する。実利用先deployとGitHub Releaseは対象外。

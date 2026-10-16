@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -98,7 +99,7 @@ let app;
   delete env.ELECTRON_RUN_AS_NODE;
   try {
     app = await electron.launch({
-      executablePath: path.join(root, 'publish/win-unpacked/AppDock.at365.exe'),
+      executablePath: path.join(getPublishDirectory(root), 'win-unpacked/AppDock.at365.exe'),
       args: [`--test-profile=${profile}`],
       env,
     });

@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { randomUUID, createHash } = require('node:crypto');
@@ -8,7 +9,7 @@ const http = require('node:http'),
   assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'web-portable-' + Date.now());
-const source = path.resolve(process.argv[2] || path.join(root, 'publish/AppDock.at365.exe'));
+const source = path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'));
 const executable = path.join(profile, 'AppDock.at365.exe');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(profile, { recursive: true });
@@ -16,7 +17,7 @@ fs.copyFileSync(source, executable);
 const sha256 = hash(source);
 assert.equal(hash(executable), sha256);
 fs.cpSync(
-  path.resolve(root, '../Applet.WebApplet.at365/publish/extensions/at365.web-applet'),
+  path.resolve(root, '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet'),
   path.join(profile, 'extensions/at365.web-applet'),
   { recursive: true },
 );

@@ -18,15 +18,15 @@ statusがcurrentの場合は結果本文を表示せず、現在のバージョ�
 
 ## 発行
 
-本体のpublish.bat/dev.bat run distはhelperをビルドし、portable EXEの発行後にpublish/update.jsonを生成する。外部公開はしない。
+本体のpublish.bat/dev.bat run distはhelperをビルドし、portable EXEの発行後にA:/40.ARTIFACT/AppDock.at365/update.jsonを生成する。外部公開はしない。
 
-共通`scripts/pack-applet-update.ps1`は.NET 10 SDKでパッカーを増分ビルドして実行する。全6Appletのpublish.batは発行後にこれを呼び、各リポジトリのpublish/update.jsonとpublish/update.zipを生成する。通常のpublish/各Applet名フォルダーは配置用のまま保持する。Applet側でOutputDirectoryを指定した場合も、その内容をパッケージ化してJSON/ZIPはリポジトリ内publishへ出力する。.NET AppletではNode.js不要。
+共通`scripts/pack-applet-update.ps1`は.NET 10 SDKでパッカーを増分ビルドして実行する。全6Appletのpublish.batは発行後にこれを呼び、`A:\40.ARTIFACT\<リポジトリ名>`へupdate.jsonとupdate.zipを生成する。その下の各Appletの配布フォルダーは配置用として保持する。Applet側でOutputDirectoryを指定した場合も、その内容をパッケージ化してJSON/ZIPは標準発行先へ出力する。.NET AppletではNode.js不要。配置スクリプトの保存・保持は[発行手順](publishing.md)を参照する。
 
 ZIPは一時ファイルへ完成させてから置換し、feedを最後に保存する。出力先が入力フォルダー自身でも、生成前に収録一覧を固定し、既存update.json/update.zipを除外する。manifestのAPI/entryと配布量上限を検査する。配布先確認は[チェックリスト](update-checklist.md)を参照。個別に生成するときは次も利用できる。
 
 ```powershell
 .\dev.bat run build:updater
-.\dev.bat run pack:update applet ..\Applet.Watch.at365\publish\Applet.Watch.at365 .artifacts\watch-update
+.\dev.bat run pack:update applet ..\..\40.ARTIFACT\Applet.Watch.at365\Applet.Watch.at365 .artifacts\watch-update
 ```
 
 生成したupdate.jsonとupdate.zipを同じWeb配布場所/GitHub Releaseに置く。本体はupdate.jsonとAppDock.at365.exe。JSONはschemaVersion=1、kind=host/applet、id=host/実Applet ID、version、任意minimumHostVersion、payload={file,sha256,size,format=exe/zip}。ZIP直下にextension.jsonと実行ファイル一式を置く。情報JSONを配布物の最後に公開する。

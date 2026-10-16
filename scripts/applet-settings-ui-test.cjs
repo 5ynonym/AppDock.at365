@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -28,7 +29,7 @@ for (const name of [
 ]) {
   const repo = path.resolve(root, '../Applet.' + name + '.at365'),
     folder = path.join(profile, 'extensions', name);
-  const source = path.join(repo, 'publish', 'Applet.' + name + '.at365');
+  const source = path.join(getPublishDirectory(repo), 'Applet.' + name + '.at365');
   fs.cpSync(source, folder, { recursive: true });
   const mf = path.join(repo, 'extension.json'),
     m = JSON.parse(fs.readFileSync(mf));

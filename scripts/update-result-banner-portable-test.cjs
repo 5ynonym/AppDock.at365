@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net'),
@@ -9,13 +10,13 @@ const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'update-result-banner-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
-fs.copyFileSync(path.join(root, 'publish/AppDock.at365.exe'), executable);
+fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), executable);
 const initialHash = createHash('sha256').update(fs.readFileSync(executable)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
 settings.gestures.enabled = false;
-settings.updates.hostSource = path.join(root, 'publish');
+settings.updates.hostSource = path.join(getPublishDirectory(root));
 settings.updates.allowSameVersion = true;
 settings.notificationPreferences = {
   overrides: [{ ownerKind: 'host', ownerId: 'updates', typeId: 'applied', durationSeconds: null }],

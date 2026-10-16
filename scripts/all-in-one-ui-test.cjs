@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net'),
@@ -7,7 +8,7 @@ const { chromium } = require('playwright');
 const { createHash, randomUUID } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const version = require('../package.json').version;
-const archive = path.join(root, `publish/AppDock.at365-all-in-one-${version}.zip`);
+const archive = path.join(getPublishDirectory(root), `AppDock.at365-all-in-one-${version}.zip`);
 const archiveSha256 = createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
 const profile = path.join(root, '.artifacts', `bundle-verify-${randomUUID()}`);
 const extracted = spawnSync(
@@ -35,7 +36,7 @@ assert.equal(
     .update(fs.readFileSync(path.join(profile, 'AppDock.at365.exe')))
     .digest('hex'),
   createHash('sha256')
-    .update(fs.readFileSync(path.join(root, 'publish/AppDock.at365.exe')))
+    .update(fs.readFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe')))
     .digest('hex'),
 );
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

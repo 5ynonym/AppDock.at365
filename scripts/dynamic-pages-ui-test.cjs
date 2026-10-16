@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `dynamic-pages-ui-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.dynamic');
 fs.mkdirSync(fixture, { recursive: true });
-const source = path.resolve(root, '../Applet.WebApplet.at365/publish/extensions/at365.web-applet');
+const source = path.resolve(root, '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet');
 fs.cpSync(source, path.join(profile, 'extensions', 'at365.web-applet'), { recursive: true });
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),

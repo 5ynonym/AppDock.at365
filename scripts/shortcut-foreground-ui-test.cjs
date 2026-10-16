@@ -30,7 +30,7 @@ settings.keybindings = [
   when: { scope: 'global', appletIds: [] },
 }));
 fs.cpSync(
-  path.resolve(root, '../Applet.WindowsTools.at365/publish/Applet.WindowsTools.at365'),
+  path.resolve(root, '../../40.ARTIFACT/Applet.WindowsTools.at365/Applet.WindowsTools.at365'),
   path.join(profile, 'extensions/WindowsTools'),
   { recursive: true },
 );

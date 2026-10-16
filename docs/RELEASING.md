@@ -179,7 +179,7 @@ planの`retentionReport`が指すJSONに、削除前一覧・保持対象・削�
 
 ## Appletを追加したとき
 
-[オールインワン発行](all-in-one.md)の自動探索が正本です。AppDockの親フォルダー直下に独立repoを置き、`.git`、`extension.json`、失敗時非0終了の`publish.bat`を用意します。共通`pack-applet-update.ps1`で`publish/update.json`と`update.zip`を作ります。IDを重複させず、version/runtime/apiVersion/minimumHostVersion/entryを正しく記載します。
+[オールインワン発行](all-in-one.md)の自動探索が正本です。AppDockの親フォルダー直下に独立repoを置き、`.git`、`extension.json`、失敗時非0終了の`publish.bat`を用意します。共通`pack-applet-update.ps1`で`A:/40.ARTIFACT/AppDock.at365/update.json`と`update.zip`を作ります。IDを重複させず、version/runtime/apiVersion/minimumHostVersion/entryを正しく記載します。
 
 Release Prepareの`pack:all-in-one`が毎回全対象を列挙するため、6件などの固定リストを更新する必要はありません。追加したAppletは自身のpublishで確認し、AppDockリリース時に全体ZIPの起動検証で収録を確認します。ローカル最新版とはその時点のcheckoutです。リリース準備は全repoのcleanを要求します。
 

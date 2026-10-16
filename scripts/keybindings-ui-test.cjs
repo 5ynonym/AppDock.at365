@@ -17,7 +17,7 @@ settings.globalShortcutCommands = [];
 settings.extensions['test.keys'] = { enabled: true, settings: {} };
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
 fs.cpSync(
-  path.resolve(root, '../Applet.Gmail.at365/publish/Applet.Gmail.at365'),
+  path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'),
   path.join(profile, 'extensions', 'Applet.Gmail.at365'),
   { recursive: true },
 );

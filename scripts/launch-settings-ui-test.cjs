@@ -1,3 +1,4 @@
+const { getPublishDirectory } = require('./publish-paths.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -13,7 +14,7 @@ const profile = path.join(root, '.artifacts', `launch-settings-${Date.now()}`);
 const folder = path.join(profile, '日本語 folder');
 fs.mkdirSync(folder, { recursive: true });
 const executable = path.join(folder, "AppDock's.at365.exe");
-const source = path.resolve(process.argv[2] || 'publish/AppDock.at365.exe');
+const source = path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'));
 fs.copyFileSync(source, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(source), hash(executable));

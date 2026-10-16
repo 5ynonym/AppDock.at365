@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..'),
 fs.mkdirSync(profile, { recursive: true });
 const appletSource = path.resolve(
   root,
-  '../Applet.WebApplet.at365/publish/extensions/at365.web-applet',
+  '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet',
 );
 fs.cpSync(appletSource, path.join(profile, 'extensions/at365.web-applet'), { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
