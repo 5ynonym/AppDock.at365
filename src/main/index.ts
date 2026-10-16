@@ -136,6 +136,8 @@ import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
 import { audioPlayback } from './core/audio-service';
+import { notificationSounds } from './core/sounds';
+import { NotificationSession } from './core/notification-session';
 import { NotificationAvailability } from './core/notification-availability';
 import { NativeNotificationState } from './core/native-notification-state';
 import { NotificationSpeechService } from './core/notification-speech';
@@ -238,6 +240,7 @@ let settingsRecoveryBusy = false;
 const settingsOperationBusy = () => settingsRecoveryBusy || launch.isBusy;
 let notificationSpeech: NotificationSpeechService | undefined;
 let notificationAvailability: NotificationAvailability | undefined;
+let notificationSession: NotificationSession | undefined;
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
@@ -2253,10 +2256,21 @@ async function initialize() {
         '通知の表示・読み上げ可否を確認できません。通知センターから確認できます。',
       ),
   });
-  powerMonitor.on('lock-screen', () => notificationAvailability?.setBlocked('lock', true));
-  powerMonitor.on('unlock-screen', () => notificationAvailability?.setBlocked('lock', false));
-  powerMonitor.on('suspend', () => notificationAvailability?.setBlocked('suspend', true));
-  powerMonitor.on('resume', () => notificationAvailability?.setBlocked('suspend', false));
+  notificationSession = new NotificationSession({
+    state: () => powerMonitor.getSystemIdleState(1),
+    on: (event, callback) => {
+      const monitor: NodeJS.EventEmitter = powerMonitor;
+      monitor.on(event, callback);
+      return () => {
+        monitor.removeListener(event, callback);
+      };
+    },
+    changed: (paused) => {
+      notificationAvailability?.setBlocked('lock', paused);
+      notificationSounds.setPaused(paused);
+      notificationService?.setPaused(paused);
+    },
+  });
   window.on('enter-full-screen', () => notificationAvailability?.setBlocked('fullscreen', true));
   window.on('leave-full-screen', () => notificationAvailability?.setBlocked('fullscreen', false));
   notificationSpeech = new NotificationSpeechService({
@@ -2281,13 +2295,8 @@ async function initialize() {
       return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
     },
     changed,
-    published: (event) => {
-      try {
-        notificationSpeech?.publish(event);
-      } finally {
-        automation?.publishEvent(event);
-      }
-    },
+    published: (event) => automation?.publishEvent(event),
+    presented: (event) => notificationSpeech?.publish(event),
     publicationFailed: () =>
       log.write('error', 'notifications', '通知の読み上げ受付に失敗しました。'),
     policyChanged: (id) => {
@@ -3019,6 +3028,8 @@ app.on('before-quit', (event) => {
   notificationWindows?.dispose();
   notificationSpeech?.dispose();
   notificationAvailability?.dispose();
+  notificationSession?.dispose();
+  notificationSounds.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();

@@ -63,6 +63,24 @@ function fixture(t) {
     },
   };
 }
+test('locked Windows projection holds new notices and restores old visible notices silently', (t) => {
+  const f = fixture(t);
+  f.s.upsert('host.old', f.input());
+  f.a.refresh();
+  assert.equal(f.sent.length, 1);
+  f.s.setPaused(true);
+  f.a.refresh();
+  assert.equal(f.sent[0].closed, 1);
+  f.s.upsert('host.new', f.input());
+  f.a.refresh();
+  assert.equal(f.sent.length, 1);
+  f.s.setPaused(false);
+  f.a.refresh();
+  assert.equal(f.sent.length, 3);
+  assert.equal(f.sent[1].input.silent, true);
+  assert.equal(f.sent[2].input.silent, false);
+});
+
 test('Windows per-ID delivery and OS close do not resolve, read or repost the active business notification', async (t) => {
   const f = fixture(t),
     id = f.s.upsert('host.test', f.input());

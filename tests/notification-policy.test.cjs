@@ -26,6 +26,48 @@ const definition = (extra) => ({
 });
 const owner = { ownerKind: 'applet', ownerId: 'fixture.notify' };
 const row = (extra) => ({ ...owner, typeId: 'message', ...extra });
+
+test('deferred typed notifications publish latest content once at unlock, with a fresh speech deadline', (t) => {
+  const f = setup(t);
+  f.service.setPaused(true);
+  const content = {
+    level: 'info',
+    title: 'first',
+    body: 'body',
+    dedupeKey: 'held',
+    historyText: { title: 'safe', body: 'safe' },
+  };
+  const first = f.typed.publish(owner, 'message', content, 'run1');
+  f.tick(86400000);
+  const second = f.typed.publish(owner, 'message', { ...content, title: 'latest' }, 'run1');
+  assert.equal(first.notificationId, second.notificationId);
+  assert.equal(f.publications.length, 0);
+  f.service.setPaused(false);
+  assert.equal(f.publications.length, 1);
+  assert.equal(f.publications[0].title, 'latest');
+  assert.equal(f.publications[0].createdAt, f.service.list()[0].expiresAt - 5000);
+  f.service.setPaused(true);
+  f.service.setPaused(false);
+  assert.equal(f.publications.length, 1);
+});
+
+test('stopped publishers and ended deferred notifications are not replayed on unlock', (t) => {
+  const f = setup(t);
+  f.service.setPaused(true);
+  const content = {
+    level: 'info',
+    title: 'held',
+    body: 'body',
+    historyText: { title: 'safe', body: 'safe' },
+  };
+  const first = f.typed.publish(owner, 'message', content, 'run1');
+  f.typed.end(owner, first.notificationId, 'run1');
+  f.typed.publish(owner, 'message', content, 'run1');
+  f.stop();
+  f.service.setPaused(false);
+  assert.equal(f.publications.length, 0);
+  assert.deepEqual(f.service.targetItems('banner'), []);
+});
 test('typed Applets expose only declared notifications while legacy-only Applets retain their kind', () => {
   const applets = [
     { id: 'typed', notificationTypes: [definition()] },
@@ -48,6 +90,7 @@ function setup(t, definitions = [definition()]) {
     generation = 'run1';
   let settings = createDefaultSettings();
   const changes = [];
+  const publications = [];
   const applet = {
     id: owner.ownerId,
     displayName: 'Fixture',
@@ -67,6 +110,7 @@ function setup(t, definitions = [definition()]) {
     changed: () => {},
     policyChanged: (id) => changes.push(id),
     now: () => clock,
+    presented: (event) => publications.push(event),
   });
   t.after(() => {
     typed.dispose();
@@ -78,6 +122,7 @@ function setup(t, definitions = [definition()]) {
     service,
     history,
     changes,
+    publications,
     applet,
     dir,
     settings: () => settings,

@@ -8,7 +8,17 @@
 
 ## 本体のサービス
 
-NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、表示されない時間も進む。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
+NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、通常は表示されない時間も進む。ロック・サスペンド中は残り時間を停止し、その間の新規通知は解除後から表示時間を数える。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
+
+### ロック中の保留
+
+`NotificationSession`はApplet開始前にElectron `powerMonitor.getSystemIdleState(1)`で現在のロック状態を確認し、以後のlock/unlock・suspend/resumeを監視する。Windowsの自動サインイン後にロックされたまま起動する場合も対象にする。初回状態が不明・照会失敗なら保留して1秒後に再確認する。idleはロックとして扱わない。
+
+保留中はbanner/desktop/windowsへの投影を空にし、新規通知の読み上げ受付を解除後へ遅らせる。通知のID、状態、最新本文、安全な履歴は受付時点から通常どおり管理し、更新は同じIDへ集約する。解消・撤回・発行元停止・世代変更で無効になった通知は解除後に再提示しない。すでに表示済みだったWindows通知を戻す際は、本文が同じならOSの通知音を再度鳴らさない。実行中の自動読み上げは既存の取消方針に従い、再読しない。
+
+Appletの`host.audio.play`による通知音も共通の`NotificationSounds`で保留し、解除後に共通音声FIFOへ渡す。待機は最大32件で、発行元の停止・世代変更・ホスト終了では破棄する。再生済みの音は再開時に繰り返さない。音声APIは通知IDと独立しているため、通知のresolve/withdrawとは連動せず、発行元が稼働中なら予約した音を再生する。未選択時の無音と既存の権限・WAV検査は維持する。
+
+保留は起動中のメモリー内で行い、再起動を越えて配送しない。手動TTS・試聴と、明示的に選択したMCP Eventsの外部配信はこのローカル通知保留の対象外。MCP Eventsは従来どおり新規通知の発行時に評価する。設定項目・保存ファイルは追加しない。
 
 targetsはbanner/desktop/windowsの複数指定、または空配列。必須先がない種類では、空配列は画面通知を使わない指定になる。読み上げとMCP Eventsは独立して選択でき、「通知センターのみ」は両方も解除する。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。
 

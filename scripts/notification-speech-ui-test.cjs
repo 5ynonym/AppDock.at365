@@ -76,7 +76,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     const id = 'fixture.speech';
     const folder = path.join(profile, 'extensions', id);
     fs.mkdirSync(folder, { recursive: true });
-    const commands = ['publish', 'update', 'end', 'real'].map((k) => ({
+    const commands = ['publish', 'update', 'end', 'real', 'sound'].map((k) => ({
       id: id + '.' + k,
       title: k,
     }));
@@ -106,14 +106,18 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         minimumHostVersion: '0.31.0',
         runtime: 'node',
         entry: 'index.cjs',
-        capabilities: ['notifications'],
+        capabilities: ['notifications', 'audio'],
         commands,
         notificationTypes: [type],
       }),
     );
+    const soundFile = path.join(profile, 'notice.wav');
+    fs.writeFileSync(soundFile, wave());
     fs.writeFileSync(
       path.join(folder, 'index.cjs'),
-      "exports.activate=async c=>{let id;const pub=async()=>{id=(await c.notifications.publish({typeId:'message',title:'Fixture notice',body:'Notification body',dedupeKey:'episode'})).notificationId;};c.commands.register('fixture.speech.publish','Publish',pub);c.commands.register('fixture.speech.update','Update',pub);c.commands.register('fixture.speech.end','End',async()=>{if(id)await c.notifications.end(id);});c.commands.register('fixture.speech.real','Real',async()=>{id=(await c.notifications.publish({typeId:'message',title:'通知読み上げの動作確認です。',body:'',dedupeKey:'real'})).notificationId;});};",
+      "exports.activate=async c=>{let id;const pub=async()=>{id=(await c.notifications.publish({typeId:'message',title:'Fixture notice',body:'Notification body',dedupeKey:'episode'})).notificationId;};c.commands.register('fixture.speech.publish','Publish',pub);c.commands.register('fixture.speech.update','Update',pub);c.commands.register('fixture.speech.end','End',async()=>{if(id)await c.notifications.end(id);});c.commands.register('fixture.speech.sound','Sound',async()=>{await c.audio.play(" +
+        JSON.stringify(soundFile) +
+        ");});c.commands.register('fixture.speech.real','Real',async()=>{id=(await c.notifications.publish({typeId:'message',title:'通知読み上げの動作確認です。',body:'',dedupeKey:'real'})).notificationId;});};",
     );
     initial.extensions[id] = { enabled: true, settings: {} };
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
@@ -160,6 +164,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await execute('appdock.settings.open');
     let page = await settingsPage(host);
     await page.getByRole('button', { name: '通知', exact: true }).click();
+    const noticeCard = page
+      .locator('.notification-setting-card')
+      .filter({ hasText: 'Speech notice' });
+    await noticeCard.locator(':scope > summary').click();
     await page.getByLabel('Speech noticeを読み上げる').waitFor();
     await execute(id + '.publish');
     await new Promise((r) => setTimeout(r, 400));
@@ -233,15 +241,46 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     assert.equal(requests[2].voice, 'common');
     assert.equal(requests[2].speed, 1);
     checks.push('independent inheritance restoration');
+    const requireMain = `process.getBuiltinModule('module').createRequire(${electronExpression}.app.getAppPath()+'/package.json')`;
+    await until(
+      () =>
+        inspect(
+          mainPort,
+          `!${requireMain}('./out/main/main/core/audio-service').audioPlayback.active`,
+        ),
+      'audio idle',
+    );
+    await inspect(
+      mainPort,
+      `(()=>{const q=${requireMain}('./out/main/main/core/audio-service').audioPlayback;const original=q.player;globalThis.lockAudioStarts=0;q.player=async r=>{globalThis.lockAudioStarts++;await original(r);};return true;})()`,
+    );
     await inspect(mainPort, electronExpression + ".powerMonitor.emit('lock-screen')");
     await execute(id + '.end');
     await execute(id + '.publish');
+    await execute(id + '.sound');
     await new Promise((r) => setTimeout(r, 350));
     assert.equal(requests.length, 3);
+    assert.equal(await inspect(mainPort, 'globalThis.lockAudioStarts'), 0);
     await inspect(mainPort, electronExpression + ".powerMonitor.emit('unlock-screen')");
+    await until(() => requests.length === 4, 'deferred speech after unlock');
     await new Promise((r) => setTimeout(r, 350));
-    assert.equal(requests.length, 3);
-    checks.push('lock suppression without desktop and no replay on unlock');
+    assert.equal(requests.length, 4);
+    checks.push('lock defers speech without desktop and unlock delivers once');
+    await until(
+      () => inspect(mainPort, 'globalThis.lockAudioStarts===2'),
+      'deferred sound and speech playback',
+    );
+    await until(
+      () =>
+        inspect(
+          mainPort,
+          `!${requireMain}('./out/main/main/core/audio-service').audioPlayback.active`,
+        ),
+      'deferred audio finished',
+    );
+    checks.push(
+      'Applet notification sound waits while locked and shares real audio FIFO with deferred speech',
+    );
     if (process.env.APPDOCK_TTS_REAL === '1') {
       await host.evaluate(async () => {
         const s = await window.dock.snapshot();

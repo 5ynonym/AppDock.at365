@@ -31,6 +31,8 @@ export class TypedNotifications {
   private reconciling = false;
   private rates = new Map<string, { tokens: number; at: number }>();
   private unsubscribe: () => void;
+  private pending = new Map<string, NotificationPublication>();
+  private flushing = false;
   constructor(
     private service: NotificationService,
     private options: {
@@ -41,6 +43,7 @@ export class TypedNotifications {
       policyChanged(id: string): void;
       now?(): number;
       published?(event: NotificationPublication): void;
+      presented?(event: NotificationPublication): void;
       publicationFailed?(): void;
     },
   ) {
@@ -52,6 +55,8 @@ export class TypedNotifications {
           .map((i) => i.id),
       );
       for (const id of this.bindings.keys()) if (!active.has(id)) this.bindings.delete(id);
+      for (const id of this.pending.keys()) if (!active.has(id)) this.pending.delete(id);
+      this.flush();
     });
   }
   private source(owner: NotificationOwner) {
@@ -136,21 +141,53 @@ export class TypedNotifications {
     this.service.identify(notificationId, owner, typeId);
     this.bindings.set(notificationId, { owner: { ...owner }, typeId, generation, input, lifetime });
     if (!previous) {
+      const event: NotificationPublication = {
+        notificationId,
+        owner: { ...owner },
+        typeId,
+        generation,
+        title: content.title,
+        body: content.body,
+        createdAt: (this.options.now ?? Date.now)(),
+      };
       try {
-        this.options.published?.({
-          notificationId,
-          owner: { ...owner },
-          typeId,
-          generation,
-          title: content.title,
-          body: content.body,
-          createdAt: (this.options.now ?? Date.now)(),
-        });
+        this.options.published?.(event);
+      } catch {
+        this.options.publicationFailed?.();
+      }
+      try {
+        if (this.service.isPaused()) this.pending.set(notificationId, event);
+        else this.options.presented?.(event);
       } catch {
         this.options.publicationFailed?.();
       }
     }
     return { status: 'accepted', notificationId };
+  }
+  private flush() {
+    if (this.flushing || this.service.isPaused() || !this.pending.size) return;
+    this.flushing = true;
+    try {
+      this.reconcile();
+      for (const [id, event] of this.pending) {
+        if (this.service.isPaused()) break;
+        this.pending.delete(id);
+        const item = this.service.list().find((i) => i.id === id && i.status === 'active');
+        if (!item || !this.bindings.has(id)) continue;
+        try {
+          this.options.presented?.({
+            ...event,
+            title: item.title,
+            body: item.body,
+            createdAt: (this.options.now ?? Date.now)(),
+          });
+        } catch {
+          this.options.publicationFailed?.();
+        }
+      }
+    } finally {
+      this.flushing = false;
+    }
   }
   isActive(owner: NotificationOwner, id: string) {
     this.reconcile();
@@ -229,6 +266,7 @@ export class TypedNotifications {
   dispose() {
     this.unsubscribe();
     this.bindings.clear();
+    this.pending.clear();
     this.rates.clear();
   }
 }

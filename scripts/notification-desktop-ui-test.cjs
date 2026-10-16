@@ -236,16 +236,26 @@ const storage = (id, key) => {
       'tray work-area bounds, stacked/scrollable cards and independent delivery while the main Window is hidden',
     );
     await main('electron.powerMonitor.emit("lock-screen")');
-    await until(async () => !(await main(desktopWindow + '.isVisible()')), 'lock suppression');
+    await until(
+      async () => !(await main(desktopWindow + '?.isVisible() ?? false')),
+      'lock suppression',
+    );
     await command(ids.node + '.timed');
     await wait(1300);
-    assert.ok(
-      !(await d.evaluate(() => window.appdockNotifications.connect())).snapshot.items.some(
-        (i) => i.title === 'Timed desktop',
-      ),
-    );
+    assert.equal(await main(desktopWindow + '?.isVisible() ?? false'), false);
     await main('electron.powerMonitor.emit("unlock-screen")');
-    await until(() => main(desktopWindow + '.isVisible()'), 'unlock resumes manual notifications');
+    await until(() => main(desktopWindow + '?.isVisible() ?? false'), 'unlock resumes manual notifications');
+    d = await surface('desktop', executable ? 'appdock.default-shell' : customId);
+    const resumed = (await d.evaluate(() => window.appdockNotifications.connect())).snapshot;
+    assert.ok(resumed.items.some((i) => i.title === 'Timed desktop'));
+    assert.ok(resumed.items.some((i) => i.id === native.id));
+    await until(
+      async () =>
+        !(await d.evaluate(() => window.appdockNotifications.connect())).snapshot.items.some(
+          (i) => i.title === 'Timed desktop',
+        ),
+      'timed notice expires after unlock',
+    );
     await main(parentWindow + '.setFullScreen(true)');
     await until(
       async () => !(await main(desktopWindow + '.isVisible()')),
@@ -254,7 +264,7 @@ const storage = (id, key) => {
     await main(parentWindow + '.setFullScreen(false)');
     await until(() => main(desktopWindow + '.isVisible()'), 'full-screen end');
     checks.push(
-      'lock/unlock event fixture and real parent full-screen suppression retain manual IDs; timed notification expires while hidden without replay',
+      'lock/unlock retains manual IDs and holds timed notices until unlock; real parent full-screen suppression remains independent',
     );
     if (app) {
       const before = (

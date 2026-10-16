@@ -1,7 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { audioPlayback } from './audio-service';
-let pending = 0;
+import { NotificationSounds } from './notification-sounds';
+export const notificationSounds = new NotificationSounds({
+  read: readWave,
+  play: (bytes, signal, beforePlay) =>
+    audioPlayback.play({ bytes, signal, beforePlay, playbackTimeoutMs: 30000 }),
+});
 export async function readWave(file: string): Promise<Buffer> {
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
     throw new Error('通知音にはWAVの絶対パスが必要です。');
@@ -23,30 +28,5 @@ export function queueSound(file: string, alive: () => boolean, failed: () => voi
   if (!file) return;
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
     throw new Error('通知音にはWAVの絶対パスが必要です。');
-  if (pending >= 32) throw new Error('通知音の再生待ちが多すぎます。');
-  if (!alive()) return;
-  pending++;
-  const controller = new AbortController();
-  const watch = setInterval(() => {
-    if (!alive()) controller.abort();
-  }, 100);
-  void (async () => {
-    try {
-      const bytes = await readWave(file);
-      if (!alive() || controller.signal.aborted) return;
-      await audioPlayback.play({
-        bytes,
-        signal: controller.signal,
-        playbackTimeoutMs: 30000,
-        beforePlay: () => {
-          if (!alive()) controller.abort();
-        },
-      });
-    } catch {
-      if (alive() && !controller.signal.aborted) failed();
-    } finally {
-      clearInterval(watch);
-      pending--;
-    }
-  })();
+  notificationSounds.enqueue(file, alive, failed);
 }

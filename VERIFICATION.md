@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-17: ロック中通知保留のコミット確認（0.54.1）
+
+- 利用者のコミット・プッシュ依頼に基づき、今回の20ファイルと影響先を再レビュー。設定・公開API・兄弟Appletの実装変更はなく、追加修正なし。必要範囲は本体の型検査・ビルド・標準回帰と、起動時ロック・通知読み上げ/着信音・共通音声・Node/.NET通知・固定EXE起動とした。
+- [実装時の検証一覧](.artifacts/notification-lock-20261016/validation.json)の492入力・必須試験の完全ログhash・各GUIの実行スクリプト・固定EXE・隔離コピー・native fixture 9ファイルを照合し、差分なし。型検査/ビルド・標準551/551・固定EXE試験5本を再利用し、同じ試験の再実行や再発行・版更新は行っていない。EXEは144,221,524 bytes、SHA256 `7a572e4979e3c9602c7d7858eeaf57302895f6bb61083739b70d7374c6df7c87`を保持。asar内182出力と同梱native/updater 412ファイル・feed・Shellの版/hashも再照合した。
+- [今回の再利用判定](.artifacts/commit-validation-notification-lock-20261017/reuse.json)に必要範囲と照合結果を保存。stageの対象・作業ファイル・tree、コミット後のtree、GitHub/AQUA両mainの先端照合結果を同所の`stage.json`・`commit.json`・`push.json`へ記録する。実ARSO再起動/物理ロック・実Google受信・可聴確認・複数DPIは引き続き未確認。GitHub Release・実利用先deployなし。
+
+## 2026-10-16: ロック中の通知を保留し解除後に配送（0.54.1）
+
+- 利用者指定で、ロック中の通知表示・着信音・新規読み上げを保留し、解除後に実行する。`NotificationSession`がApplet開始前に現在のロック状態を取得し、Windowsの自動サインイン後にロックされた状態で起動する場合も対象とした。ロック・サスペンド中は表示時間を停止し、更新は同じIDの最新内容に集約。解消・撤回・停止世代の通知は再提示しない。
+- Gmail等の独立したaudio API経路を共通`NotificationSounds`で保留し、解除後は既存音声FIFOへ渡す。待機最大32件、停止世代・ホスト終了で破棄。開始済み音声は停止して再開時に繰り返さない。Windows通知の同内容復帰は消音。手動TTSとその試聴、MCP Eventsの外部送信は従来の発行時評価を維持する。設定項目・保存ファイル・公開APIの追加削除なし。
+- [発行前レビュー](.artifacts/notification-lock-20261016/review.md)で復帰時の重複suspend blockerを撤去し、外部Eventsとローカル読み上げのcallbackを分離した。型検査・ビルド、発行後native成果物を使った標準回帰**551/551、fail/skip 0**が成功。初回標準回帰後にpublishがnativeを再ビルドしたため最終回帰を追加した。製品と単体試験・依存・ビルド入力はその間変更なし。
+- `publish.bat`終了0。通常修正として**0.54.0→0.54.1**のパッチ更新。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144,221,524 bytes / SHA256 `7a572e4979e3c9602c7d7858eeaf57302895f6bb61083739b70d7374c6df7c87`**。package、EXE FileVersion/ProductVersion、asar、Default Shell、feedの版一致。feed size/hash、asar内182出力、同梱native/updater 412ファイルを照合した。
+- 固定EXEの起動時ロック3群、通知読み上げ10群、共通音声2群、Node/.NETデスクトップ通知5群、隔離smokeがすべて成功し、隔離プロセスも終了。起動時ロック試験では製品の最初の処理で停止して初回状態だけをlockedへ差し替え、表示時間を越えても全表示先・通知音・TTSを開始しないこと、解除後に各1回だけ配送して表示時間が始まることを確認した。Windows配送はこの試験内では輸送fixture、デスクトップ/バナー・音声プレイヤーは実Electronを使用する。
+- 制限環境の依存検証停止・ローカルHTTP/ファイル操作/GUI接続失敗はログを保持し、固定lockfileと検査を維持した同じコマンドを通常ユーザー環境で成功確認。旧GUI selectorを現行折りたたみへ合わせた。起動前デバッガー試験の失敗・停止記録も保持し、停止中フレームの同期評価へ修正後にソース/固定EXE双方で成功した。
+- [検証一覧](.artifacts/notification-lock-20261016/validation.json)、[固定EXEの実行時刻・コマンド・ログhash](.artifacts/notification-lock-20261016/fixed-exe-validation.json)、[発行物照合](.artifacts/notification-lock-20261016/artifacts.json)へ証跡を保存。製品入力の差分なしを492入力で照合し、後続の変更は起動fixture追加とデスクトップfixtureの期待値・Window再取得だけ。試験方式ごとの成功は直近3件以内で、失敗・固定出力・再利用資料を保持し、削除0件。
+- 実ARSO再起動・実ログイン/ロック操作、実Google受信、スピーカーからの可聴確認、複数DPIは未確認。実利用設定・実利用先のEXEは変更していない。未ステージ・未コミット。push・Release・実利用先deployなし。
+
 ## 2026-10-16: MCP Events一時停止のコミット確認（0.54.0）
 
 - fetch後の`main`と`origin/main`はともに`3375854705697deb4f1d757607c64daf3b214065`。今回の9ファイルを再レビューし、追加の製品修正なし。購読の期限と送信許可の分離、OFF中更新、送信待ち破棄、再起動・即時終了、全体取消、説明文とテストの整合を確認した。

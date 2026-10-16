@@ -54,6 +54,67 @@ const request = (s, id, extra = {}) => {
     ...extra,
   };
 };
+
+test('locked startup defers every target and starts timed lifetime at unlock', (t) => {
+  const { service: s, tick } = fixture(t);
+  s.setPaused(true);
+  const id = s.upsert(
+    'host.alpha',
+    input({
+      lifetime: { type: 'timed', milliseconds: 100 },
+      targets: ['banner', 'desktop', 'windows'],
+    }),
+  );
+  tick(86400000);
+  for (const target of ['banner', 'desktop', 'windows'])
+    assert.deepEqual(s.targetItems(target), []);
+  assert.equal(s.list()[0].status, 'active');
+  assert.equal(s.list()[0].expiresAt, undefined);
+  s.setPaused(false);
+  for (const target of ['banner', 'desktop', 'windows'])
+    assert.equal(s.targetItems(target)[0].id, id);
+  tick(99);
+  assert.equal(s.list()[0].status, 'active');
+  tick(1);
+  assert.equal(s.list()[0].status, 'expired');
+});
+
+test('lock freezes remaining duration, updates preserve it and explicit restart replaces it', (t) => {
+  const { service: s, tick } = fixture(t);
+  const row = input({ dedupeKey: 'clock', lifetime: { type: 'timed', milliseconds: 100 } });
+  const id = s.upsert('host.alpha', row);
+  tick(40);
+  s.setPaused(true);
+  tick(10000);
+  s.upsert('host.alpha', { ...row, body: 'updated' });
+  s.setPaused(false);
+  tick(59);
+  assert.equal(s.list()[0].status, 'active');
+  s.setPaused(true);
+  s.upsert('host.alpha', { ...row, restartTimer: true });
+  tick(10000);
+  s.setPaused(false);
+  tick(99);
+  assert.equal(s.list()[0].status, 'active');
+  tick(1);
+  assert.equal(s.list()[0].status, 'expired');
+  assert.equal(s.list()[0].id, id);
+});
+
+test('resolved and withdrawn deferred notices never reappear after unlock', (t) => {
+  const { service: s } = fixture(t);
+  s.setPaused(true);
+  const a = s.upsert('host.alpha', input());
+  const b = s.upsert('host.beta', input());
+  s.end('host.alpha', a);
+  s.withdrawSource('host.beta');
+  s.setPaused(false);
+  assert.deepEqual(s.targetItems('banner'), []);
+  assert.deepEqual(
+    s.list().map((i) => i.status),
+    ['resolved', 'withdrawn'],
+  );
+});
 test('levels, lifecycle, source identity and independent target projection', (t) => {
   const { service: s } = fixture(t);
   const a = s.upsert(

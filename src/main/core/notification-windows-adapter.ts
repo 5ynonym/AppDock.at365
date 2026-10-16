@@ -6,7 +6,12 @@ import {
   type NativeNotificationHandle,
 } from './notifications';
 import type { NotificationService } from './notification-service';
-type Slot = { signature: string; handle?: NativeNotificationHandle; activated?: boolean };
+type Slot = {
+  signature: string;
+  handle?: NativeNotificationHandle;
+  activated?: boolean;
+  paused?: boolean;
+};
 /** Best-effort OS projection. OS timeout/close never resolves the business notification. */
 export class NotificationWindowsAdapter {
   private slots = new Map<string, Slot>();
@@ -52,6 +57,20 @@ export class NotificationWindowsAdapter {
   }
   refresh() {
     if (this.disposed || this.options.ready?.() === false) return;
+    if (this.service.isPaused()) {
+      for (const slot of this.slots.values()) {
+        if (slot.paused) continue;
+        slot.paused = true;
+        const handle = slot.handle;
+        slot.handle = undefined;
+        try {
+          handle?.close();
+        } catch {
+          this.options.failed();
+        }
+      }
+      return;
+    }
     const items = this.service.targetItems('windows'),
       ids = new Set(items.map((i) => i.id));
     for (const [id, slot] of this.slots)
@@ -67,7 +86,7 @@ export class NotificationWindowsAdapter {
       const silent = this.service.windowsOptions(item.id).silent;
       const signature = JSON.stringify([item.title, item.body, item.level, silent]);
       const old = this.slots.get(item.id);
-      if (old?.signature === signature) continue;
+      if (old?.signature === signature && !old.paused) continue;
       // Replace only changed content; reads, delivery reports and busy state never repost a toast.
       this.slots.delete(item.id);
       try {
@@ -92,7 +111,7 @@ export class NotificationWindowsAdapter {
           title: legacy ? item.title : labels[item.level] + '：' + item.title,
           body: item.body + (item.actions.length && !legacy ? '\n通知を開いて操作できます。' : ''),
           level: item.level,
-          silent,
+          silent: silent || (old?.paused === true && old.signature === signature),
           clicked: () => {
             if (this.disposed || this.slots.get(item.id) !== slot || slot.activated) return;
             slot.activated = true;

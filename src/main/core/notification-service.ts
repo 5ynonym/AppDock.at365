@@ -34,6 +34,7 @@ type Record = {
   input: NotificationInput;
   executing: boolean;
   actions: Map<string, () => Promise<void>>;
+  remaining?: number;
 };
 /** Content/lifetime ownership is independent of every native View and settings source. */
 export class NotificationService {
@@ -44,12 +45,34 @@ export class NotificationService {
   private timer?: ReturnType<typeof setTimeout>;
   private closed = false;
   private version = 0;
+  private paused = false;
   constructor(
     private history: NotificationHistoryStore,
     private now = Date.now,
   ) {}
   get revision() {
     return this.version;
+  }
+  isPaused() {
+    return this.paused;
+  }
+  setPaused(paused: boolean) {
+    if (this.closed || paused === this.paused) return;
+    this.expire();
+    this.paused = paused;
+    for (const r of this.records.values()) {
+      if (r.item.status !== 'active') continue;
+      if (paused && r.item.expiresAt !== undefined) {
+        r.remaining = Math.max(1, r.item.expiresAt - this.now());
+        r.item.expiresAt = undefined;
+      } else if (!paused && r.remaining !== undefined) {
+        r.item.expiresAt = this.now() + r.remaining;
+        r.remaining = undefined;
+      }
+      r.item.revision++;
+      this.persist(r);
+    }
+    this.changed();
   }
   subscribe(callback: () => void) {
     this.listeners.add(callback);
@@ -196,6 +219,12 @@ export class NotificationService {
     if (input.lifetime.type !== 'timed') r.item.expiresAt = undefined;
     else if (r.item.expiresAt === undefined || input.restartTimer)
       r.item.expiresAt = this.now() + input.lifetime.milliseconds;
+    if (input.lifetime.type !== 'timed') r.remaining = undefined;
+    else if (this.paused) {
+      if (r.remaining === undefined || input.restartTimer)
+        r.remaining = input.lifetime.milliseconds;
+      r.item.expiresAt = undefined;
+    }
     r.item.revision++;
     r.item.updatedAt = this.now();
     this.persist(r);
@@ -222,6 +251,7 @@ export class NotificationService {
   }
   targetItems(target: NotificationItem['targets'][number]) {
     this.expire();
+    if (this.paused) return [];
     return structuredClone(
       [...this.records.values()]
         .filter((r) => r.item.status === 'active' && r.item.targets.includes(target))
