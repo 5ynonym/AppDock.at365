@@ -26,6 +26,7 @@ export interface NotificationPreference extends NotificationOwner {
   targets?: NotificationTarget[];
   durationSeconds?: number | null;
   speak?: boolean;
+  mcpEvents?: boolean;
 }
 export interface NotificationSpeechSettings {
   voice?: string;
@@ -176,6 +177,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
             'targets',
             'durationSeconds',
             'speak',
+            'mcpEvents',
           ].includes(k),
       ) ||
       !['host', 'applet'].includes(v.ownerKind) ||
@@ -183,6 +185,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
       !id(v.typeId) ||
       (v.enabled !== undefined && typeof v.enabled !== 'boolean') ||
       (v.speak !== undefined && typeof v.speak !== 'boolean') ||
+      (v.mcpEvents !== undefined && typeof v.mcpEvents !== 'boolean') ||
       (v.targets !== undefined && !targets(v.targets)) ||
       (v.durationSeconds !== undefined && !duration(v.durationSeconds))
     )

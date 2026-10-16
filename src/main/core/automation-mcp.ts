@@ -7,6 +7,8 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { AutomationApi, AutomationError } from './automation-api';
 import type { ConnectionScope } from '../../shared/automation';
 import { isLocalClient, validMcpHeaders } from './automation-network';
+import type { McpEvents } from './mcp-events';
+import { modernRequest, modernResponse } from './mcp-modern';
 
 const entries = operationsFor('mcp');
 const definitions = entries.map(([, { callers, permissions, ...tool }]) => tool);
@@ -54,6 +56,7 @@ export class AutomationMcp {
     private connected: (local: boolean) => void,
     private version: string,
     private audit: (level: string, message: string) => void = () => {},
+    private events?: McpEvents,
   ) {}
   activate() {
     if (this.server?.listening) this.accepting = true;
@@ -159,7 +162,9 @@ export class AutomationMcp {
       };
       res.on('close', dispose);
       sdk.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools() }));
-      sdk.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const callTool = async (request: {
+        params: { name: string; arguments?: Record<string, unknown> };
+      }) => {
         const index = names.indexOf(request.params.name);
         const method = index < 0 ? 'unknown' : methods[index];
         const requestId = randomUUID();
@@ -207,7 +212,8 @@ export class AutomationMcp {
             structuredContent: value,
           };
         }
-      });
+      };
+      sdk.setRequestHandler(CallToolRequestSchema, callTool);
       try {
         const data = await body(req);
         if (!current() || !validHeaders()) {
@@ -221,6 +227,30 @@ export class AutomationMcp {
           !timingSafeEqual(authorization, currentToken)
         ) {
           fail(401);
+          dispose();
+          return;
+        }
+        if (modernRequest(data, req)) {
+          const reply = await modernResponse(data, req, {
+            version: this.version,
+            events: this.events,
+            tools,
+            callTool,
+          });
+          if (!res.destroyed && !res.writableEnded) {
+            res.writeHead(reply.status, {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+            });
+            res.end(JSON.stringify(reply.body));
+            if (
+              reply.status === 200 &&
+              'result' in reply.body &&
+              current() &&
+              !req.headers['x-appdock-self-test']
+            )
+              this.connected(isLocalClient(req.socket.remoteAddress));
+          }
           dispose();
           return;
         }

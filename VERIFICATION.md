@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-16: MCP Eventsのコミット確認（0.52.0）
+
+- コミット対象18ファイルを再レビュー。MCP Eventsだけを選択した場合にも折りたたみ見出しが「通知センターのみ」になっていたため、読み上げとの併用も含めて実際の選択を表示するよう修正し、既存GUIで確認を追加した。他の製品修正はなく、同じ変更の仕上げとして0.52.0を再発行した。[レビュー](.artifacts/commit-validation-mcp-events-20261016/review.md)を参照。
+- 統合時の入力・完全ログ・生成物と発行物を照合し、今回のUI/GUI試験2ファイル以外は一致。変更した2ファイルに依存しない13回帰ファイル124件を再利用し、標準回帰の残り67ファイル402件を追加実行して全成功。**80ファイル526/526、fail/skip 0**。型検査・ビルドも再実行して成功。実Node/.NET fixture、更新helper等の551入力は再発行前後で一致し、追加の回帰再実行は不要と判断した。
+- [検証一覧](.artifacts/commit-validation-mcp-events-20261016/validation.json)と[再利用判定](.artifacts/commit-validation-mcp-events-20261016/reuse.json)に、484入力・生成物・fixture・ログhash、コマンド/環境/終了結果を記録。文書追記以外の検証後変更なし。stage treeとcommit tree、両リモート照合は同証跡ディレクトリへ記録する。
+- MCP Events GUIはsource4群と[最終固定EXE4群](.artifacts/mcp-events-ui-1792135036994/result.json)が成功。MCP Eventsだけの選択と見出し、保存・再起動・解除、認証と公開範囲を確認し、設定画像を目視確認。同じEXEで[リボンGUI6群](.artifacts/ribbon-groups-ui-1792135100514/result.json)も成功し、両GUIのrendererエラーなし。
+- publish終了0。package・EXE FileVersion/ProductVersion・asar・Default Shell・feedは0.52.0。最終EXEは**144,213,639 bytes / SHA256 f0f533ba8cb3cd5402cab76f77b24fe84d41608f8d0b7ed5b30cd42403e6c6ea**。両GUIの固定コピー、feedのsize/hash、asar内out全180ファイルとの一致を確認。
+- 今回の成功GUIは方式別に直近3回以内。固定出力・失敗資料・再利用証跡も保持し、削除なし。実dot受信・実利用接続は未確認。依頼に従いmainへのコミットとGitHub/AQUAへの通常pushを行う。GitHub Release・実利用先deploy・全体ZIPは対象外。
+
+## 2026-10-16: 最新mainの取り込み・競合解消とMCP Events再発行（0.52.0）
+
+- 依頼に従い、未コミットのMCP Events変更18ファイルをバックアップして退避し、`origin/main`を`299cfec`から`5f5d1ff`へfast-forwardした。最新のリボングループ/バッジ対応を保持したまま変更を戻した。競合した`VERIFICATION.md`と`docs/settings-sync.md`は両方の独立した記録・保存仕様を残して解消。自動統合された`index.ts`も確認し、リボンとMCP Eventsの起動・状態変化・通知経路を保持した。[統合記録](.artifacts/mcp-events-pull-20261016/integration.json)と[レビュー](.artifacts/mcp-events-pull-20261016/review.md)を参照。
+- 最新側が0.51.0のため、設定・保存ファイル追加を含むMCP Eventsの統合版を**0.52.0**へ整理し、設計書も更新。統合前の0.51.0の実測記録はそのまま履歴として残す。依存版・lockfileは変更していない。
+- 型検査・main/Default Shell/.NETビルドと、MCP Events/従来MCP/通知/共通API/リボン/Shellの関連回帰**124/124（fail/skip 0）**が成功。版変更後のpnpm依存状態は固定lockfileで再照合した。[検証一覧](.artifacts/mcp-events-pull-20261016/validation.json)にログhash・環境・482入力を記録し、試験前後の入力一致を確認。全標準回帰は再実行していない。
+- 同じ最終固定EXEで[MCP Events GUI 4群](.artifacts/mcp-events-ui-1792133887266/result.json)と[リボンGUI 6群](.artifacts/ribbon-groups-ui-1792133937012/result.json)が成功。通知選択/購読公開/再起動/解除、Node/.NETバッジ、両展開方式、キーボード・外側クリック・設定編集・復元を確認。rendererエラーなし。通知設定と明暗リボンパネルの画像を確認した。実dot受信・実Google受信の確認ではない。
+- `publish.bat`終了0。package・EXE FileVersion/ProductVersion・asar・Default Shell・feedは0.52.0。EXE **144,213,353 bytes / SHA256 d3338bb393077435354eeee3a23e8a9d12b646d64b1142b2ae15dc0ac43111fd**。GUIの固定コピー2つとfeed size/hashが一致し、asar内out全180ファイルもビルド結果と一致。`A:\40.ARTIFACT\AppDock.at365`へ再発行済み。
+- 未解消の競合なし。変更は未ステージ・未コミットで保持し、退避前のファイル/差分と今回の検証証跡も保存。今回のGUI成功資料は方式別3回以内のため削除候補なし。push・GitHub Release・実利用先deploy・全体ZIPは実施していない。
+
 ## 2026-10-16: リボングループ・展開方式・登録元バッジ（0.51.0）
 
 - 1階層のグループを追加し、持続型はリボン内へ展開してPC専用`ribbon-state.json`へ開閉を保存、一時型は右方向の横1行パネルへ展開する。選択・外側クリック・Escape・画面遷移・アンカー変更等で閉じる。設定の追加/編集/所属/並べ替え/解除と外部編集を共通処理へ接続し、旧配置・未導入ID・未知の追加項目を保持する。
@@ -10,6 +28,16 @@
 - [検証一覧・ログhash](.artifacts/ribbon-implementation-20261016/validation.json)、[最終入力hash](.artifacts/ribbon-implementation-20261016/inputs-after.json)、[実行環境](.artifacts/ribbon-implementation-20261016/environment.json)、[固定EXE GUI](.artifacts/ribbon-groups-ui-1792131950607/result.json)を保存。本体開始HEADは`299cfec95cef4833e18042ba854cf975a497059e`。最終単体試験後の変更は暗色GUI試験の設定パス/待機だけで、固定EXE試験を再実行した。製品入力は不変なので単体回帰を再利用する。コミットのtree/入力照合は[コミット証跡](.artifacts/commit-validation-ribbon-20261016/validation.json)へ記録する。
 - 制限環境での.NET/Electron/一部回帰の実行失敗は通常ユーザー権限で切り分け、成功結果を上記へ記録。旧設定期待値とGUI fixtureのmanifest/登録/selector誤りは試験側を更新し、修正前の失敗記録も保持。製品指摘の未解決なし。実Google受信、複数の物理DPI/画面は未確認で、未変更Appletの全GUIは再実行していない。
 - 整理: 今回のグループ成功資料はsource3件/portable1件、パレットsource1件、smoke1件を保持。失敗・再利用資料・固定ビルド出力も保持し、削除0件。GitHub Release・実利用先deploy・全体ZIP作成は行っていない。
+
+## 2026-10-16: MCP Eventsと通知種類別のdot連携（統合前0.51.0）
+
+- 共通の新規通知発行口から、通知設定で選んだ種類だけを`appdock.notification.created`として配信する機能を追加。初期値OFF、タイトル/本文の送信をUIに表示し、「通知センターのみ」で解除する。MCP 2.0のdiscovery/eventsと従来SDK接続を併存させ、既存認証・操作許可を維持した。[設計書](docs/mcp-events-design.md)へ利用条件、通信・保存・再送・取消と実利用確認の手順を記載。
+- [発行前レビュー](.artifacts/mcp-events-20261016/review.md)で認証、公開HTTPS callbackの検証/接続先固定、署名、暗号化保存、期限・再送・取消を確認。OFF→ONの競合、DNS待ちの取消、期限切れ再購読による旧キュー復活、保存失敗後の配信を修正し、対応試験を追加した。発行を妨げる未解決指摘なし。設定項目とPC専用`automation-events.json`の追加により0.50.0→0.51.0、依存変更なし。
+- 型検査・本体/Default Shellビルド・関連回帰**80/80（fail/skip 0）**が成功。対象はMCP Events、既存automation/ネットワーク、通知policy/読み上げ/delivery/servicesと共通API。[照合資料](.artifacts/mcp-events-20261016/validation.json)へコマンド・完全ログ・実行環境・入力hashを記録。最終試験前の446入力は発行後も一致。全標準回帰と無関係Appletの試験は今回実行していない。
+- [ソースGUIの4群](.artifacts/mcp-events-ui-1792130588423/result.json)と[最終固定EXEの4群](.artifacts/mcp-events-ui-1792131218498/result.json)が成功。初期OFF、即時保存と認証付きdiscovery/list・非公開callback拒否、完全再起動後の復元、「通知センターのみ」の解除を確認。rendererエラーなし、設定画面の画像を目視確認。購読・署名・Webhook配信/再送はローカルfixture試験であり、実際のChatGPT/dot受信・起動の確認ではない。
+- `publish.bat`終了0。本体package、EXEのFileVersion/ProductVersion、asar、Default Shell、feedは**0.51.0**。EXEは**144,202,278 bytes / SHA256 f0d1e2fbcc4f9d85ffa67c758ba9545b40a30d6a502de93e883df22584cfcfa4**。固定GUIコピー・feed size/hashが一致し、asar内のout全173ファイルもビルド結果と一致。発行先は`A:\40.ARTIFACT\AppDock.at365`。
+- 制限環境のloopback/GUI失敗とpnpm依存検証の停止はログを保持し、同じ範囲を通常ユーザー環境で再実行して成功。最初のGUI fixtureのTOML名を既存契約の`config.toml`へ修正して再実行した。試験入力と版・依存検査は維持。今回のGUI成功は方式別に各1回のため整理候補なし。失敗資料・固定fixture・再利用証跡を保持した。
+- 実際のdot連携は、ChatGPTからAppDockへ届く接続経路（Secure MCP Tunnel等）、プラグイン再スキャン、dotの監視登録と受信→実行→解除の確認が必要で、未実施。現在の実利用設定・接続先は変更していない。ローカル発行まで完了し、未コミット。push・GitHub Release・実利用先deploy・全体ZIPは実施していない。
 
 ## 2026-10-16: 通知配色のコミット確認
 

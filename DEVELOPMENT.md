@@ -16,6 +16,7 @@
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
 | MCPのネットワーク接続 | [接続範囲・認証・Codex互換性の設計](docs/mcp-network-access-design.md) |
+| MCP Eventsとdot | [通知種類の選択・購読・Webhook・保存と再送](docs/mcp-events-design.md) |
 | 音声再生の共通API | [再生キュー・取消・Gmail通知移行](docs/audio-playback.md) |
 | TTSサーバー連携・読み上げAPI | [TTSサーバー連携と読み上げAPI](docs/tts-design.md) |
 | AI共通API・プロンプト設定 | [AI文章生成とApplet/MCP共通API](docs/ai.md)、[Gmail連携を含む設計](docs/ai-services-design.md)（Gmailは未実装） |

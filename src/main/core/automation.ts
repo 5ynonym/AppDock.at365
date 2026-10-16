@@ -11,6 +11,9 @@ import type {
 import { atomicWrite } from './settings';
 import { AutomationApi } from './automation-api';
 import { AutomationMcp } from './automation-mcp';
+import { McpEvents } from './mcp-events';
+import type { NotificationTypeEntry } from '../../shared/notification-types';
+import type { NotificationPublication } from './typed-notifications';
 import { networkEndpointAddresses, networkHostnames } from './automation-network';
 import {
   changeRegistration,
@@ -52,6 +55,7 @@ export class AutomationService {
   private api?: AutomationApi;
   private token = '';
   private server?: AutomationMcp;
+  private events: McpEvents;
   private busy = false;
   private closed = false;
   private loadError?: string;
@@ -84,6 +88,7 @@ export class AutomationService {
       writeClipboard?(value: string): void;
       failed?(code: string, message: string): void;
       informed?(message: string): void;
+      eventTypes?(): NotificationTypeEntry[];
     },
   ) {
     this.id =
@@ -167,6 +172,21 @@ export class AutomationService {
     }
     this.persistedConfig = structuredClone(this.config);
     this.persistedToken = this.token;
+    this.events = new McpEvents({
+      directory: options.localDirectory,
+      encrypt: options.encrypt,
+      decrypt: options.decrypt,
+      enabled: () => !!this.server && !this.closed && this.config.enabled && !this.loadError,
+      principal: () => createHash('sha256').update(this.token).digest('hex'),
+      types: () => options.eventTypes?.() ?? [],
+      audit: (code) => options.audit?.('warn', '[MCP Events] code=' + code),
+      failed: (code) =>
+        options.failed?.(
+          code,
+          'MCP Eventsの保存または配信を完了できませんでした。ログとMCP接続、通知の監視登録を確認してください。',
+        ),
+    });
+    if (!this.config.enabled) this.events.reconcile(true);
   }
   private save() {
     try {
@@ -313,6 +333,7 @@ export class AutomationService {
       },
       this.options.version,
       this.options.audit,
+      this.events,
     );
     try {
       await server.start(
@@ -330,6 +351,7 @@ export class AutomationService {
       this.save();
       this.server = server;
       server.activate();
+      this.events.start();
       this.error = undefined;
     } catch (error) {
       await server.close();
@@ -345,6 +367,12 @@ export class AutomationService {
   }
   async initialize() {
     await this.start();
+  }
+  publishEvent(event: NotificationPublication) {
+    this.events.publish(event);
+  }
+  reconcileEvents() {
+    this.events.reconcile();
   }
   async action(action: AutomationAction): Promise<AutomationReply> {
     if (!action || typeof action !== 'object' || typeof action.kind !== 'string')
@@ -431,7 +459,10 @@ export class AutomationService {
           this.config.port = action.port;
           this.save();
           if (!action.enabled || action.port !== previous.port) {
-            if (!action.enabled) this.options.authorizationChanged?.();
+            if (!action.enabled) {
+              this.events.reconcile(true);
+              this.options.authorizationChanged?.();
+            }
             await this.stop();
           }
           this.error = undefined;
@@ -529,6 +560,7 @@ export class AutomationService {
           this.config.token = this.options.encrypt(this.token);
           this.save();
           this.clearConnections();
+          this.events.reconcile(true);
           this.options.authorizationChanged?.();
           message =
             '認証情報を再発行しました。「登録・修復」でCodexの登録を更新し、他のMCPクライアントにも新しいトークンを設定してください。';
@@ -590,6 +622,7 @@ export class AutomationService {
   }
   async close() {
     this.closed = true;
+    await this.events.close();
     await this.stop();
   }
 }

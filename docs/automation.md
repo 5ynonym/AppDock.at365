@@ -16,13 +16,15 @@ LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命
 - `ribbon-commands.ts`: リボンの公開項目・配置の読取りと原子的編集。共有parseRibbonとSettingsCommandsのrevisionを使用。
 - `gesture-commands.ts`: ジェスチャーの読取り、割当操作・動作設定の一括検証と保存。共有gesturesとSettingsCommandsのrevisionを使用。
 - `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
-- `automation-mcp.ts`: 公式MCP TypeScript SDKによるstateless Streamable HTTP。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
+- `automation-mcp.ts`: 従来方式は公式MCP TypeScript SDKによるstateless Streamable HTTP。`mcp-modern.ts`でMCP 2.0（2026-07-28）も同じendpointへ接続します。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
 - `automation.ts`: PC専用設定、暗号化、起動/停止、登録状態、接続テスト。
 - `codex-registration.ts`: smol-tomlで構文・意味を検証した限定範囲の編集。既存ファイル全体を再シリアライズしません。
 - `CodexSettings.tsx`: 設定内の専用ページ。PC専用操作を即時反映します。共有設定も即時保存し、全体保存バーはありません。
 
 `dock:automation` IPCは本体Window/mainFrame/URL検査を通し、WebAppletやAppletページへ公開しません。本体のprepareSettings/commitSettingsを共有して保存します。APIからWindows起動登録・UACを呼びません。
+
+MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscribe`は[通知イベント設計](mcp-events-design.md)を参照してください。`apiVersion: 2`はAppDock操作APIの版であり、MCPのprotocolVersionとは別です。イベント用の購読と送信待ちはPC専用の暗号化`automation-events.json`へ保存し、既存のtokenを認証主体として扱います。
 
 ## API v2
 

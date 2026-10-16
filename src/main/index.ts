@@ -2094,6 +2094,7 @@ async function initialize() {
     pageCollections.reconcile();
     ribbonBadges.reconcile();
     ai.reconcile();
+    automation?.reconcileEvents();
     notificationSpeech?.reconcile();
     tts.reconcile();
     typedNotifications?.reconcile();
@@ -2107,6 +2108,7 @@ async function initialize() {
     try {
       ribbonBadges.reconcile();
       ai.reconcile();
+      automation?.reconcileEvents();
       notificationSpeech?.reconcile();
       tts.reconcile();
       typedNotifications?.reconcile();
@@ -2279,7 +2281,13 @@ async function initialize() {
       return e && ['starting', 'running'].includes(e.state) ? e.runtimeSession : undefined;
     },
     changed,
-    published: (event) => notificationSpeech?.publish(event),
+    published: (event) => {
+      try {
+        notificationSpeech?.publish(event);
+      } finally {
+        automation?.publishEvent(event);
+      }
+    },
     publicationFailed: () =>
       log.write('error', 'notifications', '通知の読み上げ受付に失敗しました。'),
     policyChanged: (id) => {
@@ -2716,6 +2724,16 @@ async function initialize() {
     localDirectory: dataDirectory,
     baseDirectory,
     version: app.getVersion(),
+    eventTypes: () =>
+      notificationCatalog(allApplets()).filter((type) =>
+        settings.value.notificationPreferences?.overrides.some(
+          (row) =>
+            row.mcpEvents === true &&
+            row.ownerKind === type.ownerKind &&
+            row.ownerId === type.ownerId &&
+            row.typeId === type.typeId,
+        ),
+      ),
     encrypt: (value) => {
       if (!safeStorage.isEncryptionAvailable())
         throw Error('Windowsの認証情報保護を利用できません。');

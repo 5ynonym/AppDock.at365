@@ -262,7 +262,17 @@ export function NotificationSettings({
                 (r) => notificationTypeKey(r) === notificationTypeKey(type),
               );
               const speaking = row?.speak === true;
+              const eventSending = row?.mcpEvents === true;
               const delivery = policy.selectedTargets.map((target) => targetTitles[target]);
+              const deliverySummary = delivery.length
+                ? delivery.join('・')
+                : eventSending
+                  ? speaking
+                    ? '音声・MCP Eventsのみ'
+                    : 'MCP Eventsのみ'
+                  : speaking
+                    ? '音声のみ'
+                    : '通知センターのみ';
               const duration =
                 type.lifetimePolicy === 'condition'
                   ? '問題が解消するまで'
@@ -270,9 +280,10 @@ export function NotificationSettings({
                     ? '閉じるまで表示'
                     : `表示時間: ${policy.durationSeconds}秒`;
               const summary = [
-                delivery.length ? delivery.join('・') : speaking ? '音声のみ' : '通知センターのみ',
+                deliverySummary,
                 duration,
                 `読み上げ: ${speaking ? 'ON' : 'OFF'}`,
+                `MCP Events: ${eventSending ? 'ON' : 'OFF'}`,
               ].join(' ／ ');
               return (
                 <SettingsSection
@@ -320,20 +331,33 @@ export function NotificationSettings({
                         checked={speaking}
                         onChange={(speak) => change(type, { speak })}
                       />
+                      <SettingsChoice
+                        label="MCP Events"
+                        description="購読中のdot等へタイトルと本文を送信"
+                        ariaLabel={type.title + 'をMCP Eventsで送信'}
+                        checked={eventSending}
+                        onChange={(mcpEvents) => change(type, { mcpEvents })}
+                      />
                     </div>
                     <label className="notification-center-only">
                       <SettingsInput
                         type="checkbox"
                         aria-label={type.title + 'の通知センターのみ'}
-                        checked={!policy.selectedTargets.length && !speaking}
+                        checked={!policy.selectedTargets.length && !speaking && !eventSending}
                         disabled={!!type.requiredTargets.length}
                         onChange={(e) => {
-                          if (e.target.checked) change(type, { targets: [], speak: false });
+                          if (e.target.checked)
+                            change(type, { targets: [], speak: false, mcpEvents: false });
                         }}
                       />
                       通知センターのみ
                     </label>
                   </fieldset>
+                  {eventSending && (
+                    <p className="muted">
+                      MCP連携の有効化、ChatGPTから届く接続経路、dotでの監視登録が必要です。AppDockが動作中に発生した新しい通知を送ります。
+                    </p>
+                  )}
                   {speaking && (!auxiliary?.configured || !effective.voice) && (
                     <p className="notification-target-hint">
                       読み上げには接続先・モデル・声の設定が必要です。

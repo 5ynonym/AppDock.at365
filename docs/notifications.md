@@ -2,13 +2,15 @@
 
 通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別の読み上げON/OFFと、通知全体の声・速度の上書きを定義する。
 
+選択した種類の新規通知は[MCP Events](mcp-events-design.md)で購読中のdot等へ送信できる。通知発行・表示APIとは独立した購読契約を使い、MCPから通知を任意発行するツールは追加しない。
+
 通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 
 ## 本体のサービス
 
 NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所有者単位のdedupeKey、通知状態、表示先状態を管理する。timedは受付時からの実時間で期限切れとなり、表示されない時間も進む。通常の更新では期限を延長せず、restartTimerを明示した更新で再設定できる。conditionは発行元のresolve/withdrawで終了する。
 
-targetsはbanner/desktop/windowsの複数指定、または空配列。必須先がない種類では、空配列は通知センターだけに表示する指定になる。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。MCPへの新規公開は行っていない。
+targetsはbanner/desktop/windowsの複数指定、または空配列。必須先がない種類では、空配列は画面通知を使わない指定になる。読み上げとMCP Eventsは独立して選択でき、「通知センターのみ」は両方も解除する。旧Windows通知APIも同じ基盤へ接続する。種類指定Applet APIはNode/.NETで提供する。
 
 同じ所有者・dedupeKeyのactive通知を更新し、終了後の再発は新IDになる。所有者は本体側が決定する。操作のホスト発行IDは現在の通知revisionと照合し、要求IDを最大512件記憶する。同じ要求の再送は同じ結果、異なる内容でのID再利用はエラーになる。通知単位のロックで別表示先からの二重押下を拒否し、失敗後は明示的に再試行できる。終了・撤回時に操作関数を回収する。
 
