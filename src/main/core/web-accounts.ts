@@ -28,6 +28,7 @@ import { queueSound } from './sounds';
 import { RegisteredSounds, soundFilename } from './registered-sounds';
 import { keepWebPageActive } from './web-page-activity';
 import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-avatar';
+import { getWebAccountGroup, groupId, type WebAccountGroup } from './web-account-groups';
 
 type Saved = {
   version: 1;
@@ -42,6 +43,7 @@ type Saved = {
 };
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
+  sharedRoot?: string;
   soundsDirectory?: string;
   capabilities: string[];
   page?: AppletPageDefinition;
@@ -125,6 +127,17 @@ export function validateWebAccounts(
   if (value.keepActive !== undefined && typeof value.keepActive !== 'boolean')
     throw Error('webAccounts.keepActive must be boolean');
   if (
+    value.accountGroup !== undefined &&
+    (!value.accountGroup ||
+      !groupId(value.accountGroup.id) ||
+      typeof value.accountGroup.title !== 'string' ||
+      !value.accountGroup.title.trim() ||
+      value.accountGroup.title.length > 60 ||
+      /[\u0000-\u001f\u007f]/.test(value.accountGroup.title) ||
+      Object.keys(value.accountGroup).some((key) => !['id', 'title'].includes(key)))
+  )
+    throw Error('webAccounts.accountGroup must declare a valid id and title');
+  if (
     value.externalLinkSetting !== undefined &&
     (typeof value.externalLinkSetting !== 'string' ||
       !/^[a-zA-Z][a-zA-Z0-9_-]{0,79}$/.test(value.externalLinkSetting))
@@ -185,6 +198,8 @@ export function allowedWebNavigation(raw: string, origins: string[]): boolean {
 }
 export class WebAccountController {
   private state: Saved;
+  private group?: WebAccountGroup;
+  private unsubscribeGroup?: () => void;
   private surface?: AppletSurface;
   private get window() {
     return this.surface?.window;
@@ -262,7 +277,17 @@ export class WebAccountController {
         .replace(/;$/, '');
     this.file = path.join(root, 'accounts.json');
     fs.mkdirSync(root, { recursive: true });
-    if (fs.existsSync(this.file)) {
+    if (definition.accountGroup) {
+      if (!services.sharedRoot) throw Error('共通アカウントの保存先が設定されていません。');
+      this.group = getWebAccountGroup(
+        definition.accountGroup.id,
+        services.sharedRoot,
+        path.resolve(root, '../..'),
+        parseWebAccountSound,
+      );
+    } else if (fs.existsSync(path.join(root, 'group-binding.json')))
+      throw Error('このAppletのアカウントはグループへ移行済みです。対応版を利用してください。');
+    if (!this.group?.hasMember(id) && fs.existsSync(this.file)) {
       this.state = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       const s = this.state;
       if (
@@ -289,7 +314,7 @@ export class WebAccountController {
         if (a.monitoring !== undefined && typeof a.monitoring !== 'boolean')
           throw Error('アカウントの監視設定を読み込めません。元のファイルを保持しています。');
       }
-    } else {
+    } else if (!this.group) {
       const id = randomUUID();
       this.state = {
         version: 1,
@@ -297,6 +322,21 @@ export class WebAccountController {
         selected: id,
       };
       this.save(this.state);
+    } else this.state = { version: 1, selected: '', accounts: [] };
+    if (this.group) {
+      this.group.connect(id, this.state.accounts.length ? this.state : undefined);
+      this.state = this.group.snapshot(id);
+      this.unsubscribeGroup = this.group.subscribe({
+        changed: () => this.syncGroup(),
+        removing: (accountId) => {
+          this.deleting.add(accountId);
+          this.dropView(accountId);
+        },
+        failed: () =>
+          this.services.failed(
+            '共通アカウント一覧を反映できませんでした。保存ファイルと同期状態を確認してください。',
+          ),
+      });
     }
     nativeTheme.on('updated', this.themeChanged);
     this.unsubscribeSettings = this.services.onSettingsChanged?.(() => this.changed());
@@ -319,9 +359,50 @@ export class WebAccountController {
     }
   }
   private save(next: Saved) {
+    if (this.group) {
+      this.group.update(this.id, next);
+      return;
+    }
     atomicWrite(this.file, JSON.stringify(next, null, 2));
     this.state = next;
     this.changed();
+  }
+  private syncGroup() {
+    if (this.disposed || !this.group) return;
+    const next = this.group.snapshot(this.id);
+    for (const id of this.views.keys())
+      if (!next.accounts.some((a) => a.id === id)) this.dropView(id);
+    this.state = next;
+    this.deleting.clear();
+    if (this.group.removingId) this.deleting.add(this.group.removingId);
+    if (this.initializing)
+      for (const a of next.accounts) if (!this.deleting.has(a.id)) this.view(a.id);
+    if (
+      next.selected &&
+      !this.deleting.has(next.selected) &&
+      this.attached !== this.views.get(next.selected)
+    )
+      this.show(next.selected);
+    this.changed();
+  }
+  private dropView(id: string) {
+    const view = this.views.get(id);
+    if (view) {
+      this.contentView?.removeChildView(view);
+      this.background?.contentView.removeChildView(view);
+      if (this.attached === view) this.attached = undefined;
+    }
+    this.activityCleanup.get(id)?.dispose();
+    this.activityCleanup.delete(id);
+    if (view && !view.webContents.isDestroyed()) view.webContents.close();
+    this.views.delete(id);
+    this.avatars.get(id)?.abort?.abort();
+    this.avatars.delete(id);
+    this.generation.set(id, (this.generation.get(id) ?? 0) + 1);
+    this.reads.delete(id);
+    this.statuses.delete(id);
+    this.acknowledgements.delete(id);
+    this.monitoringResets.delete(id);
   }
   private changed() {
     if (this.uiContents && !this.uiContents.isDestroyed())
@@ -333,7 +414,9 @@ export class WebAccountController {
     return a;
   }
   private accountSession(id: string) {
-    return session.fromPath(path.join(this.root, 'sessions', id));
+    return session.fromPath(
+      this.group ? this.group.sessionPath(id) : path.join(this.root, 'sessions', id),
+    );
   }
   private updateAccountName(id: string, raw: unknown) {
     const a = this.account(id);
@@ -526,6 +609,9 @@ export class WebAccountController {
   }
   snapshot(includeData = true): WebAccountSnapshot {
     return {
+      ...(includeData && this.definition.accountGroup
+        ? { group: this.definition.accountGroup }
+        : {}),
       navigationRevision: this.navigationRevision ?? 0,
       dark: nativeTheme?.shouldUseDarkColors ?? true,
       ...(includeData ? { registeredSounds: this.registeredSounds } : {}),
@@ -613,6 +699,7 @@ export class WebAccountController {
       throw Error('Invalid navigation action');
     await this.start();
     if (this.disposed) throw Error('Webアカウントは停止しています。');
+    if (!this.state.selected) return;
     const wc = this.view(this.state.selected).webContents;
     if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
     else if (action === 'forward' && wc.navigationHistory.canGoForward())
@@ -723,6 +810,9 @@ export class WebAccountController {
     if (!this.initializing)
       this.initializing = (async () => {
         let changed = false;
+        const originalSounds = new Map(
+          this.state.accounts.map((a) => [a.id, JSON.stringify(a.sound)]),
+        );
         const accounts = [] as Saved['accounts'];
         for (const a of this.state.accounts) {
           let next = a;
@@ -749,7 +839,16 @@ export class WebAccountController {
           }
           accounts.push(next);
         }
-        if (!this.disposed && changed) this.save({ ...this.state, accounts });
+        if (!this.disposed && changed)
+          this.save({
+            ...this.state,
+            accounts: this.state.accounts.map((current) => {
+              const migrated = accounts.find((a) => a.id === current.id);
+              return migrated && JSON.stringify(current.sound) === originalSounds.get(current.id)
+                ? { ...current, ...(migrated.sound ? { sound: migrated.sound } : {}) }
+                : current;
+            }),
+          });
       })();
     await this.initializing;
     if (this.disposed) return;
@@ -758,7 +857,7 @@ export class WebAccountController {
       this.soundPoll = setInterval(() => {
         void this.refreshSounds().catch(() => {});
       }, 2000);
-    for (const a of this.state.accounts) this.view(a.id);
+    for (const a of this.state.accounts) if (!this.deleting.has(a.id)) this.view(a.id);
   }
   private async returnHiddenViewToStart(view: WebContentsView) {
     const key = this.definition.returnToStartOnHideSetting;
@@ -886,7 +985,7 @@ export class WebAccountController {
     });
     try {
       await this.surface.open();
-      if (!this.disposed) this.show(this.state.selected);
+      if (!this.disposed && this.state.selected) this.show(this.state.selected);
     } catch {
       this.surface?.close();
       this.surface = undefined;
@@ -1039,6 +1138,29 @@ export class WebAccountController {
         const a = this.account(args[0]);
         if (this.state.accounts.length < 2)
           throw Error('最後のアカウントは残してください。ログアウトはWeb画面から行えます。');
+        if (this.group) {
+          const before = JSON.stringify(this.state.accounts.map(({ id, name }) => ({ id, name })));
+          const result = await dialog.showMessageBox(this.window!, {
+            type: 'warning',
+            title: '共有アカウントを削除',
+            message: `「${a.name}」を${this.definition.accountGroup!.title}から削除しますか？`,
+            detail:
+              'このグループを使うすべてのAppletの一覧から削除し、このPCの共通ログイン情報とサイトデータを消去します。同期先にも一覧の削除が反映されます。サービス上のアカウントやデータは削除しません。',
+            buttons: ['キャンセル', '削除'],
+            defaultId: 0,
+            cancelId: 0,
+          });
+          if (this.disposed || result.response !== 1) return;
+          if (before !== JSON.stringify(this.state.accounts.map(({ id, name }) => ({ id, name }))))
+            throw Error('確認中にアカウント一覧が変更されました。もう一度確認してください。');
+          await this.group.remove(a.id, async () => {
+            const ses = this.accountSession(a.id);
+            await ses.clearStorageData();
+            await ses.clearCache();
+            await ses.cookies.flushStore();
+          });
+          return;
+        }
         this.deleting.add(a.id);
         try {
           const result = await dialog.showMessageBox(this.window!, {
@@ -1173,6 +1295,8 @@ export class WebAccountController {
     return { ...this.snapshot(false), acknowledged, monitoringResets };
   }
   report(id: string, status: string, attention: boolean, data?: unknown) {
+    if (this.group && (this.deleting.has(id) || !this.state.accounts.some((a) => a.id === id)))
+      return;
     const account = this.account(id);
     if (typeof status !== 'string' || status.length > 200 || typeof attention !== 'boolean')
       throw Error('Invalid Web account report');
@@ -1194,6 +1318,7 @@ export class WebAccountController {
     if (this.disposed) return;
     this.disposed = true;
     clearInterval(this.soundPoll);
+    this.unsubscribeGroup?.();
     this.unsubscribeSettings?.();
     nativeTheme.removeListener('updated', this.themeChanged);
     screen.removeListener('display-added', this.displaysChanged);

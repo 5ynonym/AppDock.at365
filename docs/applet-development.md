@@ -194,6 +194,8 @@ TypeScript/Nodeの現行実利用例は[Gmail](../../Applet.Gmail.at365/DEVELOPM
 
 Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
 
+同じ名簿とPC内ログインを別Appletから使う場合は、最低ホスト版0.56.0と`webAccounts.accountGroup: {id,title}`を宣言します。Gmailと同じグループは`at365.google`です。名前・順番・削除はグループ全体、選択・監視・通知音はApplet単位となるため、操作画面で共有範囲を明示します。詳細は[アカウントグループ設計](web-account-groups-design.md)を参照してください。
+
 初回未表示からページの描画を背景で継続する必要がある場合、最低ホスト版は0.15.1としてください。ホストは透明・画面外・非フォーカスの専用WindowへViewを保持し、可視の操作Windowを選択した場合だけ移します。サービス固有の通知・観測処理は引き続きApplet側です。snapshot.darkでホストテーマを受け取り、通知音は管理領域へコピーします。
 
 通常起動でGmailの初回更新を維持する場合は0.15.2を指定し、webAccounts.keepActive:trueを宣言します。observerのready:trueを受けたobserveOriginだけを対象にし、背景では30秒ごとに同期再開を促します。native focusがあるWebContentsは通常のfocus/blurを使い、認証originではタイマーも解除します。Windowsのフォーカス/選択を自動変更する方式ではありません。通常起動での検証はテストツールによるfocus overrideを避けてください。

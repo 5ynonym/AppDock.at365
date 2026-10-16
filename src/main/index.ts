@@ -1898,6 +1898,7 @@ async function initialize() {
       (id) => shellRegistry?.ownState(id),
       () => pageCollections,
       ribbonBadges,
+      paths.shared,
     ),
     log: log.write,
   });

@@ -43,6 +43,7 @@ export function createHostApi(
   shellState?: (id: string) => import('../../shared/shell').OwnShellState | undefined,
   collectionHost?: () => import('./page-collections').PageCollectionManager,
   ribbonBadges?: import('./ribbon-badges').RibbonBadges,
+  sharedDataRoot = path.join(dataRoot, 'shared'),
 ) {
   const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -347,6 +348,7 @@ export function createHostApi(
           dataRoot,
           e.manifest.webAccounts,
           {
+            sharedRoot: sharedDataRoot,
             capabilities: e.manifest.capabilities ?? [],
             soundsDirectory: path.join(assetRoot, id, 'sounds'),
             page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),

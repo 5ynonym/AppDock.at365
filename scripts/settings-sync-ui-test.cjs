@@ -220,34 +220,14 @@ async function gmail(s) {
   deliverShared(a, b);
   await until(async () => !(await b.snapshot()).settings.recovered, 'healthy receipt');
   checks.push('valid incoming settings clear the recovery state');
-  const frame = await a.dock.evaluate(() => window.dock.createWebAccount('共有枠'));
-  deliverShared(a, b);
-  await until(
-    async () => (await b.snapshot()).webAccounts.some((p) => p.id === frame.id),
-    'roster receipt',
-  );
-  await a.dock.evaluate((id) => window.dock.renameWebAccount(id, '共有枠の変更'), frame.id);
-  deliverShared(a, b);
-  await until(
-    async () =>
-      (await b.snapshot()).webAccounts.find((p) => p.id === frame.id)?.name === '共有枠の変更',
-    'roster rename',
-  );
-  const marker = path.join(pb.local, 'web-applets', 'sessions', frame.id, 'marker');
-  fs.mkdirSync(path.dirname(marker), { recursive: true });
-  fs.writeFileSync(marker, 'PC B login');
-  const roster = path.join(pa.base, 'data', 'web-applets', 'accounts.json');
-  fs.writeFileSync(roster, JSON.stringify({ schemaVersion: 1, accounts: [] }));
-  deliverShared(a, b);
-  await until(async () => (await b.snapshot()).webAccounts.length === 0, 'remote frame removal');
-  assert.equal(fs.readFileSync(marker, 'utf8'), 'PC B login');
-  checks.push('shared roster reloads; remote deletion keeps local login data');
   const uiA = await gmail(a),
     uiB = await gmail(b);
   const accountSnapshot = (ui) => ui.evaluate(() => window.webAccounts.snapshot());
   assert.equal((await accountSnapshot(uiA)).accounts[0].id, pa.account.id);
   assert.equal((await accountSnapshot(uiB)).accounts[0].id, pb.account.id);
-  checks.push('Gmail account IDs and account-specific settings are not shared');
+  checks.push(
+    'each PC imports its original Gmail identity before receiving the shared group roster',
+  );
   const wave = Buffer.alloc(44);
   wave.write('RIFF');
   wave.write('WAVE', 8);
@@ -263,6 +243,12 @@ async function gmail(s) {
   fs.mkdirSync(path.dirname(soundPath), { recursive: true });
   fs.writeFileSync(soundPath, wave);
   deliverShared(a, b);
+  await until(
+    async () => (await accountSnapshot(uiB)).accounts[0]?.id === pa.account.id,
+    'Gmail group roster receipt',
+  );
+  assert.equal((await accountSnapshot(uiB)).accounts.length, 1);
+  checks.push('Gmail group identities synchronize; account-specific sound settings remain local');
   await until(
     async () =>
       (await accountSnapshot(uiA)).registeredSounds.includes('ベル.wav') &&
@@ -313,10 +299,9 @@ async function gmail(s) {
   await uiA.screenshot({ path: path.join(output, 'gmail-dark.png') });
   await stop(b);
   b = await start(pb);
-  assert.equal(fs.readFileSync(marker, 'utf8'), 'PC B login');
   const again = await gmail(b);
   assert.equal((await accountSnapshot(again)).accounts[0].sound.file, 'ベル.wav');
-  checks.push('restart retains local Gmail selection and preserves externally removed frame login');
+  checks.push('restart retains the shared Gmail roster and local notification sound selection');
   for (const s of states) await stop(s);
   assert.equal(fs.existsSync(path.join(pa.base, '.appdock')), false);
   assert.equal(fs.readFileSync(oldMarker, 'utf8'), 'old data must stay untouched');

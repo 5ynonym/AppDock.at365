@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-17: 共通アカウントグループのコミット確認（0.56.0）
+
+- 今回の19ファイルとGmail側11ファイルを再レビューし、共有名簿/PC専用認証/移行・復旧/削除の境界、従来の専用枠、manifestと最低ホスト版、公開文書の整合に未解決指摘なし。追加の製品修正・版更新・再発行なし。
+- 実装時の731入力、47ログ、12配布ファイル、10成功結果のhashが一致。型検査・ビルド・関連35件、Gmail25件、固定EXE/配布コードの共有・アカウント・監視・音・同期・背景監視・smokeの成功を再利用した。Node/.NET試験fixtureをビルドし、未実行77ファイル**537/537**を追加。本体標準は計82ファイル**572/572、fail/skip 0**、Gmail標準は**25/25**。追加回帰の前後で対象入力は不変。
+- [再利用判定](.artifacts/commit-validation-account-groups-20261017/reuse.json)、[追加回帰と入力hash](.artifacts/commit-validation-account-groups-20261017/remaining-regression.json)、同所`scope.json`・`stage.json`・`commit.json`・`push.json`へ対象、stage/commit tree、GitHub/AQUAの先端照合を記録する。実装時EXE/ZIPのhashも維持。追記はVERIFICATIONのみで、既存証跡・固定fixtureは再利用用に保持した。
+- 開始時のGitHub/AQUA両mainはローカルHEADに一致。依頼範囲は今回のローカルコミットと通常push。GitHub Release・実利用先deployは行わない。実Google認証/受信・実同期サービス・実スピーカーは引き続き未確認。
+
+## 2026-10-17: 共通WebアカウントグループとGmail移行（0.56.0）
+
+- main `6d05753`から、[設計](docs/web-account-groups-design.md)と共通ストア・Controller接続を実装。manifestの任意の`accountGroup`で参加し、共通名簿と同じPCのsessionを共有する。選択・監視・通知音はApplet別、認証情報はPC専用。未宣言Appletは専用枠を継続する。Gmail 0.12.0を`at365.google`へ移行し、Calendar本体・API OAuthは対象外。
+- 旧UUID・名前・順序・選択・音・監視を保持し、旧sessionは移動せず再利用。元accounts.jsonは保持する。グループ固定、移行済み枠の再取込防止、保存journalによる復旧・競合拒否、破損/欠落/上限を検証。[レビュー](.artifacts/account-groups-20261017/review.md)で初期選択、既知名簿の欠落、非同期音移行の古い書戻し、PC設定からのidentity上書きを修正した。未解決指摘なし。
+- 型検査・ビルド・発行は終了0。関連5ファイルの回帰は**35/35、fail/skip 0**、Gmail標準回帰は**25/25**。最終入力hashを記録した回帰は`regression-with-inputs.log`。依存確認の制限環境でのstack overflowと保存renameのEPERMは通常ユーザー権限で同一処理を成功確認し、依存版・lockfile・検査方針を維持した。
+- 固定配布EXEの[グループGUI 7群](.artifacts/account-groups-ui-1792183445681/result.json)で旧session再利用、共用Cookie、別グループ/アカウント隔離、独立した選択/監視、片方停止後の継続、明示削除時の全View終了とCookie消去、遅延report破棄、外部削除時のView終了とCookie保持、再起動を確認。実行中の独立したテスト用2Appletを使用した。
+- 固定EXEと発行Gmailで[アカウントGUI 14群](../Applet.Gmail.at365/.artifacts/accounts-1792182981256/result.json)、[監視GUI 16群](../Applet.Gmail.at365/.artifacts/gui-1792183066676/result.json)、[音/通知2群](../Applet.Gmail.at365/.artifacts/ui-features-1792183183986/result.json)成功。設定画面の共有範囲の説明を画像確認。以前のテストのNSIS接続・Shell列挙・起動待ち・旧通知enabled期待を現行契約へ合わせた。通知の本番処理は変更していない。
+- [本番保存先構成の同期GUI 11群](.artifacts/settings-sync-ui-1792183369636/result.json)は2つの隔離配置間でrename配達を模擬し、共有名簿・原素材の受信、PC別の音選択、再起動保持、壊れた設定の復旧、旧.appdock非変更を確認。廃止済みのWebApplet管理APIを呼ぶ旧fixture部分を除き、今回の共通グループ名簿の同期を検証した。実同期サービスの試験ではない。
+- 配布asarのコードを通常Electronで動かす[背景監視10群](../Applet.Gmail.at365/.artifacts/native-background-1792183465873/result.json)と、[最終固定EXEのsmoke](.artifacts/smoke-1792183574430/smoke-result.json)も終了0。テストツールのfocus上書きなしで、未選択2枠の初回描画・背景受信・再読込・認証画面でのactive解除・回収を確認した。実Googleの受信確認とは区別する。
+- `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**0.56.0 / 144,222,852 bytes / SHA256 `f4ee7a5c6620dd65cc9ad19ce72a943c33228861ab24c57fcd38314cb24a298a`**。package/feed/EXEと隔離コピーを照合。Gmail ZIPの全8ファイルと発行フォルダーも一致。[検証一覧](.artifacts/account-groups-20261017/validation.json)に入力・ログ・成果物hashを記録する。製品入力は発行後に変更なし。
+- 実Google認証・実メール・実スピーカー・実2PC同期は未確認。本体標準回帰全体は未実行。失敗診断・再利用用資料を保持し、不要になった今回の診断スクリプト1件だけ削除。commit・push・Release・実利用先deploy・未変更Appletの発行は行っていない。
+
 ## 2026-10-17: 未コミット設定UIのレビューと通知ボイス候補の位置修正（0.55.1）
 
 - main上の利用者の未コミット4ファイル（版・Codex連携・通知画面・共通操作欄）をレビュー。通知の案内・カード名・TTS/MCPへのリンク・操作許可リンクの移動・余白を保持し、共通操作欄の`height:100%`を除去。通知先fieldsetの見出し非表示は維持し、`aria-label`でグループ名を補完。TTSへ通知のタイトル/本文を送信する説明と、Windows通知の表示時間とセンターの操作期間の違いを補足した。[レビュー](.artifacts/settings-review-20261017/review.md)に対象・指摘と対応を記録。発行を妨げる未解決指摘なし。

@@ -1,5 +1,17 @@
 # WebアカウントAPI
 
+## アカウントグループ（0.56.0）
+
+`webAccounts.accountGroup: { id, title }`を宣言したAppletは、同じIDのグループの名簿と同じPCのアカウント別sessionを共用します。Gmail 0.12.0は`at365.google`を使います。省略時は従来のApplet専用領域です。以下の専用領域の記述はグループ未宣言のAppletに適用します。
+
+UI snapshotの`group?: {id,title}`で共有範囲を表示できます。既存のadd/rename/move/removeは共通名簿、select/monitoring/soundはAppletごとのPC専用設定へ作用します。read/reportや表示・観測APIは継続します。認証情報や保存先のパスは公開しません。
+
+名簿は共有`data/web-account-groups/<group-id>/accounts.json`、PC専用状態は`web-account-groups/<group-id>/state.json`、新規sessionは同じPC専用グループ配下の`sessions/<UUID>`。旧枠はUUIDを保持し、旧sessionを同じパスで使い続けます。初回グループ割当を`web-accounts/<Applet ID>/group-binding.json`に記録します。移行済みAppletのグループ変更や旧方式への切替は拒否します。
+
+グループ未作成時は空で始まり、UIの明示追加で最初の枠を作ります。既存データ移行は一度だけ行います。名簿の外部受信・削除確認・移行の復旧・信頼境界・検証項目の正本は[アカウントグループ設計](web-account-groups-design.md)です。共有名簿の削除は同期先にも反映し、このPCで明示削除したときだけこのPCの共通ログイン情報を消去します。
+
+## 専用アカウントの基本契約
+
 PC専用保存と登録素材の契約は[設定同期](settings-sync.md)を参照してください。Gmail等の枠はPC専用rootのweb-accountsに保存し、共有WebApplet枠とは分離します。ローカルUIのsnapshot.registeredSoundsに登録済みのファイル名を渡します。setSoundは登録済みファイル名、pickSoundはファイル登録、testSoundは試聴です。sound.fileは枠に紐づくローカル設定としてファイル名だけを保存し、ホストが自身のAppletの素材rootへ解決します。
 
 [Appletページ](applet-pages.md)の`source:"web-accounts"`宣言により、既存のReact UIを本体ページ/別ウィンドウで共用できます。IPCの送信元はWindowのrootではなく、専用UIのWebContentsで照合します。以下の「操作Window」はローカルUIと選択アカウントを表示するWindowを指し、本体ページ表示では本体Windowです。ローカルUIのviewportはそのUI内の座標のまま、ホストが本体ページへの配置を管理します。アカウントView/永続セッション/背景描画の契約は継続します。

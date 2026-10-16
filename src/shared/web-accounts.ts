@@ -1,4 +1,5 @@
 export interface WebAccountDefinition {
+  accountGroup?: { id: string; title: string };
   url: string;
   origins: string[];
   observeOrigin: string;
@@ -33,6 +34,7 @@ export interface WebAccountSound {
   name?: string;
 }
 export interface WebAccountSnapshot {
+  group?: { id: string; title: string };
   registeredSounds?: string[];
   navigationRevision?: number;
   dark: boolean;

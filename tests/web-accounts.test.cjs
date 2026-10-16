@@ -301,6 +301,19 @@ test('Web assets cannot escape Applet; observer origin and capability must be de
     observer: 'observer.js',
   };
   assert.deepEqual(validateWebAccounts(folder, web), web);
+  assert.equal(
+    validateWebAccounts(folder, { ...web, accountGroup: { id: 'at365.google', title: 'Google' } })
+      .accountGroup.id,
+    'at365.google',
+  );
+  for (const accountGroup of [
+    null,
+    {},
+    { id: '../google', title: 'Google' },
+    { id: 'at365.google', title: '' },
+    { id: 'at365.google', title: 'Google', path: 'C:\\outside' },
+  ])
+    assert.throws(() => validateWebAccounts(folder, { ...web, accountGroup }), /accountGroup/);
   for (const externalLinkSetting of [true, '', '../other', 'x'.repeat(81)])
     assert.throws(
       () => validateWebAccounts(folder, { ...web, externalLinkSetting }),

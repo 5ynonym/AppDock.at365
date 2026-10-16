@@ -14,7 +14,9 @@ MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`auto
 
 PC専用データはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
 
-EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。Webプロフィール名簿は`data/web-profiles/<Applet ID>/accounts.json`の`schemaVersion/accounts`だけを共有する。移行済みWebAppletは既存の`data/web-applets/accounts.json`を継続使用する。CookieとsessionはPC専用の同じ所有者の領域へ保存し、共有しない。Gmail等の`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backup、通知履歴notifications/history.jsonはPC専用rootに保存する。Gmail全体の設定・キーはsettings.jsonに残し、枠の名前・ID・選択・枠別監視・通知音割当だけをPC内に置く。
+EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材は同期対象。Webプロフィール名簿は`data/web-profiles/<Applet ID>/accounts.json`の`schemaVersion/accounts`だけを共有する。移行済みWebAppletは既存の`data/web-applets/accounts.json`を継続使用する。CookieとsessionはPC専用領域へ保存し、PC間では共有しない。グループ未宣言Appletの`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、ログ、更新journal/result、設定backup、通知履歴notifications/history.jsonはPC専用rootに保存する。
+
+Gmail 0.12.0以降の共通グループ名簿は`data/web-account-groups/at365.google/accounts.json`。UUID・表示名・仮名フラグ・順序だけを共有し、選択・監視・音割当と移行/復旧記録はPC専用`web-account-groups/<group-id>/state.json`へApplet別に保存する。同じPCの同じグループではsessionを共用する。旧Gmailのsessionは移動せず参照を継続し、新規枠はPC専用グループ配下へ保存する。全体設定とキーは従来のsettings.json。詳しくは[グループ設計](web-account-groups-design.md)を参照。
 
 旧.appdockからのPC専用データの移行・削除は実装しないというユーザー指定。旧chromium/web-accounts/storage/secrets/web-applets/sessionsが残る場合は警告する。同期を始める前に完全終了して旧保存データを整理する。既存settings.jsonの読み取り互換性と、従来からある名簿の旧フィールド読み取りとは区別する。
 

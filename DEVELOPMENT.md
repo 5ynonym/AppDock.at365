@@ -24,6 +24,7 @@
 | 情報通知・操作結果 | [設定・発行・移行範囲](docs/information-notifications-design.md) |
 | 共通警告・旧PC専用データ | [通知・対象一覧・整理導線の設計](docs/warning-notifications-design.md) |
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
+| アカウントグループ | [共用・保存・Gmail移行の設計](docs/web-account-groups-design.md) |
 | 動的ページとWebApplet分離 | [汎用ページ登録・共通Web基盤・独立Appletと移行の設計](docs/dynamic-pages-webapplet-design.md) |
 | 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
