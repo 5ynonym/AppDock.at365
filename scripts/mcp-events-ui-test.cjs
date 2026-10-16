@@ -134,6 +134,13 @@ async function rpc(method, args = {}) {
     let p = await page();
     const label = type.title + 'をMCP Eventsで送信';
     assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
+    await p
+      .locator('.notification-setting-card')
+      .filter({ has: p.getByRole('heading', { name: type.title, exact: true }) })
+      .getByText('購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持', {
+        exact: true,
+      })
+      .waitFor();
     await action({ kind: 'selectConfig', file: config });
     await action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
     await action({ kind: 'register' });
@@ -186,6 +193,15 @@ async function rpc(method, args = {}) {
     assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
     assert.deepEqual((await rpc('events/list')).result.events, []);
     checks.push('center-only clears event sending and removes event catalog');
+    await stop();
+    await start();
+    p = await page();
+    assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
+    assert.deepEqual((await rpc('events/list')).result.events, []);
+    await p.getByLabel(label, { exact: true }).check();
+    await settleSettings(p);
+    assert.equal((await rpc('events/list')).result.events.length, 1);
+    checks.push('OFF survives restart and ON resumes selected event discovery');
     await action({ kind: 'unregister' });
     assert.equal(fs.readFileSync(config, 'utf8'), '# isolated MCP Events test\n');
     assert.deepEqual(errors, []);

@@ -195,13 +195,8 @@ export class McpEvents {
   private allowed(value: Filter) {
     return this.options.types().some((t) => notificationTypeKey(t) === notificationTypeKey(value));
   }
-  private active(sub: Subscription) {
-    return (
-      this.available() &&
-      sub.principal === this.options.principal() &&
-      sub.expires > this.now() &&
-      this.allowed(sub.filter)
-    );
+  private valid(sub: Subscription) {
+    return sub.principal === this.options.principal() && sub.expires > this.now();
   }
   private commit(next: State) {
     if (this.failedLoad) throw new McpEventError(-32603, 'Event storage is unavailable');
@@ -311,16 +306,16 @@ export class McpEvents {
     const epoch = this.epoch;
     return this.serial(async () => {
       const { params, selected, principal, id, url } = parsed;
+      const existing = this.state.subscriptions.find((s) => s.id === id);
+      const continuing = !!existing && this.valid(existing);
       if (
         !this.available() ||
         epoch !== this.epoch ||
         principal !== this.options.principal() ||
-        !this.allowed(selected)
+        (!this.allowed(selected) && !continuing)
       )
         throw new McpEventError(-32602, 'This notification type is not enabled for events');
-      const existing = this.state.subscriptions.find((s) => s.id === id);
-      const continuing = !!existing && this.active(existing);
-      if (!existing && this.state.subscriptions.filter((s) => this.active(s)).length >= 64)
+      if (!continuing && this.state.subscriptions.filter((s) => this.valid(s)).length >= 64)
         throw new McpEventError(-32000, 'Event subscription limit reached');
       const sub: Subscription = {
         id,
@@ -365,7 +360,7 @@ export class McpEvents {
         !this.available() ||
         epoch !== this.epoch ||
         principal !== this.options.principal() ||
-        !this.allowed(selected)
+        (!this.allowed(selected) && !(existing && this.valid(existing)))
       )
         throw invalid();
       if (existing && existing.secret !== sub.secret) {
@@ -376,12 +371,12 @@ export class McpEvents {
         sub.rotateUntil = existing.rotateUntil;
       }
       const next = structuredClone(this.state);
-      next.subscriptions = next.subscriptions.filter((s) => s.id !== id && this.active(s));
+      next.subscriptions = next.subscriptions.filter((s) => s.id !== id && this.valid(s));
       next.subscriptions.push(sub);
       next.pending = next.pending.filter(
         (p) =>
           (p.subscriptionId !== id || continuing) &&
-          next.subscriptions.some((s) => s.id === p.subscriptionId),
+          next.subscriptions.some((s) => s.id === p.subscriptionId && this.allowed(s.filter)),
       );
       this.commit(next);
       this.start();
@@ -420,7 +415,7 @@ export class McpEvents {
       const selected = { ...publication.owner, typeId: publication.typeId };
       if (!this.available() || epoch !== this.epoch || !this.allowed(selected)) return;
       const matches = this.state.subscriptions.filter(
-        (s) => this.active(s) && notificationTypeKey(s.filter) === notificationTypeKey(selected),
+        (s) => this.valid(s) && notificationTypeKey(s.filter) === notificationTypeKey(selected),
       );
       if (!matches.length) return;
       if (this.state.pending.length + matches.length > 256) {
@@ -486,13 +481,14 @@ export class McpEvents {
     this.controller.abort();
     this.controller = new AbortController();
     void this.serial(() => {
-      if (this.failedLoad || this.stopped) return;
+      // close() drains this queue: persist selection/revocation even during shutdown.
+      if (this.failedLoad) return;
       const next = structuredClone(this.state);
-      next.subscriptions = revoke
-        ? []
-        : next.subscriptions.filter((s) => selectedKeys.includes(notificationTypeKey(s.filter)));
+      next.subscriptions = revoke ? [] : next.subscriptions.filter((s) => this.valid(s));
       next.pending = next.pending.filter((p) =>
-        next.subscriptions.some((s) => s.id === p.subscriptionId),
+        next.subscriptions.some(
+          (s) => s.id === p.subscriptionId && selectedKeys.includes(notificationTypeKey(s.filter)),
+        ),
       );
       if (JSON.stringify(next) !== JSON.stringify(this.state)) this.commit(next);
     }).catch(() => this.audit('EVENT_REVOKE_FAILED'));
@@ -502,9 +498,9 @@ export class McpEvents {
       if (!this.available()) return;
       const epoch = this.epoch;
       const next = structuredClone(this.state);
-      next.subscriptions = next.subscriptions.filter((s) => this.active(s));
+      next.subscriptions = next.subscriptions.filter((s) => this.valid(s));
       next.pending = next.pending.filter((p) =>
-        next.subscriptions.some((s) => s.id === p.subscriptionId),
+        next.subscriptions.some((s) => s.id === p.subscriptionId && this.allowed(s.filter)),
       );
       const pending = next.pending.find((p) => p.due <= this.now());
       if (pending) {

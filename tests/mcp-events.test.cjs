@@ -403,7 +403,7 @@ test('notification event selection is opt-in and schema-validated', () => {
     parseNotificationPreferences({ overrides: [{ ...selected, mcpEvents: 'yes' }] }),
   );
 });
-test('rapid OFF/ON revokes existing subscriptions and queued publications instead of restoring them', async (t) => {
+test('rapid OFF/ON retains subscriptions but discards queued publications', async (t) => {
   const f = fixture(t);
   await f.events.subscribe(params());
   f.events.publish(publication);
@@ -412,9 +412,239 @@ test('rapid OFF/ON revokes existing subscriptions and queued publications instea
   f.select(true);
   f.events.reconcile();
   await f.events.flush();
+  assert.equal(f.calls.length, 1);
+  f.events.publish({ ...publication, notificationId: 'after-resume' });
+  await f.events.flush();
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.at(-1).value.data.notificationId, 'after-resume');
+});
+test('OFF drops retries and new notifications, retains the subscription across restart and resumes without subscribing', async (t) => {
+  const f = fixture(t);
+  const registered = await f.events.subscribe(params());
+  f.setStatus(503);
   f.events.publish(publication);
   await f.events.flush();
-  assert.equal(f.calls.length, 1);
+  const before = f.calls.length;
+  f.select(false);
+  f.events.reconcile();
+  f.events.publish({ ...publication, notificationId: 'while-off' });
+  await f.events.flush();
+  await f.events.close();
+  const restarted = new McpEvents(f.options);
+  t.after(() => restarted.close());
+  f.advance(10000);
+  await restarted.flush();
+  assert.deepEqual(restarted.list({}).events, []);
+  assert.equal(f.calls.length, before);
+  f.select(true);
+  restarted.reconcile();
+  f.setStatus(200);
+  await restarted.flush();
+  assert.equal(f.calls.length, before);
+  restarted.publish({ ...publication, notificationId: 'after-restart' });
+  await restarted.flush();
+  assert.equal(f.calls.length, before + 1);
+  assert.equal(f.calls.at(-1).headers['X-MCP-Subscription-Id'], registered.id);
+  assert.equal(f.calls.at(-1).value.data.notificationId, 'after-restart');
+});
+test('OFF immediately followed by shutdown durably discards pending retries', async (t) => {
+  const f = fixture(t);
+  const registered = await f.events.subscribe(params());
+  f.setStatus(503);
+  f.events.publish(publication);
+  await f.events.flush();
+  const count = f.calls.length;
+  f.select(false);
+  f.events.reconcile();
+  await f.events.close();
+  f.select(true);
+  const restarted = new McpEvents(f.options);
+  t.after(() => restarted.close());
+  f.advance(10000);
+  await restarted.flush();
+  assert.equal(f.calls.length, count);
+  f.setStatus(200);
+  restarted.publish({ ...publication, notificationId: 'after-immediate-shutdown' });
+  await restarted.flush();
+  assert.equal(f.calls.length, count + 1);
+  assert.equal(f.calls.at(-1).headers['X-MCP-Subscription-Id'], registered.id);
+});
+test('startup while OFF discards persisted retries without removing the subscription', async (t) => {
+  const f = fixture(t);
+  const registered = await f.events.subscribe(params());
+  f.setStatus(503);
+  f.events.publish(publication);
+  await f.events.flush();
+  await f.events.close();
+  f.select(false);
+  const restarted = new McpEvents(f.options);
+  t.after(() => restarted.close());
+  f.advance(10000);
+  await restarted.flush();
+  const count = f.calls.length;
+  f.select(true);
+  restarted.reconcile();
+  await restarted.flush();
+  assert.equal(f.calls.length, count);
+  f.setStatus(200);
+  restarted.publish({ ...publication, notificationId: 'after-startup-off' });
+  await restarted.flush();
+  assert.equal(f.calls.length, count + 1);
+  assert.equal(f.calls.at(-1).headers['X-MCP-Subscription-Id'], registered.id);
+});
+test('an existing OFF subscription can renew after restart; new callbacks and expired subscriptions cannot', async (t) => {
+  const f = fixture(t);
+  const registered = await f.events.subscribe(params({ ttlMs: 60000 }));
+  f.select(false);
+  f.events.reconcile();
+  await f.events.close();
+  const restarted = new McpEvents(f.options);
+  t.after(() => restarted.close());
+  f.advance(30000);
+  const renewed = await restarted.subscribe(params({ ttlMs: 60000 }));
+  assert.equal(renewed.id, registered.id);
+  assert.equal(Date.parse(renewed.refreshBefore), Date.parse(registered.refreshBefore) + 30000);
+  assert.equal(f.calls.at(-1).value.type, 'verification');
+  await assert.rejects(
+    restarted.subscribe(
+      params({ delivery: { ...params().delivery, url: 'https://callbacks.example.com/other' } }),
+    ),
+    (e) => e.code === -32602,
+  );
+  const count = f.calls.length;
+  restarted.publish(publication);
+  await restarted.flush();
+  assert.equal(f.calls.length, count);
+  f.advance(60001);
+  await assert.rejects(restarted.subscribe(params()), (e) => e.code === -32602);
+  f.select(true);
+  restarted.reconcile();
+  restarted.publish(publication);
+  await restarted.flush();
+  assert.equal(f.calls.length, count);
+  await restarted.subscribe(params());
+  restarted.publish(publication);
+  await restarted.flush();
+  assert.equal(f.calls.at(-1).value.data.notificationId, publication.notificationId);
+});
+test('renewal of another selected type does not remove an OFF subscription', async (t) => {
+  const f = fixture(t);
+  const other = { ...selected, typeId: 'other' };
+  let selectedTypes = [selected, other];
+  f.options.types = () =>
+    selectedTypes.map((v) => ({ ...v, ownerTitle: 'Fixture', title: v.typeId }));
+  f.events.reconcile();
+  const registered = await f.events.subscribe(params());
+  await f.events.subscribe(params({ arguments: other }));
+  selectedTypes = [other];
+  f.events.reconcile();
+  await f.events.subscribe(params({ arguments: other }));
+  selectedTypes = [selected, other];
+  f.events.reconcile();
+  f.events.publish(publication);
+  await f.events.flush();
+  assert.equal(f.calls.at(-1).headers['X-MCP-Subscription-Id'], registered.id);
+});
+test('OFF subscriptions count towards the limit while their own renewal remains allowed', async (t) => {
+  const f = fixture(t);
+  const requests = Array.from({ length: 64 }, (_, i) =>
+    params({
+      delivery: { ...params().delivery, url: `https://callbacks.example.com/${i}` },
+    }),
+  );
+  for (const request of requests) await f.events.subscribe(request);
+  f.select(false);
+  f.events.reconcile();
+  await f.events.subscribe(requests[0]);
+  const other = { ...selected, typeId: 'other' };
+  f.options.types = () => [{ ...other, ownerTitle: 'Fixture', title: 'Other' }];
+  f.events.reconcile();
+  await assert.rejects(f.events.subscribe(params({ arguments: other })), (e) => e.code === -32000);
+});
+test('selection changes during transport startup retain valid subscriptions', async (t) => {
+  const f = fixture(t);
+  const registered = await f.events.subscribe(params());
+  f.enable(false);
+  f.select(false);
+  f.events.reconcile();
+  await f.events.flush();
+  f.enable(true);
+  f.select(true);
+  f.events.reconcile();
+  f.events.publish(publication);
+  await f.events.flush();
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls.at(-1).headers['X-MCP-Subscription-Id'], registered.id);
+});
+test('MCP disable, token rotation and unsubscribe still revoke an OFF subscription', async (t) => {
+  for (const reason of ['disable', 'token', 'unsubscribe']) {
+    const f = fixture(t);
+    await f.events.subscribe(params());
+    f.select(false);
+    f.events.reconcile();
+    await f.events.flush();
+    if (reason === 'unsubscribe') {
+      const stop = params();
+      delete stop.delivery.secret;
+      await f.events.unsubscribe(stop);
+    } else {
+      if (reason === 'disable') f.enable(false);
+      else
+        f.options.principal = () => crypto.createHash('sha256').update('new owner').digest('hex');
+      f.events.reconcile(true);
+      await f.events.flush();
+    }
+    f.enable(true);
+    await assert.rejects(f.events.subscribe(params()));
+    f.select(true);
+    f.events.reconcile();
+    f.events.publish(publication);
+    await f.events.flush();
+    assert.equal(f.calls.length, 1, reason);
+  }
+});
+test('OFF aborts in-flight delivery without resurrecting its queue on resume', async (t) => {
+  let started,
+    finish,
+    aborted = false;
+  const ready = new Promise((resolve) => (started = resolve));
+  const delivered = [];
+  const f = fixture(t, {
+    post: async (_, body, _headers, signal) => {
+      const value = JSON.parse(body);
+      if (value.type === 'verification')
+        return { status: 200, body: JSON.stringify({ challenge: value.challenge }) };
+      delivered.push(value.data.notificationId);
+      if (delivered.length > 1) return { status: 200, body: '' };
+      signal.addEventListener(
+        'abort',
+        () => {
+          aborted = true;
+        },
+        { once: true },
+      );
+      started();
+      return new Promise((resolve) => {
+        finish = () => resolve({ status: 503, body: '' });
+      });
+    },
+  });
+  await f.events.subscribe(params());
+  f.events.publish(publication);
+  const flushing = f.events.flush();
+  await ready;
+  f.select(false);
+  f.events.reconcile();
+  f.select(true);
+  f.events.reconcile();
+  finish();
+  await flushing;
+  await f.events.flush();
+  assert.equal(aborted, true);
+  assert.deepEqual(delivered, [publication.notificationId]);
+  f.events.publish({ ...publication, notificationId: 'after-abort' });
+  await f.events.flush();
+  assert.deepEqual(delivered, [publication.notificationId, 'after-abort']);
 });
 const meta = () => ({
   'io.modelcontextprotocol/protocolVersion': version,

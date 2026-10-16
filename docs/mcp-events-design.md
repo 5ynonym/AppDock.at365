@@ -1,6 +1,6 @@
 # MCP Eventsと通知連携
 
-最終確認: 2026-10-16。AppDock 0.52.0の実装設計。ローカル検証と実際のdotでの受信確認は[検証記録](../VERIFICATION.md)で区別する。
+最終確認: 2026-10-16。AppDock 0.54.0の実装設計。ローカル検証と実際のdotでの受信確認は[検証記録](../VERIFICATION.md)で区別する。
 
 ## 目的と利用条件
 
@@ -66,7 +66,7 @@ HTTPの2xxはWebhookの受領を表し、dotの仕事の完了を表さない。
 | events/subscribe | 通知種類、所有者、callback、署名鍵、期限を検証して登録または更新 |
 | events/unsubscribe | 同じ主体・通知種類・callbackの購読を解除。繰返し可能 |
 
-イベント名は`appdock.notification.created`。購読argumentsは`ownerKind`（host/applet）、`ownerId`、`typeId`の3項目を必須とし、それ以外を拒否する。events/listの説明へ選択可能な種類名とIDを含める。実際の登録でも現在の選択状態を再検査する。
+イベント名は`appdock.notification.created`。購読argumentsは`ownerKind`（host/applet）、`ownerId`、`typeId`の3項目を必須とし、それ以外を拒否する。events/listの説明へ選択可能な種類名とIDを含める。新規登録は現在ONの種類に限る。同じ主体・種類・callbackの有効な既存購読は、OFF中も更新できる。
 
 payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。generation、実行コマンド、ファイルパス、認証情報、callback、署名鍵は含めない。タイトル・本文に元々含まれる情報は送信されるので、メール等は送信する種類を選んで利用する。本文は外部由来のデータとして扱い、dotへの行動指示は埋め込まない。
 
@@ -75,9 +75,13 @@ payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。gen
 - 認証主体は現在のBearer tokenのSHA-256。既存の「同じtokenを持つクライアントは同じ主体」という契約に従う。
 - 購読IDは主体・正規化callback URL・イベント名・フィールド順を固定したargumentsから決定する。キー順が異なっても重複作成しない。
 - 既定期限24時間、最大7日、最短60秒。ttlMs:nullにも有限期限を返す。返却するrefreshBeforeまでにChatGPTが同じ購読を更新する。
-- 最大64購読。期限切れ、選択解除、主体変更の購読を配信対象から外す。
-- 種類の選択解除は購読と送信待ちを除去する。再ON時はdot側で購読を登録し直す。MCP無効化・token再発行でも既存購読を取り消す。
+- 最大64購読。OFF中の有効な購読も上限に含める。期限切れ・主体変更の購読は削除する。
+- 種類をOFFにすると購読を保持したまま送信を止め、その種類の送信待ち（再送待ちを含む）を破棄する。OFF中の新規通知は蓄積しない。「通知センターのみ」によるOFFも同じ扱い。
+- ONに戻すと、有効な購読へ以後の新しい通知から配信する。再起動しても同じ扱いで、OFF前やOFF中の通知はまとめて送らない。
+- OFF中も同じ有効購読の期限・署名鍵を更新できる。callback検証は従来どおり行うため、更新時の検証challengeはOFF中も送信する。新しいcallbackへの登録や期限切れ購読の再登録にはONが必要。
+- MCP無効化・token再発行・events/unsubscribeでは購読と送信待ちを取り消す。送信先の410応答による取消も維持する。
 - 非同期callback検証中に許可が変わった場合、古い検証結果から購読を作らない。
+- OFFへの切替で進行中の送信を中断し、古い送信結果からキューを復元しない。切替前に送信先が受領済みの通知は取り消せない。
 - cursorは常にnull。停止中や未購読時に発生した通知の履歴replayは提供しない。期限切れ後の再登録で旧送信待ちを復活させない。
 
 ## Webhookと通信保護
@@ -93,7 +97,7 @@ payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。gen
 
 ## 保存と再送
 
-PC専用rootの`automation-events.json`へ購読と送信待ちをまとめて保存する。Electron safeStorageで内容全体を暗号化し、既存atomicWriteで置換する。共有data/settingsや登録TOMLへcallback/署名鍵を書かない。再起動後も購読期限と送信待ちを保持する。
+PC専用rootの`automation-events.json`へ購読と送信待ちをまとめて保存する。Electron safeStorageで内容全体を暗号化し、既存atomicWriteで置換する。共有data/settingsや登録TOMLへcallback/署名鍵を書かない。再起動後も購読期限を保持し、送信待ちは現在ONかつ有効な購読の分だけ再開する。保存形式と設定項目は変更しない。旧版でOFFにして既に削除された購読は復元しないため、その場合はONにして再登録する。
 
 最大256送信待ち。新規通知を購読ごとにキューへ入れ、保存できてから送る。1要求ずつ配信し、イベントIDと発生時刻は再送でも保持する。署名時刻・署名は各試行で更新する。
 

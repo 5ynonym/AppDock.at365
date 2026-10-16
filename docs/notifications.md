@@ -2,7 +2,7 @@
 
 通知読み上げ機能は[通知読み上げ機能の仕様と設計](notification-speech-design.md)を参照する。種類別の読み上げON/OFFと、通知全体の声・速度の上書きを定義する。
 
-選択した種類の新規通知は[MCP Events](mcp-events-design.md)で購読中のdot等へ送信できる。通知発行・表示APIとは独立した購読契約を使い、MCPから通知を任意発行するツールは追加しない。
+選択した種類の新規通知は[MCP Events](mcp-events-design.md)で購読中のdot等へ送信できる。種類をOFFにすると有効な購読を保持して送信待ちを破棄し、ONに戻すと新しい通知から再開する。OFF中も有効購読の更新を受け付ける。通知発行・表示APIとは独立した購読契約を使い、MCPから通知を任意発行するツールは追加しない。
 
 通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
 

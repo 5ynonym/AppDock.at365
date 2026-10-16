@@ -333,7 +333,7 @@ export function NotificationSettings({
                       />
                       <SettingsChoice
                         label="MCP Events"
-                        description="購読中のdot等へタイトルと本文を送信"
+                        description="購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持"
                         ariaLabel={type.title + 'をMCP Eventsで送信'}
                         checked={eventSending}
                         onChange={(mcpEvents) => change(type, { mcpEvents })}

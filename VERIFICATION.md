@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-16: MCP Events一時停止のコミット確認（0.54.0）
+
+- fetch後の`main`と`origin/main`はともに`3375854705697deb4f1d757607c64daf3b214065`。今回の9ファイルを再レビューし、追加の製品修正なし。購読の期限と送信許可の分離、OFF中更新、送信待ち破棄、再起動・即時終了、全体取消、説明文とテストの整合を確認した。
+- [実装時の検証](.artifacts/mcp-events-pause-20261016/validation.json)の466入力、nativeソース・同梱payload、生成物180ファイル、完全ログとEXE/asar/feedを照合して一致。型検査・ビルド・発行、関連8ファイル89件、固定EXE GUI5群の成功を再利用した。
+- Node/.NET試験fixtureをビルドし、未実行の標準回帰72ファイル**451/451**を追加。再利用分を合わせて**80ファイル540/540、fail/skip 0**。ソース・fixture・生成物・同梱native payloadは追加回帰前後でも一致。fixture更新は再利用した8ファイルとMCP GUIの実行対象外。版更新・再発行なし。
+- [今回の検証一覧](.artifacts/commit-validation-mcp-pause-20261016/validation.json)と同所`reuse.json`・`plan.json`に再利用判断、入力hash、コマンド、日時、終了コード、ログhashを記録。stage treeとcommit tree、push後のGitHub/AQUAのmainの照合結果は同所`commit.json`・`push.json`へ保存する。公開リポジトリへのpushは利用者の明示許可による。
+- 検証資料と既存固定出力を保持し、削除0件。実dotでのWebhook受領・更新・仕事実行は未確認。GitHub Release・実利用先deployは今回の対象外。
+
+## 2026-10-16: MCP Eventsの種類別OFFを一時停止へ変更（0.54.0）
+
+- 変更前に作業ツリーcleanを確認し、`origin/main`を`87c3068`から`3375854705697deb4f1d757607c64daf3b214065`へfast-forwardでpull。競合なし。最新リボンUIを保持したままMCP Eventsの購読寿命と送信許可を分離した。
+- 種類別OFFは有効な購読を保持し、その種類の送信待ち・再送待ちを破棄する。OFF中の新規通知を蓄積せず、有効購読の期限・鍵更新を受け付ける。再ON後は新しい通知から配信。MCP無効化・トークン再発行・明示解除・HTTP 410による取消は維持。README・通知仕様・設計書・設定の説明文を更新した。
+- [発行前レビュー](.artifacts/mcp-events-pause-20261016/review.md)で、接続起動中の一時的な送信不可を購読削除の条件にしないよう修正し、OFF直後の終了でも送信待ち破棄を保存するよう補完。関連する型検査・ビルド・回帰8ファイル**89/89、fail/skip 0**が成功。OFF中更新、再起動、別種類の購読更新、上限64件、期限切れ、即時終了、送信中・素早いOFF/ON、全体取消と旧方式HTTPを確認。未解決指摘なし。
+- `publish.bat`終了0。OFFの操作契約を取消から一時停止へ変えるため**0.53.0→0.54.0**。設定項目・保存ファイル・保存形式の追加変更や移行処理なし。package・EXE FileVersion/ProductVersion・asar・Default Shell・feedの版が一致。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144,217,085 bytes / SHA256 `bab3e035d7745564833df65c38e2115439210a40c5bfc75d3032e7d855bfde1a`**。feed size/hash、隔離コピー、asar内180出力と同梱native payloadが一致。
+- 固定EXEの[MCP Events GUI 5群](.artifacts/mcp-events-ui-1792139336407/result.json)が成功。初期OFF、即時保存、説明文とMCP専用見出し、認証付きdiscovery、非公開callback拒否、ON/OFF両状態での再起動、ON復帰を確認。設定画像の表示確認と隔離プロセス終了も確認した。実dotでの購読・期限更新・Webhook受領・仕事の実行は未確認。
+- [検証一覧](.artifacts/mcp-events-pause-20261016/validation.json)にコマンド・日時・終了コード・ログhash・466入力とnativeソース・成果物を記録。最終回帰後の変更はGUIの説明文selectorを対象カードへ絞った1件だけで、固定EXE GUI前に記録し実行済み。発行でnativeの13出力hashが変わったため初回照合失敗を保持し、未変更nativeソース・現在のGit基点を含む製品情報・同梱payloadを確認。これらを実行しない8ファイルの回帰と、新しいEXEのGUIを分けて評価した。
+- 制限環境の依存検査停止とローカルHTTP EACCESはログを保持し、同じ固定lockfile・試験を通常ユーザー環境で成功確認。依存版・lockfile・検査設定の変更なし。全標準回帰・未変更Applet試験は再実行していない。直近portable GUI3件と過去の再利用指定資料・失敗記録・固定出力を保持し、削除0件。変更は未ステージ・未コミット。push・Release・実利用先deployなし。
+
 ## 2026-10-16: リボンUI調整のコミット確認（0.53.0）
 
 - 今回の26ファイルを[再レビュー](.artifacts/commit-validation-ribbon-ui-20261016/review.md)。追加の製品修正なし。実装時のソース498入力、完全ログ、生成物180ファイル、EXE/feedと環境を照合し、型検査・ビルド・9ファイル69件・固定EXEのsmokeを再利用した。
