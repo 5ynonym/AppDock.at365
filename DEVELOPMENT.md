@@ -48,6 +48,8 @@
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
+pnpmのパッケージストアは、`pnpm-workspace.yaml`の`storeDir`で`A:/30.PROJECT/.pnpm_store`に固定しています。ワークスペースを同じ`A:\`へ同期する別PCでも、このプロジェクト内では同じ保存先を使います。PCごとの環境変数やユーザー共通pnpm設定の変更は不要です。既存の`node_modules`が旧ストアを参照するPCでは、一度だけ`.\dev.bat install --frozen-lockfile --force`で再接続してください。ストアが空の場合は通常のインストールで必要なパッケージを取得します。
+
 初回は次の手順で準備します。公式Node.js ZIPのSHA256を照合し、npmでpnpmをプロジェクト内にインストールします。
 
 ```powershell
