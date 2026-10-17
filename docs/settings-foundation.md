@@ -1,5 +1,7 @@
 # 設定基盤とDefault Shell
 
+設定画面を本体rendererへ統合する方針と移行計画は[設定画面の本体統合とsettings-uiの整理](settings-host-ui-design.md)を参照する。同計画は未実装であり、以下は現在の設定Shellの仕様である。
+
 全設定は変更時に検証して即時保存する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
 
 ## 保存と入力
